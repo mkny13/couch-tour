@@ -5,7 +5,8 @@ import android.app.Application
 class PhishInApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Restores the saved JWT before any screen or the playback service can issue a request.
+        // Restore both sessions before any screen or the playback service issues a request.
         Session.init(this)
+        LastFmSession.init(this)
     }
 }

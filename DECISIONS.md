@@ -239,6 +239,43 @@ saver already skips anything without one, so no special case was needed.
 **D43 — The launcher icon is "PH".**
 The previous glyph was meant to be abstract and just read as an "H". Still a placeholder.
 
+## Iteration 6 — Last.fm and section dividers
+
+**D44 — The Last.fm API key must come from you; I won't register one.**
+Creating an API account is an account action, so it isn't mine to do. The key and shared
+secret are read from `local.properties` (already gitignored) into `BuildConfig` at compile
+time, which keeps the secret out of the repo. Absent, they compile to empty strings and the
+app reports Last.fm as unconfigured rather than failing oddly. The alternative — pasting
+them into a settings screen on the phone — is easy to switch to if you'd rather.
+
+**D45 — Browser auth, not the mobile-session flow.**
+`auth.getMobileSession` would need your Last.fm password typed into this app. The browser
+flow (`auth.getToken` → approve on last.fm → `auth.getSession`) never exposes it, so the app
+only ever holds a session key. That key is stored in the same encrypted preferences as the
+phish.in JWT.
+
+**D46 — Scrobbles are queued in the database, not fired and forgotten.**
+Playing offline is the normal case on a train, and a scrobbler that drops those plays isn't
+worth having. Plays go into a `pending_scrobbles` table (schema v4) and drain on the next
+successful submission or when playback starts. A failed submission stops the drain and
+leaves the row, rather than hammering the API or discarding the play.
+
+**D47 — Scrobble timing follows Last.fm's rules and counts listened time, not the playhead.**
+A track counts once it has been played for half its length or four minutes, whichever comes
+first, and only if it is longer than 30 seconds. The scrobbler accumulates actual listening
+time, so seeking to the end of a track doesn't fake a play and a long pause doesn't keep
+counting. The four-minute rule matters here more than for most music: it means a 20-minute
+Tweezer registers at four minutes rather than ten.
+
+**D48 — Track duration is filled in late.**
+The player reports no duration at the moment a track becomes current — only once it has
+prepared the media — so the scrobbler takes the duration on the periodic tick instead. A
+scrobbler that read it at transition time would treat every track as ineligible.
+
+**D49 — Sections are separated by a rule and an accent-coloured heading.**
+Previously every section was grey small-caps text on the same background, so the home
+screen read as one long list.
+
 ### Auth — now confirmed
 
 This section previously flagged every authenticated path as untested, because I could not

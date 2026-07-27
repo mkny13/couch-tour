@@ -1,6 +1,8 @@
 package dev.mike.phishin
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -67,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -123,6 +126,7 @@ fun App(vm: PlayerViewModel = viewModel()) {
             composable("home") { HomeScreen(vm, nav) }
             composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }
+            composable("lastfm") { LastFmScreen(nav) }
             composable("shows/{period}") { entry ->
                 ShowsScreen(entry.arguments?.getString("period").orEmpty(), nav)
             }
@@ -156,6 +160,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
     val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
     val historyCount by vm.progressDao.historyCount().collectAsState(initial = 0)
     val username by Session.username.collectAsState()
+    val lastFmUser by LastFmSession.username.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     val term = query.trim()
     val results = searchFor(term)
@@ -212,7 +217,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
-            item { SectionHeader("Your phish.in") }
+            item { SectionHeader("Your phish.in", divided = true) }
             if (username == null) {
                 item {
                     RowItem(
@@ -239,13 +244,28 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
+            item { SectionHeader("Scrobbling", divided = true) }
+            item {
+                RowItem(
+                    title = "Last.fm",
+                    subtitle = when {
+                        !LastFmApi.configured -> "Needs an API key — tap for setup"
+                        lastFmUser != null -> "Scrobbling as $lastFmUser"
+                        else -> "Not connected"
+                    },
+                    artUrl = null,
+                    onClick = { nav.navigate("lastfm") }
+                )
+            }
+
+            item { SectionHeader("Browse", divided = true) }
             item {
                 RowItem("Browse playlists", "Public playlists on phish.in", null) {
                     nav.navigate("playlists")
                 }
             }
 
-            item { SectionHeader("Browse by year") }
+            item { SectionHeader("Browse by year", divided = true) }
 
             when (val r = years.value) {
                 null -> item { Loading() }
@@ -379,6 +399,90 @@ private fun SearchResultsList(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun LastFmScreen(nav: NavHostController) {
+    val context = LocalContext.current
+    val username by LastFmSession.username.collectAsState()
+    var token by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Last.fm", nav)
+
+        if (!LastFmApi.configured) {
+            Text(
+                "Last.fm isn't configured in this build. Create an API account at " +
+                    "last.fm/api/account/create, then add lastfm.apiKey and " +
+                    "lastfm.apiSecret to local.properties and rebuild.",
+                fontSize = 13.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(16.dp)
+            )
+            return
+        }
+
+        if (username != null) {
+            Text(
+                "Scrobbling as $username.",
+                fontSize = 15.sp,
+                modifier = Modifier.padding(16.dp)
+            )
+            Button(
+                onClick = { LastFmSession.disconnect() },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) { Text("Disconnect") }
+            return
+        }
+
+        Text(
+            "Connecting opens Last.fm in your browser to approve this app. Your Last.fm " +
+                "password is never typed into this app.",
+            fontSize = 13.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(16.dp)
+        )
+
+        Button(
+            onClick = {
+                status = null
+                scope.launch {
+                    runCatching { LastFmApi.requestToken() }
+                        .onSuccess {
+                            token = it
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(LastFmApi.authorizeUrl(it)))
+                            )
+                        }
+                        .onFailure { status = "Couldn't reach Last.fm: ${it.message}" }
+                }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        ) { Text("1. Approve in browser") }
+
+        Button(
+            enabled = token != null,
+            onClick = {
+                val current = token ?: return@Button
+                status = null
+                scope.launch {
+                    runCatching { LastFmApi.session(current) }
+                        .onSuccess { (key, user) ->
+                            LastFmSession.connect(key, user)
+                            ScrobbleQueue.flush(context)
+                        }
+                        .onFailure { status = "Not approved yet: ${it.message}" }
+                }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        ) { Text("2. Finish connecting") }
+
+        status?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
         }
     }
 }
@@ -854,15 +958,26 @@ private fun Header(title: String, nav: NavHostController) {
     }
 }
 
+/**
+ * Section heading. [divided] draws a rule above it so the home screen's sections read as
+ * distinct blocks rather than one continuous list; the first section on a screen omits it.
+ */
 @Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text,
-        fontSize = 13.sp,
-        color = Color.Gray,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 6.dp)
-    )
+private fun SectionHeader(text: String, divided: Boolean = false) {
+    Column {
+        if (divided) {
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.10f))
+        }
+        Text(
+            text.uppercase(),
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+        )
+    }
 }
 
 @Composable

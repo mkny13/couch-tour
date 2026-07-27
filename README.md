@@ -23,6 +23,7 @@ Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public 
 - On a "Continue listening" card: tap to open it, tap the play button to resume, long-press
   for open / mark completed / remove
 - "Shuffle all" on My tracks plays your liked tracks in random order
+- Last.fm scrobbling, with plays queued locally so listening offline doesn't lose them
 - Log in to your phish.in account to see your liked shows, liked tracks, and playlists
   (both created by you and liked)
 - Browse and search public playlists; playlist excerpts are clipped correctly
@@ -39,6 +40,21 @@ by the API but have no screen. See [DECISIONS.md](DECISIONS.md).
 
 Requires JDK 17 and the Android SDK. `local.properties` points at the SDK and is
 machine-specific — don't commit it.
+
+### Last.fm (optional)
+
+Scrobbling needs your own Last.fm API credentials. Create them at
+https://www.last.fm/api/account/create, then add to `local.properties` (gitignored, so the
+secret stays out of the repo):
+
+```properties
+lastfm.apiKey=your_api_key
+lastfm.apiSecret=your_shared_secret
+```
+
+Rebuild, then connect from the Last.fm row on the home screen. It opens last.fm in a
+browser to approve the app — your Last.fm password is never typed into the app. Without
+these properties everything else works and Last.fm reports itself unconfigured.
 
 Debug APK:
 
@@ -72,7 +88,9 @@ Install to a connected device or running emulator:
 | File | Role |
 |---|---|
 | `Api.kt` | phish.in v2 client — OkHttp + kotlinx.serialization |
-| `Auth.kt` | Encrypted JWT storage and the signed-in session |
+| `Auth.kt` | Encrypted token storage and the signed-in session |
+| `LastFm.kt` | Last.fm client, request signing, and the scrobble timing rules |
+| `Scrobbler.kt` | Tracks listened time and the offline scrobble queue |
 | `PlaybackService.kt` | `MediaSessionService` owning ExoPlayer; also writes progress |
 | `PlayerViewModel.kt` | `MediaController` connection and UI-facing player state |
 | `Progress.kt` | Room table of per-queue playback positions |

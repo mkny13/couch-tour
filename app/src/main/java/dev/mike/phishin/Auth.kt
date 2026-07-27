@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 private const val PREFS = "phishin_auth"
 private const val KEY_JWT = "jwt"
 private const val KEY_USERNAME = "username"
+private const val KEY_LASTFM_KEY = "lastfm_key"
+private const val KEY_LASTFM_USER = "lastfm_user"
 
 /**
  * Encrypted-at-rest storage for the phish.in JWT.
@@ -58,10 +60,25 @@ class TokenStore(context: Context) {
         get() = prefs?.getString(KEY_USERNAME, null) ?: memoryUsername
         set(value) {
             memoryUsername = value
-            prefs?.edit()?.apply {
-                if (value == null) remove(KEY_USERNAME) else putString(KEY_USERNAME, value)
-            }?.apply()
+            write(KEY_USERNAME, value) { memoryUsername = value }
         }
+
+    /** Last.fm session key. Long-lived, so it gets the same encrypted storage as the JWT. */
+    var lastFmKey: String?
+        get() = prefs?.getString(KEY_LASTFM_KEY, null) ?: memoryLastFmKey
+        set(value) = write(KEY_LASTFM_KEY, value) { memoryLastFmKey = value }
+
+    var lastFmUser: String?
+        get() = prefs?.getString(KEY_LASTFM_USER, null) ?: memoryLastFmUser
+        set(value) = write(KEY_LASTFM_USER, value) { memoryLastFmUser = value }
+
+    private var memoryLastFmKey: String? = null
+    private var memoryLastFmUser: String? = null
+
+    private inline fun write(key: String, value: String?, remember: () -> Unit) {
+        remember()
+        prefs?.edit()?.apply { if (value == null) remove(key) else putString(key, value) }?.apply()
+    }
 }
 
 /** Holds the signed-in identity and keeps [PhishInApi.authToken] in sync with it. */

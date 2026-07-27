@@ -112,7 +112,11 @@ class MigrationTest {
 
     private fun openWithCurrentSchema(): PhishInDb =
         Room.databaseBuilder(context, PhishInDb::class.java, dbFile.name)
-            .addMigrations(PhishInDb.MIGRATION_1_2, PhishInDb.MIGRATION_2_3)
+            .addMigrations(
+                PhishInDb.MIGRATION_1_2,
+                PhishInDb.MIGRATION_2_3,
+                PhishInDb.MIGRATION_3_4,
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -209,6 +213,28 @@ class MigrationTest {
             assertFalse(dao.get("show:1997-02-13")!!.dismissed)
             // Finished stays out of the row, unfinished stays in it.
             assertEquals(listOf("show:1997-02-13"), dao.inProgress().first().map { it.queueKey })
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `the scrobble queue is available after migrating from v1`() = runBlocking {
+        createV1DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            // The table added in v4 must exist even for a database that started at v1.
+            val dao = db.scrobbleDao()
+            assertEquals(0, dao.count())
+            dao.add(
+                PendingScrobble(
+                    artist = "Phish", track = "Tweezer", album = "1997-11-17",
+                    durationSec = 300, timestampSec = 1_700_000_000,
+                )
+            )
+            assertEquals(1, dao.count())
+            assertEquals("Tweezer", dao.oldest().single().track)
         } finally {
             db.close()
         }
