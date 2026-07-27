@@ -198,12 +198,18 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
     val results = searchFor(term)
 
     Column(Modifier.fillMaxSize()) {
-        Text(
-            "Phish.in",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
-        )
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Phish.in",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            CastButton()
+        }
 
         OutlinedTextField(
             value = query,
@@ -1021,6 +1027,7 @@ private fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initial
 
 @Composable
 private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
+    val castDevice by Casting.deviceName.collectAsState()
     Column(Modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
         HorizontalDivider()
         Row(
@@ -1043,7 +1050,18 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(state.trackTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text(state.queueTitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+                // While casting, where the audio is coming out matters more than the queue
+                // name — the queue is one tap away on the cover, the device isn't.
+                if (castDevice != null) {
+                    Text(
+                        "Casting to $castDevice",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
+                    )
+                } else {
+                    Text(state.queueTitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+                }
             }
             IconButton(onClick = { vm.previous() }) { Icon(Icons.Default.SkipPrevious, "Previous") }
             IconButton(onClick = { vm.togglePlayPause() }) {
@@ -1082,6 +1100,7 @@ private fun Header(title: String, nav: NavHostController) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
         }
         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        CastButton()
         // Back only unwinds one step; from a playlist four levels deep that's tedious.
         IconButton(onClick = { nav.popBackStack("home", inclusive = false) }) {
             Icon(Icons.Default.Home, "Home")

@@ -2,12 +2,9 @@ package dev.mike.phishin
 
 import android.app.Application
 import android.content.ComponentName
-import android.net.Uri
-import android.os.Bundle
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -29,19 +26,6 @@ data class PlayerState(
     val waveformUrl: String? = null,
     val positionMs: Long = 0,
     val durationMs: Long = 0,
-)
-
-/**
- * Queue-level labelling, identical for every item in one show or playlist.
- *
- * A null [key] means the queue is ephemeral and its position is not recorded — the saver
- * skips any item without one. Used by shuffle, whose order can't be reconstructed.
- */
-private data class QueueInfo(
-    val key: String?,
-    val title: String,
-    val subtitle: String,
-    val art: String?,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -197,56 +181,5 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         controller?.release()
         controller = null
         super.onCleared()
-    }
-
-    /** "1997-11-17 · McNichols Arena", falling back to the queue when a track lacks a show. */
-    private fun albumFor(track: Track, info: QueueInfo): String {
-        val fromTrack = listOfNotNull(track.showDate, track.venueName).joinToString(" · ")
-        return fromTrack.ifBlank { "${info.title} · ${info.subtitle}" }
-    }
-
-    private fun mediaItem(track: Track, info: QueueInfo, entry: PlaylistEntry? = null): MediaItem {
-        // Per-track, not shared: waveform and cover differ for every track in a playlist.
-        val art = track.showAlbumCoverUrl ?: info.art
-        val extras = Bundle().apply {
-            info.key?.let { putString(Keys.QUEUE_KEY, it) }
-            putString(Keys.QUEUE_TITLE, info.title)
-            putString(Keys.QUEUE_SUBTITLE, info.subtitle)
-            putString(Keys.QUEUE_ART, info.art)
-            putString(Keys.WAVEFORM, track.waveformImageUrl)
-        }
-        val meta = MediaMetadata.Builder()
-            .setTitle(track.title)
-            .setArtist("Phish")
-            // The album is the show the track was played at, not the queue it arrived in.
-            // External scrobblers (the Last.fm app reads our MediaSession directly) take
-            // this field verbatim, and "some playlist · by someone · 99 tracks" is not an
-            // album. Every track carries its own show, including inside a playlist.
-            .setAlbumTitle(albumFor(track, info))
-            // Queue identity lives here instead, so the mini player still shows the
-            // playlist you started from rather than the underlying show.
-            .setSubtitle("${info.title} · ${info.subtitle}")
-            .setArtworkUri(art?.let { Uri.parse(it) })
-            .setIsBrowsable(false)
-            .setIsPlayable(true)
-            .setExtras(extras)
-            .build()
-
-        return MediaItem.Builder()
-            .setMediaId(track.id.toString())
-            .setUri(track.mp3Url)
-            .setMediaMetadata(meta)
-            .apply {
-                // Playlist entries can be excerpts; without this they'd play the full track.
-                if (entry != null && (entry.startsAtSecond != null || entry.endsAtSecond != null)) {
-                    setClippingConfiguration(
-                        MediaItem.ClippingConfiguration.Builder()
-                            .setStartPositionMs((entry.startsAtSecond ?: 0) * 1000L)
-                            .apply { entry.endsAtSecond?.let { setEndPositionMs(it * 1000L) } }
-                            .build()
-                    )
-                }
-            }
-            .build()
     }
 }

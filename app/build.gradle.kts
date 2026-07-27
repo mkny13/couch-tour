@@ -85,6 +85,12 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.media3.common)
+    implementation(libs.media3.cast)
+
+    // Cast discovery and the session lifecycle. mediarouter arrives transitively with the
+    // Cast framework, but the device picker is ours and uses it directly, so it's declared.
+    implementation(libs.play.services.cast.framework)
+    implementation(libs.androidx.mediarouter)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

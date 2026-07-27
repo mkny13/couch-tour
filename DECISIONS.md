@@ -344,6 +344,86 @@ Still unverified by me, for the same reason: "Shuffle all" on My tracks, which n
 signed-in account to have any tracks to shuffle. Its queue-building path is shared with
 playlists, which is verified, but the button itself has only been exercised by tests.
 
+## Iteration 9 — Google Cast
+
+**D58 — Cast is a second player behind the same MediaSession, not a second mode.**
+The service now owns two players — the local ExoPlayer and, once the framework has
+initialised, a `CastPlayer` — and hands the session whichever one is live. Everything above
+the service is unchanged and unaware: the UI's `MediaController`, the progress writer, the
+scrobbler and the notification all talk to `session.player` and neither know nor care where
+the audio is coming out. The alternative, a parallel cast path with its own controls, would
+have meant a second copy of every rule in this file.
+
+**D59 — Queue items now declare a MIME type.**
+`audio/mpeg`, hardcoded — the archive is all MP3. ExoPlayer sniffs the container and never
+needed it, but media3's Cast converter throws `"The item must specify its mimeType"`, so
+without it playback works locally and dies on the first track the moment you cast. That is
+the kind of failure a test can catch without a Chromecast in the room, so there is one.
+
+**D60 — Our own `MediaItemConverter`.**
+`MediaMetadata.extras` is where the queue key, the queue title and the waveform live, and
+media3's default converter drops all of it — it carries only what a TV displays. Media3
+caches the items it sent and normally rebuilds its timeline from that cache, so the loss
+only surfaces where the cache is empty: a session resumed after the app was killed, or a
+queue started by another sender. Those are precisely the cases where losing the queue key
+means casting silently stops recording your position. The extras now ride in the queue
+item's `customData`, which the receiver echoes back untouched.
+
+**D61 — Switching players never clears the outgoing queue.**
+It stops it. `clearMediaItems()` empties the timeline, which puts the player in
+`STATE_ENDED`, which the progress writer reads as "played through to the encore" (D20) —
+so every cast would have marked the show finished and dropped it out of "Continue
+listening". `stop()` leaves the queue where it is and lands in `STATE_IDLE`.
+
+**D62 — Casting continues playing; coming back from the TV lands paused.**
+Sending to a Chromecast picks up mid-track and keeps going, which is the whole point. The
+reverse is not symmetrical: a cast session usually ends because someone else took the TV or
+the network dropped, and a phone that suddenly starts playing out loud in that room is not
+what anyone asked for. The queue is loaded at the same position, ready for the play button.
+
+**D63 — The device picker is Compose, not `MediaRouteButton`.**
+The Cast SDK's button is a plain Android view whose chooser dialog needs an AppCompat theme
+and a `FragmentActivity` to show itself; this app is Compose on a `ComponentActivity` with a
+Material theme, so adopting it would have meant changing the activity's base class and the
+app theme to satisfy a single button. Driving `MediaRouter` directly is about the same
+amount of code, and the dialog matches the rest of the app. Active scanning runs only while
+the picker is open; the rest of the time the button sits on passive discovery, and it is
+invisible entirely when there is nothing to cast to.
+
+**D64 — The Cast SDK's own notification and media session are switched off.**
+`CastMediaOptions` can publish its own `MediaSession` and notification. This app already
+publishes one (that is the reason it isn't a WebView, D1), and two of them means two sets of
+lockscreen controls and every track scrobbled twice by the Last.fm app.
+
+**D65 — The stock Default Media Receiver, no registered receiver app.**
+Registering a custom receiver is a Google Cast Developer Console account action, and it
+isn't mine to do (same rule as D44). The default receiver plays progressive MP3 over HTTPS,
+which is exactly what phish.in serves.
+
+**D66 — Playlist excerpts cast as whole tracks. Known, unfixed.**
+Entries can be clipped (D30) and a receiver plays whole files; Cast has no equivalent of
+`ClippingConfiguration`. The excerpt is right on the phone and long on the TV. Fixing it
+properly needs the receiver told to seek and stop at a boundary, which the default receiver
+won't do — it would take a custom receiver, which D65 rules out for now.
+
+**D67 — A handoff mid-track no longer restarts the scrobble clock.**
+Both players announce the same track around a switch, and the scrobbler treated that as a
+track change: it reset its accumulated listening time, so a 20-minute jam could scrobble
+once on the phone and again four minutes later on the TV. It now ignores an announcement
+for the track it is already watching.
+
+**D68 — Cast initialises quietly, and is allowed never to arrive.**
+A phone with no Play services, or an outdated one, is a normal phone. Initialisation is
+asynchronous and best-effort; the service attaches the cast player whenever it turns up, the
+button never appears if it doesn't, and nothing else in the app changes either way.
+
+### Not verified on hardware
+
+Written against the media3 1.5.1 cast sources rather than guessed at, and the parts that can
+be tested off-device are (MIME type, the custom-data round trip, the scrobbler's handoff
+rule). But no Chromecast has been anywhere near it: discovery, the receiver actually playing
+a phish.in URL, and both directions of the handoff need a real device and a real TV.
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

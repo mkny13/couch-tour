@@ -64,6 +64,11 @@ class Scrobbler(private val submit: (PendingScrobble) -> Unit) {
 
     /** Called on every track change. Submits the outgoing track first if it earned it. */
     fun onTrackChanged(title: String?, albumTitle: String, durationMs: Long, nowMs: Long) {
+        // Moving playback to a Chromecast (or back) re-announces the track that is already
+        // playing. Restarting the clock there would make a long jam scrobble twice: once on
+        // the phone before the handoff, once on the TV four minutes later.
+        if (title != null && title == track && albumTitle == album) return
+
         finishCurrent(nowMs)
 
         track = title
