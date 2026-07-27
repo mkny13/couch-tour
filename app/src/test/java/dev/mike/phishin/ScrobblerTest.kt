@@ -178,6 +178,26 @@ class ScrobblerTimingTest {
     }
 
     @Test
+    fun `moving playback to a Chromecast does not restart the clock`() {
+        // Both players announce the same track around a handoff. Treating that as a track
+        // change would submit a 20-minute jam once on the phone and again on the TV.
+        val twentyMinutes = 1_200_000L
+        val s = scrobbler()
+        s.onTrackChanged("Tweezer", "1997-11-17", twentyMinutes, nowMs = 0)
+        s.onDuration(twentyMinutes)
+        s.onPlayingChanged(true, nowMs = 0)
+        s.onTick(nowMs = 240_000)
+        assertEquals(1, submitted.size)
+
+        // Handed off to the cast player, which re-announces the same track.
+        s.onTrackChanged("Tweezer", "1997-11-17", twentyMinutes, nowMs = 240_000)
+        s.onPlayingChanged(true, nowMs = 240_000)
+        s.onTick(nowMs = 600_000)
+
+        assertEquals(1, submitted.size)
+    }
+
+    @Test
     fun `stopping submits a track that had earned it`() {
         val s = scrobbler()
         s.onTrackChanged("Tweezer", "1997-11-17", fiveMinutes, nowMs = 0)

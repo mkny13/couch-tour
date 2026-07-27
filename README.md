@@ -31,12 +31,33 @@ Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public 
 - Browse and search public playlists; playlist excerpts are clipped correctly
 - "Continue listening" shows whichever you played — a show from a show page, a playlist
   from a playlist page
+- Cast to a Chromecast or a Google TV: the cast button appears once a device is on the
+  network, playback moves to it mid-track, and the same controls, progress saving, and
+  scrobbling carry on
 
 ## Not in yet
 
 Offline downloads, sleep timer, creating or editing playlists, liking things from inside
 the app. Search covers shows, tracks, and playlists; songs, venues, and tags are returned
 by the API but have no screen. See [DECISIONS.md](DECISIONS.md).
+
+## Casting
+
+The cast button sits in the top right of every screen, and only appears when there is a
+device to cast to. Tap it, pick a device, and playback moves there from wherever it had
+got to; the mini player then reads "Casting to <device>". Stop casting from the same
+button, which loads the queue back onto the phone at the same position, paused.
+
+Nothing to configure: it uses Google's stock media receiver, so no receiver app is
+registered and no API key is involved. A phone without Google Play services simply never
+shows the button.
+
+Two things to know:
+
+- Playlist **excerpts play in full** on a Chromecast. A receiver plays whole files, so the
+  clipping that makes an excerpt an excerpt is a local-player feature only.
+- Stopping the cast session leaves the queue **paused** on the phone rather than resuming
+  out loud — the session usually ends because someone else wanted the TV.
 
 ## Build
 
@@ -82,15 +103,17 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Tests
 
-92 unit tests, no device or emulator required:
+99 unit tests, no device or emulator required:
 
 ```bash
 ./gradlew testDebugUnitTest
 ```
 
 They cover JSON parsing against trimmed real API responses, outgoing request shape via
-MockWebServer (auth header, query params, path encoding), the Room queries, and both
-database migrations. Report lands at
+MockWebServer (auth header, query params, path encoding), the Room queries, both
+database migrations, and the parts of casting that don't need a Chromecast — that queue
+items declare a MIME type, and that the queue survives the round trip through a receiver.
+Report lands at
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
 Install to a connected device or running emulator:
@@ -107,8 +130,11 @@ Install to a connected device or running emulator:
 | `Auth.kt` | Encrypted token storage and the signed-in session |
 | `LastFm.kt` | Last.fm client, request signing, and the scrobble timing rules |
 | `Scrobbler.kt` | Tracks listened time and the offline scrobble queue |
-| `PlaybackService.kt` | `MediaSessionService` owning ExoPlayer; also writes progress |
+| `PlaybackService.kt` | `MediaSessionService` owning both players; also writes progress |
 | `PlayerViewModel.kt` | `MediaController` connection and UI-facing player state |
+| `MediaItems.kt` | Builds the queue items — metadata, extras, clipping, MIME type |
+| `Cast.kt` | Cast options, the session state, and the queue-item converter |
+| `CastButton.kt` | Cast button and device picker, driving `MediaRouter` directly |
 | `Progress.kt` | Room table of per-queue playback positions |
 | `Waveform.kt` | Waveform scrubber — tints the phish.in waveform PNG by play position |
 | `MainActivity.kt` | Compose UI — home, search, shows, show, mini player |
