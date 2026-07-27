@@ -249,8 +249,8 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 RowItem(
                     title = "Last.fm",
                     subtitle = when {
-                        !LastFmApi.configured -> "Needs an API key — tap for setup"
-                        lastFmUser != null -> "Scrobbling as $lastFmUser"
+                        lastFmUser != null -> "Built-in scrobbler on, as $lastFmUser"
+                        !LastFmApi.configured -> "Use the Last.fm app — tap to read how"
                         else -> "Not connected"
                     },
                     artUrl = null,
@@ -414,11 +414,23 @@ fun LastFmScreen(nav: NavHostController) {
     Column(Modifier.fillMaxSize()) {
         Header("Last.fm", nav)
 
+        Text(
+            "You probably don't need this. The official Last.fm app can scrobble this app " +
+                "directly — open it, go to Account, and switch on Phish.in under " +
+                "\"Scrobble from…\". No API key, nothing to set up here.\n\n" +
+                "Only use the built-in scrobbler below if you'd rather not run the Last.fm " +
+                "app. Do not enable both, or every track is scrobbled twice.",
+            fontSize = 13.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(16.dp)
+        )
+        HorizontalDivider(color = Color.White.copy(alpha = 0.10f))
+
         if (!LastFmApi.configured) {
             Text(
-                "Last.fm isn't configured in this build. Create an API account at " +
-                    "last.fm/api/account/create, then add lastfm.apiKey and " +
-                    "lastfm.apiSecret to local.properties and rebuild.",
+                "The built-in scrobbler is not configured in this build. It needs an API " +
+                    "account from last.fm/api/account/create, with lastfm.apiKey and " +
+                    "lastfm.apiSecret added to local.properties before rebuilding.",
                 fontSize = 13.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(16.dp)

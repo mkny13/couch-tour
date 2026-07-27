@@ -276,6 +276,31 @@ scrobbler that read it at transition time would treat every track as ineligible.
 Previously every section was grey small-caps text on the same background, so the home
 screen read as one long list.
 
+## Iteration 7 — the Last.fm app makes most of D44 unnecessary
+
+Mike spotted that the official Last.fm app has a "Scrobble from…" list that picks up any
+app publishing an Android MediaSession — which this app already does. That route needs no
+API key and no built-in scrobbler at all, and it is now the recommended one.
+
+**D50 — The album is the show, not the queue.**
+The MediaSession previously published the queue as `albumTitle`, so an external scrobbler
+reading it would log a playlist track with the album "Phish.net Key Jams Pt 1 · by
+mfhgreyboy · 99 tracks". Every track carries its own `show_date` and `venue_name`, even
+inside a playlist, so the album is now built from the track: "1990-11-02 · Glenn Miller
+Ballroom". Verified by reading the published session with `dumpsys media_session`, which is
+exactly what the Last.fm app sees.
+
+**D51 — Queue identity moved to `subtitle`.**
+Fixing D50 would otherwise have broken the earlier requirement that "Continue listening"
+and the mini player show the playlist you started from rather than the underlying show.
+Those two facts now live in different fields: `albumTitle` is the show (for scrobblers),
+`subtitle` is the queue (for our UI).
+
+**D52 — The built-in scrobbler stays, but is now clearly the fallback.**
+It still earns its place if you'd rather not run the Last.fm app, and the work is done and
+tested. The Last.fm screen leads with the app-based route and warns not to enable both,
+because two scrobblers watching the same playback means every track is logged twice.
+
 ### Auth — now confirmed
 
 This section previously flagged every authenticated path as untested, because I could not

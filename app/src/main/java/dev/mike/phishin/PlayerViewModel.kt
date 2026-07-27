@@ -72,7 +72,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             hasQueue = c.mediaItemCount > 0,
             isPlaying = c.isPlaying,
             trackTitle = meta?.title?.toString().orEmpty(),
-            queueTitle = meta?.albumTitle?.toString().orEmpty(),
+            queueTitle = (meta?.subtitle ?: meta?.albumTitle)?.toString().orEmpty(),
             artUrl = meta?.artworkUri?.toString(),
             waveformUrl = meta?.extras?.getString(Keys.WAVEFORM),
             positionMs = c.currentPosition.coerceAtLeast(0),
@@ -196,6 +196,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
+    /** "1997-11-17 · McNichols Arena", falling back to the queue when a track lacks a show. */
+    private fun albumFor(track: Track, info: QueueInfo): String {
+        val fromTrack = listOfNotNull(track.showDate, track.venueName).joinToString(" · ")
+        return fromTrack.ifBlank { "${info.title} · ${info.subtitle}" }
+    }
+
     private fun mediaItem(track: Track, info: QueueInfo, entry: PlaylistEntry? = null): MediaItem {
         // Per-track, not shared: waveform and cover differ for every track in a playlist.
         val art = track.showAlbumCoverUrl ?: info.art
@@ -209,7 +215,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val meta = MediaMetadata.Builder()
             .setTitle(track.title)
             .setArtist("Phish")
-            .setAlbumTitle("${info.title} · ${info.subtitle}")
+            // The album is the show the track was played at, not the queue it arrived in.
+            // External scrobblers (the Last.fm app reads our MediaSession directly) take
+            // this field verbatim, and "some playlist · by someone · 99 tracks" is not an
+            // album. Every track carries its own show, including inside a playlist.
+            .setAlbumTitle(albumFor(track, info))
+            // Queue identity lives here instead, so the mini player still shows the
+            // playlist you started from rather than the underlying show.
+            .setSubtitle("${info.title} · ${info.subtitle}")
             .setArtworkUri(art?.let { Uri.parse(it) })
             .setIsBrowsable(false)
             .setIsPlayable(true)

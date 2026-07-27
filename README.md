@@ -41,9 +41,23 @@ by the API but have no screen. See [DECISIONS.md](DECISIONS.md).
 Requires JDK 17 and the Android SDK. `local.properties` points at the SDK and is
 machine-specific — don't commit it.
 
-### Last.fm (optional)
+### Last.fm
 
-Scrobbling needs your own Last.fm API credentials. Create them at
+**The easy way needs nothing from this repo.** The official Last.fm app scrobbles from any
+app that publishes a MediaSession, which this one does. Open the Last.fm app → Account →
+"Scrobble from…" and switch on Phish.in. It appears there once this app has played
+something. No API key, no rebuild.
+
+The app publishes the track title as the title, "Phish" as the artist, and the show it was
+played at as the album — including for playlist tracks, which are attributed to their own
+show rather than to the playlist.
+
+### Built-in scrobbler (optional fallback)
+
+Only needed if you'd rather not run the Last.fm app. **Don't enable both** — two scrobblers
+watching the same playback log every track twice.
+
+It needs your own Last.fm API credentials. Create them at
 https://www.last.fm/api/account/create, then add to `local.properties` (gitignored, so the
 secret stays out of the repo):
 
