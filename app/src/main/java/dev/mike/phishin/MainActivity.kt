@@ -424,8 +424,14 @@ private fun SearchResultsList(
                             subtitle = listOfNotNull(
                                 track.showDate, track.venueName, track.venueLocation
                             ).joinToString(" · "),
-                            artUrl = null,
+                            artUrl = track.showAlbumCoverUrl,
                             trailing = fmt(track.duration),
+                            trailingContent = {
+                                LikeButton(
+                                    Likable.Track, track.id,
+                                    track.likedByUser, track.likesCount,
+                                )
+                            },
                             onClick = { vm.playTrack(track) }
                         )
                     }
@@ -679,6 +685,12 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
                                 ).joinToString(" · "),
                                 artUrl = e.track.showAlbumCoverUrl,
                                 trailing = fmt(e.duration),
+                                trailingContent = {
+                                    LikeButton(
+                                        Likable.Track, e.track.id,
+                                        e.track.likedByUser, e.track.likesCount,
+                                    )
+                                },
                                 onClick = { vm.playPlaylist(pl, i, 0) }
                             )
                         }
@@ -759,6 +771,12 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     ).joinToString(" · "),
                                     artUrl = track.showAlbumCoverUrl,
                                     trailing = fmt(track.duration),
+                                    trailingContent = {
+                                        LikeButton(
+                                            Likable.Track, track.id,
+                                            track.likedByUser, track.likesCount,
+                                        )
+                                    },
                                     // A single liked track plays inside its show; shuffle
                                     // above plays the liked tracks themselves.
                                     onClick = { vm.playTrack(track) }
@@ -1099,10 +1117,15 @@ private fun RowItem(
     subtitle: String,
     artUrl: String?,
     trailing: String? = null,
+    /** Slot for a control that isn't part of the row's own click target, e.g. a heart. */
+    trailingContent: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 16.dp, end = if (trailingContent != null) 4.dp else 16.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Rows without artwork (playlists, account actions) shouldn't reserve the slot.
@@ -1119,6 +1142,7 @@ private fun RowItem(
             if (subtitle.isNotBlank()) Text(subtitle, fontSize = 13.sp, color = Color.Gray, maxLines = 1)
         }
         if (trailing != null) Text(trailing, fontSize = 11.sp, color = Color.Gray)
+        trailingContent?.invoke()
     }
 }
 

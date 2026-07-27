@@ -325,6 +325,14 @@ Same navigation as the notification, so a playlist opens the playlist rather tha
 the current track came from. Shuffle has no queue key, so its cover is deliberately inert —
 there is nothing to open.
 
+**D57 — Hearts belong on every track list, not just the show screen.**
+The like button was added to the show screen's own row component, but playlists, search
+results and My tracks use the shared `RowItem`, which never got one — so three of the four
+places a track appears had no heart at all. `RowItem` now takes a trailing slot. Worth
+noting the unit tests could not have caught this: they proved the API and the models were
+right, and the models were right. The gap was purely which rows the button was wired into,
+which only looking at the screens reveals.
+
 ### Auth — now confirmed
 
 This section previously flagged every authenticated path as untested, because I could not
