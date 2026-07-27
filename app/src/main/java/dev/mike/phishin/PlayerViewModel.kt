@@ -2,6 +2,7 @@ package dev.mike.phishin
 
 import android.app.Application
 import android.content.ComponentName
+import android.net.Uri
 import android.os.Bundle
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,6 +30,15 @@ data class PlayerState(
 )
 
 fun showQueueKey(date: String) = "show:$date"
+fun playlistQueueKey(slug: String) = "playlist:$slug"
+
+/** Queue-level labelling, identical for every item in one show or playlist. */
+private data class QueueInfo(
+    val key: String,
+    val title: String,
+    val subtitle: String,
+    val art: String?,
+)
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -68,40 +78,31 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    // ------------------------------------------------------------------ play
+
     fun playShow(show: Show, startIndex: Int = 0, startPositionMs: Long = 0) {
-        val c = controller ?: return
-        val items = mediaItems(show)
-        if (items.isEmpty()) return
-        val index = startIndex.coerceIn(0, items.lastIndex)
-        c.setMediaItems(items, index, startPositionMs)
-        c.prepare()
-        c.play()
+        val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
+        val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
+        val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art)
+        start(show.tracks.filter { it.playable }.map { mediaItem(it, info) }, startIndex, startPositionMs)
     }
 
-    /**
-     * Resume a queue the user left earlier; fetches the show fresh from the API.
-     * A finished show restarts from the top — its stored position is the last second of
-     * the encore, so resuming there would stop again immediately.
-     */
-    fun resume(progress: Progress) {
-        val date = progress.queueKey.removePrefix("show:")
-        viewModelScope.launch {
-            runCatching { PhishInApi.show(date) }.onSuccess {
-                if (progress.finished) playShow(it, 0, 0)
-                else playShow(it, progress.trackIndex, progress.positionMs)
-            }
-        }
+    fun playPlaylist(playlist: Playlist, startIndex: Int = 0, startPositionMs: Long = 0) {
+        val entries = playlist.entries.filter { it.track.playable }
+        val subtitle = listOfNotNull(
+            playlist.username?.let { "by $it" },
+            "${entries.size} tracks",
+        ).joinToString(" · ")
+        val info = QueueInfo(
+            playlistQueueKey(playlist.slug),
+            playlist.name,
+            subtitle,
+            entries.firstOrNull()?.track?.showAlbumCoverUrl,
+        )
+        start(entries.map { mediaItem(it.track, info, it) }, startIndex, startPositionMs)
     }
 
-    /** Remove a show from "Continue listening" (or the archive) entirely. */
-    fun forget(progress: Progress) {
-        viewModelScope.launch { progressDao.clear(progress.queueKey) }
-    }
-
-    /**
-     * Play a track found via search. Queues its whole show so the rest of the set follows,
-     * rather than stranding the user on a single song.
-     */
+    /** Play a track found via search, queueing its whole show so the rest of the set follows. */
     fun playTrack(track: Track) {
         val date = track.showDate ?: return
         viewModelScope.launch {
@@ -112,7 +113,42 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    suspend fun progressFor(date: String): Progress? = progressDao.get(showQueueKey(date))
+    private fun start(items: List<MediaItem>, startIndex: Int, startPositionMs: Long) {
+        val c = controller ?: return
+        if (items.isEmpty()) return
+        c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), startPositionMs)
+        c.prepare()
+        c.play()
+    }
+
+    /**
+     * Resume a queue the user left earlier, re-fetching it from the API. Handles both
+     * queue kinds; a finished queue restarts from the top, because its stored position is
+     * the last second of the final track.
+     */
+    fun resume(progress: Progress) {
+        val key = progress.queueKey
+        val index = if (progress.finished) 0 else progress.trackIndex
+        val position = if (progress.finished) 0L else progress.positionMs
+        viewModelScope.launch {
+            runCatching {
+                if (key.startsWith("playlist:")) {
+                    playPlaylist(PhishInApi.playlist(key.removePrefix("playlist:")), index, position)
+                } else {
+                    playShow(PhishInApi.show(key.removePrefix("show:")), index, position)
+                }
+            }
+        }
+    }
+
+    /** Remove a show or playlist from "Continue listening" (or the archive) entirely. */
+    fun forget(progress: Progress) {
+        viewModelScope.launch { progressDao.clear(progress.queueKey) }
+    }
+
+    suspend fun progressFor(key: String): Progress? = progressDao.get(key)
+
+    // --------------------------------------------------------------- controls
 
     fun togglePlayPause() {
         val c = controller ?: return
@@ -131,32 +167,41 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
-    private fun mediaItems(show: Show): List<MediaItem> {
-        val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
-        val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
-        return show.tracks.filter { it.playable }.map { track ->
-            // Per-track, not shared: the waveform differs for every track in the queue.
-            val extras = Bundle().apply {
-                putString(Keys.QUEUE_KEY, showQueueKey(show.date))
-                putString(Keys.QUEUE_TITLE, show.date)
-                putString(Keys.QUEUE_SUBTITLE, subtitle)
-                putString(Keys.QUEUE_ART, art)
-                putString(Keys.WAVEFORM, track.waveformImageUrl)
-            }
-            val meta = MediaMetadata.Builder()
-                .setTitle(track.title)
-                .setArtist("Phish")
-                .setAlbumTitle("${show.date} · $subtitle")
-                .setArtworkUri(art?.let { android.net.Uri.parse(it) })
-                .setIsBrowsable(false)
-                .setIsPlayable(true)
-                .setExtras(extras)
-                .build()
-            MediaItem.Builder()
-                .setMediaId(track.id.toString())
-                .setUri(track.mp3Url)
-                .setMediaMetadata(meta)
-                .build()
+    private fun mediaItem(track: Track, info: QueueInfo, entry: PlaylistEntry? = null): MediaItem {
+        // Per-track, not shared: waveform and cover differ for every track in a playlist.
+        val art = track.showAlbumCoverUrl ?: info.art
+        val extras = Bundle().apply {
+            putString(Keys.QUEUE_KEY, info.key)
+            putString(Keys.QUEUE_TITLE, info.title)
+            putString(Keys.QUEUE_SUBTITLE, info.subtitle)
+            putString(Keys.QUEUE_ART, info.art)
+            putString(Keys.WAVEFORM, track.waveformImageUrl)
         }
+        val meta = MediaMetadata.Builder()
+            .setTitle(track.title)
+            .setArtist("Phish")
+            .setAlbumTitle("${info.title} · ${info.subtitle}")
+            .setArtworkUri(art?.let { Uri.parse(it) })
+            .setIsBrowsable(false)
+            .setIsPlayable(true)
+            .setExtras(extras)
+            .build()
+
+        return MediaItem.Builder()
+            .setMediaId(track.id.toString())
+            .setUri(track.mp3Url)
+            .setMediaMetadata(meta)
+            .apply {
+                // Playlist entries can be excerpts; without this they'd play the full track.
+                if (entry != null && (entry.startsAtSecond != null || entry.endsAtSecond != null)) {
+                    setClippingConfiguration(
+                        MediaItem.ClippingConfiguration.Builder()
+                            .setStartPositionMs((entry.startsAtSecond ?: 0) * 1000L)
+                            .apply { entry.endsAtSecond?.let { setEndPositionMs(it * 1000L) } }
+                            .build()
+                    )
+                }
+            }
+            .build()
     }
 }

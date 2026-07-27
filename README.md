@@ -19,12 +19,17 @@ Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public 
 - Shows played through to the encore are marked finished and move to an Archive screen, so
   they stop cluttering "Continue listening"; opening one from the archive restarts it
 - Any show can be dismissed from "Continue listening" by hand
+- Log in to your phish.in account to see your liked shows, liked tracks, and playlists
+  (both created by you and liked)
+- Browse and search public playlists; playlist excerpts are clipped correctly
+- "Continue listening" shows whichever you played — a show from a show page, a playlist
+  from a playlist page
 
 ## Not in yet
 
-Login (so no saved playlists or likes), offline downloads, sleep timer.
-Search covers shows and tracks; songs, venues, and playlists are returned by the API but
-not yet given screens. See [DECISIONS.md](DECISIONS.md).
+Offline downloads, sleep timer, creating or editing playlists, liking things from inside
+the app. Search covers shows, tracks, and playlists; songs, venues, and tags are returned
+by the API but have no screen. See [DECISIONS.md](DECISIONS.md).
 
 ## Build
 
@@ -49,7 +54,8 @@ Install to a connected device or running emulator:
 
 | File | Role |
 |---|---|
-| `Api.kt` | phish.in v2 client — three endpoints, OkHttp + kotlinx.serialization |
+| `Api.kt` | phish.in v2 client — OkHttp + kotlinx.serialization |
+| `Auth.kt` | Encrypted JWT storage and the signed-in session |
 | `PlaybackService.kt` | `MediaSessionService` owning ExoPlayer; also writes progress |
 | `PlayerViewModel.kt` | `MediaController` connection and UI-facing player state |
 | `Progress.kt` | Room table of per-queue playback positions |

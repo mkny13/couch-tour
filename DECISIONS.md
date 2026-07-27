@@ -131,6 +131,73 @@ new row. The archive has the same control.
 `IconButton` enforces a 48dp minimum touch target that overflowed the 132dp artwork and
 spilled onto the neighbouring card.
 
+## Iteration 4 — auth, playlists, and your library
+
+**D25 — The JWT goes in an `X-Auth-Token` header, not `Authorization: Bearer`.**
+The OpenAPI spec documents no auth header at all, and probing can't tell you: a missing
+token and a bogus `Bearer` token both return an identical bare `401 {"message":
+"Unauthorized"}`. Guessing Bearer would have failed in a way that looked like "wrong
+password" forever. Confirmed instead from phish.in's source (`jcraigk/phishin`) in four
+places, including `app/api/api_v2/helpers/shared_helpers.rb#current_user` and the site's
+own JS client. `Authorization: Bearer` exists too, but it carries API keys — a different
+mechanism entirely.
+
+**D26 — `?filter=mine` silently returns everything when unauthenticated.**
+Not a 401 — a 200 with all 2,504 public playlists. Presenting that as "your playlists"
+would be badly wrong, so the filtered calls are only reachable behind a signed-in state.
+This is the same class of trap as `year=1983-1987` returning an empty list. By contrast
+`liked_by_user=true` does the safe thing and returns 0 entries unauthenticated.
+
+**D27 — The password is never stored, and the token is encrypted at rest.**
+The password is used for exactly one request and discarded. The JWT goes into
+`EncryptedSharedPreferences`. If the Android keystore is in an unrecoverable state (device
+restore, key reset) the store is wiped and reopened once, and failing that the token is
+held in memory only — the session ends when the process does, but nothing sensitive is
+ever written in the clear and the app doesn't crash on launch.
+
+**D28 — `android:allowBackup` is now false.**
+It was true from the first commit, which was harmless when the app stored nothing but
+playback positions. With an auth token on disk, cloud backup becomes a way for the token
+to leave the device.
+
+**D29 — A 401 on a request that carried a token logs you out.**
+Without this, an expired or revoked JWT leaves the app looking signed in while every
+personal screen shows an error. Deliberately scoped to requests that actually sent a
+token, so a wrong password at the login screen doesn't trip it.
+
+**D30 — Playlist entries are clipped, not played whole.**
+Entries carry `starts_at_second` / `ends_at_second`, because a playlist can excerpt a jam
+out of a longer track. Ignoring them would play the wrong audio, so entries map to a
+Media3 `ClippingConfiguration`. Entry `duration` is the clipped length and is what the UI
+shows.
+
+**D31 — Playlist queues use the `playlist:<slug>` key reserved in D6.**
+"Continue listening" therefore shows whichever thing you actually played: a show played
+from a show page shows the show, a playlist shows the playlist name, its author, and its
+track count. No schema change was needed — this is what the namespaced key was for.
+
+**D32 — "My playlists" merges the `mine` and `liked` filters.**
+They are separate API calls with no combined option, so the screen requests both and
+deduplicates by slug.
+
+**D33 — Search shows playlists, but songs, venues, and tags are still skipped.**
+Playlists became actionable once there was a playlist screen to open. The rest still have
+no destination.
+
+**D34 — Rows without artwork no longer reserve the image slot.**
+Account and playlist rows have no cover, and the empty 48dp box left them looking
+mysteriously indented.
+
+### What I could not verify
+
+Every authenticated path is written against the spec and phish.in's source but is
+**untested end to end**, because I can't create an account or type a password. Verified:
+the login request reaches the server, the JSON body is correct (a malformed one would
+return 400, not 401), a rejected login surfaces "Email or password not recognised", and
+every unauthenticated screen works. Unverified: that `X-Auth-Token` is accepted on
+subsequent requests, and therefore that My Shows, My Tracks, and My Playlists return your
+data. The first real login will confirm or refute all of it at once.
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

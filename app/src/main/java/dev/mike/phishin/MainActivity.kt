@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,6 +53,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,6 +62,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -66,6 +73,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -108,12 +116,28 @@ fun App(vm: PlayerViewModel = viewModel()) {
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
             composable("archive") { ArchiveScreen(vm, nav) }
+            composable("login") { LoginScreen(nav) }
             composable("shows/{period}") { entry ->
                 ShowsScreen(entry.arguments?.getString("period").orEmpty(), nav)
             }
             composable("show/{date}") { entry ->
                 ShowScreen(entry.arguments?.getString("date").orEmpty(), vm, nav)
             }
+            composable("playlists") {
+                PlaylistsScreen("Playlists", nav) { PhishInApi.playlists() }
+            }
+            composable("playlist/{slug}") { entry ->
+                PlaylistScreen(entry.arguments?.getString("slug").orEmpty(), vm, nav)
+            }
+            composable("mine/playlists") {
+                PlaylistsScreen("My playlists", nav) {
+                    // "mine" and "liked" are separate filters; the page shows both together.
+                    (PhishInApi.playlists(filter = "mine") + PhishInApi.playlists(filter = "liked"))
+                        .distinctBy { it.slug }
+                }
+            }
+            composable("mine/shows") { MyShowsScreen(nav) }
+            composable("mine/tracks") { MyTracksScreen(vm, nav) }
         }
     }
 }
@@ -125,6 +149,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
     val years = loadOnce { PhishInApi.years() }
     val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
     val archived by vm.progressDao.archived().collectAsState(initial = emptyList())
+    val username by Session.username.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     val term = query.trim()
     val results = searchFor(term)
@@ -181,13 +206,47 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
+            item { SectionHeader("Your phish.in") }
+            if (username == null) {
+                item {
+                    RowItem(
+                        title = "Log in",
+                        subtitle = "See your saved shows, tracks, and playlists",
+                        artUrl = null,
+                        onClick = { nav.navigate("login") }
+                    )
+                }
+            } else {
+                item {
+                    RowItem("My shows", "Shows you've liked", null) { nav.navigate("mine/shows") }
+                }
+                item {
+                    RowItem("My tracks", "Tracks you've liked", null) { nav.navigate("mine/tracks") }
+                }
+                item {
+                    RowItem("My playlists", "Created by you and liked", null) {
+                        nav.navigate("mine/playlists")
+                    }
+                }
+                item {
+                    RowItem("Signed in as $username", "Tap to log out", null) { Session.logout() }
+                }
+            }
+
+            item {
+                RowItem("Browse playlists", "Public playlists on phish.in", null) {
+                    nav.navigate("playlists")
+                }
+            }
+
             item { SectionHeader("Browse by year") }
 
             when (val r = years.value) {
                 null -> item { Loading() }
                 else -> r.fold(
                     onSuccess = { periods ->
-                        items(periods, key = { it.period }) { p ->
+                        // Newest first.
+                        items(periods.reversed(), key = { it.period }) { p ->
                             RowItem(
                                 title = p.period,
                                 subtitle = "${p.showsWithAudioCount} shows with audio",
@@ -235,7 +294,7 @@ fun ShowsScreen(period: String, nav: NavHostController) {
 @Composable
 fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
     val show = loadOnce(date) { PhishInApi.show(date) }
-    val saved = loadOnce(date) { vm.progressFor(date) }
+    val saved = loadOnce(date) { vm.progressFor(showQueueKey(date)) }
 
     Column(Modifier.fillMaxSize()) {
         Header(date, nav)
@@ -295,6 +354,10 @@ private fun SearchResultsList(
                         )
                     }
                 }
+                if (r.playlists.isNotEmpty()) {
+                    item { SectionHeader("Playlists") }
+                    items(r.playlists, key = { "pl-${it.slug}" }) { PlaylistRow(it, nav) }
+                }
                 if (r.tracks.isNotEmpty()) {
                     item { SectionHeader("Tracks") }
                     items(r.tracks, key = { "track-${it.id}" }) { track ->
@@ -310,6 +373,229 @@ private fun SearchResultsList(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun LoginScreen(nav: NavHostController) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Log in", nav)
+        Text(
+            "Your phish.in account. The password is sent once to get a token and is never " +
+                "stored; only the token is kept, encrypted on this device.",
+            fontSize = 13.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it; error = null },
+            label = { Text("Email") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it; error = null },
+            label = { Text("Password") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        Button(
+            enabled = !busy && email.isNotBlank() && password.isNotBlank(),
+            onClick = {
+                busy = true
+                error = null
+                scope.launch {
+                    runCatching { Session.login(email.trim(), password) }
+                        .onSuccess { nav.popBackStack() }
+                        .onFailure {
+                            error = if (it is ApiException && it.unauthorized) {
+                                "Email or password not recognised."
+                            } else {
+                                "Couldn't log in: ${it.message}"
+                            }
+                            busy = false
+                        }
+                }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) { Text(if (busy) "Logging in…" else "Log in") }
+
+        error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+        }
+    }
+}
+
+@Composable
+fun PlaylistsScreen(title: String, nav: NavHostController, load: suspend () -> List<Playlist>) {
+    val data = loadOnce(title) { load() }
+    Column(Modifier.fillMaxSize()) {
+        Header(title, nav)
+        when (val r = data.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { lists ->
+                    if (lists.isEmpty()) {
+                        Text("Nothing here yet.", color = Color.Gray, modifier = Modifier.padding(16.dp))
+                    } else {
+                        LazyColumn { items(lists, key = { it.slug }) { PlaylistRow(it, nav) } }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaylistRow(playlist: Playlist, nav: NavHostController) {
+    RowItem(
+        title = playlist.name,
+        subtitle = listOfNotNull(
+            playlist.username?.let { "by $it" },
+            "${playlist.tracksCount} ${plural(playlist.tracksCount, "track")}",
+        ).joinToString(" · "),
+        artUrl = null,
+        trailing = fmt(playlist.duration),
+        onClick = { nav.navigate("playlist/${playlist.slug}") }
+    )
+}
+
+@Composable
+fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
+    val data = loadOnce(slug) { PhishInApi.playlist(slug) }
+    val saved = loadOnce(slug) { vm.progressFor(playlistQueueKey(slug)) }
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Playlist", nav)
+        when (val r = data.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { pl ->
+                    val entries = pl.entries.filter { it.track.playable }
+                    val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
+                    LazyColumn {
+                        item {
+                            Column(Modifier.padding(16.dp)) {
+                                Text(pl.name, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                                Text(
+                                    listOfNotNull(
+                                        pl.username?.let { "by $it" },
+                                        "${entries.size} tracks",
+                                        fmt(pl.duration),
+                                    ).joinToString(" · "),
+                                    color = Color.Gray, fontSize = 13.sp
+                                )
+                                pl.description?.takeIf { it.isNotBlank() }?.let {
+                                    Text(it, color = Color.Gray, fontSize = 13.sp,
+                                        modifier = Modifier.padding(top = 6.dp))
+                                }
+                            }
+                        }
+                        if (progress != null) {
+                            item {
+                                ResumeBanner(progress) {
+                                    vm.playPlaylist(pl, progress.trackIndex, progress.positionMs)
+                                }
+                            }
+                        }
+                        itemsIndexed(entries, key = { _, e -> "e-${e.position}-${e.track.id}" }) { i, e ->
+                            RowItem(
+                                title = e.track.title,
+                                subtitle = listOfNotNull(
+                                    e.track.showDate, e.track.venueName
+                                ).joinToString(" · "),
+                                artUrl = e.track.showAlbumCoverUrl,
+                                trailing = fmt(e.duration),
+                                onClick = { vm.playPlaylist(pl, i, 0) }
+                            )
+                        }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
+        }
+    }
+}
+
+@Composable
+fun MyShowsScreen(nav: NavHostController) {
+    val data = loadOnce("my-shows") { PhishInApi.likedShows() }
+    Column(Modifier.fillMaxSize()) {
+        Header("My shows", nav)
+        when (val r = data.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { shows ->
+                    if (shows.isEmpty()) {
+                        Text(
+                            "No liked shows yet. Like them on phish.in and they'll appear here.",
+                            color = Color.Gray, modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        LazyColumn {
+                            items(shows, key = { it.date }) { show ->
+                                RowItem(
+                                    title = show.date,
+                                    subtitle = listOfNotNull(show.venueName, show.location)
+                                        .joinToString(" · "),
+                                    artUrl = show.coverArtUrls?.small,
+                                    onClick = { nav.navigate("show/${show.date}") }
+                                )
+                            }
+                        }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
+        }
+    }
+}
+
+@Composable
+fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
+    val data = loadOnce("my-tracks") { PhishInApi.likedTracks() }
+    Column(Modifier.fillMaxSize()) {
+        Header("My tracks", nav)
+        when (val r = data.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { tracks ->
+                    if (tracks.isEmpty()) {
+                        Text(
+                            "No liked tracks yet. Like them on phish.in and they'll appear here.",
+                            color = Color.Gray, modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        LazyColumn {
+                            items(tracks, key = { it.id }) { track ->
+                                RowItem(
+                                    title = track.title,
+                                    subtitle = listOfNotNull(
+                                        track.showDate, track.venueName, track.venueLocation
+                                    ).joinToString(" · "),
+                                    artUrl = track.showAlbumCoverUrl,
+                                    trailing = fmt(track.duration),
+                                    onClick = { vm.playTrack(track) }
+                                )
+                            }
+                        }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
         }
     }
 }
@@ -519,12 +805,15 @@ private fun RowItem(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
-            model = artUrl,
-            contentDescription = null,
-            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp))
-        )
-        Spacer(Modifier.width(12.dp))
+        // Rows without artwork (playlists, account actions) shouldn't reserve the slot.
+        if (artUrl != null) {
+            AsyncImage(
+                model = artUrl,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp))
+            )
+            Spacer(Modifier.width(12.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             if (subtitle.isNotBlank()) Text(subtitle, fontSize = 13.sp, color = Color.Gray, maxLines = 1)
