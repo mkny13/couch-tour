@@ -53,6 +53,8 @@ class PlaybackService : MediaSessionService() {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) = saveNow()
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) = saveNow()
+
+            override fun onPlaybackStateChanged(state: Int) = saveNow()
         })
 
         // ...and on a slow tick while playing, so a crash or swipe-away loses at most 5s.
@@ -79,6 +81,11 @@ class PlaybackService : MediaSessionService() {
             positionMs = player.currentPosition.coerceAtLeast(0),
             trackTitle = item.mediaMetadata.title?.toString().orEmpty(),
             updatedAt = System.currentTimeMillis(),
+            // Derived, never passed in: STATE_ENDED means the queue ran out, i.e. the show
+            // played through its encore. Deriving it here means the several listeners that
+            // all fire at the end of a queue can't race to clobber each other's value, and
+            // any later play of the same show clears the flag on its own.
+            finished = player.playbackState == Player.STATE_ENDED,
         )
         scope.launch { PhishInDb.get(applicationContext).progressDao().put(progress) }
     }

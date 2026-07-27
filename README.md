@@ -16,6 +16,9 @@ Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public 
 - Playback continues when the app is backgrounded or the screen is off
 - Position is remembered per show and restored from a "Continue listening" row on the home
   screen — for every show you've opened, not just the last one
+- Shows played through to the encore are marked finished and move to an Archive screen, so
+  they stop cluttering "Continue listening"; opening one from the archive restarts it
+- Any show can be dismissed from "Continue listening" by hand
 
 ## Not in yet
 

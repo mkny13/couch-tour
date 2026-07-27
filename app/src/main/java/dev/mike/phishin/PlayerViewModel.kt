@@ -78,14 +78,24 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         c.play()
     }
 
-    /** Resume a queue the user left earlier; fetches the show fresh from the API. */
+    /**
+     * Resume a queue the user left earlier; fetches the show fresh from the API.
+     * A finished show restarts from the top — its stored position is the last second of
+     * the encore, so resuming there would stop again immediately.
+     */
     fun resume(progress: Progress) {
         val date = progress.queueKey.removePrefix("show:")
         viewModelScope.launch {
             runCatching { PhishInApi.show(date) }.onSuccess {
-                playShow(it, progress.trackIndex, progress.positionMs)
+                if (progress.finished) playShow(it, 0, 0)
+                else playShow(it, progress.trackIndex, progress.positionMs)
             }
         }
+    }
+
+    /** Remove a show from "Continue listening" (or the archive) entirely. */
+    fun forget(progress: Progress) {
+        viewModelScope.launch { progressDao.clear(progress.queueKey) }
     }
 
     /**

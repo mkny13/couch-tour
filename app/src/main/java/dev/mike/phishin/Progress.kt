@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -26,6 +28,8 @@ data class Progress(
     val positionMs: Long,
     val trackTitle: String,
     val updatedAt: Long,
+    /** Set when the queue played through to its end. Finished rows move to the archive. */
+    val finished: Boolean = false,
 )
 
 @Dao
@@ -33,8 +37,11 @@ interface ProgressDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(progress: Progress)
 
-    @Query("SELECT * FROM progress ORDER BY updatedAt DESC LIMIT 25")
-    fun recent(): Flow<List<Progress>>
+    @Query("SELECT * FROM progress WHERE finished = 0 ORDER BY updatedAt DESC LIMIT 25")
+    fun inProgress(): Flow<List<Progress>>
+
+    @Query("SELECT * FROM progress WHERE finished = 1 ORDER BY updatedAt DESC")
+    fun archived(): Flow<List<Progress>>
 
     @Query("SELECT * FROM progress WHERE queueKey = :key")
     suspend fun get(key: String): Progress?
@@ -43,11 +50,21 @@ interface ProgressDao {
     suspend fun clear(key: String)
 }
 
-@Database(entities = [Progress::class], version = 1, exportSchema = true)
+@Database(entities = [Progress::class], version = 2, exportSchema = true)
 abstract class PhishInDb : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
 
     companion object {
+        /**
+         * Adds the `finished` flag. Written as a real migration rather than a destructive
+         * one: the listening history in this table is the whole point of it existing.
+         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE progress ADD COLUMN finished INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -55,7 +72,7 @@ abstract class PhishInDb : RoomDatabase() {
                 context.applicationContext,
                 PhishInDb::class.java,
                 "phishin.db"
-            ).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2).build().also { instance = it }
         }
     }
 }

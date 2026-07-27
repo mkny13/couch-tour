@@ -94,6 +94,43 @@ bitmap gets drawn twice — once in a muted colour, once clipped to the play pos
 accent colour. First attempt used `Color.DarkGray` for the unplayed portion, which was almost
 invisible against the player background; it's now `onSurfaceVariant` at 45% alpha.
 
+## Iteration 3 — finished shows and the archive
+
+**D19 — A real Room migration, not a destructive one.**
+Adding `finished` took the schema to version 2. `fallbackToDestructiveMigration()` would
+have been one line instead of six, but it drops the table — and the listening history in
+that table is the entire reason the table exists. Verified on a populated v1 database:
+both rows survived with the new column defaulted to 0.
+
+**D20 — `finished` is derived from player state, never passed in.**
+First attempt marked the flag from inside `onPlaybackStateChanged(STATE_ENDED)`. That
+looked right and was wrong: ending a queue also fires `onIsPlayingChanged(false)`, which
+ran a moment later and wrote `finished = false` straight back over it. The flag never
+survived. It is now computed inside the save itself as
+`player.playbackState == Player.STATE_ENDED`, so every listener that fires at the end of a
+queue writes the same value and none of them can race. It also self-clears: playing the
+show again naturally writes `false`.
+
+**D21 — Rows already at the end of a show were not backfilled as finished.**
+The migration defaults every existing row to 0, including shows that had in fact been
+played out before the flag existed. Inferring it from `positionMs` against a track
+duration the table doesn't store would mean guessing. They sort themselves out the next
+time they're played.
+
+**D22 — A finished show restarts from the top.**
+Its stored position is the last second of the encore, so resuming there stops again
+immediately — the wart that prompted this work. Both entry points are handled: the archive
+row opens the show screen, and the show screen hides its resume banner when finished.
+
+**D23 — Dismiss deletes the row rather than hiding it.**
+"Remove from Continue listening" is a plain delete, so a dismissed show is genuinely
+forgotten rather than accumulating invisible state. Playing it again starts it over as a
+new row. The archive has the same control.
+
+**D24 — A plain clickable Box for the dismiss button, not `IconButton`.**
+`IconButton` enforces a 48dp minimum touch target that overflowed the 132dp artwork and
+spilled onto the neighbouring card.
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

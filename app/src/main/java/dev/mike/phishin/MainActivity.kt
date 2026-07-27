@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -106,6 +107,7 @@ fun App(vm: PlayerViewModel = viewModel()) {
     ) { padding ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
+            composable("archive") { ArchiveScreen(vm, nav) }
             composable("shows/{period}") { entry ->
                 ShowsScreen(entry.arguments?.getString("period").orEmpty(), nav)
             }
@@ -121,7 +123,8 @@ fun App(vm: PlayerViewModel = viewModel()) {
 @Composable
 fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
     val years = loadOnce { PhishInApi.years() }
-    val recent by vm.progressDao.recent().collectAsState(initial = emptyList())
+    val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
+    val archived by vm.progressDao.archived().collectAsState(initial = emptyList())
     var query by rememberSaveable { mutableStateOf("") }
     val term = query.trim()
     val results = searchFor(term)
@@ -165,6 +168,17 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                     }
                 }
                 item { Spacer(Modifier.height(8.dp)) }
+            }
+
+            if (archived.isNotEmpty()) {
+                item {
+                    RowItem(
+                        title = "Archive",
+                        subtitle = "${archived.size} finished ${plural(archived.size, "show")}",
+                        artUrl = archived.first().artUrl,
+                        onClick = { nav.navigate("archive") }
+                    )
+                }
             }
 
             item { SectionHeader("Browse by year") }
@@ -230,7 +244,9 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
             else -> r.fold(
                 onSuccess = { s ->
                     val playable = s.tracks.filter { it.playable }
-                    val progress = saved.value?.getOrNull()
+                    // A finished show's stored position is the end of the encore, so
+                    // offering to resume it would just stop again immediately.
+                    val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
                     LazyColumn {
                         item { ShowHeader(s, playable.size) }
                         if (progress != null) {
@@ -338,16 +354,76 @@ private fun ResumeCard(progress: Progress, vm: PlayerViewModel) {
     Column(
         Modifier.width(132.dp).clickable { vm.resume(progress) }
     ) {
-        AsyncImage(
-            model = progress.artUrl,
-            contentDescription = null,
-            modifier = Modifier.size(132.dp).clip(RoundedCornerShape(8.dp))
-        )
+        Box {
+            AsyncImage(
+                model = progress.artUrl,
+                contentDescription = null,
+                modifier = Modifier.size(132.dp).clip(RoundedCornerShape(8.dp))
+            )
+            // Manual removal: drops the show from the list without playing it.
+            // A plain clickable Box rather than IconButton — IconButton enforces a 48dp
+            // minimum touch target that spills outside the 132dp artwork and over the
+            // neighbouring card.
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable { vm.forget(progress) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    "Remove ${progress.title} from Continue listening",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
         Spacer(Modifier.height(6.dp))
         Text(progress.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         Text(progress.trackTitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
     }
 }
+
+@Composable
+fun ArchiveScreen(vm: PlayerViewModel, nav: NavHostController) {
+    val archived by vm.progressDao.archived().collectAsState(initial = emptyList())
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Archive", nav)
+        if (archived.isEmpty()) {
+            Text(
+                "Shows you play all the way through land here.",
+                color = Color.Gray,
+                modifier = Modifier.padding(16.dp)
+            )
+            return
+        }
+        LazyColumn {
+            items(archived, key = { it.queueKey }) { p ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        RowItem(
+                            title = p.title,
+                            subtitle = p.subtitle,
+                            artUrl = p.artUrl,
+                            trailing = "finished",
+                            onClick = { nav.navigate("show/${p.queueKey.removePrefix("show:")}") }
+                        )
+                    }
+                    IconButton(onClick = { vm.forget(p) }) {
+                        Icon(Icons.Default.Close, "Remove ${p.title} from archive", tint = Color.Gray)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun plural(n: Int, word: String) = if (n == 1) word else "${word}s"
 
 @Composable
 private fun TrackRow(track: Track, number: Int, onClick: () -> Unit) {
