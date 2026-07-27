@@ -141,8 +141,11 @@ private data class PlaylistsPage(
 )
 
 object PhishInApi {
-    private val BASE = "https://phish.in/api/v2".toHttpUrl()
+    private val DEFAULT_BASE = "https://phish.in/api/v2".toHttpUrl()
     private val JSON_MEDIA = "application/json".toMediaType()
+
+    /** Overridden by tests to point at a local mock server. */
+    internal var baseUrl: HttpUrl = DEFAULT_BASE
 
     /**
      * The JWT from /auth/login, sent as `X-Auth-Token`.
@@ -194,7 +197,7 @@ object PhishInApi {
     }
 
     private fun path(vararg segments: String) =
-        BASE.newBuilder().apply { segments.forEach { addPathSegment(it) } }
+        baseUrl.newBuilder().apply { segments.forEach { addPathSegment(it) } }
 
     // ------------------------------------------------------------------ auth
 

@@ -63,12 +63,12 @@ fun WaveformScrubber(
             .height(56.dp)
             .pointerInput(durationMs) {
                 detectTapGestures { offset ->
-                    if (durationMs > 0) onSeek(msAt(offset.x, size.width, durationMs))
+                    if (durationMs > 0) onSeek(positionAt(offset.x, size.width, durationMs))
                 }
             }
             .pointerInput(durationMs) {
                 detectHorizontalDragGestures { change, _ ->
-                    if (durationMs > 0) onSeek(msAt(change.position.x, size.width, durationMs))
+                    if (durationMs > 0) onSeek(positionAt(change.position.x, size.width, durationMs))
                 }
             }
     ) {
@@ -80,6 +80,3 @@ fun WaveformScrubber(
         }
     }
 }
-
-private fun msAt(x: Float, widthPx: Int, durationMs: Long): Long =
-    (x / widthPx.toFloat() * durationMs).toLong().coerceIn(0L, durationMs)

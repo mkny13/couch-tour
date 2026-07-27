@@ -1,0 +1,2802 @@
+{
+ "exact_show": null,
+ "other_shows": [
+  {
+   "id": 2515,
+   "date": "2025-07-27",
+   "audio_status": "complete",
+   "cover_art_urls": {
+    "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+    "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+    "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+   },
+   "album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+   "album_zip_url": null,
+   "duration": 11702952,
+   "admin_notes": null,
+   "tour_name": "Summer Tour 2025",
+   "venue_name": "Broadview Stage at SPAC",
+   "venue": {
+    "slug": "saratoga-performing-arts-center",
+    "name": "Saratoga Performing Arts Center",
+    "other_names": [
+     "Broadview Stage at SPAC"
+    ],
+    "latitude": 43.055813,
+    "longitude": -73.805773,
+    "city": "Saratoga Springs",
+    "state": "NY",
+    "country": "USA",
+    "location": "Saratoga Springs, NY",
+    "map_snapshot_url": "https://phish.in/blob/t3wgl8s6jhw3nhsg7fsqpvxuycs8.png",
+    "shows_count": 27,
+    "shows_with_audio_count": 27,
+    "created_at": "2013-02-09T22:10:40-05:00",
+    "updated_at": "2026-01-01T21:23:09-05:00"
+   },
+   "taper_notes": "Phish\n2025/07/27\nSaratoga Performing Arts Center\nSaratoga Springs, NY\n\nSet 1:\n01. Buried Alive\n02. Tweezer Reprise\n03. Reba\n04. Tweezer Reprise\n05. Funky Bitch\n06. Roses Are Free\n07. Tweezer Reprise\n08. 46 Days\n09. About to Run\n10. Split Open And Melt\n11. Tweezer Reprise\n\nSet 2:\n12. Kill Devil Falls\n13. Twist\n14. Golden Age\n15. Tweezer Reprise\n16. Boogie On Reggae Woman\n17. You Enjoy Myself\n18. Tweezer Reprise\n\nEncore:\n19. Tweezer\n20. Harry Hood\n\nSource: AKG CK63 (NOS) > nBob actives > Naiant PFA > MixPre 6ii (32/48)\n\nTaped and mastered by Al W.\nAddeddate 2025-07-28 17:41:58\nIdentifier phish2025-07-27.ck63\nScanner Internet Archive HTML5 Uploader 1.7.0\n",
+   "likes_count": 19,
+   "performance_gap_value": 1,
+   "created_at": "2025-07-28T16:13:44-04:00",
+   "updated_at": "2026-07-10T15:35:06-04:00",
+   "tags": [
+    {
+     "name": "Lore",
+     "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+     "color": "#808080",
+     "priority": 22,
+     "notes": "Tweezer, which was played as an encore for the first time, ended abruptly with a \"Do you get it?\" sound bite immediately following the song's conclusion."
+    }
+   ],
+   "tracks": [
+    {
+     "id": 40497,
+     "slug": "buried-alive",
+     "title": "Buried Alive",
+     "position": 1,
+     "duration": 193200,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 3,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/7c1vh6g3qy2yj5f4sqha8qxilhat.mp3",
+     "waveform_image_url": "https://phish.in/blob/2fyexm4dbxk6xjjg0vx4ob55roey.png",
+     "tags": [],
+     "created_at": "2025-07-28T16:13:44-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "buried-alive",
+       "title": "Buried Alive",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 176,
+       "tracks_with_audio_count": 162,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2021-05-04T09:35:38-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40498,
+     "slug": "tweezer-reprise",
+     "title": "Tweezer Reprise",
+     "position": 2,
+     "duration": 783408,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 12,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/9zmtctoe5vjvthmu9n04cr9fj36c.mp3",
+     "waveform_image_url": "https://phish.in/blob/j1yw4i8a9bveh1ax8bwubk852obf.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Ushered in an unprecedented \"Tweezer Reprise\" fest with a version that was easily the most jammed to date, that is, until being later surpassed in the same show. The similarities at times to \"Tweezer\" are unsurprising, but the jam makes its own mark with the uplifting section beginning around 7:30 before it takes another swing at the typical ascending chords and then peters out > \"Reba\".",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:13:47-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "tweezer-reprise",
+       "title": "Tweezer Reprise",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 341,
+       "tracks_with_audio_count": 333,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40499,
+     "slug": "reba",
+     "title": "Reba",
+     "position": 3,
+     "duration": 760704,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 8,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/ysoj9thni0r44lzml5hazi0bfczn.mp3",
+     "waveform_image_url": "https://phish.in/blob/b1jptcqfejh0732v4jkgoannfzka.png",
+     "tags": [
+      {
+       "name": "Unfinished",
+       "description": "Incomplete performance of a composition",
+       "color": "#888888",
+       "priority": 16,
+       "notes": null,
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "A perhaps less than perfect version notable primarily for the way Trey manages to work the \"Tweezer Reprise\" progression into the already gorgeous \"Reba\" jam and for the subsequent segue into same despite a botched attempt at ending the jam from Fishman.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:13:57-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "reba",
+       "title": "Reba",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 422,
+       "tracks_with_audio_count": 401,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40500,
+     "slug": "tweezer-reprise-2",
+     "title": "Tweezer Reprise",
+     "position": 4,
+     "duration": 183624,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 6,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/7bca0xrk3isxgwtfjryw79j3lmpi.mp3",
+     "waveform_image_url": "https://phish.in/blob/q9pn0wvdakgu7u3voreh1mryi878.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Exhilarating segue -> in from \"Reba's\" peak, then drops into a short rocking jam and > \"Funky Bitch\".",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:14:06-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "tweezer-reprise",
+       "title": "Tweezer Reprise",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 341,
+       "tracks_with_audio_count": 333,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40501,
+     "slug": "funky-bitch",
+     "title": "Funky Bitch",
+     "position": 5,
+     "duration": 415584,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 6,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/2zwz0zamg3tdmnbgwka3ha4img07.mp3",
+     "waveform_image_url": "https://phish.in/blob/zuz77chazf32ie7sa1cj7bmmtolq.png",
+     "tags": [],
+     "created_at": "2025-07-28T16:14:09-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "funky-bitch",
+       "title": "Funky Bitch",
+       "alias": null,
+       "original": false,
+       "artist": "Meredith Brooks",
+       "tracks_count": 246,
+       "tracks_with_audio_count": 235,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T01:50:06-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40502,
+     "slug": "roses-are-free",
+     "title": "Roses Are Free",
+     "position": 6,
+     "duration": 1026240,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 11,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/bt06w6dx16j5m6jpmowc57wf4j0s.mp3",
+     "waveform_image_url": "https://phish.in/blob/dothjpu47fmvsnhi16yfuymgosbj.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "The longest \"Roses\" since Cypress is another gem in the \"Reprise Fest.\" Fish's driving play ensures this stays uptempo the whole time, before -> into \"Tweezer Reprise\".",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:14:14-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "roses-are-free",
+       "title": "Roses Are Free",
+       "alias": null,
+       "original": false,
+       "artist": "Ween",
+       "tracks_count": 53,
+       "tracks_with_audio_count": 53,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T01:54:03-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40503,
+     "slug": "tweezer-reprise-3",
+     "title": "Tweezer Reprise",
+     "position": 7,
+     "duration": 73680,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/3oo3dqhyhrfx3rsddjwbkhsab53g.mp3",
+     "waveform_image_url": "https://phish.in/blob/ymlhaqg1m4d3b81lybeok7de3mqe.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "This time, it's -> out of a big \"Roses\" jam that \"Tweezer Reprise\" gets another run in the middle of a wild set.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:14:27-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "tweezer-reprise",
+       "title": "Tweezer Reprise",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 341,
+       "tracks_with_audio_count": 333,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40504,
+     "slug": "46-days",
+     "title": "46 Days",
+     "position": 8,
+     "duration": 575856,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 5,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/svrglkmyo9komrt7bt01tcxiigaa.mp3",
+     "waveform_image_url": "https://phish.in/blob/ak99es5b9qs5q6dhlwht8f2vaee9.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Compact version with no shortage of ideas or verve. Listen for the atypical tonal and mode shifts.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:14:28-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "46-days",
+       "title": "46 Days",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 160,
+       "tracks_with_audio_count": 154,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2021-05-09T01:13:22-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40505,
+     "slug": "about-to-run",
+     "title": "About to Run",
+     "position": 9,
+     "duration": 385032,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 3,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/izzi5csm6124tzrlwhbidxiu7og4.mp3",
+     "waveform_image_url": "https://phish.in/blob/81m13xwzn2ss15cjqzhj71lx1hb8.png",
+     "tags": [],
+     "created_at": "2025-07-28T16:14:35-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "about-to-run",
+       "title": "About to Run",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 29,
+       "tracks_with_audio_count": 28,
+       "created_at": "2019-06-13T13:07:36-04:00",
+       "updated_at": "2021-05-08T20:59:35-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40506,
+     "slug": "split-open-and-melt",
+     "title": "Split Open and Melt",
+     "position": 10,
+     "duration": 785976,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 7,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/fc635f7r1enpsme730vx3p73gfs7.mp3",
+     "waveform_image_url": "https://phish.in/blob/r1oh22p95x6rjzwg87173pip4nkk.png",
+     "tags": [
+      {
+       "name": "Unfinished",
+       "description": "Incomplete performance of a composition",
+       "color": "#888888",
+       "priority": 16,
+       "notes": null,
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "A nice side of musical deconstruction with all those different versions of \"Tweezer Reprise\". Fish and Mike stand out in the chaos. The jam emerges from the muck and like a freight train barrels back into -> another \"Reprise\".",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:14:40-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "split-open-and-melt",
+       "title": "Split Open and Melt",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 357,
+       "tracks_with_audio_count": 344,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40507,
+     "slug": "tweezer-reprise-4",
+     "title": "Tweezer Reprise",
+     "position": 11,
+     "duration": 180984,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 5,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/0jo9xavd4crf2i3orsnbo9j108xk.mp3",
+     "waveform_image_url": "https://phish.in/blob/5fk961aqjlkmlatjvpgn4n8lus4t.png",
+     "tags": [
+      {
+       "name": "Tease",
+       "description": "Transient musical reference",
+       "color": "#888888",
+       "priority": 15,
+       "notes": "Split Open and Melt",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Rises from the ashes of a destructive \"Melt\" jam to close a phenomenal set while also interpolating the usual \"Melt\" ending.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:14:50-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "tweezer-reprise",
+       "title": "Tweezer Reprise",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 341,
+       "tracks_with_audio_count": 333,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40508,
+     "slug": "kill-devil-falls",
+     "title": "Kill Devil Falls",
+     "position": 12,
+     "duration": 1017192,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 11,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/41lv297hc9y97vreroovbs73vfzt.mp3",
+     "waveform_image_url": "https://phish.in/blob/e612df0ef4rb8l9zic2q830pw4h0.png",
+     "tags": [
+      {
+       "name": "Tease",
+       "description": "Transient musical reference",
+       "color": "#888888",
+       "priority": 15,
+       "notes": "The Secret of Life by Dead Milkmen",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Unfinished",
+       "description": "Incomplete performance of a composition",
+       "color": "#888888",
+       "priority": 16,
+       "notes": null,
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Brisk play takes hold from the beginning, with Trey and Mike's interplay being particularly elevated and conversational. Play then breaks into dreamier territory, retaining an upbeat bent while shifting between major and minor key tonalities. The band then latches on to an infectious, driving theme that culminates in hose-y Trey peaks and a massive Mike bass bomb before > \"Twist\".",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:14:52-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "kill-devil-falls",
+       "title": "Kill Devil Falls",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 126,
+       "tracks_with_audio_count": 123,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-09T01:13:23-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40509,
+     "slug": "twist",
+     "title": "Twist",
+     "position": 13,
+     "duration": 873696,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 9,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/3ejmcroqdq5leci6u2esmeew6u68.mp3",
+     "waveform_image_url": "https://phish.in/blob/jhmpgv9z45r635u1fbyakws2er7g.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Finds itself in an almost elastic space both rhythmically and harmonically. The band's adept interplay pushes the music through several different tonalities and moods with ease. An intense, darker rock segment emerges before then flipping towards an upbeat vibe to deliver another intense, peak-filled crescendo for this jam's conclusion.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:15:05-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "twist",
+       "title": "Twist",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 195,
+       "tracks_with_audio_count": 189,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-09T01:13:23-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40510,
+     "slug": "golden-age",
+     "title": "Golden Age",
+     "position": 14,
+     "duration": 365688,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 3,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/t69xhc8qpshnkgmarh2raemmdc44.mp3",
+     "waveform_image_url": "https://phish.in/blob/7uiaeoz05v8bie76xocybgas7ota.png",
+     "tags": [],
+     "created_at": "2025-07-28T16:15:15-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "golden-age",
+       "title": "Golden Age",
+       "alias": null,
+       "original": false,
+       "artist": "TV On The Radio",
+       "tracks_count": 90,
+       "tracks_with_audio_count": 86,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2024-03-15T15:56:26-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40511,
+     "slug": "tweezer-reprise-5",
+     "title": "Tweezer Reprise",
+     "position": 15,
+     "duration": 1383240,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 12,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/rfrwel5j78jopvwf69o4yigwzwoh.mp3",
+     "waveform_image_url": "https://phish.in/blob/pje1zs2wtk89iokh6d34t5h4ms3v.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "The 5th(!) \"Tweezer Reprise\" from this instant-classic show is a must-hear, multi-sectioned freight train of improvisation. This journey includes optimistic peak-filled play, muscular dance-funk, space-y Pink Floyd-isms and a menacingly dark crawl, from which the \"Tweezer Reprise\" theme rises like some sort of unholy Kraken-Phoenix hybrid, before building to a hose-y climax and -> \"Boogie On Reggae Woman\".",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:15:20-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "tweezer-reprise",
+       "title": "Tweezer Reprise",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 341,
+       "tracks_with_audio_count": 333,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40512,
+     "slug": "boogie-on-reggae-woman",
+     "title": "Boogie on Reggae Woman",
+     "position": 16,
+     "duration": 290064,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 6,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/5it4wq8jp074q0reckm7hld3nu58.mp3",
+     "waveform_image_url": "https://phish.in/blob/rau2b1p9xplf4rr7h13xmbkdcbij.png",
+     "tags": [],
+     "created_at": "2025-07-28T16:15:37-04:00",
+     "updated_at": "2026-01-01T21:39:09-05:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "boogie-on-reggae-woman",
+       "title": "Boogie on Reggae Woman",
+       "alias": null,
+       "original": false,
+       "artist": "Stevie Wonder",
+       "tracks_count": 99,
+       "tracks_with_audio_count": 99,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2026-01-01T21:39:09-05:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40513,
+     "slug": "you-enjoy-myself",
+     "title": "You Enjoy Myself",
+     "position": 17,
+     "duration": 1037376,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/dcei75xlm8ly2mpal8p95ovp13e8.mp3",
+     "waveform_image_url": "https://phish.in/blob/eav1xb6v76g9zq41l4pcob9m7fcr.png",
+     "tags": [],
+     "created_at": "2025-07-28T16:15:41-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "you-enjoy-myself",
+       "title": "You Enjoy Myself",
+       "alias": "YEM",
+       "original": true,
+       "artist": null,
+       "tracks_count": 639,
+       "tracks_with_audio_count": 585,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-08T20:57:54-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40514,
+     "slug": "tweezer-reprise-6",
+     "title": "Tweezer Reprise",
+     "position": 18,
+     "duration": 180360,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/s2ocqhxv2qi7k5hb796fmirqpb7f.mp3",
+     "waveform_image_url": "https://phish.in/blob/p1tv1372g0xncasbcouw8ccfakg5.png",
+     "tags": [
+      {
+       "name": "Banter",
+       "description": "Spoken interaction between band members or audience",
+       "color": "#888888",
+       "priority": 17,
+       "notes": "Trey thanks the crowd",
+       "starts_at_second": 138,
+       "ends_at_second": null,
+       "transcript": "TREY: Thanks so much, everyone."
+      },
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "The 6th and final \"Tweezer Reprise\" of a historic show begins -> from \"YEM's\" second jam and includes some bonus Trey soloing before emphatically closing out the set.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:15:54-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "tweezer-reprise",
+       "title": "Tweezer Reprise",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 341,
+       "tracks_with_audio_count": 333,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40515,
+     "slug": "tweezer",
+     "title": "Tweezer",
+     "position": 19,
+     "duration": 298512,
+     "jam_starts_at_second": null,
+     "set_name": "Encore",
+     "exclude_from_stats": false,
+     "likes_count": 5,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/b7hhvi2xn2pbb6hyzak75haahb3e.mp3",
+     "waveform_image_url": "https://phish.in/blob/zz622z4rub3hz8a8txnbapfdr7pd.png",
+     "tags": [
+      {
+       "name": "Banter",
+       "description": "Spoken interaction between band members or audience",
+       "color": "#888888",
+       "priority": 17,
+       "notes": "Fish asks if the crowd gets the Tweezer joke",
+       "starts_at_second": 268,
+       "ends_at_second": null,
+       "transcript": "FISH: Do you get it?"
+      }
+     ],
+     "created_at": "2025-07-28T16:15:56-04:00",
+     "updated_at": "2026-01-05T04:12:50-05:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "tweezer",
+       "title": "Tweezer",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 458,
+       "tracks_with_audio_count": 447,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 40516,
+     "slug": "harry-hood",
+     "title": "Harry Hood",
+     "position": 20,
+     "duration": 892536,
+     "jam_starts_at_second": null,
+     "set_name": "Encore",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/dabu0hfm49cs588u1gsax2chnnbi.mp3",
+     "waveform_image_url": "https://phish.in/blob/yf7vqc8oeo5emdnsbtj94drtlfsq.png",
+     "tags": [
+      {
+       "name": "Banter",
+       "description": "Spoken interaction between band members or audience",
+       "color": "#888888",
+       "priority": 17,
+       "notes": "Trey thanks the crowd, crew, and staff",
+       "starts_at_second": 819,
+       "ends_at_second": null,
+       "transcript": "TREY: Thank you, guys. What a fun tour. Thank you all for having us. I wish I could take a moment to thank everybody by name but would you please give a huge hand to our unbelievable crew and staff and crew, and everybody, the whole family, thank you. I'm joining you. You're the best crew ever, in the whole wide world. There they are. Hey guys and gals, men, women, people, all of you. Hey you. Thanks everybody. Can't wait to see you again really soon. Thank you. Be safe, we love you, and we'll see you very soon."
+      },
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Puts a capper on a tremendous show and a tour which saw a strong return to form for pure \"Hood\" jams. This version begins delicately until a repeated riff from Trey at 9:45 starts the build to a beautifully layered peak, after which Trey thanks the crew for the end of the tour.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2025-07-28T16:16:00-04:00",
+     "updated_at": "2025-10-01T23:26:02-04:00",
+     "show_date": "2025-07-27",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+      "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+      "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+     "venue_slug": "saratoga-performing-arts-center",
+     "venue_name": "Broadview Stage at SPAC",
+     "venue_location": "Saratoga Springs, NY",
+     "songs": [
+      {
+       "slug": "harry-hood",
+       "title": "Harry Hood",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 449,
+       "tracks_with_audio_count": 431,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:40-04:00"
+      }
+     ],
+     "liked_by_user": false
+    }
+   ],
+   "liked_by_user": false,
+   "previous_show_date": null,
+   "next_show_date": null,
+   "previous_show_date_with_audio": null,
+   "next_show_date_with_audio": null
+  },
+  {
+   "id": 932,
+   "date": "1998-08-15",
+   "audio_status": "complete",
+   "cover_art_urls": {
+    "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+    "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+    "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+   },
+   "album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+   "album_zip_url": "https://phish.in/blob/xm7h0fr7dwlwnazp6d0ydxocja25.zip",
+   "duration": 19589774,
+   "admin_notes": null,
+   "tour_name": "Summer U.S. Tour 1998",
+   "venue_name": "Loring Commerce Centre",
+   "venue": {
+    "slug": "loring-commerce-centre",
+    "name": "Loring Commerce Centre",
+    "other_names": [],
+    "latitude": 46.953543,
+    "longitude": -67.885578,
+    "city": "Limestone",
+    "state": "ME",
+    "country": "USA",
+    "location": "Limestone, ME",
+    "map_snapshot_url": "https://phish.in/blob/7wdjg301atx3stw62mnezvgyrqob.png",
+    "shows_count": 8,
+    "shows_with_audio_count": 8,
+    "created_at": "2013-02-09T22:10:39-05:00",
+    "updated_at": "2026-01-01T21:23:11-05:00"
+   },
+   "taper_notes": "Phish\r\nAugust 15th, 1998\r\nLoring Air Force Base\r\nLimestone, ME\r\n\r\n-Source DAT for Set1, Set2, and Ambient Set labeled (FOB Neumann u89i > Grace Lunatec V2 > Apogee > D8 @ 48khz)\r\n-Source DAT for Set3 labeled (Neumann u89i > Grace Lunatec V2 > Apogee > D8 @ 44khz)\r\n-Taper Unknown\r\n-Set1, Set2, Ambient Set transfer Tascam DA-40 > S/PDIF > M-Audio 2496 @ 48khz\r\n-Set3 transfer Tascam DA-40 > S/PDIF > M-Audio 2496 @ 44khz\r\n-Set1, Set2, Ambient Set 48khz > 44khz sample rate conversion via iZotope SRC 64 bit SRC \r\n-Tracking performed in Adobe Audition 3.0\r\n-FLAC conversion via Trader's Little Helper\r\n\r\nAll transfers by ifthir@hotmail.com (1.24.2011)\r\n\r\n\r\nSet 1\r\n\r\n1. Mike's Song > [10:16]\r\n2. Simple [11:56]\r\n3. Beauty Of My Dreams [3:28]\r\n4. Roggae [8:39]\r\n5. Split Open And Melt [12:19]\r\n6. Poor Heart [4:20]\r\n7. Moma Dance [13:02]\r\n8. Divided Sky [16:52]\r\n9. Water In The Sky [3:30]\r\n10. Funky Bitch > [7:50]\r\n11. Cities > [8:30]\r\n12. Weekapaug Groove [10:50]\r\n\r\nTotal Time [1:51:32]\r\n\r\nSet 2\r\n\r\n1. The Wedge [7:05]\r\n2. Reba [16:45]\r\n3. Gumbo > [13:48]\r\n4. Sanity > [5:33]\r\n5. Tweezer > [16:04]\r\n6. The Horse > [1:39]\r\n7. Silent In The Morning [5:23]\r\n8. Chalkdust Torture [8:02]\r\n9. Slave To The Traffic Light [10:48]\r\n\r\nTotal Time [1:25:07]\r\n\r\nSet 3\r\n\r\n1. NICU > [5:29]\r\n2. David Bowie [24:56]\r\n3. Strange Design [3:22]\r\n4. Limb By Limb > [11:29]\r\n5. Brian And Robert [3:42]\r\n6. Loving Cup [10:12]\r\n\r\nEncore\r\n\r\n7. Halley's Comet > [7:07]\r\n8. Cavern [4:09]\r\n9. Tweezer Reprise [9:03]\r\n\r\nTotal Time [1:19:29]\r\n\r\n\r\nAmbient Set \r\n\r\n1. Ambient Set [51:55]\r\n\r\n\r\n\r\nShow Notes:\r\n\r\nSplit Open and Melt was by request\r\nSneakin' Sally tease during Cities\r\nAlternate lyrics during Cities\r\nExtended intro to David Bowie\r\nAmbient Jam is in the style of \"Brian Eno\", per Trey's speech at the end of Tweezer Reprise\n\n----------------------------------------\n\nPHISH\n\nAugust 15, 1998\nLoring Commerce Centre\nLimestone, Maine\n\nSource: FM (KA2XE \"The Badger\") Sony Walkman > Sony D5; Taped by Zeke Vaughn\nCass/m > Yamaha KX-350 > Tascam DR100 MKII @ 24/48\nwav > Audacity > iZotope RX > xACT(FLAC/TAG); DiGiHoArDeRs: 10/29/2023, 3/30/25\n\nAmbient Jam",
+   "likes_count": 107,
+   "performance_gap_value": 1,
+   "created_at": "2012-11-11T21:59:27-05:00",
+   "updated_at": "2026-07-08T08:06:56-04:00",
+   "tags": [
+    {
+     "name": "Lore",
+     "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+     "color": "#808080",
+     "priority": 22,
+     "notes": "After Tweezer Reprise, Trey made a long announcement thanking people for coming and remarked on the fun and joy of the summer concert festivals. He said that there would be some more music, played by the light of candles made that day by fans. The ensuing ambient jam was in the style of Brian Eno and was nearly an hour long."
+    }
+   ],
+   "tracks": [
+    {
+     "id": 18448,
+     "slug": "mikes-song",
+     "title": "Mike's Song",
+     "position": 1,
+     "duration": 616908,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 12,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/3iv0ungvid52mylc6koml0rijkyr.mp3",
+     "waveform_image_url": "https://phish.in/blob/b7ukvq3214uf39x4wsggi0mwstag.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:27-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "mike-s-song",
+       "title": "Mike's Song",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 567,
+       "tracks_with_audio_count": 532,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-09T01:13:23-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18449,
+     "slug": "simple",
+     "title": "Simple",
+     "position": 2,
+     "duration": 716800,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 12,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/hb74cs40e1kecrmowgjv3wwc0ahl.mp3",
+     "waveform_image_url": "https://phish.in/blob/ktcmuz537xrin4m59bzp4udc0g2i.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:28-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "simple",
+       "title": "Simple",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 218,
+       "tracks_with_audio_count": 215,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2018-12-26T22:40:53-05:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18450,
+     "slug": "beauty-of-my-dreams",
+     "title": "Beauty of My Dreams",
+     "position": 3,
+     "duration": 208274,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/ipgmzgq2osuvp2oajsr2cana1lin.mp3",
+     "waveform_image_url": "https://phish.in/blob/hcshm3elq3qyruq9izgie7iycmv0.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:28-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "beauty-of-my-dreams",
+       "title": "Beauty of My Dreams",
+       "alias": null,
+       "original": false,
+       "artist": "The Del McCoury Band",
+       "tracks_count": 57,
+       "tracks_with_audio_count": 57,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2021-05-04T03:05:36-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18451,
+     "slug": "roggae",
+     "title": "Roggae",
+     "position": 4,
+     "duration": 519497,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 5,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/76rckw2wzke33652665qac35vk1b.mp3",
+     "waveform_image_url": "https://phish.in/blob/iauxiib1d980xpmp1u2xmxz58ih7.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:28-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "roggae",
+       "title": "Roggae",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 120,
+       "tracks_with_audio_count": 116,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2018-12-26T22:40:53-05:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18452,
+     "slug": "split-open-and-melt",
+     "title": "Split Open and Melt",
+     "position": 5,
+     "duration": 739814,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 7,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/x6d4gqu1ypkivjsd86olmat07d98.mp3",
+     "waveform_image_url": "https://phish.in/blob/ar79wkc9vsh64rnqcgplpytq6jhv.png",
+     "tags": [
+      {
+       "name": "Banter",
+       "description": "Spoken interaction between band members or audience",
+       "color": "#888888",
+       "priority": 17,
+       "notes": "Played by request for an eight-year-old boy named Sam Jarvis.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:28-05:00",
+     "updated_at": "2026-01-06T00:58:17-05:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "split-open-and-melt",
+       "title": "Split Open and Melt",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 357,
+       "tracks_with_audio_count": 344,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18453,
+     "slug": "poor-heart",
+     "title": "Poor Heart",
+     "position": 6,
+     "duration": 260989,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 5,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/c2m3t5yhkhjgd0jb2eetpts7v7am.mp3",
+     "waveform_image_url": "https://phish.in/blob/zu230n02qcjlagrlqkjmzxxr5167.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:29-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "poor-heart",
+       "title": "Poor Heart",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 312,
+       "tracks_with_audio_count": 302,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18454,
+     "slug": "the-moma-dance",
+     "title": "The Moma Dance",
+     "position": 7,
+     "duration": 782968,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 13,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/6lsskskf6m8jbkgzjqlcv303hpz2.mp3",
+     "waveform_image_url": "https://phish.in/blob/qbh7bitag7jxcv565fjmfmxg5c49.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:29-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "the-moma-dance",
+       "title": "The Moma Dance",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 216,
+       "tracks_with_audio_count": 210,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:40-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18455,
+     "slug": "divided-sky",
+     "title": "Divided Sky",
+     "position": 8,
+     "duration": 1012558,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 19,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/r6wfh5gt38nqmktjrdklxh05cukz.mp3",
+     "waveform_image_url": "https://phish.in/blob/el8mjs6a8kylxk2cujlroy5rou4f.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Musically, 1998 falls somewhere between the crisp, hard rocking sound of the mid-90's and the subtle, layered grooves of 1999 and 2000. This excellent version provides glimpses of both.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:29-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "divided-sky",
+       "title": "Divided Sky",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 447,
+       "tracks_with_audio_count": 414,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:39-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18456,
+     "slug": "water-in-the-sky",
+     "title": "Water in the Sky",
+     "position": 9,
+     "duration": 210390,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 2,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/hh86g1r9u3mkbsbhja96hksggbe5.mp3",
+     "waveform_image_url": "https://phish.in/blob/lkdh0e0i4d3wz4np3aaoi4e0susd.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:29-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "water-in-the-sky",
+       "title": "Water in the Sky",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 89,
+       "tracks_with_audio_count": 89,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-09T01:13:23-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18457,
+     "slug": "funky-bitch",
+     "title": "Funky Bitch",
+     "position": 10,
+     "duration": 470491,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 9,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/kaik2s6o1rrxwm63bgck0ys5n6zq.mp3",
+     "waveform_image_url": "https://phish.in/blob/da0bwtffun16fa7tip71t9vvh4b2.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:29-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "funky-bitch",
+       "title": "Funky Bitch",
+       "alias": null,
+       "original": false,
+       "artist": "Meredith Brooks",
+       "tracks_count": 246,
+       "tracks_with_audio_count": 235,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T01:50:06-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18458,
+     "slug": "cities",
+     "title": "Cities",
+     "position": 11,
+     "duration": 510929,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 13,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/hhd9s9rxeg9pd7xw1aptsqmwblxl.mp3",
+     "waveform_image_url": "https://phish.in/blob/my3m72oi6n6kjgbqpbnpoivjmue7.png",
+     "tags": [
+      {
+       "name": "Tease",
+       "description": "Transient musical reference",
+       "color": "#888888",
+       "priority": 15,
+       "notes": "Sneakin' Sally Through the Alley by Allen Toussaint",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Alt Lyric",
+       "description": "Atypical lyric or keyword variant",
+       "color": "#888888",
+       "priority": 10,
+       "notes": "Included alternate lyrics relating to the concert grounds.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:30-05:00",
+     "updated_at": "2026-01-05T22:21:10-05:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "cities",
+       "title": "Cities",
+       "alias": null,
+       "original": false,
+       "artist": "Talking Heads",
+       "tracks_count": 115,
+       "tracks_with_audio_count": 105,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2024-10-02T17:01:33-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18459,
+     "slug": "weekapaug-groove",
+     "title": "Weekapaug Groove",
+     "position": 12,
+     "duration": 650841,
+     "jam_starts_at_second": null,
+     "set_name": "Set 1",
+     "exclude_from_stats": false,
+     "likes_count": 9,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/cmjcvrh2zefr89py0xyg7pio7ehy.mp3",
+     "waveform_image_url": "https://phish.in/blob/jkx8u4pwaoysen3psy8wk4bfs8bn.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:30-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "weekapaug-groove",
+       "title": "Weekapaug Groove",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 535,
+       "tracks_with_audio_count": 502,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18460,
+     "slug": "the-wedge",
+     "title": "The Wedge",
+     "position": 13,
+     "duration": 425509,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/tjl6jjyd0jzicpzldk34or7u8oso.mp3",
+     "waveform_image_url": "https://phish.in/blob/41a3t4fcgajju2d07yzsxlwddenr.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:30-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "the-wedge",
+       "title": "The Wedge",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 135,
+       "tracks_with_audio_count": 132,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-09T01:13:23-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18461,
+     "slug": "reba",
+     "title": "Reba",
+     "position": 14,
+     "duration": 1005453,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 14,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/xwstoqf6u5z75x8850q40kw79snv.mp3",
+     "waveform_image_url": "https://phish.in/blob/ehpka8tptrtwlntet3l7xkmx2frx.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:31-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "reba",
+       "title": "Reba",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 422,
+       "tracks_with_audio_count": 401,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18462,
+     "slug": "gumbo",
+     "title": "Gumbo",
+     "position": 15,
+     "duration": 828604,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 31,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/f78u5mbabwzmt8fdlcaa8djhcfbo.mp3",
+     "waveform_image_url": "https://phish.in/blob/odgpynth90sicy9mcik7uun97iwd.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "\"Manteca\"-like jamming to start, then, slowly, a \"Tweezer Reprise\" jam develops, and once it peaks, it breaks down into a fun danceable jam with a nice segue into \"Sanity\".",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Tease",
+       "description": "Transient musical reference",
+       "color": "#888888",
+       "priority": 15,
+       "notes": "Tweezer Reprise",
+       "starts_at_second": 589,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:31-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "gumbo",
+       "title": "Gumbo",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 128,
+       "tracks_with_audio_count": 123,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:40-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18463,
+     "slug": "sanity",
+     "title": "Sanity",
+     "position": 16,
+     "duration": 333923,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 7,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/izy4db452su3tq9w3s11qcfnzmki.mp3",
+     "waveform_image_url": "https://phish.in/blob/54v8cw7kw8dyy4j9c4g3ov1ab478.png",
+     "tags": [
+      {
+       "name": "Bustout",
+       "description": "First performance of a song in at least 100 shows",
+       "color": "#888888",
+       "priority": 21,
+       "notes": "First performance of Sanity in 140 shows",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:31-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "sanity",
+       "title": "Sanity",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 45,
+       "tracks_with_audio_count": 42,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18464,
+     "slug": "tweezer",
+     "title": "Tweezer",
+     "position": 17,
+     "duration": 964989,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 14,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/8f4k3cqpz8pxm0heu1v3f8fey0qn.mp3",
+     "waveform_image_url": "https://phish.in/blob/imcudd7t8xu2ddlslljrs8sp577y.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "Brief appearance by the MOOG.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:31-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "tweezer",
+       "title": "Tweezer",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 458,
+       "tracks_with_audio_count": 447,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18465,
+     "slug": "the-horse",
+     "title": "The Horse",
+     "position": 18,
+     "duration": 99866,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 3,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/cbhnfd85cmsuxcyk6tz0nxui3wvt.mp3",
+     "waveform_image_url": "https://phish.in/blob/df1dijhjox3d2vhvs7olokghxrfg.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:32-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "the-horse",
+       "title": "The Horse",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 175,
+       "tracks_with_audio_count": 174,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2018-12-26T22:40:52-05:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18466,
+     "slug": "silent-in-the-morning",
+     "title": "Silent in the Morning",
+     "position": 19,
+     "duration": 323918,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 3,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/fkxjk94m5ke8882wb9hmif0i6o0x.mp3",
+     "waveform_image_url": "https://phish.in/blob/cx2dyr4pcu470k2lo4sa8f2sqg2v.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:32-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "silent-in-the-morning",
+       "title": "Silent in the Morning",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 190,
+       "tracks_with_audio_count": 190,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-09T01:13:23-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18467,
+     "slug": "chalk-dust-torture",
+     "title": "Chalk Dust Torture",
+     "position": 20,
+     "duration": 482429,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 0,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/5hghgmox4ydf672vfer1ibsm7uav.mp3",
+     "waveform_image_url": "https://phish.in/blob/w1fgd78rax4cjsfpqy9mw0tewpjy.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:32-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "chalk-dust-torture",
+       "title": "Chalk Dust Torture",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 534,
+       "tracks_with_audio_count": 517,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2021-05-08T20:19:08-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18468,
+     "slug": "slave-to-the-traffic-light",
+     "title": "Slave to the Traffic Light",
+     "position": 21,
+     "duration": 648098,
+     "jam_starts_at_second": null,
+     "set_name": "Set 2",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/ympzeu1oiy7dv8yzv9emy46krp4s.mp3",
+     "waveform_image_url": "https://phish.in/blob/6ke3mf09y1zcohm35zcexyx6mqq3.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:32-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "slave-to-the-traffic-light",
+       "title": "Slave to the Traffic Light",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 298,
+       "tracks_with_audio_count": 286,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18469,
+     "slug": "nicu",
+     "title": "NICU",
+     "position": 22,
+     "duration": 329639,
+     "jam_starts_at_second": null,
+     "set_name": "Set 3",
+     "exclude_from_stats": false,
+     "likes_count": 1,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/pw4kav6vf7tz1qplvb8fz6ayerj7.mp3",
+     "waveform_image_url": "https://phish.in/blob/dy1ohxzsb1lpvrp665w1ptbmfjbt.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:32-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "nicu",
+       "title": "NICU",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 163,
+       "tracks_with_audio_count": 162,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2018-12-26T22:40:53-05:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18470,
+     "slug": "david-bowie",
+     "title": "David Bowie",
+     "position": 23,
+     "duration": 1496085,
+     "jam_starts_at_second": null,
+     "set_name": "Set 3",
+     "exclude_from_stats": false,
+     "likes_count": 8,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/84t4w0mcldd8al0623bmytub5med.mp3",
+     "waveform_image_url": "https://phish.in/blob/tnm0h2ezf9tahusd4jxlr3meop0v.png",
+     "tags": [
+      {
+       "name": "Tease",
+       "description": "Transient musical reference",
+       "color": "#888888",
+       "priority": 15,
+       "notes": "Theme from Mission: Impossible by Lalo Schifrin",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:33-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "david-bowie",
+       "title": "David Bowie",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 497,
+       "tracks_with_audio_count": 459,
+       "created_at": "2017-06-14T20:21:53-04:00",
+       "updated_at": "2021-05-04T09:35:43-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18471,
+     "slug": "strange-design",
+     "title": "Strange Design",
+     "position": 24,
+     "duration": 202841,
+     "jam_starts_at_second": null,
+     "set_name": "Set 3",
+     "exclude_from_stats": false,
+     "likes_count": 4,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/x299y9woetq809132rb3tinyyajh.mp3",
+     "waveform_image_url": "https://phish.in/blob/4upr4nygxf1ryjh8aib9qrp6bxyb.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:33-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "strange-design",
+       "title": "Strange Design",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 69,
+       "tracks_with_audio_count": 69,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:41-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18472,
+     "slug": "limb-by-limb",
+     "title": "Limb by Limb",
+     "position": 25,
+     "duration": 690051,
+     "jam_starts_at_second": null,
+     "set_name": "Set 3",
+     "exclude_from_stats": false,
+     "likes_count": 6,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/hszbvx5blpwcvnu23emiisyp49qu.mp3",
+     "waveform_image_url": "https://phish.in/blob/iiwbzvoaqu1tpbf7yc8kgtt0rhng.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "1998 was also a strong year for \"Limb.\" This Lemonwheel version is a case in point with a '98 style diminuendo ending.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:33-05:00",
+     "updated_at": "2026-01-01T21:39:09-05:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "limb-by-limb",
+       "title": "Limb by Limb",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 164,
+       "tracks_with_audio_count": 164,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2026-01-01T21:39:08-05:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18473,
+     "slug": "brian-and-robert",
+     "title": "Brian and Robert",
+     "position": 26,
+     "duration": 222877,
+     "jam_starts_at_second": null,
+     "set_name": "Set 3",
+     "exclude_from_stats": false,
+     "likes_count": 2,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/dnflih93hv3m3vsm9h20kejzwglk.mp3",
+     "waveform_image_url": "https://phish.in/blob/atw55u1t63t8nw6ch8ql8b7dwsjq.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:34-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "brian-and-robert",
+       "title": "Brian and Robert",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 56,
+       "tracks_with_audio_count": 56,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2021-05-09T01:13:22-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18474,
+     "slug": "loving-cup",
+     "title": "Loving Cup",
+     "position": 27,
+     "duration": 612075,
+     "jam_starts_at_second": null,
+     "set_name": "Set 3",
+     "exclude_from_stats": false,
+     "likes_count": 10,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/gpm7xyh4wk9g4lf299rvfpt6ma1b.mp3",
+     "waveform_image_url": "https://phish.in/blob/j79au4kz4g1t92xay4w4h71nfyl3.png",
+     "tags": [
+      {
+       "name": "Jamcharts",
+       "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+       "color": "#888888",
+       "priority": 4,
+       "notes": "They just kill it to close the third set!",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:34-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "loving-cup",
+       "title": "Loving Cup",
+       "alias": null,
+       "original": false,
+       "artist": "The Rolling Stones",
+       "tracks_count": 156,
+       "tracks_with_audio_count": 155,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T01:52:04-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18475,
+     "slug": "halleys-comet",
+     "title": "Halley's Comet",
+     "position": 28,
+     "duration": 427833,
+     "jam_starts_at_second": null,
+     "set_name": "Encore",
+     "exclude_from_stats": false,
+     "likes_count": 2,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/qgwxii5vue7iyzr6afxm1fbnvb27.mp3",
+     "waveform_image_url": "https://phish.in/blob/8f47b8yr5aw4afsm7h3ea3hwnm5h.png",
+     "tags": [
+      {
+       "name": "Alt Lyric",
+       "description": "Atypical lyric or keyword variant",
+       "color": "#888888",
+       "priority": 10,
+       "notes": "Included alternate lyrics relating to the concert grounds.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:34-05:00",
+     "updated_at": "2026-01-05T22:21:10-05:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "halley-s-comet",
+       "title": "Halley's Comet",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 161,
+       "tracks_with_audio_count": 152,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2021-05-04T09:35:40-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18476,
+     "slug": "cavern",
+     "title": "Cavern",
+     "position": 29,
+     "duration": 249757,
+     "jam_starts_at_second": null,
+     "set_name": "Encore",
+     "exclude_from_stats": false,
+     "likes_count": 0,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/vdllr18vd036kwnrdyg0w8938r4s.mp3",
+     "waveform_image_url": "https://phish.in/blob/9ea14xmpiliv8etrzvyfzm7mbxs9.png",
+     "tags": [],
+     "created_at": "2012-11-11T21:59:34-05:00",
+     "updated_at": "2025-10-01T23:25:08-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "cavern",
+       "title": "Cavern",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 487,
+       "tracks_with_audio_count": 456,
+       "created_at": "2012-08-25T11:01:05-04:00",
+       "updated_at": "2021-05-04T09:35:38-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18477,
+     "slug": "tweezer-reprise",
+     "title": "Tweezer Reprise",
+     "position": 30,
+     "duration": 543112,
+     "jam_starts_at_second": null,
+     "set_name": "Encore",
+     "exclude_from_stats": false,
+     "likes_count": 1,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/7u0tt7csuu835u7dc12fq3okgxgd.mp3",
+     "waveform_image_url": "https://phish.in/blob/rchqubrfzdowlzncll5q83vphawe.png",
+     "tags": [
+      {
+       "name": "Banter",
+       "description": "Spoken interaction between band members or audience",
+       "color": "#888888",
+       "priority": 17,
+       "notes": "After the song, Trey made a long announcement thanking people for coming and remarked on the fun and joy of the summer concert festivals.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:34-05:00",
+     "updated_at": "2026-01-06T00:58:17-05:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "tweezer-reprise",
+       "title": "Tweezer Reprise",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 341,
+       "tracks_with_audio_count": 333,
+       "created_at": "2012-08-25T11:01:07-04:00",
+       "updated_at": "2021-05-04T09:35:42-04:00"
+      }
+     ],
+     "liked_by_user": false
+    },
+    {
+     "id": 18478,
+     "slug": "ambient-jam",
+     "title": "Ambient Jam",
+     "position": 31,
+     "duration": 3002256,
+     "jam_starts_at_second": null,
+     "set_name": "Set 4",
+     "exclude_from_stats": false,
+     "likes_count": 34,
+     "audio_status": "complete",
+     "mp3_url": "https://phish.in/blob/0c4okbvd0bt0w3ob58jcb0sektg7.mp3",
+     "waveform_image_url": "https://phish.in/blob/qj6rt7leiprz0u3g3q6v7j1feumy.png",
+     "tags": [
+      {
+       "name": "Tease",
+       "description": "Transient musical reference",
+       "color": "#888888",
+       "priority": 15,
+       "notes": "Albert (TODO by what artist?)",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "SBD",
+       "description": "Soundboard recording",
+       "color": "#888888",
+       "priority": 1,
+       "notes": null,
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Tease",
+       "description": "Transient musical reference",
+       "color": "#888888",
+       "priority": 15,
+       "notes": "Albert",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      },
+      {
+       "name": "Lore",
+       "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+       "color": "#808080",
+       "priority": 22,
+       "notes": "Played by the light of candles made that day by fans. The jam was in the style of Brian Eno and was nearly an hour long.",
+       "starts_at_second": null,
+       "ends_at_second": null,
+       "transcript": null
+      }
+     ],
+     "created_at": "2012-11-11T21:59:35-05:00",
+     "updated_at": "2026-07-06T17:48:26-04:00",
+     "show_date": "1998-08-15",
+     "show_cover_art_urls": {
+      "large": "https://phish.in/blob/bvjrnuc2p39xh947qkvsyl65jb9c.jpg",
+      "medium": "https://phish.in/blob/dw1nb83q5zbr2v1ednoz0u7s3ucn.jpg",
+      "small": "https://phish.in/blob/qh2kqrwqoo76pvdu3vlll6gxkdty.jpg"
+     },
+     "show_album_cover_url": "https://phish.in/blob/ojkmzimvtftygel04kna8or1b6ob.jpg",
+     "venue_slug": "loring-commerce-centre",
+     "venue_name": "Loring Commerce Centre",
+     "venue_location": "Limestone, ME",
+     "songs": [
+      {
+       "slug": "jam",
+       "title": "Jam",
+       "alias": null,
+       "original": true,
+       "artist": null,
+       "tracks_count": 33,
+       "tracks_with_audio_count": 143,
+       "created_at": "2012-08-25T11:01:06-04:00",
+       "updated_at": "2018-12-26T22:40:51-05:00"
+      }
+     ],
+     "liked_by_user": false
+    }
+   ],
+   "liked_by_user": false,
+   "previous_show_date": null,
+   "next_show_date": null,
+   "previous_show_date_with_audio": null,
+   "next_show_date_with_audio": null
+  }
+ ],
+ "songs": [
+  {
+   "slug": "tweezer",
+   "title": "Tweezer",
+   "alias": null,
+   "original": true,
+   "artist": null,
+   "tracks_count": 458,
+   "tracks_with_audio_count": 447,
+   "created_at": "2012-08-25T11:01:07-04:00",
+   "updated_at": "2021-05-04T09:35:42-04:00"
+  },
+  {
+   "slug": "tweezer-reprise",
+   "title": "Tweezer Reprise",
+   "alias": null,
+   "original": true,
+   "artist": null,
+   "tracks_count": 341,
+   "tracks_with_audio_count": 333,
+   "created_at": "2012-08-25T11:01:07-04:00",
+   "updated_at": "2021-05-04T09:35:42-04:00"
+  }
+ ],
+ "venues": [],
+ "tracks": [
+  {
+   "id": 7037,
+   "slug": "possum",
+   "title": "Possum",
+   "position": 18,
+   "duration": 701100,
+   "jam_starts_at_second": null,
+   "set_name": "Set 2",
+   "exclude_from_stats": false,
+   "likes_count": 5,
+   "audio_status": "complete",
+   "mp3_url": "https://phish.in/blob/xqlp0ea7v2bx8bqjqp3it4ypu7jo.mp3",
+   "waveform_image_url": "https://phish.in/blob/fdwn3bdys3dkv2rxu3om1uw1x9op.png",
+   "tags": [
+    {
+     "name": "Jamcharts",
+     "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+     "color": "#888888",
+     "priority": 4,
+     "notes": "Great and varied jam that includes a \"Tweezer\" jam at the beginning and a nice melodic section. Then it acclerates.",
+     "starts_at_second": null,
+     "ends_at_second": null,
+     "transcript": null
+    },
+    {
+     "name": "Tease",
+     "description": "Transient musical reference",
+     "color": "#888888",
+     "priority": 15,
+     "notes": "Tweezer",
+     "starts_at_second": 195,
+     "ends_at_second": null,
+     "transcript": null
+    },
+    {
+     "name": "Signal",
+     "description": "Secret Language invocation",
+     "color": "#888888",
+     "priority": 18,
+     "notes": "All Fall Down",
+     "starts_at_second": null,
+     "ends_at_second": null,
+     "transcript": null
+    },
+    {
+     "name": "Banter",
+     "description": "Spoken interaction between band members or audience",
+     "color": "#888888",
+     "priority": 17,
+     "notes": "Page teased Call to the Post when Gordon Stone was introduced after Possum.",
+     "starts_at_second": null,
+     "ends_at_second": null,
+     "transcript": null
+    }
+   ],
+   "created_at": "2012-10-15T23:39:12-04:00",
+   "updated_at": "2026-01-05T21:49:05-05:00",
+   "show_date": "1993-07-22",
+   "show_cover_art_urls": {
+    "large": "https://phish.in/blob/vwadtqbc5weeht0j7895uglph5kq.jpg",
+    "medium": "https://phish.in/blob/ufzo0u68q9q078t9jkupfi7tdnx5.jpg",
+    "small": "https://phish.in/blob/1fl1ihks4mrn304pn72waeml0302.jpg"
+   },
+   "show_album_cover_url": "https://phish.in/blob/l93x70jz3w5ln0jfbk51nft3mpab.jpg",
+   "venue_slug": "stowe-performing-arts-center",
+   "venue_name": "Stowe Performing Arts Center",
+   "venue_location": "Stowe, VT",
+   "songs": [
+    {
+     "slug": "possum",
+     "title": "Possum",
+     "alias": null,
+     "original": true,
+     "artist": null,
+     "tracks_count": 583,
+     "tracks_with_audio_count": 528,
+     "created_at": "2012-08-25T11:01:06-04:00",
+     "updated_at": "2021-05-04T09:35:41-04:00"
+    }
+   ],
+   "liked_by_user": false
+  },
+  {
+   "id": 40515,
+   "slug": "tweezer",
+   "title": "Tweezer",
+   "position": 19,
+   "duration": 298512,
+   "jam_starts_at_second": null,
+   "set_name": "Encore",
+   "exclude_from_stats": false,
+   "likes_count": 5,
+   "audio_status": "complete",
+   "mp3_url": "https://phish.in/blob/b7hhvi2xn2pbb6hyzak75haahb3e.mp3",
+   "waveform_image_url": "https://phish.in/blob/zz622z4rub3hz8a8txnbapfdr7pd.png",
+   "tags": [
+    {
+     "name": "Banter",
+     "description": "Spoken interaction between band members or audience",
+     "color": "#888888",
+     "priority": 17,
+     "notes": "Fish asks if the crowd gets the Tweezer joke",
+     "starts_at_second": 268,
+     "ends_at_second": null,
+     "transcript": "FISH: Do you get it?"
+    }
+   ],
+   "created_at": "2025-07-28T16:15:56-04:00",
+   "updated_at": "2026-01-05T04:12:50-05:00",
+   "show_date": "2025-07-27",
+   "show_cover_art_urls": {
+    "large": "https://phish.in/blob/i2vzsjzuas00qzsdewb2783acu0e.jpg",
+    "medium": "https://phish.in/blob/sp0b5dj10fe7zwrfbb69wsfqyqyp.jpg",
+    "small": "https://phish.in/blob/j0d50x7omesun7hr98lkhpl5i2a2.jpg"
+   },
+   "show_album_cover_url": "https://phish.in/blob/ypd0xqgxciw3lcowalt8bcmyv0ht.jpg",
+   "venue_slug": "saratoga-performing-arts-center",
+   "venue_name": "Broadview Stage at SPAC",
+   "venue_location": "Saratoga Springs, NY",
+   "songs": [
+    {
+     "slug": "tweezer",
+     "title": "Tweezer",
+     "alias": null,
+     "original": true,
+     "artist": null,
+     "tracks_count": 458,
+     "tracks_with_audio_count": 447,
+     "created_at": "2012-08-25T11:01:07-04:00",
+     "updated_at": "2021-05-04T09:35:42-04:00"
+    }
+   ],
+   "liked_by_user": false
+  }
+ ],
+ "tags": [],
+ "playlists": [
+  {
+   "id": 3258,
+   "slug": "2024s-middle-class",
+   "name": "2024's Middle Class",
+   "description": "Everything but the brightest highlights of 2024.\n\nIf possible, also check out:\n2/21 DWD;\n2/22 Axilla 2, ASIHTOS, Tweezer;\n2/23 KDF, Blaze On, Harry Hood;\n2/24 Wolfmans, Gin",
+   "username": "maxhog",
+   "duration": 72365738,
+   "tracks_count": 78,
+   "likes_count": 0,
+   "created_at": "2024-10-05T10:58:34-04:00",
+   "updated_at": "2024-10-05T11:00:53-04:00",
+   "published": true,
+   "liked_by_user": false
+  },
+  {
+   "id": 3474,
+   "slug": "phish-a-live-one",
+   "name": "PHISH - A Live One",
+   "description": "Discography - Released 1995-06-27\n\nDisc 1\n1\tBouncing Around the Room\n2\tStash\n3\tGumbo\n4\tMontana (min 16:07-18:12 in Tweezer)\n5\tYou Enjoy Myself\n6\tChalk Dust Torture\n7\tSlave to the Traffic Light\n\nDisc 2\n8\tWilson\n9\tTweezer\n10\tSimple\n11\tHarry Hood\n12\tThe Squirming Coil",
+   "username": "MrPalmerLH",
+   "duration": 10315881,
+   "tracks_count": 12,
+   "likes_count": 0,
+   "created_at": "2025-08-05T15:17:32-04:00",
+   "updated_at": "2025-08-06T10:53:18-04:00",
+   "published": true,
+   "liked_by_user": false
+  }
+ ]
+}

@@ -16,9 +16,13 @@ Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public 
 - Playback continues when the app is backgrounded or the screen is off
 - Position is remembered per show and restored from a "Continue listening" row on the home
   screen — for every show you've opened, not just the last one
-- Shows played through to the encore are marked finished and move to an Archive screen, so
-  they stop cluttering "Continue listening"; opening one from the archive restarts it
-- Any show can be dismissed from "Continue listening" by hand
+- Shows played through to the encore are marked finished and drop out of "Continue
+  listening"; opening one again restarts it from the top
+- A History screen lists everything you've played — in progress, completed, or removed by
+  hand — with the completed ones marked
+- On a "Continue listening" card: tap to open it, tap the play button to resume, long-press
+  for open / mark completed / remove
+- "Shuffle all" on My tracks plays your liked tracks in random order
 - Log in to your phish.in account to see your liked shows, liked tracks, and playlists
   (both created by you and liked)
 - Browse and search public playlists; playlist excerpts are clipped correctly
@@ -43,6 +47,19 @@ Debug APK:
 ```
 
 Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
+
+## Tests
+
+92 unit tests, no device or emulator required:
+
+```bash
+./gradlew testDebugUnitTest
+```
+
+They cover JSON parsing against trimmed real API responses, outgoing request shape via
+MockWebServer (auth header, query params, path encoding), the Room queries, and both
+database migrations. Report lands at
+`app/build/reports/tests/testDebugUnitTest/index.html`.
 
 Install to a connected device or running emulator:
 

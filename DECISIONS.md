@@ -188,15 +188,67 @@ no destination.
 Account and playlist rows have no cover, and the empty 48dp box left them looking
 mysteriously indented.
 
-### What I could not verify
+## Iteration 5 — tests, history, and card actions
 
-Every authenticated path is written against the spec and phish.in's source but is
-**untested end to end**, because I can't create an account or type a password. Verified:
-the login request reaches the server, the JSON body is correct (a malformed one would
-return 400, not 401), a rejected login surfaces "Email or password not recognised", and
-every unauthenticated screen works. Unverified: that `X-Auth-Token` is accepted on
-subsequent requests, and therefore that My Shows, My Tracks, and My Playlists return your
-data. The first real login will confirm or refute all of it at once.
+**D35 — Tests are plain JVM unit tests, no device needed.**
+92 of them, run with `./gradlew testDebugUnitTest`. JSON parsing runs against trimmed real
+API responses kept in `app/src/test/resources/fixtures`, so a decoder that isn't tolerant
+of unknown fields fails in CI rather than in your hands. Request-level behaviour is checked
+against a local MockWebServer, and the Room work runs under Robolectric.
+
+**D36 — A few pure functions moved out of the Compose files to be testable.**
+`fmt`, `plural` and the scrubber's position maths lived in files that import Compose, which
+drags UI classes into a plain JVM test. They now live in `Format.kt` and `Queue.kt`. The
+queue-key prefix handling became a real parser (`parseQueueKey`) instead of inline
+`startsWith` checks, which is both tested and safer — an unrecognised key is skipped rather
+than being fetched as the wrong kind of thing.
+
+**D37 — The most valuable tests pin down the traps, not the happy path.**
+Specifically: that the JWT goes in `X-Auth-Token` and that no `Authorization` header is
+ever sent; that a single-year period uses `year=` and a range uses `year_range=`; that a
+401 on a token-bearing request logs out but a rejected login does not; and that both
+database migrations preserve real rows. Each of those is a bug that previously shipped or
+nearly shipped.
+
+**D38 — Dismissing no longer deletes. This reverses D23.**
+You asked for history to include things removed from "Continue listening", which the old
+behaviour made impossible. `dismissed` is now its own flag (schema v3): the row leaves the
+home row but stays in history, and playing it again clears the flag and brings it back.
+Deleting outright is still available, from the history screen.
+
+**D39 — "Archive" became "History", and it holds everything.**
+It previously listed only finished shows. It now lists every queue you've played — in
+progress, finished, or dismissed — newest first, tagged `✓ completed`, `removed · <time>`,
+or `at <time>`.
+
+**D40 — Tapping a "Continue listening" card opens it; a play button plays it.**
+Tapping used to start playback immediately, which made it impossible to go look at a
+playlist you were partway through. Long-press opens a menu with open / mark completed /
+remove. The old X button is gone — removal lives in that menu now.
+
+**D41 — Every screen header has a home button.**
+Back only unwinds one step, which is tedious from a playlist several levels deep.
+
+**D42 — Shuffle deliberately records no progress.**
+"Shuffle all" on My tracks plays your liked tracks in random order. It is the one queue
+that is not resumable, and that is on purpose: resuming would re-fetch and re-shuffle, so
+a saved index would point at a different track than the one you left. Rather than record a
+position that would silently lie, the shuffle queue carries no queue key at all — and the
+saver already skips anything without one, so no special case was needed.
+
+**D43 — The launcher icon is "PH".**
+The previous glyph was meant to be abstract and just read as an "H". Still a placeholder.
+
+### Auth — now confirmed
+
+This section previously flagged every authenticated path as untested, because I could not
+create an account or type a password. Mike logged in on a real device and confirmed My
+Shows, My Tracks, and My Playlists all return his data, so `X-Auth-Token` is correct and
+D25 holds.
+
+Still unverified by me, for the same reason: "Shuffle all" on My tracks, which needs a
+signed-in account to have any tracks to shuffle. Its queue-building path is shared with
+playlists, which is verified, but the button itself has only been exercised by tests.
 
 ## Open questions for after you've seen the MVP
 

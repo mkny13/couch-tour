@@ -29,12 +29,14 @@ data class PlayerState(
     val durationMs: Long = 0,
 )
 
-fun showQueueKey(date: String) = "show:$date"
-fun playlistQueueKey(slug: String) = "playlist:$slug"
-
-/** Queue-level labelling, identical for every item in one show or playlist. */
+/**
+ * Queue-level labelling, identical for every item in one show or playlist.
+ *
+ * A null [key] means the queue is ephemeral and its position is not recorded — the saver
+ * skips any item without one. Used by shuffle, whose order can't be reconstructed.
+ */
 private data class QueueInfo(
-    val key: String,
+    val key: String?,
     val title: String,
     val subtitle: String,
     val art: String?,
@@ -102,6 +104,19 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         start(entries.map { mediaItem(it.track, info, it) }, startIndex, startPositionMs)
     }
 
+    /**
+     * Play a set of loose tracks in random order.
+     *
+     * Deliberately not resumable: the queue key is omitted so no progress row is written.
+     * Recording a position would be a lie — resuming re-fetches and re-shuffles, so the
+     * saved index would land on a different track than the one you left.
+     */
+    fun shuffle(tracks: List<Track>, title: String) {
+        val playable = tracks.filter { it.playable }.shuffled()
+        val info = QueueInfo(null, title, "${playable.size} tracks, shuffled", null)
+        start(playable.map { mediaItem(it, info) }, 0, 0)
+    }
+
     /** Play a track found via search, queueing its whole show so the rest of the set follows. */
     fun playTrack(track: Track) {
         val date = track.showDate ?: return
@@ -127,23 +142,37 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
      * the last second of the final track.
      */
     fun resume(progress: Progress) {
-        val key = progress.queueKey
+        val ref = parseQueueKey(progress.queueKey) ?: return
         val index = if (progress.finished) 0 else progress.trackIndex
         val position = if (progress.finished) 0L else progress.positionMs
         viewModelScope.launch {
             runCatching {
-                if (key.startsWith("playlist:")) {
-                    playPlaylist(PhishInApi.playlist(key.removePrefix("playlist:")), index, position)
-                } else {
-                    playShow(PhishInApi.show(key.removePrefix("show:")), index, position)
+                when (ref.kind) {
+                    QueueKind.PLAYLIST ->
+                        playPlaylist(PhishInApi.playlist(ref.id), index, position)
+                    QueueKind.SHOW ->
+                        playShow(PhishInApi.show(ref.id), index, position)
                 }
             }
         }
     }
 
-    /** Remove a show or playlist from "Continue listening" (or the archive) entirely. */
+    /**
+     * Hide from "Continue listening" without losing it — it stays in history, and playing
+     * it again brings it back.
+     */
+    fun dismiss(progress: Progress) {
+        viewModelScope.launch { progressDao.dismiss(progress.queueKey) }
+    }
+
+    /** Erase from history entirely. */
     fun forget(progress: Progress) {
         viewModelScope.launch { progressDao.clear(progress.queueKey) }
+    }
+
+    /** Mark as played through without actually playing to the end. */
+    fun markCompleted(progress: Progress) {
+        viewModelScope.launch { progressDao.markFinished(progress.queueKey) }
     }
 
     suspend fun progressFor(key: String): Progress? = progressDao.get(key)
@@ -171,7 +200,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         // Per-track, not shared: waveform and cover differ for every track in a playlist.
         val art = track.showAlbumCoverUrl ?: info.art
         val extras = Bundle().apply {
-            putString(Keys.QUEUE_KEY, info.key)
+            info.key?.let { putString(Keys.QUEUE_KEY, it) }
             putString(Keys.QUEUE_TITLE, info.title)
             putString(Keys.QUEUE_SUBTITLE, info.subtitle)
             putString(Keys.QUEUE_ART, info.art)

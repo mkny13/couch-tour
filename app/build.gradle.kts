@@ -33,6 +33,12 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            // Robolectric needs the merged manifest and resources.
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 ksp {
@@ -66,4 +72,11 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.androidx.security.crypto)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.room.testing)
 }

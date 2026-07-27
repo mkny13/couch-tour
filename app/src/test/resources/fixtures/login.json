@@ -1,0 +1,5 @@
+{
+ "jwt": "header.payload.signature",
+ "username": "mike",
+ "email": "m@example.com"
+}

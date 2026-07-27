@@ -6,8 +6,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,13 +31,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -115,7 +121,7 @@ fun App(vm: PlayerViewModel = viewModel()) {
     ) { padding ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
-            composable("archive") { ArchiveScreen(vm, nav) }
+            composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }
             composable("shows/{period}") { entry ->
                 ShowsScreen(entry.arguments?.getString("period").orEmpty(), nav)
@@ -148,7 +154,7 @@ fun App(vm: PlayerViewModel = viewModel()) {
 fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
     val years = loadOnce { PhishInApi.years() }
     val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
-    val archived by vm.progressDao.archived().collectAsState(initial = emptyList())
+    val historyCount by vm.progressDao.historyCount().collectAsState(initial = 0)
     val username by Session.username.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     val term = query.trim()
@@ -189,19 +195,19 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(recent, key = { it.queueKey }) { p -> ResumeCard(p, vm) }
+                        items(recent, key = { it.queueKey }) { p -> ResumeCard(p, vm, nav) }
                     }
                 }
                 item { Spacer(Modifier.height(8.dp)) }
             }
 
-            if (archived.isNotEmpty()) {
+            if (historyCount > 0) {
                 item {
                     RowItem(
-                        title = "Archive",
-                        subtitle = "${archived.size} finished ${plural(archived.size, "show")}",
-                        artUrl = archived.first().artUrl,
-                        onClick = { nav.navigate("archive") }
+                        title = "History",
+                        subtitle = "$historyCount ${plural(historyCount, "show")} and playlists played",
+                        artUrl = null,
+                        onClick = { nav.navigate("history") }
                     )
                 }
             }
@@ -579,7 +585,18 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
                             color = Color.Gray, modifier = Modifier.padding(16.dp)
                         )
                     } else {
+                        val playable = tracks.filter { it.playable }
                         LazyColumn {
+                            item {
+                                Button(
+                                    onClick = { vm.shuffle(playable, "My tracks") },
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Shuffle, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Shuffle all ${playable.size}")
+                                }
+                            }
                             items(tracks, key = { it.id }) { track ->
                                 RowItem(
                                     title = track.title,
@@ -588,6 +605,8 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     ).joinToString(" · "),
                                     artUrl = track.showAlbumCoverUrl,
                                     trailing = fmt(track.duration),
+                                    // A single liked track plays inside its show; shuffle
+                                    // above plays the liked tracks themselves.
                                     onClick = { vm.playTrack(track) }
                                 )
                             }
@@ -635,36 +654,67 @@ private fun ResumeBanner(progress: Progress, onResume: () -> Unit) {
     }
 }
 
+/** Navigates to whatever a stored queue key points at. */
+private fun openQueue(progress: Progress, nav: NavHostController) {
+    val ref = parseQueueKey(progress.queueKey) ?: return
+    when (ref.kind) {
+        QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
+        QueueKind.SHOW -> nav.navigate("show/${ref.id}")
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ResumeCard(progress: Progress, vm: PlayerViewModel) {
-    Column(
-        Modifier.width(132.dp).clickable { vm.resume(progress) }
-    ) {
+private fun ResumeCard(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val isPlaylist = parseQueueKey(progress.queueKey)?.kind == QueueKind.PLAYLIST
+
+    Column(Modifier.width(132.dp)) {
         Box {
             AsyncImage(
                 model = progress.artUrl,
                 contentDescription = null,
-                modifier = Modifier.size(132.dp).clip(RoundedCornerShape(8.dp))
+                modifier = Modifier
+                    .size(132.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    // Tapping the art opens it; playing is the explicit button below.
+                    .combinedClickable(
+                        onClick = { openQueue(progress, nav) },
+                        onLongClick = { menuOpen = true },
+                    )
             )
-            // Manual removal: drops the show from the list without playing it.
             // A plain clickable Box rather than IconButton — IconButton enforces a 48dp
-            // minimum touch target that spills outside the 132dp artwork and over the
-            // neighbouring card.
+            // minimum touch target that spills outside the 132dp artwork.
             Box(
                 Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(28.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable { vm.forget(progress) },
+                    .clickable { vm.resume(progress) },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Close,
-                    "Remove ${progress.title} from Continue listening",
+                    Icons.Default.PlayArrow,
+                    "Resume ${progress.title}",
                     tint = Color.White,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(if (isPlaylist) "Open playlist" else "Open show") },
+                    onClick = { menuOpen = false; openQueue(progress, nav) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Mark completed") },
+                    onClick = { menuOpen = false; vm.markCompleted(progress) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Remove from list") },
+                    onClick = { menuOpen = false; vm.dismiss(progress) }
                 )
             }
         }
@@ -674,34 +724,53 @@ private fun ResumeCard(progress: Progress, vm: PlayerViewModel) {
     }
 }
 
+/**
+ * Everything ever played: still going, finished, or removed from "Continue listening" by
+ * hand. Removing something from the home row hides it here rather than destroying it.
+ */
 @Composable
-fun ArchiveScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val archived by vm.progressDao.archived().collectAsState(initial = emptyList())
+fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
+    val history by vm.progressDao.history().collectAsState(initial = emptyList())
 
     Column(Modifier.fillMaxSize()) {
-        Header("Archive", nav)
-        if (archived.isEmpty()) {
+        Header("History", nav)
+        if (history.isEmpty()) {
             Text(
-                "Shows you play all the way through land here.",
+                "Shows and playlists you've played will appear here.",
                 color = Color.Gray,
                 modifier = Modifier.padding(16.dp)
             )
             return
         }
         LazyColumn {
-            items(archived, key = { it.queueKey }) { p ->
+            items(history, key = { it.queueKey }) { p ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         RowItem(
                             title = p.title,
                             subtitle = p.subtitle,
                             artUrl = p.artUrl,
-                            trailing = "finished",
-                            onClick = { nav.navigate("show/${p.queueKey.removePrefix("show:")}") }
+                            onClick = {
+                                val ref = parseQueueKey(p.queueKey)
+                                when (ref?.kind) {
+                                    QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
+                                    QueueKind.SHOW -> nav.navigate("show/${ref.id}")
+                                    null -> Unit
+                                }
+                            },
+                            trailing = when {
+                                p.finished -> "✓ completed"
+                                p.dismissed -> "removed · ${fmt(p.positionMs)}"
+                                else -> "at ${fmt(p.positionMs)}"
+                            },
                         )
                     }
                     IconButton(onClick = { vm.forget(p) }) {
-                        Icon(Icons.Default.Close, "Remove ${p.title} from archive", tint = Color.Gray)
+                        Icon(
+                            Icons.Default.Close,
+                            "Delete ${p.title} from history",
+                            tint = Color.Gray,
+                        )
                     }
                 }
             }
@@ -709,7 +778,6 @@ fun ArchiveScreen(vm: PlayerViewModel, nav: NavHostController) {
     }
 }
 
-private fun plural(n: Int, word: String) = if (n == 1) word else "${word}s"
 
 @Composable
 private fun TrackRow(track: Track, number: Int, onClick: () -> Unit) {
@@ -778,7 +846,11 @@ private fun Header(title: String, nav: NavHostController) {
         IconButton(onClick = { nav.popBackStack() }) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
         }
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        // Back only unwinds one step; from a playlist four levels deep that's tedious.
+        IconButton(onClick = { nav.popBackStack("home", inclusive = false) }) {
+            Icon(Icons.Default.Home, "Home")
+        }
     }
 }
 
@@ -876,10 +948,3 @@ private fun androidx.compose.foundation.lazy.LazyListScope.tracksGroupedBySet(
     }
 }
 
-fun fmt(ms: Long): String {
-    val total = ms / 1000
-    val h = total / 3600
-    val m = (total % 3600) / 60
-    val s = total % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
-}

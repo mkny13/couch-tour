@@ -1,0 +1,172 @@
+{
+ "id": 131,
+ "slug": "phishnet-key-jams-pt-1",
+ "name": "Phish.net Key Jams Pt 1",
+ "description": null,
+ "username": "mfhgreyboy",
+ "duration": 93221960,
+ "entries": [
+  {
+   "track": {
+    "id": 8380,
+    "slug": "the-curtain-with",
+    "title": "The Curtain With",
+    "position": 1,
+    "duration": 865097,
+    "jam_starts_at_second": null,
+    "set_name": "Set 1",
+    "exclude_from_stats": false,
+    "likes_count": 34,
+    "audio_status": "complete",
+    "mp3_url": "https://phish.in/blob/yr0jzt6sh2o0wal94q0n1f21wul4.mp3",
+    "waveform_image_url": "https://phish.in/blob/aw7jzgioud4zz3uygyadzuuzwpxg.png",
+    "tags": [
+     {
+      "name": "SBD",
+      "description": "Soundboard recording",
+      "color": "#888888",
+      "priority": 1,
+      "notes": null,
+      "starts_at_second": null,
+      "ends_at_second": null,
+      "transcript": null
+     },
+     {
+      "name": "RMSTR",
+      "description": "Remastered audio",
+      "color": "#888888",
+      "priority": 2,
+      "notes": null,
+      "starts_at_second": null,
+      "ends_at_second": null,
+      "transcript": null
+     },
+     {
+      "name": "Jamcharts",
+      "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+      "color": "#888888",
+      "priority": 4,
+      "notes": "A well-executed Curtain - not spotless, but few, if any, are. This With jam is evocative and captures a sense of weigtlessness, soaring above the musical clouds. Many of these early With jams move beyond this uplifting section, exploring more dissonant, rocking terrain. Not so here, as the band seems content to let this one gracefully recede, following a soaring peak.",
+      "starts_at_second": null,
+      "ends_at_second": null,
+      "transcript": null
+     }
+    ],
+    "created_at": "2012-10-16T01:46:52-04:00",
+    "updated_at": "2025-10-01T23:24:41-04:00",
+    "show_date": "1988-05-24",
+    "show_cover_art_urls": {
+     "large": "https://phish.in/blob/43w865118qg48xeav1z59912siri.jpg",
+     "medium": "https://phish.in/blob/8ijsgk0nsw5cvhhxb84qe49aloft.jpg",
+     "small": "https://phish.in/blob/3zrcskv8ypvxuo7zmjg4n9arm10u.jpg"
+    },
+    "show_album_cover_url": "https://phish.in/blob/bo6582bk3tygu33oosmdbionduun.jpg",
+    "venue_slug": "nectar-s",
+    "venue_name": "Nectar's",
+    "venue_location": "Burlington, VT",
+    "songs": [
+     {
+      "slug": "the-curtain-with",
+      "title": "The Curtain With",
+      "alias": null,
+      "original": true,
+      "artist": null,
+      "tracks_count": 46,
+      "tracks_with_audio_count": 45,
+      "created_at": "2012-08-25T11:01:06-04:00",
+      "updated_at": "2021-05-04T09:35:39-04:00"
+     }
+    ],
+    "liked_by_user": false
+   },
+   "position": 1,
+   "duration": 865097,
+   "starts_at_second": null,
+   "ends_at_second": null
+  },
+  {
+   "track": {
+    "id": 8389,
+    "slug": "jesus-just-left-chicago",
+    "title": "Jesus Just Left Chicago",
+    "position": 10,
+    "duration": 917473,
+    "jam_starts_at_second": null,
+    "set_name": "Set 2",
+    "exclude_from_stats": false,
+    "likes_count": 14,
+    "audio_status": "complete",
+    "mp3_url": "https://phish.in/blob/su4plm1ar83h1a0lpwfln6chb34y.mp3",
+    "waveform_image_url": "https://phish.in/blob/0w1i1a5o4pkv5mczc1sdnw26qc6d.png",
+    "tags": [
+     {
+      "name": "SBD",
+      "description": "Soundboard recording",
+      "color": "#888888",
+      "priority": 1,
+      "notes": null,
+      "starts_at_second": null,
+      "ends_at_second": null,
+      "transcript": null
+     },
+     {
+      "name": "RMSTR",
+      "description": "Remastered audio",
+      "color": "#888888",
+      "priority": 2,
+      "notes": null,
+      "starts_at_second": null,
+      "ends_at_second": null,
+      "transcript": null
+     },
+     {
+      "name": "Jamcharts",
+      "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+      "color": "#888888",
+      "priority": 4,
+      "notes": "Preceding the famed Slip Stitch and Pass version by 9 years, and longer by more than 2 minutes, this jammed out version includes Page rocking first the piano, then the B-3, and a great Trey solo leading to an extended band-wide blues rocker. Part of a 3 song set! (\"JJLC\", \"Fluffhead\" > \"Whipping Post\").",
+      "starts_at_second": null,
+      "ends_at_second": null,
+      "transcript": null
+     }
+    ],
+    "created_at": "2012-10-16T01:46:53-04:00",
+    "updated_at": "2025-10-01T23:24:41-04:00",
+    "show_date": "1988-05-24",
+    "show_cover_art_urls": {
+     "large": "https://phish.in/blob/43w865118qg48xeav1z59912siri.jpg",
+     "medium": "https://phish.in/blob/8ijsgk0nsw5cvhhxb84qe49aloft.jpg",
+     "small": "https://phish.in/blob/3zrcskv8ypvxuo7zmjg4n9arm10u.jpg"
+    },
+    "show_album_cover_url": "https://phish.in/blob/bo6582bk3tygu33oosmdbionduun.jpg",
+    "venue_slug": "nectar-s",
+    "venue_name": "Nectar's",
+    "venue_location": "Burlington, VT",
+    "songs": [
+     {
+      "slug": "jesus-just-left-chicago",
+      "title": "Jesus Just Left Chicago",
+      "alias": null,
+      "original": false,
+      "artist": "ZZ Top",
+      "tracks_count": 82,
+      "tracks_with_audio_count": 76,
+      "created_at": "2012-08-25T11:01:06-04:00",
+      "updated_at": "2021-05-04T01:51:34-04:00"
+     }
+    ],
+    "liked_by_user": false
+   },
+   "position": 2,
+   "duration": 60000,
+   "starts_at_second": 30,
+   "ends_at_second": 90
+  }
+ ],
+ "tracks_count": 99,
+ "likes_count": 41,
+ "created_at": "2014-07-25T14:32:32-04:00",
+ "updated_at": "2014-07-25T14:32:34-04:00",
+ "published": true,
+ "liked_by_user": false
+}

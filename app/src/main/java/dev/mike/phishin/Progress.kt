@@ -28,8 +28,13 @@ data class Progress(
     val positionMs: Long,
     val trackTitle: String,
     val updatedAt: Long,
-    /** Set when the queue played through to its end. Finished rows move to the archive. */
+    /** Set when the queue played through to its end. */
     val finished: Boolean = false,
+    /**
+     * Set when the user removes it from "Continue listening" by hand. It stays in history;
+     * playing it again clears the flag and brings it back.
+     */
+    val dismissed: Boolean = false,
 )
 
 @Dao
@@ -37,20 +42,31 @@ interface ProgressDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(progress: Progress)
 
-    @Query("SELECT * FROM progress WHERE finished = 0 ORDER BY updatedAt DESC LIMIT 25")
+    /** The "Continue listening" row: still going, and not hidden by hand. */
+    @Query("SELECT * FROM progress WHERE finished = 0 AND dismissed = 0 ORDER BY updatedAt DESC LIMIT 25")
     fun inProgress(): Flow<List<Progress>>
 
-    @Query("SELECT * FROM progress WHERE finished = 1 ORDER BY updatedAt DESC")
-    fun archived(): Flow<List<Progress>>
+    /** Everything ever played, including finished and dismissed queues. */
+    @Query("SELECT * FROM progress ORDER BY updatedAt DESC")
+    fun history(): Flow<List<Progress>>
+
+    @Query("SELECT COUNT(*) FROM progress")
+    fun historyCount(): Flow<Int>
 
     @Query("SELECT * FROM progress WHERE queueKey = :key")
     suspend fun get(key: String): Progress?
+
+    @Query("UPDATE progress SET dismissed = 1 WHERE queueKey = :key")
+    suspend fun dismiss(key: String)
+
+    @Query("UPDATE progress SET finished = 1 WHERE queueKey = :key")
+    suspend fun markFinished(key: String)
 
     @Query("DELETE FROM progress WHERE queueKey = :key")
     suspend fun clear(key: String)
 }
 
-@Database(entities = [Progress::class], version = 2, exportSchema = true)
+@Database(entities = [Progress::class], version = 3, exportSchema = true)
 abstract class PhishInDb : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
 
@@ -59,9 +75,16 @@ abstract class PhishInDb : RoomDatabase() {
          * Adds the `finished` flag. Written as a real migration rather than a destructive
          * one: the listening history in this table is the whole point of it existing.
          */
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE progress ADD COLUMN finished INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Adds the `dismissed` flag. Same reasoning as [MIGRATION_1_2]: keep the history. */
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE progress ADD COLUMN dismissed INTEGER NOT NULL DEFAULT 0")
             }
         }
 
@@ -72,7 +95,7 @@ abstract class PhishInDb : RoomDatabase() {
                 context.applicationContext,
                 PhishInDb::class.java,
                 "phishin.db"
-            ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
         }
     }
 }
