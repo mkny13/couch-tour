@@ -19,6 +19,8 @@ data class PlayerState(
     val hasQueue: Boolean = false,
     val isPlaying: Boolean = false,
     val trackTitle: String = "",
+    /** The show the track was played at — "1995-12-29 · Worcester Centrum Centre". */
+    val showTitle: String = "",
     val queueTitle: String = "",
     /** Null for ephemeral queues such as shuffle, which have nothing to navigate to. */
     val queueKey: String? = null,
@@ -53,12 +55,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         val c = controller ?: return
         val meta = c.currentMediaItem?.mediaMetadata
+        val queue = (meta?.subtitle ?: meta?.albumTitle)?.toString().orEmpty()
+        val show = meta?.albumTitle?.toString().orEmpty()
         _state.value = PlayerState(
             connected = true,
             hasQueue = c.mediaItemCount > 0,
             isPlaying = c.isPlaying,
             trackTitle = meta?.title?.toString().orEmpty(),
-            queueTitle = (meta?.subtitle ?: meta?.albumTitle)?.toString().orEmpty(),
+            // A track with no show of its own falls back to the queue label; don't say it twice.
+            showTitle = if (show == queue) "" else show,
+            queueTitle = queue,
             queueKey = meta?.extras?.getString(Keys.QUEUE_KEY),
             artUrl = meta?.artworkUri?.toString(),
             waveformUrl = meta?.extras?.getString(Keys.WAVEFORM),
