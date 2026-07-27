@@ -424,6 +424,24 @@ be tested off-device are (MIME type, the custom-data round trip, the scrobbler's
 rule). But no Chromecast has been anywhere near it: discovery, the receiver actually playing
 a phish.in URL, and both directions of the handoff need a real device and a real TV.
 
+## Iteration 10 — Player layout
+
+**D69 — The player's transport moved to its own row, and the track display shows both labels.**
+On a real device the three controls were sharing one row with the artwork and the text, which
+made them small targets and squeezed the text column to the point that the queue label was
+truncated mid-word. Worse, the show a track came from was not displayed at all — a playlist
+jumps between shows every track, so the date and venue are the interesting part. The transport
+now sits on its own centred row at the bottom of the player, where the thumb already is, with
+targets big enough to hit without looking; the text column gets the full width and three lines:
+track, show (`albumTitle`), queue (`subtitle`). Where a track has no show of its own,
+`albumFor` already falls back to the queue label, so the show line would repeat the queue line
+verbatim — the state layer blanks it in that case rather than printing it twice. The player is
+taller than it was; it is the bottom bar of a `Scaffold`, so the list above simply gets
+shorter, which is the trade Mike asked for.
+
+The third line is also where "Casting to <device>" goes (D58), so casting costs the queue
+label rather than the show — the queue is one tap away on the cover, the device isn't.
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

@@ -77,6 +77,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -1038,7 +1039,7 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
                 model = state.artUrl,
                 contentDescription = "Open ${state.queueTitle}",
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(56.dp)
                     .clip(RoundedCornerShape(6.dp))
                     // Shuffle has no queue key and so nowhere to go.
                     .then(
@@ -1048,29 +1049,36 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
                     )
             )
             Spacer(Modifier.width(10.dp))
+            // Full width: the transport sits on its own row below, so neither the show nor
+            // the queue line gets squeezed out by the buttons.
             Column(Modifier.weight(1f)) {
-                Text(state.trackTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                // While casting, where the audio is coming out matters more than the queue
-                // name — the queue is one tap away on the cover, the device isn't.
-                if (castDevice != null) {
+                Text(
+                    state.trackTitle,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (state.showTitle.isNotEmpty()) {
                     Text(
-                        "Casting to $castDevice",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1
+                        state.showTitle,
+                        fontSize = 13.sp,
+                        color = Color.LightGray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                } else {
-                    Text(state.queueTitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
                 }
-            }
-            IconButton(onClick = { vm.previous() }) { Icon(Icons.Default.SkipPrevious, "Previous") }
-            IconButton(onClick = { vm.togglePlayPause() }) {
-                Icon(
-                    if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    if (state.isPlaying) "Pause" else "Play"
+                // While casting, where the audio is coming out matters more than the queue
+                // name — the queue is one tap away on the cover, the device isn't. The show
+                // line above stays either way; it's the queue line that gives up its slot.
+                Text(
+                    if (castDevice != null) "Casting to $castDevice" else state.queueTitle,
+                    fontSize = 12.sp,
+                    color = if (castDevice != null) MaterialTheme.colorScheme.primary else Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = { vm.next() }) { Icon(Icons.Default.SkipNext, "Next") }
         }
         if (state.durationMs > 0) {
             WaveformScrubber(
@@ -1088,6 +1096,28 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
             ) {
                 Text(fmt(state.positionMs), fontSize = 11.sp, color = Color.Gray)
                 Text(fmt(state.durationMs), fontSize = 11.sp, color = Color.Gray)
+            }
+        }
+        // Bottom of the screen, where the thumb already is.
+        Row(
+            Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { vm.previous() }, modifier = Modifier.size(60.dp)) {
+                Icon(Icons.Default.SkipPrevious, "Previous", Modifier.size(38.dp))
+            }
+            Spacer(Modifier.width(20.dp))
+            IconButton(onClick = { vm.togglePlayPause() }, modifier = Modifier.size(68.dp)) {
+                Icon(
+                    if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (state.isPlaying) "Pause" else "Play",
+                    Modifier.size(52.dp)
+                )
+            }
+            Spacer(Modifier.width(20.dp))
+            IconButton(onClick = { vm.next() }, modifier = Modifier.size(60.dp)) {
+                Icon(Icons.Default.SkipNext, "Next", Modifier.size(38.dp))
             }
         }
     }
