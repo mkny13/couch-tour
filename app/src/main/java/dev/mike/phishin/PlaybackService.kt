@@ -1,5 +1,7 @@
 package dev.mike.phishin
 
+import android.app.PendingIntent
+import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -54,7 +56,21 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
-        session = MediaSession.Builder(this, player).build()
+        // Tapping the notification opens the app, which then navigates to whatever is
+        // playing at that moment. The PendingIntent is built once and the queue changes as
+        // playback moves, so the destination is resolved on arrival rather than baked in.
+        val openApp = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java)
+                .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                .putExtra(MainActivity.EXTRA_OPEN_NOW_PLAYING, true),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        session = MediaSession.Builder(this, player)
+            .setSessionActivity(openApp)
+            .build()
 
         // Save on the events that matter immediately...
         player.addListener(object : Player.Listener {
@@ -148,7 +164,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
-    override fun onTaskRemoved(rootIntent: android.content.Intent?) {
+    override fun onTaskRemoved(rootIntent: Intent?) {
         val player = session?.player
         if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
             stopSelf()

@@ -24,6 +24,8 @@ Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public 
   for open / mark completed / remove
 - "Shuffle all" on My tracks plays your liked tracks in random order
 - Last.fm scrobbling, with plays queued locally so listening offline doesn't lose them
+- Like shows, tracks, and playlists, with like counts shown throughout
+- Tap the now-playing cover, or the media notification, to jump to what's playing
 - Log in to your phish.in account to see your liked shows, liked tracks, and playlists
   (both created by you and liked)
 - Browse and search public playlists; playlist excerpts are clipped correctly

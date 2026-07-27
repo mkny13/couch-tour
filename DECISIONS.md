@@ -301,6 +301,30 @@ It still earns its place if you'd rather not run the Last.fm app, and the work i
 tested. The Last.fm screen leads with the app-based route and warns not to enable both,
 because two scrobblers watching the same playback means every track is logged twice.
 
+## Iteration 8 — likes and now-playing navigation
+
+**D53 — The like fields were in the API all along; the models just ignored them.**
+`likes_count` and `liked_by_user` come back on shows, tracks, and playlists, and none of
+them were in the models. `Show` didn't even read its own `id`, which liking requires.
+
+**D54 — The like button owns its state and rolls back on failure.**
+It flips immediately so the row feels responsive, then reverts the heart and the count if
+the request fails, rather than leaving a like on screen that never reached the server.
+Signed out it still shows the count — that's public — but tapping does nothing rather than
+erroring.
+
+**D55 — Tapping the notification resolves its destination on arrival, not in advance.**
+A `PendingIntent` is built once when the session is created, but the queue changes as
+playback moves, so a baked-in destination would go stale within a track. The intent instead
+carries a flag; the activity reads the *current* queue key from the MediaController and
+navigates then. Because the activity is `singleTask`, a second tap re-enters through
+`onNewIntent` rather than `onCreate`, so both paths set the flag.
+
+**D56 — The now-playing cover opens the queue you started from.**
+Same navigation as the notification, so a playlist opens the playlist rather than the show
+the current track came from. Shuffle has no queue key, so its cover is deliberately inert —
+there is nothing to open.
+
 ### Auth — now confirmed
 
 This section previously flagged every authenticated path as untested, because I could not

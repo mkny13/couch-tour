@@ -43,6 +43,9 @@ data class Show(
     @SerialName("tour_name") val tourName: String? = null,
     @SerialName("audio_status") val audioStatus: String = "missing",
     val duration: Long = 0,
+    val id: Long = 0,
+    @SerialName("likes_count") val likesCount: Int = 0,
+    @SerialName("liked_by_user") val likedByUser: Boolean = false,
     @SerialName("album_cover_url") val albumCoverUrl: String? = null,
     @SerialName("cover_art_urls") val coverArtUrls: CoverArt? = null,
     val venue: Venue? = null,
@@ -57,10 +60,15 @@ data class Venue(
     val location: String? = null,
 )
 
+/** The three things phish.in lets you like. Matches the API's `likable_type` values. */
+enum class Likable { Show, Track, Playlist }
+
 @Serializable
 data class Track(
     val id: Long,
     val title: String,
+    @SerialName("likes_count") val likesCount: Int = 0,
+    @SerialName("liked_by_user") val likedByUser: Boolean = false,
     val position: Int = 0,
     /** milliseconds */
     val duration: Long = 0,
@@ -87,6 +95,7 @@ data class Playlist(
     val duration: Long = 0,
     @SerialName("tracks_count") val tracksCount: Int = 0,
     @SerialName("likes_count") val likesCount: Int = 0,
+    @SerialName("liked_by_user") val likedByUser: Boolean = false,
     /** Only populated by the single-playlist endpoint, never by the list endpoints. */
     val entries: List<PlaylistEntry> = emptyList(),
 )
@@ -258,6 +267,31 @@ object PhishInApi {
 
     suspend fun playlist(slug: String): Playlist =
         json.decodeFromString(get(path("playlists", slug).build()))
+
+    // ------------------------------------------------------------------ likes
+
+    /** Both require auth; unauthenticated the API rejects them rather than silently no-op. */
+    suspend fun like(type: Likable, id: Long) {
+        val payload = JsonObject(
+            mapOf(
+                "likable_type" to JsonPrimitive(type.name),
+                "likable_id" to JsonPrimitive(id),
+            )
+        ).toString()
+        send(
+            Request.Builder().url(path("likes").build()).withAuth()
+                .post(payload.toRequestBody(JSON_MEDIA))
+                .build()
+        )
+    }
+
+    suspend fun unlike(type: Likable, id: Long) {
+        val url = path("likes")
+            .addQueryParameter("likable_type", type.name)
+            .addQueryParameter("likable_id", id.toString())
+            .build()
+        send(Request.Builder().url(url).withAuth().delete().build())
+    }
 
     // ----------------------------------------------------------- liked by user
 

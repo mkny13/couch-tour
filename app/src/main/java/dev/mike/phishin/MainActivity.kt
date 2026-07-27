@@ -33,6 +33,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -58,7 +60,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -89,8 +93,19 @@ class MainActivity : ComponentActivity() {
     private val notifPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    /** Set when launched from the media notification; consumed once the UI has navigated. */
+    private val openNowPlaying = mutableStateOf(false)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // launchMode is singleTask, so a second tap re-enters through here, not onCreate.
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false)) openNowPlaying.value = true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        openNowPlaying.value = intent?.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false) == true
 
         // Without this the media notification (and therefore the lockscreen controls)
         // is silently suppressed on Android 13+.
@@ -100,16 +115,33 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(modifier = Modifier.fillMaxSize()) { App() }
+                Surface(modifier = Modifier.fillMaxSize()) { App(openNowPlaying = openNowPlaying) }
             }
         }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_NOW_PLAYING = "open_now_playing"
     }
 }
 
 @Composable
-fun App(vm: PlayerViewModel = viewModel()) {
+fun App(
+    vm: PlayerViewModel = viewModel(),
+    openNowPlaying: MutableState<Boolean> = remember { mutableStateOf(false) },
+) {
     val nav = rememberNavController()
     val state by vm.state.collectAsState()
+
+    // Arriving from the media notification. Waits for the queue key, which isn't known
+    // until the MediaController has connected, then navigates once and clears the flag.
+    LaunchedEffect(openNowPlaying.value, state.queueKey) {
+        val key = state.queueKey
+        if (openNowPlaying.value && key != null) {
+            openQueueKey(key, nav)
+            openNowPlaying.value = false
+        }
+    }
 
     // Player events don't fire while a track simply advances, so tick the scrubber.
     LaunchedEffect(state.isPlaying) {
@@ -120,7 +152,7 @@ fun App(vm: PlayerViewModel = viewModel()) {
     }
 
     Scaffold(
-        bottomBar = { if (state.hasQueue) MiniPlayer(state, vm) }
+        bottomBar = { if (state.hasQueue) MiniPlayer(state, vm, nav) }
     ) { padding ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
@@ -610,20 +642,26 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
                     val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
                     LazyColumn {
                         item {
-                            Column(Modifier.padding(16.dp)) {
-                                Text(pl.name, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                            Row(
+                                Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(pl.name, fontWeight = FontWeight.Bold, fontSize = 19.sp)
                                 Text(
                                     listOfNotNull(
                                         pl.username?.let { "by $it" },
                                         "${entries.size} tracks",
                                         fmt(pl.duration),
                                     ).joinToString(" · "),
-                                    color = Color.Gray, fontSize = 13.sp
-                                )
-                                pl.description?.takeIf { it.isNotBlank() }?.let {
-                                    Text(it, color = Color.Gray, fontSize = 13.sp,
-                                        modifier = Modifier.padding(top = 6.dp))
+                                        color = Color.Gray, fontSize = 13.sp
+                                    )
+                                    pl.description?.takeIf { it.isNotBlank() }?.let {
+                                        Text(it, color = Color.Gray, fontSize = 13.sp,
+                                            modifier = Modifier.padding(top = 6.dp))
+                                    }
                                 }
+                                LikeButton(Likable.Playlist, pl.id, pl.likedByUser, pl.likesCount)
                             }
                         }
                         if (progress != null) {
@@ -746,11 +784,12 @@ private fun ShowHeader(show: Show, trackCount: Int) {
             modifier = Modifier.size(88.dp).clip(RoundedCornerShape(8.dp))
         )
         Spacer(Modifier.width(14.dp))
-        Column {
+        Column(Modifier.weight(1f)) {
             Text(show.venueName.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
             Text(show.location.orEmpty(), color = Color.Gray, fontSize = 14.sp)
             Text("$trackCount tracks · ${fmt(show.duration)}", color = Color.Gray, fontSize = 13.sp)
         }
+        LikeButton(Likable.Show, show.id, show.likedByUser, show.likesCount)
     }
 }
 
@@ -770,14 +809,17 @@ private fun ResumeBanner(progress: Progress, onResume: () -> Unit) {
     }
 }
 
-/** Navigates to whatever a stored queue key points at. */
-private fun openQueue(progress: Progress, nav: NavHostController) {
-    val ref = parseQueueKey(progress.queueKey) ?: return
+/** Navigates to whatever a queue key points at. */
+private fun openQueueKey(key: String, nav: NavHostController) {
+    val ref = parseQueueKey(key) ?: return
     when (ref.kind) {
         QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
         QueueKind.SHOW -> nav.navigate("show/${ref.id}")
     }
 }
+
+private fun openQueue(progress: Progress, nav: NavHostController) =
+    openQueueKey(progress.queueKey, nav)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -898,18 +940,69 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
 @Composable
 private fun TrackRow(track: Track, number: Int, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("$number", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.width(28.dp))
         // The set is already the section header above; repeating it per row is noise.
         Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
         Text(fmt(track.duration), color = Color.Gray, fontSize = 13.sp)
+        LikeButton(Likable.Track, track.id, track.likedByUser, track.likesCount)
+    }
+}
+
+/**
+ * Heart plus count. Owns its own state so a row updates immediately, and rolls back if the
+ * request fails rather than showing a like that didn't happen. Signed out it still shows
+ * the count, since that's public, but tapping is inert.
+ */
+@Composable
+private fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initialCount: Int) {
+    val signedIn by Session.username.collectAsState()
+    var liked by remember(id) { mutableStateOf(initiallyLiked) }
+    var count by remember(id) { mutableIntStateOf(initialCount) }
+    var busy by remember(id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .then(
+                if (signedIn == null) Modifier else Modifier.clickable(enabled = !busy) {
+                    val wasLiked = liked
+                    liked = !wasLiked
+                    count += if (wasLiked) -1 else 1
+                    busy = true
+                    scope.launch {
+                        val result = runCatching {
+                            if (wasLiked) PhishInApi.unlike(type, id) else PhishInApi.like(type, id)
+                        }
+                        if (result.isFailure) {
+                            liked = wasLiked
+                            count += if (wasLiked) 1 else -1
+                        }
+                        busy = false
+                    }
+                }
+            )
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        Icon(
+            if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            if (liked) "Unlike" else "Like",
+            tint = if (liked) MaterialTheme.colorScheme.primary else Color.Gray,
+            modifier = Modifier.size(18.dp)
+        )
+        if (count > 0) {
+            Spacer(Modifier.width(4.dp))
+            Text("$count", fontSize = 12.sp, color = Color.Gray)
+        }
     }
 }
 
 @Composable
-private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel) {
+private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
     Column(Modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
         HorizontalDivider()
         Row(
@@ -918,8 +1011,16 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel) {
         ) {
             AsyncImage(
                 model = state.artUrl,
-                contentDescription = null,
-                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp))
+                contentDescription = "Open ${state.queueTitle}",
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    // Shuffle has no queue key and so nowhere to go.
+                    .then(
+                        state.queueKey?.let { key ->
+                            Modifier.clickable { openQueueKey(key, nav) }
+                        } ?: Modifier
+                    )
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {

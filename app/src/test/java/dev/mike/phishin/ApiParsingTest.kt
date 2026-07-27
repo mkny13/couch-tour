@@ -60,6 +60,27 @@ class ApiParsingTest {
         assertTrue(track.waveformImageUrl!!.endsWith(".png"))
     }
 
+    @Test
+    fun `reads like counts and whether the user liked it`() {
+        val show = json.decodeFromString<Show>(fixture("show.json"))
+        assertEquals(412L, show.id)
+        assertEquals(172, show.likesCount)
+        assertFalse(show.likedByUser)
+
+        val track = show.tracks[0]
+        assertEquals(8435L, track.id)
+        assertEquals(89, track.likesCount)
+        assertFalse(track.likedByUser)
+    }
+
+    @Test
+    fun `reads playlist like state`() {
+        val playlist = json.decodeFromString<Playlist>(fixture("playlist.json"))
+        assertEquals(131L, playlist.id)
+        assertEquals(41, playlist.likesCount)
+        assertFalse(playlist.likedByUser)
+    }
+
     // ------------------------------------------------------------------ years
 
     @Test

@@ -23,6 +23,8 @@ data class PlayerState(
     val isPlaying: Boolean = false,
     val trackTitle: String = "",
     val queueTitle: String = "",
+    /** Null for ephemeral queues such as shuffle, which have nothing to navigate to. */
+    val queueKey: String? = null,
     val artUrl: String? = null,
     val waveformUrl: String? = null,
     val positionMs: Long = 0,
@@ -73,6 +75,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             isPlaying = c.isPlaying,
             trackTitle = meta?.title?.toString().orEmpty(),
             queueTitle = (meta?.subtitle ?: meta?.albumTitle)?.toString().orEmpty(),
+            queueKey = meta?.extras?.getString(Keys.QUEUE_KEY),
             artUrl = meta?.artworkUri?.toString(),
             waveformUrl = meta?.extras?.getString(Keys.WAVEFORM),
             positionMs = c.currentPosition.coerceAtLeast(0),

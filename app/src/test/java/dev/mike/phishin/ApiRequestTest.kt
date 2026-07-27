@@ -255,6 +255,67 @@ class ApiRequestTest {
         assertEquals("liked", take().requestUrl!!.queryParameter("filter"))
     }
 
+    // ------------------------------------------------------------------ likes
+
+    @Test
+    fun `liking posts the type and id`() = runBlocking {
+        PhishInApi.authToken = "jwt"
+        enqueue("{}")
+
+        PhishInApi.like(Likable.Track, 8435)
+
+        val request = take()
+        assertEquals("POST", request.method)
+        assertTrue(request.path!!.endsWith("/likes"))
+        // likable_id is an integer in the API, not a quoted string.
+        assertEquals("""{"likable_type":"Track","likable_id":8435}""", request.body.readUtf8())
+    }
+
+    @Test
+    fun `unliking deletes with query parameters`() = runBlocking {
+        PhishInApi.authToken = "jwt"
+        enqueue("{}")
+
+        PhishInApi.unlike(Likable.Show, 412)
+
+        val request = take()
+        assertEquals("DELETE", request.method)
+        val url = request.requestUrl!!
+        assertEquals("Show", url.queryParameter("likable_type"))
+        assertEquals("412", url.queryParameter("likable_id"))
+    }
+
+    @Test
+    fun `likes carry the auth token`() = runBlocking {
+        PhishInApi.authToken = "jwt"
+        enqueue("{}")
+
+        PhishInApi.like(Likable.Playlist, 131)
+
+        assertEquals("jwt", take().getHeader("X-Auth-Token"))
+    }
+
+    @Test
+    fun `the likable type names match the API values`() {
+        // Sent verbatim as likable_type; renaming the enum would silently break liking.
+        assertEquals("Show", Likable.Show.name)
+        assertEquals("Track", Likable.Track.name)
+        assertEquals("Playlist", Likable.Playlist.name)
+    }
+
+    @Test
+    fun `a rejected like surfaces as an exception so the UI can roll back`() = runBlocking {
+        PhishInApi.authToken = "jwt"
+        enqueue("""{"message":"Unauthorized"}""", code = 401)
+
+        try {
+            PhishInApi.like(Likable.Track, 1)
+            fail("expected ApiException")
+        } catch (e: ApiException) {
+            assertTrue(e.unauthorized)
+        }
+    }
+
     // ------------------------------------------------------------ liked lists
 
     @Test
