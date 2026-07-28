@@ -425,12 +425,11 @@ A phone with no Play services, or an outdated one, is a normal phone. Initialisa
 asynchronous and best-effort; the service attaches the cast player whenever it turns up, the
 button never appears if it doesn't, and nothing else in the app changes either way.
 
-### Not verified on hardware
+### Hardware — now confirmed
 
-Written against the media3 1.5.1 cast sources rather than guessed at, and the parts that can
-be tested off-device are (MIME type, the custom-data round trip, the scrobbler's handoff
-rule). But no Chromecast has been anywhere near it: discovery, the receiver actually playing
-a phish.in URL, and both directions of the handoff need a real device and a real TV.
+This section previously flagged the whole feature as untested, because no Chromecast had been
+near it. Mike has since cast to a real device: discovery, the picker, the receiver playing a
+phish.in URL, and the handoff all work. The one thing that didn't was volume — see D71.
 
 ## Iteration 10 — Player layout
 
@@ -463,6 +462,32 @@ the privacy and data-collection surface before going to a public store outweighe
 fallback nobody needed to use. `LastFm.kt`, `Scrobbler.kt`, the Last.fm settings screen, and
 the `pending_scrobbles` table are gone; schema v5's `MIGRATION_4_5` drops the now-orphaned
 table. External scrobbling via the MediaSession is unaffected.
+
+## Iteration 12 — cast volume
+
+**D71 — Volume on a Chromecast needed media3 1.9+, not code of ours.**
+Casting worked, but the volume slider read 0 and wouldn't move. It wasn't a wiring mistake:
+media3 1.5.1's `CastPlayer` — the version D58 was built on — declines to implement device
+volume at all. `getDeviceVolume()` is `return 0` with the comment "not supported", every
+setter is an empty method, its `DeviceInfo` never sets a maximum volume, and none of
+`COMMAND_GET_DEVICE_VOLUME` / `COMMAND_SET_DEVICE_VOLUME` / `COMMAND_ADJUST_DEVICE_VOLUME` are
+in its available commands. The session layer reads exactly those three things: no adjust
+command means the volume provider it publishes to the system is `VOLUME_CONTROL_FIXED`, and a
+fixed provider reporting volume 0 out of a maximum of 0 is precisely the dead slider Mike saw.
+Nothing this app could do from outside the player would have moved it.
+
+Media3 implemented it in 1.8.0 and split the cast-only player out as `RemoteCastPlayer` in
+1.9, which is what the service now builds: real `getDeviceVolume`, setters that call
+`CastSession.setVolume`, a 20-step maximum, the three commands advertised, and an
+`EVENT_DEVICE_VOLUME_CHANGED` when the volume changes at the other end — so turning it up with
+the TV remote moves the phone's slider too. Media3 went 1.5.1 → 1.10.1 in one step, which was
+possible without further work because the Play Store preparation had already taken `compileSdk`
+to 36; 1.10 requires it. `play-services-cast-framework` and `mediarouter` are pinned to the
+versions media3-cast itself depends on, so the declared version is the one that resolves.
+
+The upgrade also makes `CastPlayer` a deprecated wrapper over a new local-plus-remote player
+that does its own switching. Not adopted: our handoff rules are deliberate (D61, D62), and
+swapping them for someone else's semantics is not a volume fix.
 
 ## Open questions for after you've seen the MVP
 
