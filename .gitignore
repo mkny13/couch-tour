@@ -10,3 +10,4 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+store/
