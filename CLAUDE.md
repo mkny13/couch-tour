@@ -55,8 +55,8 @@ migration is never the right answer here. Add a `MIGRATION_n_n+1`, register it i
 Being prepared for a Google Play release. Two constraints come from outside the code:
 
 - The phish.in maintainer permitted the API use but asked that this not be branded as
-  official. Their own app is "Phish Tapes". Nothing in the store listing, app title, or icon
-  may imply a first-party relationship.
+  official. Nothing in the store listing, app title, or icon may imply a first-party
+  relationship.
 - Keep the band's name out of the store title — it is their trademark. Descriptive use in the
   listing body is fine.
 
