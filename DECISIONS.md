@@ -400,6 +400,14 @@ Registering a custom receiver is a Google Cast Developer Console account action,
 isn't mine to do (same rule as D44). The default receiver plays progressive MP3 over HTTPS,
 which is exactly what phish.in serves.
 
+The visible cost, confirmed on Mike's TV: the receiver's own name, "Default Media Receiver",
+sits above the track info, because that string is the app name Google registered for the
+stock receiver's ID and no metadata we send can override it. The fix is a **Styled Media
+Receiver** — registered in the console under whatever name should appear on the TV, with the
+CSS field left empty so there is still nothing to host. It costs a one-off $5 developer
+registration and yields an app ID, at which point `RECEIVER_APP_ID` in `Cast.kt` is a
+one-line change. Mike's call, since it's his account and his $5.
+
 **D66 — Playlist excerpts cast as whole tracks. Known, unfixed.**
 Entries can be clipped (D30) and a receiver plays whole files; Cast has no equivalent of
 `ClippingConfiguration`. The excerpt is right on the phone and long on the TV. Fixing it

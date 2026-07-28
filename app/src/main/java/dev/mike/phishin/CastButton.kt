@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.CastConnected
@@ -122,7 +124,9 @@ private fun CastPicker(
         onDismissRequest = onDismiss,
         title = { Text(if (device != null) "Casting to $device" else "Cast to") },
         text = {
-            Column {
+            // A dialog caps its own height, so a house with a few Homes and a couple of TVs
+            // silently loses the ones past the fold without this.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (routes.isEmpty()) {
                     Text("Looking for devices…", color = Color.Gray)
                 }
