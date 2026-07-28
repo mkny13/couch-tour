@@ -91,8 +91,8 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 ```
 
 They cover JSON parsing against trimmed real API responses, outgoing request shape via
-MockWebServer (auth header, query params, path encoding), the Room queries, both
-database migrations, and the parts of casting that don't need a Chromecast — that queue
+MockWebServer (auth header, query params, path encoding), the Room queries, every
+database migration, and the parts of casting that don't need a Chromecast — that queue
 items declare a MIME type, and that the queue survives the round trip through a receiver.
 Report lands at
 `app/build/reports/tests/testDebugUnitTest/index.html`.
