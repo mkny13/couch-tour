@@ -489,6 +489,19 @@ The upgrade also makes `CastPlayer` a deprecated wrapper over a new local-plus-r
 that does its own switching. Not adopted: our handoff rules are deliberate (D61, D62), and
 swapping them for someone else's semantics is not a volume fix.
 
+## Iteration 13 — the show line
+
+**D72 — The show line is blanked on a prefix, not on equality. Refines D69.**
+D69 blanked the show line only when it matched the queue line exactly, which covered the case
+it was written for — a track with no show of its own, where `albumFor` falls back to the queue
+label verbatim. It missed the common one. Playing a show from its own page, the queue line is
+the show line *plus the city*: `1997-11-17 · McNichols Arena` against
+`1997-11-17 · McNichols Arena · Denver, CO`. Not equal, so both rendered, and the player said
+the date and venue twice on the path most used. A `startsWith` test catches both cases, keeps
+the city, and leaves playlists alone, where the show and the queue are unrelated strings and
+both lines earn their place. Seen on a screen, not in a test: the two strings differ, so
+nothing short of rendering them together shows the problem.
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

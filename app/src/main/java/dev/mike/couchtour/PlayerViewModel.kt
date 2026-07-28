@@ -62,8 +62,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             hasQueue = c.mediaItemCount > 0,
             isPlaying = c.isPlaying,
             trackTitle = meta?.title?.toString().orEmpty(),
-            // A track with no show of its own falls back to the queue label; don't say it twice.
-            showTitle = if (show == queue) "" else show,
+            // Don't say the same thing twice. Two ways it can happen: a track with no show
+            // of its own falls back to the queue label verbatim, and a show played from its
+            // own page has a queue line that is the show line plus the city. A prefix test
+            // catches both. In a playlist the two are unrelated, so both lines survive.
+            showTitle = if (queue.startsWith(show)) "" else show,
             queueTitle = queue,
             queueKey = meta?.extras?.getString(Keys.QUEUE_KEY),
             artUrl = meta?.artworkUri?.toString(),
