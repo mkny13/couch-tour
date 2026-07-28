@@ -52,6 +52,9 @@ Nothing to configure: it uses Google's stock media receiver, so no receiver app 
 registered and no API key is involved. A phone without Google Play services simply never
 shows the button.
 
+The phone's volume keys control the TV while casting, and the volume slider follows changes
+made at the other end.
+
 Two things to know:
 
 - Playlist **excerpts play in full** on a Chromecast. A receiver plays whole files, so the

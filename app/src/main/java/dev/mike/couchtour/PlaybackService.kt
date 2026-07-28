@@ -2,7 +2,7 @@ package dev.mike.couchtour
 
 import android.app.PendingIntent
 import android.content.Intent
-import androidx.media3.cast.CastPlayer
+import androidx.media3.cast.RemoteCastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -11,7 +11,6 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import com.google.android.gms.cast.framework.CastContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,15 +49,15 @@ private data class Handoff(
  * MediaSession that Android surfaces on the lockscreen, in the notification shade, and
  * to Bluetooth / headset buttons.
  *
- * It owns both players — the local ExoPlayer and, once Cast is available, a CastPlayer —
- * and hands the session whichever one is live. Everything above it (the UI's
+ * It owns both players — the local ExoPlayer and, once Cast is available, a RemoteCastPlayer
+ * — and hands the session whichever one is live. Everything above it (the UI's
  * MediaController, the progress writer) is deliberately unaware of which.
  */
 class PlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
     private var localPlayer: ExoPlayer? = null
-    private var castPlayer: CastPlayer? = null
+    private var castPlayer: RemoteCastPlayer? = null
     private var handoff: Handoff? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -110,7 +109,10 @@ class PlaybackService : MediaSessionService() {
 
         // Cast initialises off the main thread and may never arrive at all, so the player
         // is attached whenever it turns up rather than waited for.
-        scope.launch { attachCast(Casting.castContext.filterNotNull().first()) }
+        scope.launch {
+            Casting.castContext.filterNotNull().first()
+            attachCast()
+        }
     }
 
     private val playerListener = object : Player.Listener {
@@ -129,18 +131,13 @@ class PlaybackService : MediaSessionService() {
 
     // -------------------------------------------------------------------- cast
 
-    private fun attachCast(castContext: CastContext) {
-        // The context argument is only there to fill in the player's DeviceInfo, which is
-        // what makes the system volume panel name the TV instead of the phone. Everything
-        // after it is the default the shorter constructors pass anyway.
-        val cast = CastPlayer(
-            /* context = */ this,
-            castContext,
-            CastItemConverter(),
-            C.DEFAULT_SEEK_BACK_INCREMENT_MS,
-            C.DEFAULT_SEEK_FORWARD_INCREMENT_MS,
-            C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS,
-        )
+    private fun attachCast() {
+        // Only looks up the CastContext the app has already initialised — which is why this
+        // waits for that first. The context it needs is this service, for the DeviceInfo
+        // that names the TV in the system volume panel.
+        val cast = RemoteCastPlayer.Builder(this)
+            .setMediaItemConverter(CastItemConverter())
+            .build()
         cast.addListener(playerListener)
         cast.setSessionAvailabilityListener(object : SessionAvailabilityListener {
             override fun onCastSessionAvailable() = switchTo(cast)
