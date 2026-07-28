@@ -450,6 +450,20 @@ shorter, which is the trade Mike asked for.
 The third line is also where "Casting to <device>" goes (D58), so casting costs the queue
 label rather than the show — the queue is one tap away on the cover, the device isn't.
 
+## Iteration 11 — removing built-in scrobbling
+
+**D70 — The built-in scrobbler was removed on 2026-07-27, ahead of the Play Store release.
+This supersedes D44–D48 and D52.**
+The scrobbler was one more thing collecting and transmitting data — a Last.fm API key and
+session key, a queue of tracks written to disk, and outbound calls to
+ws.audioscrobbler.com — for a feature Iteration 7 had already made optional in practice: the
+official Last.fm app's "Scrobble from…" route reads the same track, artist, and album
+straight off the MediaSession, with no API key and nothing shipped in this app. Shrinking
+the privacy and data-collection surface before going to a public store outweighed keeping a
+fallback nobody needed to use. `LastFm.kt`, `Scrobbler.kt`, the Last.fm settings screen, and
+the `pending_scrobbles` table are gone; schema v5's `MIGRATION_4_5` drops the now-orphaned
+table. External scrobbling via the MediaSession is unaffected.
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

@@ -52,6 +52,25 @@ class MigrationTest {
     """.trimIndent()
     private val v2IdentityHash = "be05c275dc8057db9c62c7fe0280aa57"
 
+    // From app/schemas/dev.mike.couchtour.PhishInDb/4.json.
+    private val v4CreateTable = """
+        CREATE TABLE IF NOT EXISTS `progress` (
+            `queueKey` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
+            `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
+            `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL,
+            `finished` INTEGER NOT NULL, `dismissed` INTEGER NOT NULL,
+            PRIMARY KEY(`queueKey`)
+        )
+    """.trimIndent()
+    private val v4PendingScrobblesTable = """
+        CREATE TABLE IF NOT EXISTS `pending_scrobbles` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `artist` TEXT NOT NULL, `track` TEXT NOT NULL, `album` TEXT NOT NULL,
+            `durationSec` INTEGER NOT NULL, `timestampSec` INTEGER NOT NULL
+        )
+    """.trimIndent()
+    private val v4IdentityHash = "e8c073632e44866ca4fd0fda3bcea1c7"
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -110,12 +129,40 @@ class MigrationTest {
         db.close()
     }
 
+    private fun createV4DatabaseWithRows() {
+        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        db.execSQL(v4CreateTable)
+        db.execSQL(v4PendingScrobblesTable)
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+        db.execSQL(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            arrayOf(v4IdentityHash),
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0)"""
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0)"""
+        )
+        db.execSQL(
+            """INSERT INTO pending_scrobbles (artist, track, album, durationSec, timestampSec)
+               VALUES ('Phish','Tweezer','1997-11-17',300,1700000000)"""
+        )
+        db.version = 4
+        db.close()
+    }
+
     private fun openWithCurrentSchema(): PhishInDb =
         Room.databaseBuilder(context, PhishInDb::class.java, dbFile.name)
             .addMigrations(
                 PhishInDb.MIGRATION_1_2,
                 PhishInDb.MIGRATION_2_3,
                 PhishInDb.MIGRATION_3_4,
+                PhishInDb.MIGRATION_4_5,
             )
             .allowMainThreadQueries()
             .build()
@@ -218,23 +265,25 @@ class MigrationTest {
         }
     }
 
+    // ------------------------------------------------------------------ v4 -> v5
+
     @Test
-    fun `the scrobble queue is available after migrating from v1`() = runBlocking {
-        createV1DatabaseWithRows()
+    fun `migrating from v4 drops the pending scrobbles table and keeps progress rows`() = runBlocking {
+        createV4DatabaseWithRows()
 
         val db = openWithCurrentSchema()
         try {
-            // The table added in v4 must exist even for a database that started at v1.
-            val dao = db.scrobbleDao()
-            assertEquals(0, dao.count())
-            dao.add(
-                PendingScrobble(
-                    artist = "Phish", track = "Tweezer", album = "1997-11-17",
-                    durationSec = 300, timestampSec = 1_700_000_000,
-                )
-            )
-            assertEquals(1, dao.count())
-            assertEquals("Tweezer", dao.oldest().single().track)
+            // Built-in scrobbling was removed; the queue table it fed has nothing left to
+            // read it, so v5 drops it. Progress is a different table entirely and survives.
+            val dao = db.progressDao()
+            assertEquals(2, dao.history().first().size)
+            assertTrue(dao.get("show:1992-12-02")!!.finished)
+            assertFalse(dao.get("show:1997-02-13")!!.finished)
+
+            val tableExists = db.openHelper.readableDatabase.query(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pending_scrobbles'"
+            ).use { it.count > 0 }
+            assertFalse(tableExists)
         } finally {
             db.close()
         }

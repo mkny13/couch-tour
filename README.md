@@ -24,7 +24,6 @@ with the maintainer's permission.
 - On a "Continue listening" card: tap to open it, tap the play button to resume, long-press
   for open / mark completed / remove
 - "Shuffle all" on My tracks plays your liked tracks in random order
-- Last.fm scrobbling, with plays queued locally so listening offline doesn't lose them
 - Like shows, tracks, and playlists, with like counts shown throughout
 - Tap the now-playing cover, or the media notification, to jump to what's playing
 - Log in to your phish.in account to see your liked shows, liked tracks, and playlists
@@ -67,32 +66,13 @@ machine-specific — don't commit it.
 
 ### Last.fm
 
-**The easy way needs nothing from this repo.** The official Last.fm app scrobbles from any
-app that publishes a MediaSession, which this one does. Open the Last.fm app → Account →
-"Scrobble from…" and switch on Phish.in. It appears there once this app has played
-something. No API key, no rebuild.
+The official Last.fm app scrobbles from any app that publishes a MediaSession, which this
+one does. Open the Last.fm app → Account → "Scrobble from…" and switch on Phish.in. It
+appears there once this app has played something. No API key, no rebuild.
 
 The app publishes the track title as the title, "Phish" as the artist, and the show it was
 played at as the album — including for playlist tracks, which are attributed to their own
 show rather than to the playlist.
-
-### Built-in scrobbler (optional fallback)
-
-Only needed if you'd rather not run the Last.fm app. **Don't enable both** — two scrobblers
-watching the same playback log every track twice.
-
-It needs your own Last.fm API credentials. Create them at
-https://www.last.fm/api/account/create, then add to `local.properties` (gitignored, so the
-secret stays out of the repo):
-
-```properties
-lastfm.apiKey=your_api_key
-lastfm.apiSecret=your_shared_secret
-```
-
-Rebuild, then connect from the Last.fm row on the home screen. It opens last.fm in a
-browser to approve the app — your Last.fm password is never typed into the app. Without
-these properties everything else works and Last.fm reports itself unconfigured.
 
 Debug APK:
 
@@ -104,7 +84,7 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Tests
 
-126 unit tests, no device or emulator required:
+106 unit tests, no device or emulator required:
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -129,8 +109,6 @@ Install to a connected device or running emulator:
 |---|---|
 | `Api.kt` | phish.in v2 client — OkHttp + kotlinx.serialization |
 | `Auth.kt` | Encrypted token storage and the signed-in session |
-| `LastFm.kt` | Last.fm client, request signing, and the scrobble timing rules |
-| `Scrobbler.kt` | Tracks listened time and the offline scrobble queue |
 | `PlaybackService.kt` | `MediaSessionService` owning both players; also writes progress |
 | `PlayerViewModel.kt` | `MediaController` connection and UI-facing player state |
 | `MediaItems.kt` | Builds the queue items — metadata, extras, clipping, MIME type |

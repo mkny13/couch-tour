@@ -52,7 +52,7 @@ private data class Handoff(
  *
  * It owns both players — the local ExoPlayer and, once Cast is available, a CastPlayer —
  * and hands the session whichever one is live. Everything above it (the UI's
- * MediaController, the progress writer, the scrobbler) is deliberately unaware of which.
+ * MediaController, the progress writer) is deliberately unaware of which.
  */
 class PlaybackService : MediaSessionService() {
 
@@ -61,13 +61,6 @@ class PlaybackService : MediaSessionService() {
     private var castPlayer: CastPlayer? = null
     private var handoff: Handoff? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val scrobbler by lazy {
-        Scrobbler { pending ->
-            if (LastFmSession.connected && LastFmApi.configured) {
-                ScrobbleQueue.enqueue(applicationContext, pending)
-            }
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -111,10 +104,6 @@ class PlaybackService : MediaSessionService() {
                 val active = session?.player ?: continue
                 if (active.isPlaying) {
                     saveNow()
-                    // The duration isn't known at track-transition time, so it's refreshed
-                    // on the tick once the player has prepared the media.
-                    scrobbler.onDuration(active.duration)
-                    scrobbler.onTick(System.currentTimeMillis())
                 }
             }
         }
@@ -127,27 +116,14 @@ class PlaybackService : MediaSessionService() {
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             saveNow()
-            scrobbler.onPlayingChanged(isPlaying, System.currentTimeMillis())
-            if (isPlaying) ScrobbleQueue.flush(applicationContext)
-            if (isPlaying) nowPlaying()
         }
 
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
             saveNow()
-            scrobbler.onTrackChanged(
-                title = item?.mediaMetadata?.title?.toString(),
-                albumTitle = item?.mediaMetadata?.albumTitle?.toString().orEmpty(),
-                durationMs = 0,
-                nowMs = System.currentTimeMillis(),
-            )
-            nowPlaying()
         }
 
         override fun onPlaybackStateChanged(state: Int) {
             saveNow()
-            if (state == Player.STATE_ENDED) {
-                scrobbler.onStopped(System.currentTimeMillis())
-            }
         }
     }
 
@@ -225,29 +201,6 @@ class PlaybackService : MediaSessionService() {
             positionMs = player.currentPosition.coerceAtLeast(0),
             playWhenReady = player.playWhenReady,
         )
-    }
-
-    private fun nowPlaying() {
-        val key = LastFmSession.sessionKey ?: return
-        if (!LastFmApi.configured) return
-        val player = session?.player ?: return
-        val meta = player.currentMediaItem?.mediaMetadata ?: return
-        val title = meta.title?.toString() ?: return
-        val duration = player.duration.coerceAtLeast(0)
-        scope.launch {
-            runCatching {
-                LastFmApi.updateNowPlaying(
-                    key,
-                    Scrobble(
-                        artist = "Phish",
-                        track = title,
-                        album = meta.albumTitle?.toString().orEmpty(),
-                        durationSec = (duration / 1000).toInt(),
-                        timestampSec = System.currentTimeMillis() / 1000,
-                    ),
-                )
-            }
-        }
     }
 
     private fun saveNow() {

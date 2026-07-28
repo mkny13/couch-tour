@@ -37,40 +37,6 @@ data class Progress(
     val dismissed: Boolean = false,
 )
 
-/**
- * A play waiting to reach Last.fm. Scrobbles are queued rather than fired and forgotten so
- * that playing offline — the normal case on a train — doesn't silently lose them.
- */
-@Entity(tableName = "pending_scrobbles")
-data class PendingScrobble(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val artist: String,
-    val track: String,
-    val album: String,
-    val durationSec: Int,
-    val timestampSec: Long,
-) {
-    fun toScrobble() = Scrobble(artist, track, album, durationSec, timestampSec)
-}
-
-@Dao
-interface ScrobbleDao {
-    @Insert
-    suspend fun add(scrobble: PendingScrobble)
-
-    @Query("SELECT * FROM pending_scrobbles ORDER BY timestampSec ASC LIMIT 50")
-    suspend fun oldest(): List<PendingScrobble>
-
-    @Query("DELETE FROM pending_scrobbles WHERE id = :id")
-    suspend fun remove(id: Long)
-
-    @Query("SELECT COUNT(*) FROM pending_scrobbles")
-    suspend fun count(): Int
-
-    @Query("DELETE FROM pending_scrobbles")
-    suspend fun clear()
-}
-
 @Dao
 interface ProgressDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -101,13 +67,12 @@ interface ProgressDao {
 }
 
 @Database(
-    entities = [Progress::class, PendingScrobble::class],
-    version = 4,
+    entities = [Progress::class],
+    version = 5,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
-    abstract fun scrobbleDao(): ScrobbleDao
 
     companion object {
         /**
@@ -139,6 +104,17 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /**
+         * Drops the pending-scrobble queue. Built-in scrobbling was removed, so the table
+         * has nothing left to feed it — external scrobblers never used it in the first
+         * place, they read the MediaSession directly.
+         */
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS pending_scrobbles")
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -149,7 +125,7 @@ abstract class PhishInDb : RoomDatabase() {
                 // invisible to users, and changing it orphans every existing install's
                 // listening history.
                 "phishin.db"
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build().also { instance = it }
         }
     }

@@ -2,7 +2,6 @@ package dev.mike.couchtour
 
 import android.Manifest
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -73,7 +72,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -159,7 +157,6 @@ fun App(
             composable("home") { HomeScreen(vm, nav) }
             composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }
-            composable("lastfm") { LastFmScreen(nav) }
             composable("shows/{period}") { entry ->
                 ShowsScreen(entry.arguments?.getString("period").orEmpty(), nav)
             }
@@ -193,7 +190,6 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
     val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
     val historyCount by vm.progressDao.historyCount().collectAsState(initial = 0)
     val username by Session.username.collectAsState()
-    val lastFmUser by LastFmSession.username.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     val term = query.trim()
     val results = searchFor(term)
@@ -281,20 +277,6 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 item {
                     RowItem("Signed in as $username", "Tap to log out", null) { Session.logout() }
                 }
-            }
-
-            item { SectionHeader("Scrobbling", divided = true) }
-            item {
-                RowItem(
-                    title = "Last.fm",
-                    subtitle = when {
-                        lastFmUser != null -> "Built-in scrobbler on, as $lastFmUser"
-                        !LastFmApi.configured -> "Use the Last.fm app — tap to read how"
-                        else -> "Not connected"
-                    },
-                    artUrl = null,
-                    onClick = { nav.navigate("lastfm") }
-                )
             }
 
             item { SectionHeader("Browse", divided = true) }
@@ -444,102 +426,6 @@ private fun SearchResultsList(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun LastFmScreen(nav: NavHostController) {
-    val context = LocalContext.current
-    val username by LastFmSession.username.collectAsState()
-    var token by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    Column(Modifier.fillMaxSize()) {
-        Header("Last.fm", nav)
-
-        Text(
-            "You probably don't need this. The official Last.fm app can scrobble this app " +
-                "directly — open it, go to Account, and switch on Phish.in under " +
-                "\"Scrobble from…\". No API key, nothing to set up here.\n\n" +
-                "Only use the built-in scrobbler below if you'd rather not run the Last.fm " +
-                "app. Do not enable both, or every track is scrobbled twice.",
-            fontSize = 13.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(16.dp)
-        )
-        HorizontalDivider(color = Color.White.copy(alpha = 0.10f))
-
-        if (!LastFmApi.configured) {
-            Text(
-                "The built-in scrobbler is not configured in this build. It needs an API " +
-                    "account from last.fm/api/account/create, with lastfm.apiKey and " +
-                    "lastfm.apiSecret added to local.properties before rebuilding.",
-                fontSize = 13.sp,
-                color = Color.Gray,
-                modifier = Modifier.padding(16.dp)
-            )
-            return
-        }
-
-        if (username != null) {
-            Text(
-                "Scrobbling as $username.",
-                fontSize = 15.sp,
-                modifier = Modifier.padding(16.dp)
-            )
-            Button(
-                onClick = { LastFmSession.disconnect() },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            ) { Text("Disconnect") }
-            return
-        }
-
-        Text(
-            "Connecting opens Last.fm in your browser to approve this app. Your Last.fm " +
-                "password is never typed into this app.",
-            fontSize = 13.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(16.dp)
-        )
-
-        Button(
-            onClick = {
-                status = null
-                scope.launch {
-                    runCatching { LastFmApi.requestToken() }
-                        .onSuccess {
-                            token = it
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(LastFmApi.authorizeUrl(it)))
-                            )
-                        }
-                        .onFailure { status = "Couldn't reach Last.fm: ${it.message}" }
-                }
-            },
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        ) { Text("1. Approve in browser") }
-
-        Button(
-            enabled = token != null,
-            onClick = {
-                val current = token ?: return@Button
-                status = null
-                scope.launch {
-                    runCatching { LastFmApi.session(current) }
-                        .onSuccess { (key, user) ->
-                            LastFmSession.connect(key, user)
-                            ScrobbleQueue.flush(context)
-                        }
-                        .onFailure { status = "Not approved yet: ${it.message}" }
-                }
-            },
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        ) { Text("2. Finish connecting") }
-
-        status?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
         }
     }
 }

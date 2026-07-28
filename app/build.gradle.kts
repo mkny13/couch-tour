@@ -1,21 +1,9 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-}
-
-/**
- * Last.fm credentials come from local.properties, which is gitignored — the shared secret
- * must not land in the repo. Absent, they compile to empty strings and the app simply
- * reports Last.fm as unconfigured.
- */
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -28,15 +16,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1"
-
-        buildConfigField(
-            "String", "LASTFM_KEY",
-            "\"${localProperties.getProperty("lastfm.apiKey", "")}\""
-        )
-        buildConfigField(
-            "String", "LASTFM_SECRET",
-            "\"${localProperties.getProperty("lastfm.apiSecret", "")}\""
-        )
     }
 
     buildTypes {
