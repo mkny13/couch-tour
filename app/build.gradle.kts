@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,21 +8,61 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * Release signing comes from local.properties, which is gitignored — the keystore and its
+ * passwords must never land in the repo. If release.storeFile isn't set, the release build
+ * type is left unsigned (fine for CI/local verification builds); if it is set, the keystore
+ * it points at must actually exist, or the build fails below with a clear message instead of
+ * a confusing signing-tool error.
+ */
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val releaseStoreFile = localProperties.getProperty("release.storeFile")
+
 android {
     namespace = "dev.mike.couchtour"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "dev.mike.couchtour"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
-        versionName = "0.1"
+        versionName = "1.0"
+    }
+
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                val file = rootProject.file(releaseStoreFile)
+                if (!file.exists()) {
+                    error(
+                        "local.properties sets release.storeFile=$releaseStoreFile, but no " +
+                            "keystore exists at that path. Generate one (see CLAUDE.md) or " +
+                            "remove the release.* properties to produce an unsigned build."
+                    )
+                }
+                storeFile = file
+                storePassword = localProperties.getProperty("release.storePassword")
+                keyAlias = localProperties.getProperty("release.keyAlias")
+                keyPassword = localProperties.getProperty("release.keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (releaseStoreFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
@@ -32,7 +74,6 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true
     }
     testOptions {
         unitTests {
