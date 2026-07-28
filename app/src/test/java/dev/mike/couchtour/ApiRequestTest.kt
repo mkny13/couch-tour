@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl.Companion.toHttpUrl

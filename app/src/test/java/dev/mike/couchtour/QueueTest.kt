@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

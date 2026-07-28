@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.Canvas

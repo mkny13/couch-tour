@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import androidx.media3.common.MimeTypes
 import org.junit.Assert.assertEquals

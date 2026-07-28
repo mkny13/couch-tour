@@ -1,10 +1,11 @@
-# Phish.in for Android
+# Couch Tour
 
 An unofficial native Android client for [phish.in](https://phish.in), the open-source live
 Phish archive. Built for two things above all: real Android media controls, and never losing
 your place.
 
-Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public API.
+Not affiliated with phish.in or Phish. Audio is streamed from phish.in's public API, used
+with the maintainer's permission.
 
 ## What works (MVP)
 

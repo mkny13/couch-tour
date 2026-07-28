@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import android.content.Context
 import androidx.room.Dao
@@ -145,6 +145,9 @@ abstract class PhishInDb : RoomDatabase() {
             instance ?: Room.databaseBuilder(
                 context.applicationContext,
                 PhishInDb::class.java,
+                // Predates the rename to Couch Tour and stays that way: the filename is
+                // invisible to users, and changing it orphans every existing install's
+                // listening history.
                 "phishin.db"
             ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build().also { instance = it }

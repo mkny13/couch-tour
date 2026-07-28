@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider

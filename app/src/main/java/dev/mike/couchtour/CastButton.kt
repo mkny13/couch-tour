@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column

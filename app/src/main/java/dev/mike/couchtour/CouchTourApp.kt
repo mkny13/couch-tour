@@ -1,8 +1,8 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import android.app.Application
 
-class PhishInApp : Application() {
+class CouchTourApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // Restore both sessions before any screen or the playback service issues a request.

@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 /** Formats a millisecond duration as m:ss, or h:mm:ss once it passes an hour. */
 fun fmt(ms: Long): String {

@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals

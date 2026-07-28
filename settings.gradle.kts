@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PhishIn"
+rootProject.name = "CouchTour"
 include(":app")

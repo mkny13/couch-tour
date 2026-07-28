@@ -19,11 +19,11 @@ val localProperties = Properties().apply {
 }
 
 android {
-    namespace = "dev.mike.phishin"
+    namespace = "dev.mike.couchtour"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "dev.mike.phishin"
+        applicationId = "dev.mike.couchtour"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

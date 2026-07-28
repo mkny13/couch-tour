@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

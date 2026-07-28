@@ -1,4 +1,4 @@
-package dev.mike.phishin
+package dev.mike.couchtour
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -29,7 +29,7 @@ class MigrationTest {
     private lateinit var context: Context
     private lateinit var dbFile: File
 
-    // Straight from app/schemas/dev.mike.phishin.PhishInDb/1.json.
+    // Straight from app/schemas/dev.mike.couchtour.PhishInDb/1.json.
     private val v1CreateTable = """
         CREATE TABLE IF NOT EXISTS `progress` (
             `queueKey` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
@@ -40,7 +40,7 @@ class MigrationTest {
     """.trimIndent()
     private val v1IdentityHash = "db5a97926aec82a06ff094ca2e38ff6d"
 
-    // From app/schemas/dev.mike.phishin.PhishInDb/2.json.
+    // From app/schemas/dev.mike.couchtour.PhishInDb/2.json.
     private val v2CreateTable = """
         CREATE TABLE IF NOT EXISTS `progress` (
             `queueKey` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
