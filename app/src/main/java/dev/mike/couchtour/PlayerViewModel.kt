@@ -79,25 +79,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ play
 
     fun playShow(show: Show, startIndex: Int = 0, startPositionMs: Long = 0) {
-        val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
-        val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
-        val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art)
-        start(show.tracks.filter { it.playable }.map { mediaItem(it, info) }, startIndex, startPositionMs)
+        start(showTrackItems(show), startIndex, startPositionMs)
     }
 
     fun playPlaylist(playlist: Playlist, startIndex: Int = 0, startPositionMs: Long = 0) {
-        val entries = playlist.entries.filter { it.track.playable }
-        val subtitle = listOfNotNull(
-            playlist.username?.let { "by $it" },
-            "${entries.size} tracks",
-        ).joinToString(" · ")
-        val info = QueueInfo(
-            playlistQueueKey(playlist.slug),
-            playlist.name,
-            subtitle,
-            entries.firstOrNull()?.track?.showAlbumCoverUrl,
-        )
-        start(entries.map { mediaItem(it.track, info, it) }, startIndex, startPositionMs)
+        start(playlistTrackItems(playlist), startIndex, startPositionMs)
     }
 
     /**

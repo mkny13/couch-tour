@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Declares Couch Tour as an Android Auto media app, browsable via PlaybackService's
+     MediaLibrarySession. Automotive OS support would add android:minCarApiLevel here, but
+     that's a separate effort (see CLAUDE.md / issue #4). -->
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>

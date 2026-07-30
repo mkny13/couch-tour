@@ -25,6 +25,34 @@ internal fun albumFor(track: Track, info: QueueInfo): String {
     return fromTrack.ifBlank { "${info.title} · ${info.subtitle}" }
 }
 
+/**
+ * The playable [MediaItem]s for a whole show, in set order. Shared by [PlayerViewModel.playShow]
+ * and the Android Auto browse tree ([PlaybackService]'s "show:" node) so a show queued from
+ * either place is built exactly the same way.
+ */
+internal fun showTrackItems(show: Show): List<MediaItem> {
+    val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
+    val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
+    val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art)
+    return show.tracks.filter { it.playable }.map { mediaItem(it, info) }
+}
+
+/** Same as [showTrackItems], for a playlist — shared by [PlayerViewModel.playPlaylist] and Auto. */
+internal fun playlistTrackItems(playlist: Playlist): List<MediaItem> {
+    val entries = playlist.entries.filter { it.track.playable }
+    val subtitle = listOfNotNull(
+        playlist.username?.let { "by $it" },
+        "${entries.size} tracks",
+    ).joinToString(" · ")
+    val info = QueueInfo(
+        playlistQueueKey(playlist.slug),
+        playlist.name,
+        subtitle,
+        entries.firstOrNull()?.track?.showAlbumCoverUrl,
+    )
+    return entries.map { mediaItem(it.track, info, it) }
+}
+
 internal fun mediaItem(track: Track, info: QueueInfo, entry: PlaylistEntry? = null): MediaItem {
     // Per-track, not shared: waveform and cover differ for every track in a playlist.
     val art = track.showAlbumCoverUrl ?: info.art
