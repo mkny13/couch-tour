@@ -502,6 +502,48 @@ the city, and leaves playlists alone, where the show and the queue are unrelated
 both lines earn their place. Seen on a screen, not in a test: the two strings differ, so
 nothing short of rendering them together shows the problem.
 
+## Iteration 14 — Android Auto
+
+**D73 — Android Auto browses through the existing MediaSession; `PlaybackService` gained a
+browse tree, not a second service.**
+`PlaybackService` became a `MediaLibraryService` rather than sitting alongside a separate one —
+Auto (and, if it's ever pursued, Automotive) connects through `onGetSession` like every other
+controller, and the dual-player handoff (D61, D62) doesn't care who's asking. The tree is
+Root → Years → shows, with an extra Tour layer inserted only where a period has more than one
+distinct `tour_name` — the early ranged periods (`"1983-1987"` and the like) are usually the
+case that needs it; a single-tour or tourless year, which is most of them, goes straight to its
+shows. A Continue Listening node is built from `progressDao.inProgress()`, and its resume media
+IDs wrap the same namespaced `queueKey` (D6) rather than inventing a second identifier scheme.
+
+Resuming from Continue Listening lands on the right *track*, not the right *second*: Auto plays
+from the top of whichever item is tapped, and there's no hook for a mid-track start position on
+a system-driven tap the way `PlayerViewModel.resume()` gets one from a direct
+`MediaController.setMediaItems` call. Slicing the already-fetched track list at `trackIndex`
+gets the right track for free; true position resumption would need Media3's
+`onPlaybackResumption` callback, which is a separate, real piece of work and not done here.
+
+A parent id that fails to parse, or a `PhishInApi` call that throws — no signal in a moving
+car is the expected case, not an edge one — both return an empty child list rather than an
+error result. `LibraryResult.ofError` wants a `SessionError`; an empty folder is a safe, always-
+available fallback that needs none of the guessing that picking the "right" error code would.
+
+No `onConnect` override was needed: `MediaSession.ConnectionResult.AcceptedResultBuilder`
+already switches on `session is MediaLibrarySession` to grant the library browsing commands
+alongside the usual playback ones.
+
+Android Automotive OS — the full in-car OS with no phone, as opposed to Auto's phone
+projection — is out of scope, same as the issue that asked for this scoped it:
+`automotive_app_desc.xml` declares `<uses name="media"/>` for Auto only, with no
+`minCarApiLevel`, and there's no handling of the "recent root" request Automotive uses for its
+resume-on-boot flow.
+
+This environment couldn't run `./gradlew`: Google's Maven, where every `androidx.media3`
+artifact is hosted, wasn't reachable from it. The Media3 API surface this relies on —
+`MediaLibrarySession.Builder`'s constructor, the `Callback` method signatures, the
+`LibraryResult` factories — was checked against the `androidx/media` source on GitHub instead
+of an actual compile. Run `testDebugUnitTest` (it now includes `BrowseTest`) on a machine with
+the Android SDK before this ships.
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

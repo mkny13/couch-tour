@@ -2,15 +2,24 @@ package dev.mike.couchtour
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import androidx.media3.cast.RemoteCastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.LibraryParams
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,15 +56,16 @@ private data class Handoff(
 /**
  * Foreground media service. This is the piece a WebView can't provide: it owns the
  * MediaSession that Android surfaces on the lockscreen, in the notification shade, and
- * to Bluetooth / headset buttons.
+ * to Bluetooth / headset buttons — and, as a [MediaLibraryService], the browse tree Android
+ * Auto uses to show years, shows and tracks on a head unit.
  *
  * It owns both players — the local ExoPlayer and, once Cast is available, a RemoteCastPlayer
  * — and hands the session whichever one is live. Everything above it (the UI's
  * MediaController, the progress writer) is deliberately unaware of which.
  */
-class PlaybackService : MediaSessionService() {
+class PlaybackService : MediaLibraryService() {
 
-    private var session: MediaSession? = null
+    private var session: MediaLibrarySession? = null
     private var localPlayer: ExoPlayer? = null
     private var castPlayer: RemoteCastPlayer? = null
     private var handoff: Handoff? = null
@@ -88,7 +98,7 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        session = MediaSession.Builder(this, player)
+        session = MediaLibrarySession.Builder(this, player, LibrarySessionCallback())
             .setSessionActivity(openApp)
             .build()
 
@@ -225,7 +235,160 @@ class PlaybackService : MediaSessionService() {
         scope.launch { PhishInDb.get(applicationContext).progressDao().put(progress) }
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
+
+    // -------------------------------------------------------------------- browse tree
+
+    /**
+     * Android Auto's MediaBrowser calls in from a Binder thread and expects a
+     * ListenableFuture back, not a suspend function — this bridges the two so the browse
+     * tree can be built with the same suspending [PhishInApi] calls the rest of the app uses.
+     */
+    private fun <T : Any> CoroutineScope.futureOf(block: suspend () -> T): ListenableFuture<T> {
+        val future = SettableFuture.create<T>()
+        launch {
+            try {
+                future.set(block())
+            } catch (t: Throwable) {
+                future.setException(t)
+            }
+        }
+        return future
+    }
+
+    private inner class LibrarySessionCallback : MediaLibrarySession.Callback {
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<MediaItem>> =
+            Futures.immediateFuture(LibraryResult.ofItem(rootItem(), params))
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?,
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            val node = BrowseNode.parse(parentId)
+            return scope.futureOf {
+                // A network hiccup in the car shouldn't crash the browse service — an empty
+                // folder is a safe, recoverable result; a dead Binder call is not.
+                val children = node?.let { runCatching { childrenFor(it) }.getOrDefault(emptyList()) }
+                    ?: emptyList()
+                LibraryResult.ofItemList(children.drop(page * pageSize).take(pageSize), params)
+            }
+        }
+    }
+
+    private fun browsableItem(
+        id: String,
+        title: String,
+        subtitle: String? = null,
+        artUri: String? = null,
+    ): MediaItem {
+        val meta = MediaMetadata.Builder()
+            .setTitle(title)
+            .apply { subtitle?.let { setSubtitle(it) } }
+            .apply { artUri?.let { setArtworkUri(Uri.parse(it)) } }
+            .setIsBrowsable(true)
+            .setIsPlayable(false)
+            .build()
+        return MediaItem.Builder().setMediaId(id).setMediaMetadata(meta).build()
+    }
+
+    private fun rootItem(): MediaItem = browsableItem(BrowseNode.Root.id, "Couch Tour")
+
+    private suspend fun childrenFor(node: BrowseNode): List<MediaItem> = when (node) {
+        BrowseNode.Root -> rootChildren()
+        BrowseNode.Continue -> continueChildren()
+        BrowseNode.Years -> yearsChildren()
+        is BrowseNode.Year -> yearChildren(node.period)
+        is BrowseNode.Tour -> tourChildren(node.period, node.name)
+        is BrowseNode.ShowNode -> showTrackItems(PhishInApi.show(node.date))
+        is BrowseNode.Resume -> resumeChildren(node.queueKey)
+    }
+
+    private suspend fun rootChildren(): List<MediaItem> {
+        val hasProgress = progressDao().inProgress().first().isNotEmpty()
+        return buildList {
+            if (hasProgress) add(browsableItem(BrowseNode.Continue.id, "Continue Listening"))
+            add(browsableItem(BrowseNode.Years.id, "Years"))
+        }
+    }
+
+    private suspend fun continueChildren(): List<MediaItem> =
+        progressDao().inProgress().first().map { progress ->
+            browsableItem(
+                id = BrowseNode.Resume(progress.queueKey).id,
+                title = progress.title,
+                subtitle = listOfNotNull(progress.subtitle, progress.trackTitle)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · "),
+                artUri = progress.artUrl,
+            )
+        }
+
+    private suspend fun yearsChildren(): List<MediaItem> =
+        PhishInApi.years().map { period ->
+            browsableItem(
+                id = BrowseNode.Year(period.period).id,
+                title = period.period,
+                subtitle = "${period.showsWithAudioCount} shows",
+                artUri = period.coverArtUrls?.medium,
+            )
+        }
+
+    /**
+     * Most periods are one continuous run with a single (or no) tour name, so the year opens
+     * straight onto its shows. Early, multi-tour years — several of the ranged periods like
+     * "1983-1987" cover more than one — get an extra layer of tour nodes instead.
+     */
+    private suspend fun yearChildren(period: String): List<MediaItem> {
+        val shows = PhishInApi.showsForPeriod(period)
+        val tourNames = shows.mapNotNull { it.tourName }.distinct()
+        if (tourNames.size <= 1) return shows.map { showItem(it) }
+        return tourNames.map { name ->
+            val tourShows = shows.filter { it.tourName == name }
+            browsableItem(
+                id = BrowseNode.Tour(period, name).id,
+                title = name,
+                subtitle = "${tourShows.size} shows",
+                artUri = tourShows.firstOrNull { it.albumCoverUrl != null }?.albumCoverUrl,
+            )
+        }
+    }
+
+    private suspend fun tourChildren(period: String, name: String): List<MediaItem> =
+        PhishInApi.showsForPeriod(period).filter { it.tourName == name }.map { showItem(it) }
+
+    private fun showItem(show: Show): MediaItem = browsableItem(
+        id = BrowseNode.ShowNode(show.date).id,
+        title = show.date,
+        subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · "),
+        artUri = show.albumCoverUrl ?: show.coverArtUrls?.medium,
+    )
+
+    /**
+     * Picks up a queue exactly where "Continue listening" left off. There's no per-track
+     * position here — Auto plays from the top of whichever track you tap — but landing on
+     * the right track instead of the first one is most of what resuming means.
+     */
+    private suspend fun resumeChildren(queueKey: String): List<MediaItem> {
+        val ref = parseQueueKey(queueKey) ?: return emptyList()
+        val progress = progressDao().get(queueKey)
+        val all = when (ref.kind) {
+            QueueKind.SHOW -> showTrackItems(PhishInApi.show(ref.id))
+            QueueKind.PLAYLIST -> playlistTrackItems(PhishInApi.playlist(ref.id))
+        }
+        if (progress == null || progress.finished || all.isEmpty()) return all
+        return all.drop(progress.trackIndex.coerceIn(0, all.lastIndex))
+    }
+
+    private fun progressDao() = PhishInDb.get(applicationContext).progressDao()
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = session?.player

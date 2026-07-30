@@ -34,6 +34,8 @@ with the maintainer's permission.
 - Cast to a Chromecast or a Google TV: the cast button appears once a device is on the
   network, playback moves to it mid-track, and the same controls, progress saving, and
   scrobbling carry on
+- Android Auto: browse Years → shows → tracks and Continue Listening from the car head
+  unit, with the same playback controls as the phone
 
 ## Not in yet
 
@@ -87,7 +89,7 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Tests
 
-106 unit tests, no device or emulator required:
+110 unit tests, no device or emulator required:
 
 ```bash
 ./gradlew testDebugUnitTest
