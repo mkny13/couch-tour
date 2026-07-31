@@ -7,7 +7,19 @@ name: Build debug APK
 on:
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional: create a GitHub Release at this tag (e.g. v0.11) with the APK attached"
+        required: false
+        type: string
+      release_notes:
+        description: "Release notes, used only when release_tag is set"
+        required: false
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -29,3 +41,15 @@ jobs:
         with:
           name: couch-tour-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Create release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          NOTES: ${{ inputs.release_notes }}
+        run: |
+          asset="couch-tour-${TAG}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$asset"
+          printf '%s\n' "$NOTES" > RELEASE_NOTES.md
+          gh release create "$TAG" "$asset" --title "$TAG" --notes-file RELEASE_NOTES.md
