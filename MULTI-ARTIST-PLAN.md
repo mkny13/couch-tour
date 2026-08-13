@@ -159,7 +159,18 @@ code they cover.
       show with no chosen recording still builds a playable, unresumable queue rather than
       refusing outright — the same tradeoff D42 makes for shuffle. 6 tests in
       `MediaItemsTest`.
-- [ ] **P6 — `PlayerViewModel.kt`: resume dispatch + `playRecording`.**
+- [x] **P6 — `PlayerViewModel.kt`: resume dispatch + `playRecording`.** `playRecording(detail,
+      startIndex, startPositionMs)` mirrors `playShow`/`playPlaylist`. `resume()`'s
+      `QueueKind.RECORDING` branch re-parses the queue key back into a `RecordingId` and
+      re-fetches with the **stored** source id, not the current default tape — resuming has
+      to reopen the exact tape a position was recorded against, same reasoning P3's
+      `recordingId` param exists for. It looks up the real `ArtistRef` via
+      `RelistenCatalogSource.artists()` (warm from the O4 cache in the ordinary case) rather
+      than building a name-only one, because `hasSets` has to be right for
+      `toShowDetail`/`recordingTrackItems` to suppress the set-name divider correctly on
+      resume, not just on first play; `progress.artist` (the denormalised column from P2b) is
+      the fallback if that lookup fails offline. No new tests — `PlayerViewModel` isn't
+      unit-tested for the phish.in path either, since it needs a live `MediaController`.
 - [ ] **P7 — `MainActivity.kt`: routes and screens.** `artists`,
       `artist/{backend}/{id}`, `artist/{backend}/{id}/{period}`,
       `recording/{backend}/{artist}/{date}?src=`. Home gains an "Artists" row; the Phish path

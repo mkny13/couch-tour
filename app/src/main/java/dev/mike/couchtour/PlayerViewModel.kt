@@ -86,6 +86,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         start(playlistTrackItems(playlist), startIndex, startPositionMs)
     }
 
+    /** Play one tape of a Relisten show. [detail] already picked the recording (P3). */
+    fun playRecording(detail: ShowDetail, startIndex: Int = 0, startPositionMs: Long = 0) {
+        start(recordingTrackItems(detail), startIndex, startPositionMs)
+    }
+
     /**
      * Play a set of loose tracks in random order.
      *
@@ -134,9 +139,20 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         playPlaylist(PhishInApi.playlist(ref.id), index, position)
                     QueueKind.SHOW ->
                         playShow(PhishInApi.show(ref.id), index, position)
-                    // Wired up once Relisten can build queue items. Doing nothing matches
-                    // what an unparseable key already does rather than playing the wrong tape.
-                    QueueKind.RECORDING -> Unit
+                    QueueKind.RECORDING -> {
+                        val rec = parseRecordingId(ref.id) ?: return@runCatching
+                        // The real ArtistRef, not a name-only stand-in: hasSets controls
+                        // whether toShowDetail suppresses the set-name divider, and getting
+                        // it wrong here would only show up on resume, not on first play.
+                        // progress.artist is the fallback if the artist list can't be
+                        // fetched (e.g. offline) — degrades to showing that divider rather
+                        // than failing to resume at all.
+                        val artist = RelistenCatalogSource.artists().firstOrNull { it.id == rec.artistSlug }
+                            ?: ArtistRef(Backend.RELISTEN, rec.artistSlug, progress.artist)
+                        // The stored source id, not the current default tape — resuming
+                        // must reopen the exact tape the position was recorded against.
+                        playRecording(RelistenCatalogSource.show(artist, rec.date, rec.sourceId), index, position)
+                    }
                 }
             }
         }
