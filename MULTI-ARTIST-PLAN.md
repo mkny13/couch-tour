@@ -87,7 +87,7 @@ code they cover.
       Inner delimiter is `/`, not `:`, to sidestep the first-colon-only ambiguity
       `parseQueueKey` and `BrowseNode.parse` both work around. Existing prefixes untouched.
       *Tests first, in `QueueTest`.*
-- [ ] **P2 — `Catalog.kt`: domain model + `MusicSource` seam + `PhishInSource` adapter.**
+- [x] **P2 — `Catalog.kt`: domain model + `MusicSource` seam + `PhishInSource` adapter.**
       Narrow: only what browse → play needs. `Api.kt` is not rewritten.
 - [ ] **P3 — `Relisten.kt`: DTOs and parsing.** Fixtures in
       `app/src/test/resources/fixtures/`. *Tests first, in `RelistenParsingTest`.*
