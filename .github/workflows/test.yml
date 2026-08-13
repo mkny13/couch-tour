@@ -1,0 +1,36 @@
+name: Unit tests
+
+# The whole suite is local — Robolectric and MockWebServer, no device or emulator — but it
+# still needs the Android SDK and every androidx artifact from Google's Maven (dl.google.com).
+# The environment this repo is usually developed from can't reach that host, so the tests run
+# here instead. Same reasoning as build-debug-apk.yml, which says so for the APK build.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      # The HTML report is the useful artifact on a failure; Gradle's console output only
+      # names the failing test, not the assertion.
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: app/build/reports/tests/testDebugUnitTest/

@@ -35,6 +35,15 @@ data class Progress(
      * playing it again clears the flag and brings it back.
      */
     val dismissed: Boolean = false,
+    /**
+     * The band, denormalised like the rest of the display fields so history renders without
+     * a network call or a look at which backend the key belongs to.
+     *
+     * Its own column rather than part of [subtitle], because grouping history by artist off
+     * a display string would mean splitting on a separator that venue names are free to
+     * contain. Empty only on a row that somehow predates the v6 backfill.
+     */
+    val artist: String = "",
 )
 
 @Dao
@@ -53,6 +62,13 @@ interface ProgressDao {
     @Query("SELECT COUNT(*) FROM progress")
     fun historyCount(): Flow<Int>
 
+    /** The bands in history, for grouping it. Blank artists are skipped — see [Progress.artist]. */
+    @Query("SELECT DISTINCT artist FROM progress WHERE artist != '' ORDER BY artist")
+    fun artists(): Flow<List<String>>
+
+    @Query("SELECT * FROM progress WHERE artist = :artist ORDER BY updatedAt DESC")
+    fun historyFor(artist: String): Flow<List<Progress>>
+
     @Query("SELECT * FROM progress WHERE queueKey = :key")
     suspend fun get(key: String): Progress?
 
@@ -68,7 +84,7 @@ interface ProgressDao {
 
 @Database(
     entities = [Progress::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
@@ -115,6 +131,23 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the band to each row, so history can be grouped by artist once there is more
+         * than one. Existing rows are backfilled to Phish rather than left blank.
+         *
+         * That backfill is not the guess D21 declined to make. Until a second backend
+         * existed, phish.in was the only thing this app could play, so every row already in
+         * the table is Phish — playlist rows included, since their tracks are Phish too.
+         * D21's case was different in kind: inferring `finished` needed a track duration the
+         * table has never stored.
+         */
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE progress ADD COLUMN artist TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE progress SET artist = 'Phish'")
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -125,7 +158,9 @@ abstract class PhishInDb : RoomDatabase() {
                 // invisible to users, and changing it orphans every existing install's
                 // listening history.
                 "phishin.db"
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            ).addMigrations(
+                MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+            )
                 .build().also { instance = it }
         }
     }

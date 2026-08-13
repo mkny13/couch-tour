@@ -231,6 +231,10 @@ class PlaybackService : MediaLibraryService() {
             // all fire at the end of a queue can't race to clobber each other's value, and
             // any later play of the same show clears the flag on its own.
             finished = player.playbackState == Player.STATE_ENDED,
+            // Read off the metadata rather than the extras: the item already publishes an
+            // artist for external scrobblers to read (D50), so there is nothing to add and
+            // no second copy to keep in step.
+            artist = item.mediaMetadata.artist?.toString().orEmpty(),
         )
         scope.launch { PhishInDb.get(applicationContext).progressDao().put(progress) }
     }
@@ -306,9 +310,13 @@ class PlaybackService : MediaLibraryService() {
         BrowseNode.Root -> rootChildren()
         BrowseNode.Continue -> continueChildren()
         BrowseNode.Years -> yearsChildren()
+        BrowseNode.Artists -> artistsChildren()
         is BrowseNode.Year -> yearChildren(node.period)
         is BrowseNode.Tour -> tourChildren(node.period, node.name)
         is BrowseNode.ShowNode -> showTrackItems(PhishInApi.show(node.date))
+        is BrowseNode.Artist -> artistPeriodsChildren(node)
+        is BrowseNode.ArtistPeriod -> artistShowsChildren(node)
+        is BrowseNode.Recording -> recordingChildren(node)
         is BrowseNode.Resume -> resumeChildren(node.queueKey)
     }
 
@@ -316,8 +324,57 @@ class PlaybackService : MediaLibraryService() {
         val hasProgress = progressDao().inProgress().first().isNotEmpty()
         return buildList {
             if (hasProgress) add(browsableItem(BrowseNode.Continue.id, "Continue Listening"))
+            // Above Years, per the plan: Relisten carries far more artists than phish.in has
+            // years, so it's the entry point most trips down this tree will actually want.
+            add(browsableItem(BrowseNode.Artists.id, "Artists"))
             add(browsableItem(BrowseNode.Years.id, "Years"))
         }
+    }
+
+    private suspend fun artistsChildren(): List<MediaItem> =
+        RelistenCatalogSource.artists().sortedByDescending { it.showCount }.map { artist ->
+            browsableItem(
+                id = BrowseNode.Artist(artist.backend.id, artist.id).id,
+                title = artist.name,
+                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+            )
+        }
+
+    private suspend fun artistPeriodsChildren(node: BrowseNode.Artist): List<MediaItem> {
+        val backend = Backend.from(node.backend) ?: return emptyList()
+        val source = sourceFor(backend)
+        val artist = source.artists().firstOrNull { it.id == node.artistId } ?: return emptyList()
+        return source.periods(artist).sortedByDescending { it.label }.map { period ->
+            browsableItem(
+                id = BrowseNode.ArtistPeriod(node.backend, node.artistId, period.id).id,
+                title = period.label,
+                subtitle = "${period.showCount} ${plural(period.showCount, "show")}",
+                artUri = period.artUrl,
+            )
+        }
+    }
+
+    private suspend fun artistShowsChildren(node: BrowseNode.ArtistPeriod): List<MediaItem> {
+        val backend = Backend.from(node.backend) ?: return emptyList()
+        val source = sourceFor(backend)
+        val artist = source.artists().firstOrNull { it.id == node.artistId } ?: return emptyList()
+        val period = source.periods(artist).firstOrNull { it.id == node.periodId } ?: return emptyList()
+        return source.shows(artist, period).map { show ->
+            browsableItem(
+                id = BrowseNode.Recording(node.backend, node.artistId, show.date).id,
+                title = show.date,
+                subtitle = show.where,
+                artUri = show.artUrl,
+            )
+        }
+    }
+
+    /** Always the default tape (P3) — no tape switcher on a head unit, same scope cut as O3. */
+    private suspend fun recordingChildren(node: BrowseNode.Recording): List<MediaItem> {
+        val backend = Backend.from(node.backend) ?: return emptyList()
+        val source = sourceFor(backend)
+        val artist = source.artists().firstOrNull { it.id == node.artistId } ?: return emptyList()
+        return recordingTrackItems(source.show(artist, node.date))
     }
 
     private suspend fun continueChildren(): List<MediaItem> =
@@ -383,6 +440,17 @@ class PlaybackService : MediaLibraryService() {
         val all = when (ref.kind) {
             QueueKind.SHOW -> showTrackItems(PhishInApi.show(ref.id))
             QueueKind.PLAYLIST -> playlistTrackItems(PhishInApi.playlist(ref.id))
+            QueueKind.RECORDING -> {
+                val rec = parseRecordingId(ref.id)
+                if (rec == null) emptyList() else {
+                    // Same fallback resume() uses on the phone: the cached artist list is the
+                    // real ArtistRef (hasSets matters for the set-name divider), and the
+                    // denormalised progress.artist covers it if that lookup fails offline.
+                    val artist = RelistenCatalogSource.artists().firstOrNull { it.id == rec.artistSlug }
+                        ?: ArtistRef(Backend.RELISTEN, rec.artistSlug, progress?.artist.orEmpty())
+                    recordingTrackItems(RelistenCatalogSource.show(artist, rec.date, rec.sourceId))
+                }
+            }
         }
         if (progress == null || progress.finished || all.isEmpty()) return all
         return all.drop(progress.trackIndex.coerceIn(0, all.lastIndex))

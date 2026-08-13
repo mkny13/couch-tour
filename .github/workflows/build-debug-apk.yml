@@ -34,6 +34,34 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Without this, AGP auto-generates a fresh debug keystore on every run, since a
+      # GitHub-hosted runner starts clean and keeps nothing between builds. Each build would
+      # then carry a different random debug signing key, so installing a CI build over a
+      # locally-built one (or over the previous CI build) fails outright with "App not
+      # installed" rather than updating — exactly what happened installing v0.2a.
+      # The secret is this repo's own local ~/.android/debug.keystore, base64-encoded, so
+      # every build — local or CI — signs with the same key and updates in place. Falls
+      # back to AGP's auto-generated keystore if the secret isn't set (e.g. a fork's runs,
+      # which can't see this repo's secrets), same as before this existed.
+      #
+      # Written to BOTH ~/.android/ and ~/.config/.android/: AGP 8.10 on this runner logs
+      # "Creating default debug keystore at /home/runner/.config/.android/debug.keystore" —
+      # the newer XDG Base Directory path, not the classic ~/.android/ every guide (including
+      # this workflow's first attempt at this fix) assumes. Covering both is cheap insurance
+      # against that differing again by platform or AGP version.
+      - name: Restore debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            mkdir -p ~/.android ~/.config/.android
+            echo "$DEBUG_KEYSTORE_BASE64" | base64 --decode > ~/.android/debug.keystore
+            cp ~/.android/debug.keystore ~/.config/.android/debug.keystore
+            sha256sum ~/.android/debug.keystore ~/.config/.android/debug.keystore
+          else
+            echo "DEBUG_KEYSTORE_BASE64 secret is empty or unset"
+          fi
+
       - name: Assemble debug APK
         run: ./gradlew assembleDebug
 

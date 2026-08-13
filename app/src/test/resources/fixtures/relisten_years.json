@@ -1,0 +1,266 @@
+[
+ {
+  "show_count": 1,
+  "source_count": 1,
+  "duration": 727,
+  "avg_duration": 727.0,
+  "avg_rating": 7.733333,
+  "year": "1965",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "597b0de7-dfe4-f6f2-dab7-063932c284e4",
+  "popularity": {
+   "momentum_score": 0.06,
+   "trend_ratio": 0.3529,
+   "windows": {
+    "48h": {
+     "plays": 2,
+     "hours": 0.3267,
+     "hot_score": 1.4142
+    },
+    "7d": {
+     "plays": 19,
+     "hours": 2.1056,
+     "hot_score": 4.3589
+    },
+    "30d": {
+     "plays": 78,
+     "hours": 8.8736,
+     "hot_score": 8.8318
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2009-08-12T12:54:33Z"
+ },
+ {
+  "show_count": 18,
+  "source_count": 35,
+  "duration": 131945,
+  "avg_duration": 4787.6855,
+  "avg_rating": 8.6197815,
+  "year": "1966",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "73e71130-76e6-7071-c6c0-8a7731f00201",
+  "popularity": {
+   "momentum_score": 0.2733,
+   "trend_ratio": 0.5372,
+   "windows": {
+    "48h": {
+     "plays": 198,
+     "hours": 12.68,
+     "hot_score": 14.0712
+    },
+    "7d": {
+     "plays": 691,
+     "hours": 41.955,
+     "hot_score": 26.2869
+    },
+    "30d": {
+     "plays": 7179,
+     "hours": 533.6069,
+     "hot_score": 84.729
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2025-01-02T20:33:11Z"
+ },
+ {
+  "show_count": 16,
+  "source_count": 24,
+  "duration": 79421,
+  "avg_duration": 3886.75,
+  "avg_rating": 8.030405,
+  "year": "1967",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "140627e5-da5a-5b8a-4a0b-5cdc1c9d9128",
+  "popularity": {
+   "momentum_score": 0.6733,
+   "trend_ratio": 0.8686,
+   "windows": {
+    "48h": {
+     "plays": 94,
+     "hours": 15.3283,
+     "hot_score": 9.6954
+    },
+    "7d": {
+     "plays": 190,
+     "hours": 27.2594,
+     "hot_score": 13.784
+    },
+    "30d": {
+     "plays": 1911,
+     "hours": 255.8831,
+     "hot_score": 43.715
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2026-01-17T14:56:13Z"
+ },
+ {
+  "show_count": 30,
+  "source_count": 63,
+  "duration": 280942,
+  "avg_duration": 5427.365,
+  "avg_rating": 8.616563,
+  "year": "1968",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "a77119b9-8368-3b13-fee4-77c4b92de4ea",
+  "popularity": {
+   "momentum_score": 0.3467,
+   "trend_ratio": 0.6344,
+   "windows": {
+    "48h": {
+     "plays": 224,
+     "hours": 27.5008,
+     "hot_score": 14.9666
+    },
+    "7d": {
+     "plays": 920,
+     "hours": 113.3011,
+     "hot_score": 30.3315
+    },
+    "30d": {
+     "plays": 4475,
+     "hours": 562.0811,
+     "hot_score": 66.8954
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2024-06-29T14:49:03Z"
+ },
+ {
+  "show_count": 88,
+  "source_count": 160,
+  "duration": 941183,
+  "avg_duration": 6586.175,
+  "avg_rating": 8.587082,
+  "year": "1969",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "598a7fc9-80f9-67f8-5228-4956ab3ee820",
+  "popularity": {
+   "momentum_score": 0.68,
+   "trend_ratio": 1.0004,
+   "windows": {
+    "48h": {
+     "plays": 1141,
+     "hours": 150.1836,
+     "hot_score": 33.7787
+    },
+    "7d": {
+     "plays": 2131,
+     "hours": 290.2869,
+     "hot_score": 46.1628
+    },
+    "30d": {
+     "plays": 12998,
+     "hours": 1867.3894,
+     "hot_score": 114.0088
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2026-04-01T16:47:20Z"
+ },
+ {
+  "show_count": 79,
+  "source_count": 193,
+  "duration": 1282798,
+  "avg_duration": 9070.094,
+  "avg_rating": 8.8161,
+  "year": "1970",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "fc007fea-3f71-fd2f-5257-41e6a2fc6ab1",
+  "popularity": {
+   "momentum_score": 0.6333,
+   "trend_ratio": 0.7244,
+   "windows": {
+    "48h": {
+     "plays": 1367,
+     "hours": 167.6344,
+     "hot_score": 36.973
+    },
+    "7d": {
+     "plays": 3462,
+     "hours": 385.8714,
+     "hot_score": 58.8388
+    },
+    "30d": {
+     "plays": 19516,
+     "hours": 2211.16,
+     "hot_score": 139.6997
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2026-07-29T11:10:36Z"
+ },
+ {
+  "show_count": 69,
+  "source_count": 182,
+  "duration": 1668480,
+  "avg_duration": 10477.423,
+  "avg_rating": 8.897123,
+  "year": "1971",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "7a1380b1-5c43-d814-55d1-839ac6ddb367",
+  "popularity": {
+   "momentum_score": 0.7,
+   "trend_ratio": 0.7905,
+   "windows": {
+    "48h": {
+     "plays": 1670,
+     "hours": 194.5728,
+     "hot_score": 40.8656
+    },
+    "7d": {
+     "plays": 6920,
+     "hours": 802.3517,
+     "hot_score": 83.1865
+    },
+    "30d": {
+     "plays": 33356,
+     "hours": 3881.3767,
+     "hot_score": 182.6363
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2026-07-10T16:02:31Z"
+ },
+ {
+  "show_count": 78,
+  "source_count": 184,
+  "duration": 1810286,
+  "avg_duration": 11412.587,
+  "avg_rating": 8.908544,
+  "year": "1972",
+  "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "uuid": "e8a95afa-bd15-bccb-c231-de9f56a5c8fa",
+  "popularity": {
+   "momentum_score": 0.6133,
+   "trend_ratio": 0.6038,
+   "windows": {
+    "48h": {
+     "plays": 2231,
+     "hours": 276.9706,
+     "hot_score": 47.2335
+    },
+    "7d": {
+     "plays": 6996,
+     "hours": 883.7661,
+     "hot_score": 83.6421
+    },
+    "30d": {
+     "plays": 63097,
+     "hours": 7853.5453,
+     "hot_score": 251.1912
+    }
+   }
+  },
+  "created_at": "2018-10-23T07:01:01Z",
+  "updated_at": "2025-06-17T23:11:24Z"
+ }
+]

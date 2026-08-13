@@ -71,6 +71,11 @@ class MigrationTest {
     """.trimIndent()
     private val v4IdentityHash = "e8c073632e44866ca4fd0fda3bcea1c7"
 
+    // From app/schemas/dev.mike.couchtour.PhishInDb/5.json — same as v4's progress table,
+    // with pending_scrobbles dropped.
+    private val v5CreateTable = v4CreateTable
+    private val v5IdentityHash = "2748fc6495e0489eaa1ea10e27656425"
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -156,6 +161,28 @@ class MigrationTest {
         db.close()
     }
 
+    private fun createV5DatabaseWithRows() {
+        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        db.execSQL(v5CreateTable)
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+        db.execSQL(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            arrayOf(v5IdentityHash),
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0)"""
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+               VALUES ('playlist:key-jams','Key Jams','by mfhgreyboy',NULL,5,35342,'Taste',100,0,0)"""
+        )
+        db.version = 5
+        db.close()
+    }
+
     private fun openWithCurrentSchema(): PhishInDb =
         Room.databaseBuilder(context, PhishInDb::class.java, dbFile.name)
             .addMigrations(
@@ -163,6 +190,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_2_3,
                 PhishInDb.MIGRATION_3_4,
                 PhishInDb.MIGRATION_4_5,
+                PhishInDb.MIGRATION_5_6,
             )
             .allowMainThreadQueries()
             .build()
@@ -300,6 +328,59 @@ class MigrationTest {
 
             assertEquals(0, dao.inProgress().first().size)
             assertEquals(2, dao.history().first().size)
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v5 -> v6
+
+    @Test
+    fun `migrating from v5 keeps every row and its position`() = runBlocking {
+        createV5DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val rows = db.progressDao().history().first()
+            assertEquals(2, rows.size)
+            val show = rows.first { it.queueKey == "show:1992-12-02" }
+            assertEquals(22, show.trackIndex)
+            assertEquals(169397L, show.positionMs)
+            assertEquals("Rocky Top", show.trackTitle)
+            assertTrue(show.finished)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `migrating from v5 backfills every existing row as Phish`() = runBlocking {
+        // Not a guess, which is what separates this from D21: until the second backend
+        // existed, phish.in was the only thing the app could play, so every row already in
+        // the table is Phish — including the playlist rows, whose tracks are Phish too.
+        createV5DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val rows = db.progressDao().history().first()
+            assertEquals(2, rows.size)
+            assertTrue(rows.all { it.artist == "Phish" })
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `a database migrated all the way from v1 is also backfilled`() = runBlocking {
+        // The whole chain runs, so the backfill has to survive four migrations ahead of it.
+        createV1DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val rows = db.progressDao().history().first()
+            assertEquals(2, rows.size)
+            assertTrue(rows.all { it.artist == "Phish" })
+            assertEquals(listOf("Phish"), db.progressDao().artists().first())
         } finally {
             db.close()
         }
