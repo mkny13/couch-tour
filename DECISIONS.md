@@ -544,6 +544,63 @@ artifact is hosted, wasn't reachable from it. The Media3 API surface this relies
 of an actual compile. Run `testDebugUnitTest` (it now includes `BrowseTest`) on a machine with
 the Android SDK before this ships.
 
+## Iteration 15 — multi-artist support via Relisten
+
+**D74 — Relisten, not archive.org directly, as the second backend.** archive.org's raw
+`/metadata/{id}` is free-text taper filenames — no setlists, no song identity, no set
+boundaries. Relisten already normalises archive.org into exactly that: artists, years,
+shows, and recordings with real track titles. Going straight to archive.org would mean
+rebuilding Relisten, for worse data.
+
+**D75 — phish.in stays the Phish backend; Relisten adds everyone else.** Relisten also
+carries Phish (sourced from phish.in upstream), but without waveforms, cover art, likes,
+playlists, or login. Keeping phish.in for Phish means zero regression in the existing test
+suite and zero churn to the login/likes/playlists paths, which stay phish.in-only features.
+
+**D76 — `Progress` gained an `artist` column (schema v6) rather than folding the band into
+`subtitle`.** Grouping history by artist off a display string would mean splitting on a
+separator a venue name is free to contain — the first "Barton Hall · Ithaca, NY" show breaks
+it. `MIGRATION_5_6` backfills every existing row to "Phish", which isn't a guess: until
+Relisten existed, phish.in was the only thing the app could play, so every row already in
+the table genuinely was Phish.
+
+**D77 — A recording's source UUID is part of the queue key, not just its date.** Relisten
+carries around nine tapes of an average Grateful Dead show, each with its own track
+boundaries — Cornell's ten sources run 20 to 25 tracks each. A stored `trackIndex` means
+different music depending on the tape, so the key is `relisten:<slug>/<date>/<uuid>`, with
+`/` as the inner delimiter to sidestep the first-colon-only rule the other two prefixes use.
+
+**D78 — Relisten's own `features` flags drive the UI, not guesses.** `features.sets` is
+false for Grateful Dead (a single wrapper set literally named "Set" on every source) and
+true for Phish; `features.multiple_sources` is the inverse. Both were verified against the
+live API rather than assumed — the next decision is exactly the kind of thing a guess would
+have gotten wrong.
+
+**D79 — The default tape is never tie-broken on `is_soundboard`.** Sources arrive
+pre-sorted by `avg_rating_weighted` descending, so the default tape is
+`sources.firstOrNull()`. Cornell's soundboard ranks 4th (8.21 against the top tape's 8.26);
+preferring soundboards would override Relisten's own ranking and hand the user a
+worse-rated recording.
+
+**D80 — Relisten track duration is seconds; converted to milliseconds on the way in.**
+Everything else in the app — `Format.fmt`, `MediaItems.kt`, Cast — is milliseconds. Pinned
+with a test, since a duration 1000× off looks fine until someone opens the scrubber.
+
+**D81 — MP3 only; Relisten's FLAC is ignored.** Media3 plays FLAC, but Cast's MIME type is
+hardcoded to `audio/mpeg` (D59) and the stock receiver expects progressive MP3. Taking
+MP3-only keeps the Cast path working unchanged; FLAC support is its own future piece of
+work.
+
+**D82 — Android Auto's browse tree and the phone's screens share one `MusicSource` seam.**
+`sourceFor(backend)` resolves to `PhishInSource` or `RelistenCatalogSource`, and both the
+Compose screens and `PlaybackService`'s browse tree call through it, rather than a second,
+Auto-only implementation of the same browsing logic.
+
+See [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) for the full working history — the API
+facts pinned down against the live service, the phase-by-phase build order, and the open
+questions (FLAC support, catalog caching, and whether Relisten's own operators have been
+approached about the API use, the same courtesy phish.in's maintainer extended).
+
 ## Open questions for after you've seen the MVP
 
 - Sleep timer? Playback speed? Neither is in the MVP.

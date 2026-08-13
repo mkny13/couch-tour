@@ -220,7 +220,16 @@ code they cover.
       original Auto work (D73) had to lean on reading the Media3 source instead of a compile.
       3 new tests in `BrowseTest`, including that `"artistperiod:"` isn't mistaken for
       `"artist:"` despite being a textual prefix-superset of it. 274 tests, all green.
-- [ ] **P9 — Docs.** New DECISIONS.md iteration; README feature lines and test count.
+- [x] **P9 — Docs.** DECISIONS.md gained "Iteration 15 — multi-artist support via Relisten"
+      (D74–D82), summarizing the calls made here for the permanent record, with a pointer
+      back to this file for the full working history. README: intro and attribution now
+      mention Relisten (audio streams via its API, hosted on archive.org — see O5 below,
+      still open); a new feature bullet; the Last.fm note no longer says the artist is always
+      "Phish"; the layout table gained `Relisten.kt`, `Catalog.kt`, and `Browse.kt`; a new
+      "Relisten" API-notes subsection mirrors the phish.in one; test count is 274.
+
+All nine phases are now done. What's left is the on-device Verification checklist below —
+nothing further to build blind without a device in hand.
 
 ## Open questions — conservative choice taken, flagged for discussion
 
