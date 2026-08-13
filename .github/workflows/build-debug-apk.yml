@@ -50,10 +50,17 @@ jobs:
           if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
             mkdir -p ~/.android
             echo "$DEBUG_KEYSTORE_BASE64" | base64 --decode > ~/.android/debug.keystore
+            sha256sum ~/.android/debug.keystore
+          else
+            echo "DEBUG_KEYSTORE_BASE64 secret is empty or unset"
           fi
 
+      # --no-build-cache: gradle/actions/setup-gradle restores ~/.gradle's build cache from
+      # a previous run, and a cached packageDebug/signing output could otherwise be reused
+      # across a keystore change if the cache key isn't sensitive to it — ruling that out
+      # rather than assuming it doesn't apply here.
       - name: Assemble debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-build-cache
 
       - uses: actions/upload-artifact@v4
         with:
