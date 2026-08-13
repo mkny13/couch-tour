@@ -383,6 +383,9 @@ class PlaybackService : MediaLibraryService() {
         val all = when (ref.kind) {
             QueueKind.SHOW -> showTrackItems(PhishInApi.show(ref.id))
             QueueKind.PLAYLIST -> playlistTrackItems(PhishInApi.playlist(ref.id))
+            // Wired up once Relisten can build queue items. Until then an empty folder is
+            // the same fallback every other unfetchable node here uses.
+            QueueKind.RECORDING -> emptyList()
         }
         if (progress == null || progress.finished || all.isEmpty()) return all
         return all.drop(progress.trackIndex.coerceIn(0, all.lastIndex))

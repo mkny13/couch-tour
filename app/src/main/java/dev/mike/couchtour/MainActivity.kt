@@ -726,6 +726,8 @@ private fun openQueueKey(key: String, nav: NavHostController) {
     when (ref.kind) {
         QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
         QueueKind.SHOW -> nav.navigate("show/${ref.id}")
+        // Wired up once there is a recording screen to navigate to.
+        QueueKind.RECORDING -> Unit
     }
 }
 
@@ -824,6 +826,8 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 when (ref?.kind) {
                                     QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
                                     QueueKind.SHOW -> nav.navigate("show/${ref.id}")
+                                    // Wired up once there is a recording screen to navigate to.
+                                    QueueKind.RECORDING -> Unit
                                     null -> Unit
                                 }
                             },

@@ -134,6 +134,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         playPlaylist(PhishInApi.playlist(ref.id), index, position)
                     QueueKind.SHOW ->
                         playShow(PhishInApi.show(ref.id), index, position)
+                    // Wired up once Relisten can build queue items. Doing nothing matches
+                    // what an unparseable key already does rather than playing the wrong tape.
+                    QueueKind.RECORDING -> Unit
                 }
             }
         }

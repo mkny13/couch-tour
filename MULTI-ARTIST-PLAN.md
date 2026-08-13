@@ -79,10 +79,10 @@ Actions; Phase 0 exists to make that possible.
 Each phase is one commit, small enough to verify on its own. Tests are written before the
 code they cover.
 
-- [ ] **P0 — CI runs the tests.** Add a `test` job (`testDebugUnitTest`) to
+- [x] **P0 — CI runs the tests.** Add a `test` job (`testDebugUnitTest`) to
       `.github/workflows/`, triggered on `pull_request` and on pushes to this branch. Without
       this nothing below can be verified at all.
-- [ ] **P1 — `Queue.kt`: the recording queue key.** `QueueKind.RECORDING`,
+- [x] **P1 — `Queue.kt`: the recording queue key.** `QueueKind.RECORDING`,
       `recordingQueueKey(artistSlug, date, sourceId)` → `relisten:<slug>/<date>/<uuid>`.
       Inner delimiter is `/`, not `:`, to sidestep the first-colon-only ambiguity
       `parseQueueKey` and `BrowseNode.parse` both work around. Existing prefixes untouched.
