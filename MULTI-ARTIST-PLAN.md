@@ -54,11 +54,40 @@ app already uses (`PhishInApi.show(date)`, route `show/{date}`, key `show:$date`
 Track nesting: `Source` → `sets: SourceSet[]` (`index`, `name`, `is_encore`) →
 `tracks: SourceTrack[]` (`uuid`, `title`, `track_position`, `duration`, `mp3_url`, `flac_url`).
 
+### Verified against the live API
+
+Checked against `grateful-dead/1977-05-08` (Cornell) and `/v3/artists` on 2026-08-13. These
+replace earlier guesses — several of them contradicted what seemed obvious.
+
+- **`duration` is seconds.** "Minglewood Blues" = `325` (5:25); the source total is `10059`
+  (2h47m). Everything in this app is milliseconds (`Api.kt:74`, `Format.fmt`,
+  `MediaItems.kt`), so the mapper multiplies by 1000. Pin it with a test — a duration
+  1000× off is exactly the kind of thing that looks fine until someone opens the scrubber.
+- **Track counts really do differ per tape.** Cornell's ten sources run 20, 21, 21, 25, 21,
+  18, 21, 22, 19, 18. This is the empirical case for putting the source in the queue key: a
+  stored `trackIndex` of 22 means different music depending on the tape, and on three of
+  these it doesn't exist at all.
+- **Sources arrive pre-sorted by `avg_rating_weighted`, descending.** The default tape is
+  therefore just `sources[0]`. **Do not tie-break on `is_soundboard`** — Cornell's soundboard
+  ranks 4th (8.212 against 8.260), so preferring it would override Relisten's own ranking
+  and hand the user a worse-rated recording.
+- **`features` on each artist is a capability model, and it beats guessing:**
+  - `features.sets` is **false for Grateful Dead**, true for Phish. Dead sources carry a
+    single wrapper set literally named "Set", so set headings must be suppressed when this
+    is false — otherwise every Dead show renders one meaningless "Set" divider.
+  - `features.multiple_sources` is **false for Phish** (1884 shows against 1888 sources),
+    which independently confirms decision 2: Relisten's Phish has no tape to choose.
+  - Also present: `can_have_flac`, `track_durations`, `eras`, `tours`, `ratings`,
+    `setlist_data_incomplete`.
+- 226 artists. `mp3_url` points at `archive.org/download/...`, so playback needs archive.org
+  reachable from the device.
+
+`ArtistRef` therefore needs `hasSets` and `hasMultipleSources` — an additive change to the
+model already landed in P2.
+
 ### Traps — each fails silently if missed
 
-1. **`duration` is seconds on Relisten, milliseconds on phish.in.** `Track.duration` is ms
-   everywhere here (`Api.kt:74`, `Format.fmt`, `MediaItems.kt`). Convert in the mapper, pin
-   with a test. **Unverified against a live response — see open question O1.**
+1. **Seconds against milliseconds**, as above.
 2. **`mp3_url` is nullable.** Same shape as D12 — filter to usable URLs, and filter
    *identically* in the UI and the queue builder or the stored `trackIndex` means two things.
 3. **No waveforms, usually no cover art.** `waveformUrl`/`artUrl` null; scrubber falls back
@@ -69,10 +98,11 @@ Track nesting: `Source` → `sets: SourceSet[]` (`index`, `name`, `is_encore`) �
 
 ### Environment
 
-`dl.google.com` is denied by this environment's network policy (403 at the egress proxy), so
-there is **no Android SDK and `./gradlew` cannot run locally** — the same wall D73 hit.
-`api.relisten.net` and `archive.org` are blocked too. Verification therefore runs in GitHub
-Actions; Phase 0 exists to make that possible.
+The cloud container this started in had `dl.google.com` denied by its network policy, so
+there was no Android SDK and `./gradlew` could not run — the same wall D73 hit. That is why
+`.github/workflows/test.yml` exists, and it is worth keeping regardless: it means nothing
+reaches `main` unverified. Network access has since been opened, and the work is moving to a
+local machine where the SDK is already installed and a device can be attached.
 
 ## Phases
 
@@ -89,8 +119,12 @@ code they cover.
       *Tests first, in `QueueTest`.*
 - [x] **P2 — `Catalog.kt`: domain model + `MusicSource` seam + `PhishInSource` adapter.**
       Narrow: only what browse → play needs. `Api.kt` is not rewritten.
-- [ ] **P3 — `Relisten.kt`: DTOs and parsing.** Fixtures in
-      `app/src/test/resources/fixtures/`. *Tests first, in `RelistenParsingTest`.*
+- [ ] **P3 — `Relisten.kt`: DTOs and parsing.** Capture and trim real responses into
+      `app/src/test/resources/fixtures/` (`relisten_artists.json`, `relisten_years.json`,
+      `relisten_year.json`, `relisten_show.json`). Add `hasSets`/`hasMultipleSources` to
+      `ArtistRef`. *Tests first, in `RelistenParsingTest`* — cover the seconds→ms
+      conversion, set flattening, dropping null-`mp3_url` tracks, and `sources[0]` as the
+      default tape.
 - [ ] **P4 — `Relisten.kt`: request shapes.** MockWebServer via `internal var baseUrl`,
       restored in `@After`, same pattern as `ApiRequestTest`. *Tests first.*
 - [ ] **P5 — `MediaItems.kt`: per-artist metadata + `recordingTrackItems`.** Both builders
@@ -109,12 +143,12 @@ code they cover.
 
 ## Open questions — conservative choice taken, flagged for discussion
 
-**O1 — Relisten fixtures are built from the published OpenAPI schema, not captured live.**
-`api.relisten.net` is egress-blocked from this environment, so the JSON fixtures are
-constructed from Relisten's schema definitions (via the `relisten-mobile` repo) rather than
-being trimmed real responses. That is weaker than the existing fixtures, whose whole value
-per D35 is that they are real. **The duration unit (seconds vs ms) and the default source
-ordering both need checking against a live response before this ships.**
+**O1 — resolved.** Fixtures were going to be reconstructed from Relisten's OpenAPI schema
+because the API host was unreachable, which would have been weaker than the existing
+fixtures — their whole value per D35 is that they are real responses. Network access is now
+open, so fixtures get captured and trimmed from the live API like every other one in
+`app/src/test/resources/fixtures/`, and the duration unit and source ordering are confirmed
+facts rather than assumptions. See "Verified against the live API" above.
 
 **O2 — No schema migration; the artist goes in `subtitle`.**
 The structured option is a new `artist` column (schema v6). The conservative option is to
