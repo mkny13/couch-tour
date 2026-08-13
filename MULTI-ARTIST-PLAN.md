@@ -204,9 +204,22 @@ code they cover.
       cover and, after a small dedup, `HistoryScreen`, which previously duplicated the whole
       switch inline). No new tests — Compose screens aren't unit-tested anywhere else in this
       codebase either (they need a live `MediaController`/device); still 271 passing.
-- [ ] **P8 — `Browse.kt` / `PlaybackService.kt`: Android Auto.** Artists node above Years,
-      `BrowseNode.Recording`. `Resume` already wraps the `queueKey` verbatim (D73), so
-      Continue Listening picks up Relisten rows with no change.
+- [x] **P8 — `Browse.kt` / `PlaybackService.kt`: Android Auto.** Four new `BrowseNode`
+      kinds: `Artists` (root child, above Years — Relisten carries far more artists than
+      phish.in has years, so it's the entry point most trips down this tree actually want),
+      `Artist(backend, artistId)`, `ArtistPeriod(backend, artistId, periodId)`, and
+      `Recording(backend, artistId, date)` — always the default tape; there's no tape
+      switcher on a head unit, the same scope cut O3 made for FLAC. `PlaybackService` walks
+      these through the same `sourceFor(backend)` seam the phone screens use (moved from
+      `MainActivity.kt` to `Catalog.kt` so both callers can reach it) rather than a second,
+      Auto-only implementation. `Resume` already wrapped the `queueKey` verbatim (D73), so
+      the only change needed there was actually building the Relisten branch instead of
+      returning an empty list — Continue Listening on Auto now picks up a Relisten row the
+      same way it always picked up a phish.in one. Not device-tested (needs a head unit or
+      the Desktop Head Unit emulator); the browse-ID round-trip is what's tested, same as the
+      original Auto work (D73) had to lean on reading the Media3 source instead of a compile.
+      3 new tests in `BrowseTest`, including that `"artistperiod:"` isn't mistaken for
+      `"artist:"` despite being a textual prefix-superset of it. 274 tests, all green.
 - [ ] **P9 — Docs.** New DECISIONS.md iteration; README feature lines and test count.
 
 ## Open questions — conservative choice taken, flagged for discussion

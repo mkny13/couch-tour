@@ -129,6 +129,12 @@ interface MusicSource {
     suspend fun show(artist: ArtistRef, date: String, recordingId: String? = null): ShowDetail
 }
 
+/** Shared by MainActivity's screens and PlaybackService's Auto browse tree — one seam, two callers. */
+internal fun sourceFor(backend: Backend): MusicSource = when (backend) {
+    Backend.PHISHIN -> PhishInSource
+    Backend.RELISTEN -> RelistenCatalogSource
+}
+
 // ------------------------------------------------------------------- phish.in
 
 /** phish.in is a single-artist archive, so its artist is a constant rather than a fetch. */

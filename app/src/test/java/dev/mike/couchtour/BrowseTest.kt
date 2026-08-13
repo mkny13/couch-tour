@@ -2,6 +2,7 @@ package dev.mike.couchtour
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BrowseTest {
@@ -45,5 +46,42 @@ class BrowseTest {
         assertNull(BrowseNode.parse("tour:1997"))
         assertNull(BrowseNode.parse("tour:1997:"))
         assertNull(BrowseNode.parse("unknown:thing"))
+    }
+
+    // -------------------------------------------------------------- artists
+
+    @Test
+    fun `round-trips the artists node and its children`() {
+        assertEquals(BrowseNode.Artists, BrowseNode.parse(BrowseNode.Artists.id))
+        assertEquals(
+            BrowseNode.Artist("relisten", "grateful-dead"),
+            BrowseNode.parse(BrowseNode.Artist("relisten", "grateful-dead").id)
+        )
+        assertEquals(
+            BrowseNode.ArtistPeriod("relisten", "grateful-dead", "year-uuid"),
+            BrowseNode.parse(BrowseNode.ArtistPeriod("relisten", "grateful-dead", "year-uuid").id)
+        )
+        assertEquals(
+            BrowseNode.Recording("relisten", "grateful-dead", "1977-05-08"),
+            BrowseNode.parse(BrowseNode.Recording("relisten", "grateful-dead", "1977-05-08").id)
+        )
+    }
+
+    @Test
+    fun `rejects malformed artist ids instead of guessing`() {
+        assertNull(BrowseNode.parse("artist:"))
+        assertNull(BrowseNode.parse("artist:relisten"))
+        assertNull(BrowseNode.parse("artist:relisten:"))
+        assertNull(BrowseNode.parse("artistperiod:relisten:grateful-dead"))
+        assertNull(BrowseNode.parse("recording:relisten:grateful-dead"))
+    }
+
+    @Test
+    fun `an artistperiod id is not mistaken for an artist id`() {
+        // "artistperiod:" starts with "artist" but not "artist:" — the two prefixes must not
+        // collide even though one is a textual prefix of the other's name.
+        val node = BrowseNode.ArtistPeriod("relisten", "wsp", "period-uuid")
+        assertEquals(node, BrowseNode.parse(node.id))
+        assertTrue(node.id.startsWith("artistperiod:"))
     }
 }

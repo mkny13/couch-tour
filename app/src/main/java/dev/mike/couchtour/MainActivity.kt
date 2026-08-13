@@ -439,11 +439,6 @@ fun ArtistsScreen(nav: NavHostController) {
     }
 }
 
-private fun sourceFor(backend: Backend): MusicSource = when (backend) {
-    Backend.PHISHIN -> PhishInSource
-    Backend.RELISTEN -> RelistenCatalogSource
-}
-
 /** Years (or ranged periods) for one Relisten artist. */
 @Composable
 fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
