@@ -150,9 +150,15 @@ code they cover.
       slug directly, so `ArtistRef.id` (already the slug) needs no uuid-lookup round trip.
       (The DTO for one tape is `RelistenSource`; the `MusicSource` implementation is
       `RelistenCatalogSource` — same word, deliberately different names to keep them apart.)
-- [ ] **P5 — `MediaItems.kt`: per-artist metadata + `recordingTrackItems`.** Both builders
-      converge on the same private `mediaItem(...)` so the phone and the Auto tree still
-      produce byte-identical queues (the property D73 relies on). *Tests first.*
+- [x] **P5 — `MediaItems.kt`: per-artist metadata + `recordingTrackItems`.** `QueueInfo`
+      gained `artist` (defaults to `"Phish"`, so every existing phish.in call site needed no
+      change); `mediaItem` and the new `recordingMediaItem` both call through a private
+      `coreMediaItem(...)`, which is where `.setArtist("Phish")` actually lived — fixing the
+      hardcode there fixes it for every caller at once, phone and Auto tree alike (D73).
+      `recordingTrackItems(detail: ShowDetail)` builds the queue for one Relisten tape; a
+      show with no chosen recording still builds a playable, unresumable queue rather than
+      refusing outright — the same tradeoff D42 makes for shuffle. 6 tests in
+      `MediaItemsTest`.
 - [ ] **P6 — `PlayerViewModel.kt`: resume dispatch + `playRecording`.**
 - [ ] **P7 — `MainActivity.kt`: routes and screens.** `artists`,
       `artist/{backend}/{id}`, `artist/{backend}/{id}/{period}`,
