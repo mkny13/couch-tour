@@ -231,6 +231,10 @@ class PlaybackService : MediaLibraryService() {
             // all fire at the end of a queue can't race to clobber each other's value, and
             // any later play of the same show clears the flag on its own.
             finished = player.playbackState == Player.STATE_ENDED,
+            // Read off the metadata rather than the extras: the item already publishes an
+            // artist for external scrobblers to read (D50), so there is nothing to add and
+            // no second copy to keep in step.
+            artist = item.mediaMetadata.artist?.toString().orEmpty(),
         )
         scope.launch { PhishInDb.get(applicationContext).progressDao().put(progress) }
     }

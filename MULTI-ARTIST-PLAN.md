@@ -101,8 +101,15 @@ model already landed in P2.
 The cloud container this started in had `dl.google.com` denied by its network policy, so
 there was no Android SDK and `./gradlew` could not run — the same wall D73 hit. That is why
 `.github/workflows/test.yml` exists, and it is worth keeping regardless: it means nothing
-reaches `main` unverified. Network access has since been opened, and the work is moving to a
-local machine where the SDK is already installed and a device can be attached.
+reaches `main` unverified.
+
+Network access has since been opened, so the SDK installs and the suite runs in-container
+after all. On a fresh container: install `cmdline-tools` from `dl.google.com`, then
+`sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"`, and point
+`local.properties` at it with `sdk.dir=<sdk>` (gitignored, never commit it). Note
+`JAVA_TOOL_OPTIONS` carries proxy and truststore flags that Gradle echoes on every line —
+clear it for readable output. A device still cannot be attached, so the checks under
+Verification below remain a local-machine job.
 
 ## Phases
 
@@ -119,6 +126,9 @@ code they cover.
       *Tests first, in `QueueTest`.*
 - [x] **P2 — `Catalog.kt`: domain model + `MusicSource` seam + `PhishInSource` adapter.**
       Narrow: only what browse → play needs. `Api.kt` is not rewritten.
+- [x] **P2b — `Progress.kt`: the `artist` column (schema v6).** Not in the original plan;
+      added when O2 was overruled. `MIGRATION_5_6` backfills existing rows to Phish, and
+      `artists()` / `historyFor()` are what the column is for.
 - [ ] **P3 — `Relisten.kt`: DTOs and parsing.** Capture and trim real responses into
       `app/src/test/resources/fixtures/` (`relisten_artists.json`, `relisten_years.json`,
       `relisten_year.json`, `relisten_show.json`). Add `hasSets`/`hasMultipleSources` to
@@ -150,11 +160,23 @@ open, so fixtures get captured and trimmed from the live API like every other on
 `app/src/test/resources/fixtures/`, and the duration unit and source ordering are confirmed
 facts rather than assumptions. See "Verified against the live API" above.
 
-**O2 — No schema migration; the artist goes in `subtitle`.**
-The structured option is a new `artist` column (schema v6). The conservative option is to
-fold the band name into the existing denormalized `subtitle` — no migration, no new identity
-hash in `MigrationTest`, no risk to the one table the app exists to protect. Taken the
-conservative option. Revisit if history ever needs filtering or grouping by artist.
+**O2 — overruled, and rightly. The artist is its own column (schema v6).**
+The conservative choice had been to fold the band name into the denormalised `subtitle` and
+avoid touching the one table the app exists to protect. Mike wants history filtered and
+grouped by artist, and that makes `subtitle` a kludge: grouping off a display string means
+splitting on a separator that venue names are free to contain, so the first
+`Barton Hall · Ithaca, NY` breaks it. Done properly instead — `MIGRATION_5_6`, schema v6,
+`6.json` committed, and `ProgressDao.artists()` / `historyFor(artist)` to make the column
+worth having.
+
+Existing rows are backfilled to `'Phish'`. **That is not the guess D21 declined to make:**
+until the second backend existed, phish.in was the only thing the app could play, so every
+row already in the table is Phish, playlist rows included. D21's case differed in kind —
+inferring `finished` needed a track duration the table has never stored.
+
+The writer takes the artist from `MediaMetadata.artist`, which items already publish for
+external scrobblers (D50), so there is no second copy to keep in step and the field becomes
+correct for Relisten automatically once P5 stops hardcoding `"Phish"`.
 
 **O3 — MP3 only; FLAC ignored.**
 Relisten serves `flac_url` alongside `mp3_url`. Media3 plays FLAC, but `MimeTypes.AUDIO_MPEG`

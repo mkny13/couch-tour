@@ -43,6 +43,7 @@ class ProgressDaoTest {
         dismissed: Boolean = false,
         updatedAt: Long = 1_000,
         trackTitle: String = "Track",
+        artist: String = "Phish",
     ) = Progress(
         queueKey = key,
         title = key,
@@ -54,6 +55,7 @@ class ProgressDaoTest {
         updatedAt = updatedAt,
         finished = finished,
         dismissed = dismissed,
+        artist = artist,
     )
 
     @Test
@@ -242,5 +244,42 @@ class ProgressDaoTest {
         repeat(30) { dao.put(progress("show:$it", updatedAt = it.toLong())) }
 
         assertEquals(25, dao.inProgress().first().size)
+    }
+
+    // ---------------------------------------------------------------- artists
+
+    @Test
+    fun `lists the artists in history, distinct and sorted`() = runBlocking {
+        dao.put(progress("show:1997-02-13", artist = "Phish"))
+        dao.put(progress("relisten:grateful-dead/1977-05-08/a", artist = "Grateful Dead"))
+        dao.put(progress("relisten:grateful-dead/1972-08-27/b", artist = "Grateful Dead"))
+        dao.put(progress("relisten:wsp/2001-04-22/c", artist = "Widespread Panic"))
+
+        assertEquals(
+            listOf("Grateful Dead", "Phish", "Widespread Panic"),
+            dao.artists().first(),
+        )
+    }
+
+    @Test
+    fun `filters history to one artist, newest first`() = runBlocking {
+        dao.put(progress("relisten:grateful-dead/1972-08-27/b", artist = "Grateful Dead", updatedAt = 100))
+        dao.put(progress("show:1997-02-13", artist = "Phish", updatedAt = 200))
+        dao.put(progress("relisten:grateful-dead/1977-05-08/a", artist = "Grateful Dead", updatedAt = 300))
+
+        assertEquals(
+            listOf("relisten:grateful-dead/1977-05-08/a", "relisten:grateful-dead/1972-08-27/b"),
+            dao.historyFor("Grateful Dead").first().map { it.queueKey },
+        )
+    }
+
+    @Test
+    fun `a row with no artist is left out of the artist list`() = runBlocking {
+        // Nothing writes an empty artist today, but a row could predate the backfill on a
+        // database restored from somewhere unexpected. An empty heading is worse than none.
+        dao.put(progress("show:1997-02-13", artist = ""))
+        dao.put(progress("show:1998-11-02", artist = "Phish"))
+
+        assertEquals(listOf("Phish"), dao.artists().first())
     }
 }
