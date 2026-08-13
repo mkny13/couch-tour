@@ -29,6 +29,11 @@ data class ArtistRef(
     val id: String,
     val name: String,
     val showCount: Int = 0,
+    /** Relisten's `features.sets`. False means sources carry one wrapper set named "Set",
+     *  so a set-name divider would be a meaningless one. Always true for phish.in. */
+    val hasSets: Boolean = true,
+    /** Relisten's `features.multiple_sources`. False means there is no tape to switch. */
+    val hasMultipleSources: Boolean = false,
 )
 
 /**

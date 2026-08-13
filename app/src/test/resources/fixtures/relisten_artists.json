@@ -1,0 +1,237 @@
+[
+ {
+  "show_count": 1884,
+  "source_count": 1888,
+  "upstream_sources": [
+   {
+    "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+    "upstream_source": {
+     "name": "phish.net",
+     "url": "https://phish.net",
+     "description": "Phish.net is a non-commercial project run by Phish fans and for Phish fans under the auspices of the all-volunteer, non-profit Mockingbird Foundation.\n\nThis project serves to compile, preserve, and protect encyclopedic information about Phish and their music.\n\nRelisten uses information from phish.net to show Show ratings and reviews.",
+     "credit_line": "blop blorp"
+    },
+    "upstream_source_id": 4,
+    "upstream_identifier": ""
+   },
+   {
+    "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+    "upstream_source": {
+     "name": "phish.in",
+     "url": "https://phish.in",
+     "description": "Phish.in provides a JSON API for programmatic access to content. It is a fan run site to host Phish audience recordings alongside detailed setlist information in compliance with Phish's official taping policy.\n\nRelisten uses this information for everything about Phish aside from reviews and ratings.",
+     "credit_line": "beep boop"
+    },
+    "upstream_source_id": 3,
+    "upstream_identifier": ""
+   }
+  ],
+  "popularity": {
+   "momentum_score": 0.9224,
+   "trend_ratio": 0.9109,
+   "windows": {
+    "48h": {
+     "plays": 23726,
+     "hours": 3861.98,
+     "hot_score": 154.0325
+    },
+    "7d": {
+     "plays": 71376,
+     "hours": 11452.7872,
+     "hot_score": 267.1629
+    },
+    "30d": {
+     "plays": 532697,
+     "hours": 85593.1103,
+     "hot_score": 729.8609
+    }
+   }
+  },
+  "features": {
+   "descriptions": true,
+   "eras": true,
+   "multiple_sources": false,
+   "reviews": true,
+   "ratings": true,
+   "tours": true,
+   "taper_notes": true,
+   "source_information": false,
+   "sets": true,
+   "per_show_venues": true,
+   "per_source_venues": true,
+   "venue_coords": true,
+   "songs": true,
+   "years": true,
+   "track_md5s": false,
+   "review_titles": false,
+   "jam_charts": true,
+   "setlist_data_incomplete": false,
+   "track_names": true,
+   "venue_past_names": true,
+   "reviews_have_ratings": false,
+   "track_durations": true,
+   "can_have_flac": false
+  },
+  "musicbrainz_id": "e01646f2-2a04-450d-8bf2-0d993082e058",
+  "name": "Phish",
+  "featured": 1,
+  "slug": "phish",
+  "sort_name": "Phish",
+  "uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+  "created_at": "2017-02-12T21:11:14Z",
+  "updated_at": "2019-07-03T18:54:18Z"
+ },
+ {
+  "show_count": 1905,
+  "source_count": 9135,
+  "upstream_sources": [
+   {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "upstream_source": {
+     "name": "jerrygarcia.com",
+     "url": "https://jerrygarcia.com",
+     "description": " jerrygarcia.com has detailed setlist information for all the bands that he was a part. Relisten uses this information to match venues and songs to recordings.",
+     "credit_line": "fix"
+    },
+    "upstream_source_id": 7,
+    "upstream_identifier": "grateful_dead"
+   },
+   {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "upstream_source": {
+     "name": "archive.org",
+     "url": "https://archive.org",
+     "description": "The Live Music Archive, part of the Internet Archive, is a collection of over 170,000 concert recordings in lossless audio formats. The songs are also downloadable or playable in lossy formats such as Ogg Vorbis or MP3. Archive.org is the one hosting the music you are listening to. Reviews and ratings also come from archive.org.",
+     "credit_line": "blah blah blah"
+    },
+    "upstream_source_id": 1,
+    "upstream_identifier": "GratefulDead"
+   }
+  ],
+  "popularity": {
+   "momentum_score": 0.9193,
+   "trend_ratio": 0.8922,
+   "windows": {
+    "48h": {
+     "plays": 80577,
+     "hours": 9936.7481,
+     "hot_score": 283.8609
+    },
+    "7d": {
+     "plays": 229637,
+     "hours": 28494.6906,
+     "hot_score": 479.2045
+    },
+    "30d": {
+     "plays": 1238593,
+     "hours": 155781.4103,
+     "hot_score": 1112.9209
+    }
+   }
+  },
+  "features": {
+   "descriptions": true,
+   "eras": false,
+   "multiple_sources": true,
+   "reviews": true,
+   "ratings": true,
+   "tours": true,
+   "taper_notes": true,
+   "source_information": true,
+   "sets": false,
+   "per_show_venues": true,
+   "per_source_venues": true,
+   "venue_coords": false,
+   "songs": true,
+   "years": true,
+   "track_md5s": true,
+   "review_titles": true,
+   "jam_charts": false,
+   "setlist_data_incomplete": false,
+   "track_names": true,
+   "venue_past_names": false,
+   "reviews_have_ratings": true,
+   "track_durations": true,
+   "can_have_flac": true
+  },
+  "musicbrainz_id": "6faa7ca7-0d99-4a5e-bfa6-1fd5037520c6",
+  "name": "Grateful Dead",
+  "featured": 1,
+  "slug": "grateful-dead",
+  "sort_name": "Grateful Dead",
+  "uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+  "created_at": "2017-05-19T09:02:11Z",
+  "updated_at": "2019-07-03T18:54:14Z"
+ },
+ {
+  "show_count": 2550,
+  "source_count": 4357,
+  "upstream_sources": [
+   {
+    "artist_uuid": "ce1dd669-3f3b-0186-ab59-e8300e92db7f",
+    "upstream_source": {
+     "name": "archive.org",
+     "url": "https://archive.org",
+     "description": "The Live Music Archive, part of the Internet Archive, is a collection of over 170,000 concert recordings in lossless audio formats. The songs are also downloadable or playable in lossy formats such as Ogg Vorbis or MP3. Archive.org is the one hosting the music you are listening to. Reviews and ratings also come from archive.org.",
+     "credit_line": "blah blah blah"
+    },
+    "upstream_source_id": 1,
+    "upstream_identifier": "WidespreadPanic"
+   }
+  ],
+  "popularity": {
+   "momentum_score": 0.9146,
+   "trend_ratio": 0.8072,
+   "windows": {
+    "48h": {
+     "plays": 9292,
+     "hours": 1111.1561,
+     "hot_score": 96.395
+    },
+    "7d": {
+     "plays": 25756,
+     "hours": 3070.7875,
+     "hot_score": 160.4868
+    },
+    "30d": {
+     "plays": 163440,
+     "hours": 19731.6881,
+     "hot_score": 404.2771
+    }
+   }
+  },
+  "features": {
+   "descriptions": true,
+   "eras": false,
+   "multiple_sources": true,
+   "reviews": true,
+   "ratings": true,
+   "tours": false,
+   "taper_notes": true,
+   "source_information": true,
+   "sets": false,
+   "per_show_venues": false,
+   "per_source_venues": true,
+   "venue_coords": false,
+   "songs": false,
+   "years": true,
+   "track_md5s": true,
+   "review_titles": true,
+   "jam_charts": false,
+   "setlist_data_incomplete": false,
+   "track_names": true,
+   "venue_past_names": false,
+   "reviews_have_ratings": true,
+   "track_durations": true,
+   "can_have_flac": true
+  },
+  "musicbrainz_id": "3797a6d0-7700-44bf-96fb-f44386bc9ab2",
+  "name": "Widespread Panic",
+  "featured": 0,
+  "slug": "wsp",
+  "sort_name": "Widespread Panic",
+  "uuid": "ce1dd669-3f3b-0186-ab59-e8300e92db7f",
+  "created_at": "2017-02-12T21:14:53Z",
+  "updated_at": "2025-06-26T19:56:11Z"
+ }
+]

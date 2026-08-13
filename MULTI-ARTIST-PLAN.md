@@ -129,12 +129,16 @@ code they cover.
 - [x] **P2b — `Progress.kt`: the `artist` column (schema v6).** Not in the original plan;
       added when O2 was overruled. `MIGRATION_5_6` backfills existing rows to Phish, and
       `artists()` / `historyFor()` are what the column is for.
-- [ ] **P3 — `Relisten.kt`: DTOs and parsing.** Capture and trim real responses into
-      `app/src/test/resources/fixtures/` (`relisten_artists.json`, `relisten_years.json`,
-      `relisten_year.json`, `relisten_show.json`). Add `hasSets`/`hasMultipleSources` to
-      `ArtistRef`. *Tests first, in `RelistenParsingTest`* — cover the seconds→ms
-      conversion, set flattening, dropping null-`mp3_url` tracks, and `sources[0]` as the
-      default tape.
+- [x] **P3 — `Relisten.kt`: DTOs and parsing.** Fixtures captured live and trimmed into
+      `app/src/test/resources/fixtures/` (`relisten_artists.json`: Phish, Grateful Dead,
+      Widespread Panic; `relisten_years.json`: Dead years; `relisten_year.json`: six Dead
+      shows around 5/8/77; `relisten_show.json`: Cornell's first four sources, full track
+      lists). `ArtistRef` gained `hasSets`/`hasMultipleSources`. 13 tests in
+      `RelistenParsingTest` cover the seconds→ms conversion, set flattening in index order,
+      dropping null/blank-`mp3_url` tracks, `sources[0]` as the default tape (and that an
+      explicit or unknown recording id is handled correctly), and that set names are
+      suppressed for `hasSets = false`. No `MusicSource` implementation yet — that needs the
+      request layer, which is P4.
 - [ ] **P4 — `Relisten.kt`: request shapes.** MockWebServer via `internal var baseUrl`,
       restored in `@After`, same pattern as `ApiRequestTest`. *Tests first.*
 - [ ] **P5 — `MediaItems.kt`: per-artist metadata + `recordingTrackItems`.** Both builders
