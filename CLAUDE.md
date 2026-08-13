@@ -2,7 +2,8 @@
 
 An unofficial native Android client for [phish.in](https://phish.in), the open-source live
 Phish archive. Kotlin, Jetpack Compose, Media3, Room. See [README.md](README.md) for what
-the app does and [DECISIONS.md](DECISIONS.md) for why it does it that way.
+the app does, [DECISIONS.md](DECISIONS.md) for why it does it that way, and
+[ROADMAP.md](ROADMAP.md) for what's not built yet.
 
 ## Building
 
@@ -45,6 +46,8 @@ migration is never the right answer here. Add a `MIGRATION_n_n+1`, register it i
 - **Log decisions in [DECISIONS.md](DECISIONS.md).** It is organised by iteration with `Dnn`
   identifiers. When a decision reverses an earlier one, add a new entry marking the old one
   superseded rather than editing history.
+- **Track not-yet-built features and open questions in [ROADMAP.md](ROADMAP.md)**, not
+  DECISIONS.md — DECISIONS.md is a log of choices already made, not a backlog.
 - **Comments explain why, not what.** The existing code is deliberately literate about
   tradeoffs and surprises — match that when adding to it.
 - **The README states a unit-test count.** It goes stale; update it when adding or removing

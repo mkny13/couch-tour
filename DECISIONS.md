@@ -598,13 +598,7 @@ Auto-only implementation of the same browsing logic.
 
 See [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) for the full working history — the API
 facts pinned down against the live service, the phase-by-phase build order, and the open
-questions (FLAC support, catalog caching, and whether Relisten's own operators have been
-approached about the API use, the same courtesy phish.in's maintainer extended).
+questions O1 through O5.
 
-## Open questions for after you've seen the MVP
-
-- Sleep timer? Playback speed? Neither is in the MVP.
-- Should a show auto-advance into the next show, or stop at the encore?
-- Do you want the waveform images (`waveform_image_url`) in the player, or is a plain
-  scrubber enough?
-- Search is not in the MVP (you picked browse-by-year as the entry point). Still wanted?
+See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
+next.

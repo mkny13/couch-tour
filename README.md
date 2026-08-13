@@ -47,8 +47,9 @@ hosted on archive.org.
 ## Not in yet
 
 Offline downloads, sleep timer, creating or editing playlists, liking things from inside
-the app. Search covers shows, tracks, and playlists; songs, venues, and tags are returned
-by the API but have no screen. See [DECISIONS.md](DECISIONS.md).
+the app, and search for songs, venues, or tags. See [ROADMAP.md](ROADMAP.md) for the full
+list and open questions, and [DECISIONS.md](DECISIONS.md) for why the app looks the way it
+does today.
 
 ## Casting
 

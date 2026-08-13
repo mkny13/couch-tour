@@ -233,6 +233,9 @@ nothing further to build blind without a device in hand.
 
 ## Open questions — conservative choice taken, flagged for discussion
 
+O3, O4, and O5 are also tracked in [ROADMAP.md](ROADMAP.md) as forward-looking work; this
+section keeps the full reasoning behind each.
+
 **O1 — resolved.** Fixtures were going to be reconstructed from Relisten's OpenAPI schema
 because the API host was unreachable, which would have been weaker than the existing
 fixtures — their whole value per D35 is that they are real responses. Network access is now
