@@ -55,12 +55,37 @@ jobs:
             echo "DEBUG_KEYSTORE_BASE64 secret is empty or unset"
           fi
 
+      - name: Print HOME and user.home
+        run: |
+          echo "shell HOME=$HOME"
+          cat > /tmp/PrintHome.java <<'EOF'
+          public class PrintHome {
+            public static void main(String[] a) {
+              System.out.println("user.home=" + System.getProperty("user.home"));
+            }
+          }
+          EOF
+          "$JAVA_HOME/bin/javac" -d /tmp /tmp/PrintHome.java
+          "$JAVA_HOME/bin/java" -cp /tmp PrintHome
+
       # --no-build-cache: gradle/actions/setup-gradle restores ~/.gradle's build cache from
       # a previous run, and a cached packageDebug/signing output could otherwise be reused
       # across a keystore change if the cache key isn't sensitive to it — ruling that out
       # rather than assuming it doesn't apply here.
+      #
+      # TEMPORARY: --info, filtered and saved as an artifact, to see which path AGP actually
+      # validates/creates the debug keystore at — the restored file's checksum matches what
+      # was written, but the resulting APK still isn't signed with it, so something about
+      # AGP's own resolution of the debug signing config is the remaining unknown.
       - name: Assemble debug APK
-        run: ./gradlew assembleDebug --no-build-cache
+        run: |
+          ./gradlew assembleDebug --no-build-cache --info > /tmp/build-info.log 2>&1 || (tail -200 /tmp/build-info.log && exit 1)
+          grep -i -E "keystore|debug.*sign|validateSigning" /tmp/build-info.log > /tmp/keystore-debug.log || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keystore-debug-log
+          path: /tmp/keystore-debug.log
 
       - uses: actions/upload-artifact@v4
         with:
