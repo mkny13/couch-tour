@@ -34,6 +34,23 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Without this, AGP auto-generates a fresh ~/.android/debug.keystore on every run,
+      # since a GitHub-hosted runner starts clean and keeps nothing between builds. Each
+      # build would then carry a different random debug signing key, so installing a CI
+      # build over a locally-built one (or over the previous CI build) fails outright with
+      # "App not installed" rather than updating — exactly what happened installing v0.2a.
+      # The secret is this repo's own local ~/.android/debug.keystore, base64-encoded, so
+      # every build — local or CI — signs with the same key and updates in place. Falls
+      # back to AGP's auto-generated keystore if the secret isn't set (e.g. a fork's runs,
+      # which can't see this repo's secrets), same as before this existed.
+      - name: Restore debug keystore
+        if: ${{ secrets.DEBUG_KEYSTORE_BASE64 != '' }}
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p ~/.android
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 --decode > ~/.android/debug.keystore
+
       - name: Assemble debug APK
         run: ./gradlew assembleDebug
 
