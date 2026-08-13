@@ -1,13 +1,21 @@
 package dev.mike.couchtour
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
 /**
- * DTOs and pure mapping for [api.relisten.net](https://api.relisten.net), Relisten's public
- * API. The request layer (`RelistenApi`, matching `PhishInApi`'s shape) is P4 — this is only
- * the shapes and the mapping into the backend-neutral model from `Catalog.kt`, so both can be
- * tested without a network call, the same reasoning D36 and P2's `Catalog.kt` mapping used.
+ * DTOs, pure mapping, and the request layer for [api.relisten.net](https://api.relisten.net),
+ * Relisten's public API. The mapping stays in pure functions, tested without a network call,
+ * the same reasoning D36 and P2's `Catalog.kt` mapping used; `RelistenApi` matches
+ * `PhishInApi`'s shape (a `MockWebServer`-testable `internal var baseUrl`, no Retrofit, D4).
  *
  * Facts baked into the mapping below, verified against the live API (see
  * MULTI-ARTIST-PLAN.md "Verified against the live API" — do not re-derive these):
@@ -182,4 +190,74 @@ internal fun RelistenShowWithSources.toShowDetail(artist: ArtistRef, recordingId
         alternates = sources.filter { it.uuid != chosen?.uuid }.map { it.toRecordingRef() },
         tracks = tracks,
     )
+}
+
+// ------------------------------------------------------------------- requests
+
+/**
+ * Plain reads, no key and no auth (per the plan's API notes). `/v3` carries artists and
+ * years; the per-show endpoint with every tape is still `/v2` — Relisten hasn't moved it.
+ */
+object RelistenApi {
+    private val DEFAULT_BASE = "https://api.relisten.net/api".toHttpUrl()
+
+    /** Overridden by tests to point at a local mock server, same pattern as PhishInApi. */
+    internal var baseUrl: HttpUrl = DEFAULT_BASE
+
+    private val http = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun path(vararg segments: String) =
+        baseUrl.newBuilder().apply { segments.forEach { addPathSegment(it) } }
+
+    private suspend fun get(url: HttpUrl): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).header("Accept", "application/json").build()
+        http.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw ApiException("HTTP ${resp.code}", resp.code)
+            resp.body?.string() ?: throw ApiException("Empty response")
+        }
+    }
+
+    suspend fun artists(): List<RelistenArtist> =
+        json.decodeFromString(get(path("v3", "artists").build()))
+
+    suspend fun years(artistUuid: String): List<RelistenYear> =
+        json.decodeFromString(get(path("v3", "artists", artistUuid, "years").build()))
+
+    suspend fun year(artistUuid: String, yearUuid: String): RelistenYearWithShows =
+        json.decodeFromString(get(path("v3", "artists", artistUuid, "years", yearUuid).build()))
+
+    suspend fun show(artistIdOrSlug: String, date: String): RelistenShowWithSources =
+        json.decodeFromString(get(path("v2", "artists", artistIdOrSlug, "shows", date).build()))
+}
+
+/**
+ * Wires [RelistenApi] and the mapping above behind the [MusicSource] seam P2 defined.
+ * `/v3/artists/{artistUuidOrSlug}/years` and its `.../years/{yearUuid}` sibling both accept
+ * the slug directly (confirmed live), so [ArtistRef.id] — already the slug — needs no uuid
+ * lookup to feed either call.
+ */
+object RelistenCatalogSource : MusicSource {
+    override val backend = Backend.RELISTEN
+
+    // The one cache the plan calls for (O4): a ~200-entry list re-fetched on every
+    // back-navigation is the one case worth it; a real catalog cache stays out of scope.
+    // Not private: tests reset it between runs, the same way PhishInApi exposes baseUrl.
+    @Volatile internal var cachedArtists: List<ArtistRef>? = null
+
+    override suspend fun artists(): List<ArtistRef> =
+        cachedArtists ?: RelistenApi.artists().map { it.toArtistRef() }.also { cachedArtists = it }
+
+    override suspend fun periods(artist: ArtistRef): List<PeriodRef> =
+        RelistenApi.years(artist.id).map { it.toPeriodRef() }
+
+    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> =
+        RelistenApi.year(artist.id, period.id).shows.map { it.toShowSummary(artist) }
+
+    override suspend fun show(artist: ArtistRef, date: String, recordingId: String?): ShowDetail =
+        RelistenApi.show(artist.id, date).toShowDetail(artist, recordingId)
 }

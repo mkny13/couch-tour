@@ -139,8 +139,17 @@ code they cover.
       explicit or unknown recording id is handled correctly), and that set names are
       suppressed for `hasSets = false`. No `MusicSource` implementation yet — that needs the
       request layer, which is P4.
-- [ ] **P4 — `Relisten.kt`: request shapes.** MockWebServer via `internal var baseUrl`,
-      restored in `@After`, same pattern as `ApiRequestTest`. *Tests first.*
+- [x] **P4 — `Relisten.kt`: request shapes, plus the `MusicSource` seam.** `RelistenApi` —
+      `artists()`, `years(uuid)`, `year(artistUuid, yearUuid)`, `show(slug, date)` — no key,
+      no auth. `RelistenRequestTest` pins the one easy-to-get-wrong shape: the per-show
+      endpoint stays on `/v2` (`api/v2/artists/{slug}/shows/{date}`) while everything else
+      moved to `/v3`. Wiring `RelistenCatalogSource : MusicSource` turned out cheap enough to
+      fold in here rather than wait for P6/P7: it's the P3 mapping functions plus `RelistenApi`
+      behind the seam P2 defined, with the one cache O4 called for. Confirmed live — not
+      assumed — that `/v3/artists/{slug}/years` and `.../years/{yearUuid}` both accept the
+      slug directly, so `ArtistRef.id` (already the slug) needs no uuid-lookup round trip.
+      (The DTO for one tape is `RelistenSource`; the `MusicSource` implementation is
+      `RelistenCatalogSource` — same word, deliberately different names to keep them apart.)
 - [ ] **P5 — `MediaItems.kt`: per-artist metadata + `recordingTrackItems`.** Both builders
       converge on the same private `mediaItem(...)` so the phone and the Auto tree still
       produce byte-identical queues (the property D73 relies on). *Tests first.*
