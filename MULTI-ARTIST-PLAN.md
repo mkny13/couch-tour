@@ -171,11 +171,21 @@ code they cover.
       resume, not just on first play; `progress.artist` (the denormalised column from P2b) is
       the fallback if that lookup fails offline. No new tests — `PlayerViewModel` isn't
       unit-tested for the phish.in path either, since it needs a live `MediaController`.
-- [ ] **P7 — `MainActivity.kt`: routes and screens.** `artists`,
-      `artist/{backend}/{id}`, `artist/{backend}/{id}/{period}`,
-      `recording/{backend}/{artist}/{date}?src=`. Home gains an "Artists" row; the Phish path
-      does not move. Reuse `RowItem`, `SectionHeader`, `loadOnce`, and the set-grouping helper.
-      `openQueueKey` gains the `relisten:` case.
+- [x] **P7a — `MainActivity.kt`: `artists` route + `ArtistsScreen`.** Home gains an "Artists"
+      row; the Phish path (Home itself) does not move. Reuses `RowItem`/`Header`/`loadOnce`.
+      Sorted by `showCount` descending so heavily-archived artists (Grateful Dead, 1905 shows)
+      surface before ones with a handful. **Known dead end until P7b lands:** tapping an
+      artist navigates to `artist/{backend}/{id}`, which isn't registered yet — Compose
+      Navigation throws if a route is navigated to before it exists. Split this way anyway
+      (rather than as one P7 commit) because it's the one piece of the screen work that's
+      fully self-contained; the years → shows → recording chain can't be split further, since
+      each link needs its destination registered in the same commit or tapping it crashes.
+      Not independently released — the branch ships as a whole once P9 lands.
+- [ ] **P7b — `MainActivity.kt`: artist → years → shows → recording, and the tape switcher.**
+      `artist/{backend}/{id}` (years), `artist/{backend}/{id}/{period}` (shows),
+      `recording/{backend}/{artist}/{date}?src=`. Reuses `RowItem`, `SectionHeader`,
+      `loadOnce`, and the set-grouping helper. `openQueueKey` (both call sites — the mini
+      player and history) gains the `relisten:` case.
 - [ ] **P8 — `Browse.kt` / `PlaybackService.kt`: Android Auto.** Artists node above Years,
       `BrowseNode.Recording`. `Resume` already wraps the `queueKey` verbatim (D73), so
       Continue Listening picks up Relisten rows with no change.

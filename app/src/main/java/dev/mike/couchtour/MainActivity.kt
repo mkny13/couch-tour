@@ -157,6 +157,7 @@ fun App(
             composable("home") { HomeScreen(vm, nav) }
             composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }
+            composable("artists") { ArtistsScreen(nav) }
             composable("shows/{period}") { entry ->
                 ShowsScreen(entry.arguments?.getString("period").orEmpty(), nav)
             }
@@ -285,6 +286,11 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                     nav.navigate("playlists")
                 }
             }
+            item {
+                RowItem("Artists", "Grateful Dead, Widespread Panic, and more", null) {
+                    nav.navigate("artists")
+                }
+            }
 
             item { SectionHeader("Browse by year", divided = true) }
 
@@ -364,6 +370,36 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                         }
                         tracksGroupedBySet(playable) { index, track ->
                             TrackRow(track, index + 1) { vm.playShow(s, index, 0) }
+                        }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
+        }
+    }
+}
+
+/** Relisten's artist list. phish.in itself doesn't appear here — it's the Home screen. */
+@Composable
+fun ArtistsScreen(nav: NavHostController) {
+    val artists = loadOnce { RelistenCatalogSource.artists() }
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Artists", nav)
+        when (val r = artists.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { list ->
+                    LazyColumn {
+                        // Most-recorded first, so Grateful Dead and other heavily-archived
+                        // artists surface before ones with a handful of shows.
+                        items(list.sortedByDescending { it.showCount }, key = { it.id }) { artist ->
+                            RowItem(
+                                title = artist.name,
+                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                                artUrl = null,
+                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                            )
                         }
                     }
                 },
