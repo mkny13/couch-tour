@@ -80,9 +80,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -158,6 +160,34 @@ fun App(
             composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }
             composable("artists") { ArtistsScreen(nav) }
+            composable("artist/{backend}/{id}") { entry ->
+                ArtistScreen(
+                    backendId = entry.arguments?.getString("backend").orEmpty(),
+                    artistId = entry.arguments?.getString("id").orEmpty(),
+                    nav = nav,
+                )
+            }
+            composable("artist/{backend}/{id}/{period}") { entry ->
+                ArtistShowsScreen(
+                    backendId = entry.arguments?.getString("backend").orEmpty(),
+                    artistId = entry.arguments?.getString("id").orEmpty(),
+                    periodId = entry.arguments?.getString("period").orEmpty(),
+                    nav = nav,
+                )
+            }
+            composable(
+                "recording/{backend}/{artistId}/{date}?src={src}",
+                arguments = listOf(navArgument("src") { type = NavType.StringType; nullable = true }),
+            ) { entry ->
+                RecordingScreen(
+                    backendId = entry.arguments?.getString("backend").orEmpty(),
+                    artistId = entry.arguments?.getString("artistId").orEmpty(),
+                    date = entry.arguments?.getString("date").orEmpty(),
+                    recordingId = entry.arguments?.getString("src"),
+                    vm = vm,
+                    nav = nav,
+                )
+            }
             composable("shows/{period}") { entry ->
                 ShowsScreen(entry.arguments?.getString("period").orEmpty(), nav)
             }
@@ -406,6 +436,200 @@ fun ArtistsScreen(nav: NavHostController) {
                 onFailure = { ErrorText(it) }
             )
         }
+    }
+}
+
+private fun sourceFor(backend: Backend): MusicSource = when (backend) {
+    Backend.PHISHIN -> PhishInSource
+    Backend.RELISTEN -> RelistenCatalogSource
+}
+
+/** Years (or ranged periods) for one Relisten artist. */
+@Composable
+fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
+    val backend = Backend.from(backendId)
+    val loaded = loadOnce(artistId) {
+        val source = sourceFor(backend ?: error("Unknown backend $backendId"))
+        val artist = source.artists().firstOrNull { it.id == artistId } ?: error("Unknown artist $artistId")
+        artist to source.periods(artist)
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Header(loaded.value?.getOrNull()?.first?.name ?: artistId, nav)
+        when (val r = loaded.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { (_, periods) ->
+                    LazyColumn {
+                        // Newest first, matching the phish.in years screen.
+                        items(periods.sortedByDescending { it.label }, key = { it.id }) { period ->
+                            RowItem(
+                                title = period.label,
+                                subtitle = "${period.showCount} ${plural(period.showCount, "show")}",
+                                artUrl = period.artUrl,
+                                onClick = { nav.navigate("artist/$backendId/$artistId/${period.id}") }
+                            )
+                        }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
+        }
+    }
+}
+
+/** Shows within one period of one Relisten artist. */
+@Composable
+fun ArtistShowsScreen(backendId: String, artistId: String, periodId: String, nav: NavHostController) {
+    val backend = Backend.from(backendId)
+    val loaded = loadOnce(periodId) {
+        val source = sourceFor(backend ?: error("Unknown backend $backendId"))
+        val artist = source.artists().firstOrNull { it.id == artistId } ?: error("Unknown artist $artistId")
+        val period = source.periods(artist).firstOrNull { it.id == periodId } ?: error("Unknown period $periodId")
+        Triple(artist, period, source.shows(artist, period))
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Header(loaded.value?.getOrNull()?.second?.label ?: periodId, nav)
+        when (val r = loaded.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { (_, _, shows) ->
+                    LazyColumn {
+                        items(shows, key = { it.date }) { show ->
+                            RowItem(
+                                title = show.date,
+                                subtitle = show.where,
+                                artUrl = show.artUrl,
+                                trailing = if (show.recordingCount > 1) "${show.recordingCount} tapes" else null,
+                                onClick = { nav.navigate("recording/$backendId/$artistId/${show.date}") }
+                            )
+                        }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
+        }
+    }
+}
+
+/**
+ * One tape of a Relisten show. [recordingId] null takes the source's own default (P3);
+ * switching tapes re-navigates here with a different `src`.
+ */
+@Composable
+fun RecordingScreen(
+    backendId: String,
+    artistId: String,
+    date: String,
+    recordingId: String?,
+    vm: PlayerViewModel,
+    nav: NavHostController,
+) {
+    val backend = Backend.from(backendId)
+    val loaded = loadOnce(Triple(artistId, date, recordingId)) {
+        val source = sourceFor(backend ?: error("Unknown backend $backendId"))
+        val artist = source.artists().firstOrNull { it.id == artistId } ?: error("Unknown artist $artistId")
+        val detail = source.show(artist, date, recordingId)
+        // A finished show's stored position is the end of the encore, same reasoning
+        // ShowScreen's resume banner uses (D22).
+        detail to detail.queueKey?.let { vm.progressFor(it) }?.takeIf { !it.finished }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Header(date, nav)
+        when (val r = loaded.value) {
+            null -> Loading()
+            else -> r.fold(
+                onSuccess = { (detail, progress) ->
+                    LazyColumn {
+                        item { RecordingHeader(detail, backendId, artistId, date, nav) }
+                        if (progress != null) {
+                            item {
+                                ResumeBanner(progress) {
+                                    vm.playRecording(detail, progress.trackIndex, progress.positionMs)
+                                }
+                            }
+                        }
+                        groupedBySet(detail.tracks, { it.setName }, { it.id }) { index, track ->
+                            RecordingTrackRow(track, index + 1) { vm.playRecording(detail, index, 0) }
+                        }
+                    }
+                },
+                onFailure = { ErrorText(it) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: String, date: String, nav: NavHostController) {
+    val summary = detail.summary
+    Column {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = summary.artUrl,
+                contentDescription = null,
+                modifier = Modifier.size(88.dp).clip(RoundedCornerShape(8.dp))
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(summary.venue.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text(summary.location.orEmpty(), color = Color.Gray, fontSize = 14.sp)
+                Text("${detail.tracks.size} tracks", color = Color.Gray, fontSize = 13.sp)
+                detail.recording?.let { rec ->
+                    Text(recordingLabel(rec), color = Color.Gray, fontSize = 13.sp)
+                }
+            }
+        }
+        // No tape to switch on a single-source artist (Phish) or a show with only one.
+        if (summary.artist.hasMultipleSources && detail.alternates.isNotEmpty()) {
+            TapeSwitcher(detail, backendId, artistId, date, nav)
+        }
+    }
+}
+
+private fun recordingLabel(rec: RecordingRef): String {
+    val rating = if (rec.rating > 0) " · %.1f".format(rec.rating) else ""
+    return rec.label + rating
+}
+
+@Composable
+private fun TapeSwitcher(detail: ShowDetail, backendId: String, artistId: String, date: String, nav: NavHostController) {
+    var open by remember { mutableStateOf(false) }
+    val tapes = listOfNotNull(detail.recording) + detail.alternates
+
+    Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        RowItem(
+            title = "Switch tape",
+            subtitle = "${tapes.size} ${plural(tapes.size, "recording")} of this show",
+            artUrl = null,
+            onClick = { open = true },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            tapes.forEach { tape ->
+                val current = tape.id == detail.recording?.id
+                DropdownMenuItem(
+                    text = { Text((if (current) "✓ " else "") + recordingLabel(tape)) },
+                    onClick = {
+                        open = false
+                        if (!current) nav.navigate("recording/$backendId/$artistId/$date?src=${tape.id}")
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordingTrackRow(track: PlayableTrack, number: Int, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("$number", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.width(28.dp))
+        Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
+        Text(fmt(track.durationMs), color = Color.Gray, fontSize = 13.sp)
     }
 }
 
@@ -762,8 +986,10 @@ private fun openQueueKey(key: String, nav: NavHostController) {
     when (ref.kind) {
         QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
         QueueKind.SHOW -> nav.navigate("show/${ref.id}")
-        // Wired up once there is a recording screen to navigate to.
-        QueueKind.RECORDING -> Unit
+        QueueKind.RECORDING -> {
+            val rec = parseRecordingId(ref.id) ?: return
+            nav.navigate("recording/${Backend.RELISTEN.id}/${rec.artistSlug}/${rec.date}?src=${rec.sourceId}")
+        }
     }
 }
 
@@ -857,16 +1083,7 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
                             title = p.title,
                             subtitle = p.subtitle,
                             artUrl = p.artUrl,
-                            onClick = {
-                                val ref = parseQueueKey(p.queueKey)
-                                when (ref?.kind) {
-                                    QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
-                                    QueueKind.SHOW -> nav.navigate("show/${ref.id}")
-                                    // Wired up once there is a recording screen to navigate to.
-                                    QueueKind.RECORDING -> Unit
-                                    null -> Unit
-                                }
-                            },
+                            onClick = { openQueue(p, nav) },
                             trailing = when {
                                 p.finished -> "✓ completed"
                                 p.dismissed -> "removed · ${fmt(p.positionMs)}"
@@ -1166,12 +1383,25 @@ private fun <T> loadOnce(key: Any = Unit, block: suspend () -> T): State<Result<
 private fun androidx.compose.foundation.lazy.LazyListScope.tracksGroupedBySet(
     tracks: List<Track>,
     content: @Composable (Int, Track) -> Unit,
+) = groupedBySet(tracks, { it.setName }, { it.id }, content)
+
+/**
+ * The backend-neutral form of [tracksGroupedBySet], reused for [PlayableTrack] by
+ * [RecordingScreen] — a Relisten tape without real sets (D-verified: `features.sets`) maps
+ * every track to an empty [PlayableTrack.setName] (P3), which collapses to one group with no
+ * header rather than one meaningless "Set" divider.
+ */
+private fun <T> androidx.compose.foundation.lazy.LazyListScope.groupedBySet(
+    items: List<T>,
+    setName: (T) -> String,
+    key: (T) -> Any,
+    content: @Composable (Int, T) -> Unit,
 ) {
-    tracks.forEachIndexed { index, track ->
-        if (index == 0 || tracks[index - 1].setName != track.setName) {
-            item(key = "set-${track.setName}-$index") { SectionHeader(track.setName) }
+    items.forEachIndexed { index, item ->
+        if (setName(item).isNotEmpty() && (index == 0 || setName(items[index - 1]) != setName(item))) {
+            item(key = "set-${setName(item)}-$index") { SectionHeader(setName(item)) }
         }
-        item(key = "track-${track.id}") { content(index, track) }
+        item(key = "track-${key(item)}") { content(index, item) }
     }
 }
 

@@ -181,11 +181,29 @@ code they cover.
       fully self-contained; the years → shows → recording chain can't be split further, since
       each link needs its destination registered in the same commit or tapping it crashes.
       Not independently released — the branch ships as a whole once P9 lands.
-- [ ] **P7b — `MainActivity.kt`: artist → years → shows → recording, and the tape switcher.**
-      `artist/{backend}/{id}` (years), `artist/{backend}/{id}/{period}` (shows),
-      `recording/{backend}/{artist}/{date}?src=`. Reuses `RowItem`, `SectionHeader`,
-      `loadOnce`, and the set-grouping helper. `openQueueKey` (both call sites — the mini
-      player and history) gains the `relisten:` case.
+- [x] **P7b — `MainActivity.kt`: artist → years → shows → recording, and the tape switcher.**
+      `artist/{backend}/{id}` (years/periods), `artist/{backend}/{id}/{period}` (shows),
+      `recording/{backend}/{artistId}/{date}?src=` (one tape, `src` optional — omitted takes
+      P3's default). Every new screen re-fetches through the `MusicSource` seam (a small
+      `sourceFor(backend)` resolver), the same "no caching beyond the artist list" tradeoff
+      O4 already accepted — periods/shows/show all re-fetch on screen entry, like every
+      existing `loadOnce` call.
+      Reused `RowItem`, `Header`, `loadOnce`. The set-grouping helper became generic
+      (`groupedBySet<T>`, with `tracksGroupedBySet` now a one-line wrapper over it) so
+      `RecordingScreen` could reuse it for `PlayableTrack` — and the generic version skips
+      the divider entirely when `setName` is blank, which is what P3 already produces for an
+      artist with `hasSets = false`, so the "one meaningless Set divider" trap named in the
+      plan's traps list is closed here, on the render side, not just suppressed in the data.
+      The tape switcher is a `DropdownMenu` off a "Switch tape" row, shown only when the
+      artist has multiple sources **and** this particular show actually has alternates
+      (`hasMultipleSources` is an artist-level flag; a specific show can still have just one
+      recording). Switching re-navigates to the same route with a different `src` — no
+      `popUpTo` back-stack trimming, so repeated switches are back-button-navigable; not
+      polished further given the effort this phase already took.
+      `openQueueKey`'s `RECORDING` case is wired in both places it's needed (the mini player
+      cover and, after a small dedup, `HistoryScreen`, which previously duplicated the whole
+      switch inline). No new tests — Compose screens aren't unit-tested anywhere else in this
+      codebase either (they need a live `MediaController`/device); still 271 passing.
 - [ ] **P8 — `Browse.kt` / `PlaybackService.kt`: Android Auto.** Artists node above Years,
       `BrowseNode.Recording`. `Resume` already wraps the `queueKey` verbatim (D73), so
       Continue Listening picks up Relisten rows with no change.
