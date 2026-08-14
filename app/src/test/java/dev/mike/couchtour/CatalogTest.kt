@@ -163,4 +163,63 @@ class CatalogTest {
         val detail = ShowDetail(summary = ShowSummary(artist = artist, date = "2001-04-22"))
         assertNull(detail.queueKey)
     }
+
+    // ----------------------------------------------------------------- search
+
+    @Test
+    fun `phish-in search results carry their tracks and playlists straight through`() {
+        val fixture = javaClass.classLoader!!.getResourceAsStream("fixtures/search.json")!!
+            .bufferedReader().readText()
+        val results = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString<SearchResults>(fixture)
+        val hits = results.toSearchHits()
+        assertEquals(results.shows.size, hits.shows.size)
+        assertEquals(results.tracks, hits.tracks)
+        assertEquals(results.playlists, hits.playlists)
+    }
+
+    private val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+    private val wsp = ArtistRef(Backend.RELISTEN, "wsp", "Widespread Panic")
+
+    @Test
+    fun `plus merges every field and unions the failed set`() {
+        val a = SearchHits(artists = listOf(dead), failed = setOf(Backend.RELISTEN))
+        val b = SearchHits(artists = listOf(wsp))
+        val merged = a + b
+        assertEquals(listOf(dead, wsp), merged.artists)
+        assertEquals(setOf(Backend.RELISTEN), merged.failed)
+    }
+
+    @Test
+    fun `artistsPresent is deduped across every hit type`() {
+        val hits = SearchHits(
+            artists = listOf(dead),
+            shows = listOf(ShowSummary(artist = dead, date = "1977-05-08")),
+            slices = listOf(SliceHit(SliceKind.SONG, wsp, PeriodRef("song:x", "Junior"))),
+            tracks = listOf(Track(id = 1, title = "Tweezer")),
+        )
+        assertEquals(listOf(dead, wsp, PHISH), hits.artistsPresent)
+    }
+
+    @Test
+    fun `filteredTo narrows every field to one artist, dropping phish-only fields for others`() {
+        val hits = SearchHits(
+            artists = listOf(dead, wsp),
+            shows = listOf(
+                ShowSummary(artist = dead, date = "1977-05-08"),
+                ShowSummary(artist = wsp, date = "2001-04-22"),
+            ),
+            tracks = listOf(Track(id = 1, title = "Tweezer")),
+        )
+        val filtered = hits.filteredTo(dead)
+        assertEquals(listOf(dead), filtered.artists)
+        assertEquals(listOf("1977-05-08"), filtered.shows.map { it.date })
+        assertTrue(filtered.tracks.isEmpty())
+    }
+
+    @Test
+    fun `filteredTo a null key returns everything unchanged`() {
+        val hits = SearchHits(artists = listOf(dead, wsp))
+        assertEquals(hits, hits.filteredTo(null))
+    }
 }

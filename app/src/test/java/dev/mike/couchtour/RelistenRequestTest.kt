@@ -180,4 +180,70 @@ class RelistenRequestTest {
         assertEquals("relisten:grateful-dead/1977-05-08/src-1", detail.queueKey)
         assertEquals("Minglewood Blues", detail.tracks.first().title)
     }
+
+    // ----------------------------------------------------------------- search
+
+    @Test
+    fun `search sends the term as a q query parameter, not a path segment`() = runBlocking {
+        // The opposite of phish.in's /search/{term} path form — the shape most likely to
+        // get this backend's request wrong.
+        enqueue("""{"Artists":[],"Shows":[],"Songs":[],"Venues":[]}""")
+
+        RelistenApi.search("scarlet begonias")
+
+        val request = take()
+        assertEquals(listOf("api", "v3", "search"), request.requestUrl!!.pathSegments)
+        assertEquals("scarlet begonias", request.requestUrl!!.queryParameter("q"))
+    }
+
+    @Test
+    fun `song and venue requests hit their own v3 sub-paths`() = runBlocking {
+        enqueue("""{"name":"Scarlet Begonias","shows":[]}""")
+        RelistenApi.song("grateful-dead", "song-uuid")
+        assertEquals(
+            listOf("api", "v3", "artists", "grateful-dead", "songs", "song-uuid"),
+            take().requestUrl!!.pathSegments
+        )
+
+        enqueue("""{"name":"Barton Hall","shows":[]}""")
+        RelistenApi.venue("grateful-dead", "venue-uuid")
+        assertEquals(
+            listOf("api", "v3", "artists", "grateful-dead", "venues", "venue-uuid"),
+            take().requestUrl!!.pathSegments
+        )
+    }
+
+    @Test
+    fun `RelistenCatalogSource shows routes a namespaced period to the matching endpoint`() = runBlocking {
+        val artist = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+
+        enqueue("""{"name":"Scarlet Begonias","shows":[]}""")
+        RelistenCatalogSource.shows(artist, PeriodRef(songPeriodId("song-uuid"), "Scarlet Begonias"))
+        assertEquals(listOf("songs", "song-uuid"), take().requestUrl!!.pathSegments.takeLast(2))
+
+        enqueue("""{"name":"Barton Hall","shows":[]}""")
+        RelistenCatalogSource.shows(artist, PeriodRef(venuePeriodId("venue-uuid"), "Barton Hall"))
+        assertEquals(listOf("venues", "venue-uuid"), take().requestUrl!!.pathSegments.takeLast(2))
+
+        // A bare uuid (no prefix) is still an ordinary year lookup.
+        enqueue("""{"year":"1977","shows":[]}""")
+        RelistenCatalogSource.shows(artist, PeriodRef("year-uuid", "1977"))
+        assertEquals(listOf("years", "year-uuid"), take().requestUrl!!.pathSegments.takeLast(2))
+    }
+
+    @Test
+    fun `RelistenCatalogSource search delegates to the mapper`() = runBlocking {
+        enqueue(
+            """{"Artists":[],"Shows":[],
+                "Songs":[{"slim_artist":{"slug":"grateful-dead","name":"Grateful Dead"},
+                    "name":"Scarlet Begonias","uuid":"song-uuid","shows_played_at":312}],
+                "Venues":[]}"""
+        )
+
+        val hits = RelistenCatalogSource.search("scarlet begonias")
+
+        assertEquals(1, hits.slices.size)
+        assertEquals(SliceKind.SONG, hits.slices.first().kind)
+        assertEquals("Grateful Dead", hits.slices.first().artist.name)
+    }
 }

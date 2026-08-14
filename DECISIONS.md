@@ -600,5 +600,49 @@ See [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) for the full working history �
 facts pinned down against the live service, the phase-by-phase build order, and the open
 questions O1 through O5.
 
+## Iteration 16 — search across every artist
+
+**D83 — `MusicSource` gained a `search` capability, fanned out by `searchAll` with
+per-backend failure isolation.** Iteration 15 gave every backend a shared browse seam but
+left `searchFor` calling `PhishInApi.search` alone, so Relisten's ~200 artists were
+unreachable from the search box. `searchAll` runs both backends' `search(term)`
+concurrently and merges the results with `SearchHits.plus`; a backend that throws
+contributes `SearchHits(failed = setOf(that backend))` instead of failing the whole query,
+so one backend being down costs its own section, not the other's results.
+
+**D84 — Results are grouped by type, with an artist filter-chip row, not grouped by
+artist.** The existing Shows/Tracks/Playlists section layout stayed rather than being
+replaced by per-artist grouping, which keeps the phish.in-only path visually unchanged. A
+`FilterChip` row appears only when a query's hits span more than one artist — "Scarlet
+Begonias" hits eight — and filtering is pure and client-side over the already-fetched
+`SearchHits`, so switching chips costs no refetch.
+
+**D85 — Relisten's own Phish hits are dropped from search, same as browsing.** phish.in is
+the Phish backend (D75); a Relisten hit for the `phish` slug would be a near-duplicate row
+leading to a screen with no waveform, cover art, likes, or playlists. `toSearchHits()`
+filters every bucket on the slug before mapping.
+
+**D86 — Songs and venues travel as `song:`/`venue:`-namespaced `PeriodRef` ids, reusing the
+existing shows route rather than a new screen.** `PeriodRef.id` was already opaque to
+everything but the backend that issues it (phish.in already branches on shape to pick
+`year_range=` over `year=`), so a song or venue hit becomes a `PeriodRef` whose id carries a
+prefix `RelistenCatalogSource.shows()` dispatches on to `/v3/artists/{slug}/songs/{uuid}` or
+`.../venues/{uuid}` instead of the ordinary year lookup. Tapping a hit lands on
+`ArtistShowsScreen` exactly as browsing a year does — no new screen, no new route, and
+nothing for Android Auto's browse tree to learn about.
+
+**D87 — The `Sources` and `Tours` search buckets are ignored.** `Sources` matches free text
+in taper notes and descriptions — a "scarlet begonias" query returns 20 tapes whose notes
+happen to mention the song, capped and arbitrary against the hundreds that exist, and
+strictly worse than the precise `Songs` hit for the same query. `Tours` has no destination
+screen in the app, same reasoning as D14 for tags. `RelistenSearchResults` declares no DTO
+for either bucket; `ignoreUnknownKeys` drops them for free.
+
+**D88 — A Relisten "Shows" search hit has no venue, unlike a browsed show.** `/v3/search`'s
+`Shows` bucket carries `slim_artist`, `display_date`, `source_count`, and `avg_rating`, but
+only a `venue_uuid` — no populated venue. A show row reached from search therefore shows
+just the date and band; the venue only appears once the show itself is opened and fetched
+through the ordinary per-show endpoint, which does return one.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

@@ -178,4 +178,65 @@ class RelistenParsingTest {
         val tracks = json.decodeFromString<RelistenShowWithSources>(raw).toShowDetail(artist).tracks
         assertEquals(listOf("Kept"), tracks.map { it.title })
     }
+
+    // ----------------------------------------------------------------- search
+
+    @Test
+    fun `parses every search bucket and drops the phish slug`() {
+        val results = json.decodeFromString<RelistenSearchResults>(fixture("relisten_search.json"))
+        val hits = results.toSearchHits()
+
+        assertEquals(listOf("Goose"), hits.artists.map { it.name })
+        assertEquals(listOf("Grateful Dead"), hits.shows.map { it.artist.name })
+        // Phish's own hit (4 shows) is dropped — phish.in is the Phish backend.
+        assertEquals(
+            listOf("Grateful Dead", "Dark Star Orchestra"),
+            hits.slices.filter { it.kind == SliceKind.SONG }.map { it.artist.name }
+        )
+        assertEquals(listOf("Grateful Dead"), hits.slices.filter { it.kind == SliceKind.VENUE }.map { it.artist.name })
+    }
+
+    @Test
+    fun `song and venue slices carry namespaced period ids`() {
+        val hits = json.decodeFromString<RelistenSearchResults>(fixture("relisten_search.json")).toSearchHits()
+
+        val song = hits.slices.first { it.kind == SliceKind.SONG }
+        assertEquals("song:73a1f1ec-0e2c-2b68-839f-946193fb3565", song.period.id)
+        assertEquals("Scarlet Begonias", song.period.label)
+        assertEquals(312, song.period.showCount)
+
+        val venue = hits.slices.first { it.kind == SliceKind.VENUE }
+        assertEquals("venue:29f9f7c0-102a-48df-4df5-033823561a09", venue.period.id)
+        assertEquals("Barton Hall, Cornell University", venue.period.label)
+    }
+
+    @Test
+    fun `sources and tours are ignored, since neither has a screen to land on`() {
+        // ignoreUnknownKeys makes this automatic, but the fixture carries a real Sources
+        // entry so a schema change that broke this silently would fail loudly here instead.
+        val results = json.decodeFromString<RelistenSearchResults>(fixture("relisten_search.json"))
+        val hits = results.toSearchHits()
+        assertTrue(hits.artists.isNotEmpty() || hits.shows.isNotEmpty() || hits.slices.isNotEmpty())
+    }
+
+    @Test
+    fun `a song's shows parse through the existing show-summary shape`() {
+        val slice = json.decodeFromString<RelistenSliceWithShows>(fixture("relisten_song_shows.json"))
+        val summaries = slice.toShowSummaries(deadArtist)
+
+        assertEquals("1974-03-23", summaries.first().date)
+        assertEquals("Cow Palace", summaries.first().venue)
+        assertEquals("Daly City, CA, USA", summaries.first().location)
+        assertEquals(deadArtist, summaries.first().artist)
+    }
+
+    @Test
+    fun `a venue's shows parse the same way, with the venue populated unlike a search hit`() {
+        val slice = json.decodeFromString<RelistenSliceWithShows>(fixture("relisten_venue_shows.json"))
+        val summaries = slice.toShowSummaries(deadArtist)
+
+        assertEquals("1977-05-08", summaries.first().date)
+        assertEquals("Barton Hall, Cornell University", summaries.first().venue)
+        assertEquals(10, summaries.first().recordingCount)
+    }
 }

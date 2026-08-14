@@ -43,13 +43,14 @@ hosted on archive.org.
   via an "Artists" row on Home, with the same resume, history, and Android Auto support as
   Phish. Shows with more than one taped recording get a tape switcher, and each tape keeps
   its own resume point. Likes, playlists, and login stay phish.in-only
+- Search spans every artist, not just Phish: shows, songs, and venues across phish.in and
+  Relisten fan out together, with a filter chip row when a query hits more than one band
 
 ## Not in yet
 
-Offline downloads, sleep timer, creating or editing playlists, liking things from inside
-the app, and search for songs, venues, or tags. See [ROADMAP.md](ROADMAP.md) for the full
-list and open questions, and [DECISIONS.md](DECISIONS.md) for why the app looks the way it
-does today.
+Offline downloads, sleep timer, creating or editing playlists, and liking things from
+inside the app. See [ROADMAP.md](ROADMAP.md) for the full list and open questions, and
+[DECISIONS.md](DECISIONS.md) for why the app looks the way it does today.
 
 ## Casting
 
@@ -98,7 +99,7 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Tests
 
-274 unit tests, no device or emulator required:
+185 unit tests, no device or emulator required:
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -162,3 +163,9 @@ years are `/v3`; the per-show endpoint with every recording is still `/v2`.
 - An artist's `features.sets` and `features.multiple_sources` flags are real and worth
   reading rather than assuming — they differ artist to artist (false and true, respectively,
   for Grateful Dead; the reverse for Phish).
+- `/v3/search?q=` takes the term as a **query parameter**, not a path segment like phish.in's
+  `/search/{term}`. It returns six buckets, each capped at 20 hits; this app uses Artists,
+  Shows, Songs, and Venues, and drops Sources (free-text taper-note matches) and Tours (no
+  screen to land on). Songs and venues aren't playable themselves — they resolve to a show
+  list through `song:`/`venue:`-namespaced `PeriodRef` ids that route to
+  `/v3/artists/{slug}/songs/{uuid}` and `.../venues/{uuid}`.

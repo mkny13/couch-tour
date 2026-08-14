@@ -117,6 +117,64 @@ data class RelistenShowWithSources(
     val sources: List<RelistenSource> = emptyList(),
 )
 
+// -------------------------------------------------------------------- search
+
+/** The artist embedded in a search hit — a slimmer projection than [RelistenArtist],
+ *  missing `show_count`/`features`, which is fine since every destination screen
+ *  re-resolves the real [ArtistRef] through `source.artists()`. */
+@Serializable
+data class RelistenSlimArtist(val slug: String, val name: String)
+
+@Serializable
+data class RelistenSearchShow(
+    @SerialName("slim_artist") val slimArtist: RelistenSlimArtist,
+    @SerialName("display_date") val displayDate: String,
+    @SerialName("source_count") val sourceCount: Int = 0,
+)
+
+@Serializable
+data class RelistenSearchSong(
+    @SerialName("slim_artist") val slimArtist: RelistenSlimArtist,
+    val name: String,
+    val uuid: String,
+    @SerialName("shows_played_at") val showsPlayedAt: Int = 0,
+)
+
+@Serializable
+data class RelistenSearchVenue(
+    @SerialName("slim_artist") val slimArtist: RelistenSlimArtist,
+    val name: String,
+    val location: String? = null,
+    val uuid: String,
+)
+
+/** `/v3/search?q=` — six buckets; `Sources` and `Tours` are dropped by [ignoreUnknownKeys]
+ *  since neither has a screen to land on (see MULTI-ARTIST-PLAN.md). */
+@Serializable
+data class RelistenSearchResults(
+    @SerialName("Artists") val artists: List<RelistenArtist> = emptyList(),
+    @SerialName("Shows") val shows: List<RelistenSearchShow> = emptyList(),
+    @SerialName("Songs") val songs: List<RelistenSearchSong> = emptyList(),
+    @SerialName("Venues") val venues: List<RelistenSearchVenue> = emptyList(),
+)
+
+/** `/v3/artists/{slug}/songs/{uuid}` and `/v3/artists/{slug}/venues/{uuid}` share this
+ *  shape: the entity's own name plus the shows it appears in. */
+@Serializable
+data class RelistenSliceWithShows(
+    val name: String,
+    val shows: List<RelistenShowSummary> = emptyList(),
+)
+
+/** Namespace prefixes for [PeriodRef.id] so [RelistenCatalogSource.shows] can dispatch a
+ *  song or venue hit to the right endpoint instead of the ordinary year lookup. A bare uuid
+ *  (no prefix) is still a year id — existing routes are untouched. */
+private const val SONG_PREFIX = "song:"
+private const val VENUE_PREFIX = "venue:"
+
+internal fun songPeriodId(uuid: String) = "$SONG_PREFIX$uuid"
+internal fun venuePeriodId(uuid: String) = "$VENUE_PREFIX$uuid"
+
 // ---------------------------------------------------------------- mapping
 
 internal fun RelistenArtist.toArtistRef() = ArtistRef(
@@ -192,6 +250,36 @@ internal fun RelistenShowWithSources.toShowDetail(artist: ArtistRef, recordingId
     )
 }
 
+/**
+ * Maps every bucket to [SearchHits], dropping the `phish` slug: phish.in is the Phish
+ * backend (D-verified, MULTI-ARTIST-PLAN.md decision 2), so a Relisten hit for it would be
+ * a near-duplicate row missing likes, waveforms, and cover art. Shows and slices carry
+ * artist-projection [ArtistRef]s built from [RelistenSlimArtist] rather than a full lookup —
+ * every screen they lead to re-resolves the real one anyway.
+ */
+internal fun RelistenSearchResults.toSearchHits(): SearchHits {
+    fun RelistenSlimArtist.toRef() = ArtistRef(Backend.RELISTEN, slug, name)
+
+    return SearchHits(
+        artists = artists.filter { it.slug != PHISH.id }.map { it.toArtistRef() },
+        shows = shows.filter { it.slimArtist.slug != PHISH.id }.map {
+            ShowSummary(
+                artist = it.slimArtist.toRef(),
+                date = it.displayDate,
+                recordingCount = it.sourceCount.coerceAtLeast(1),
+            )
+        },
+        slices = songs.filter { it.slimArtist.slug != PHISH.id }.map {
+            SliceHit(SliceKind.SONG, it.slimArtist.toRef(), PeriodRef(songPeriodId(it.uuid), it.name, it.showsPlayedAt))
+        } + venues.filter { it.slimArtist.slug != PHISH.id }.map {
+            SliceHit(SliceKind.VENUE, it.slimArtist.toRef(), PeriodRef(venuePeriodId(it.uuid), it.name))
+        },
+    )
+}
+
+internal fun RelistenSliceWithShows.toShowSummaries(artist: ArtistRef) =
+    shows.map { it.toShowSummary(artist) }
+
 // ------------------------------------------------------------------- requests
 
 /**
@@ -233,6 +321,19 @@ object RelistenApi {
 
     suspend fun show(artistIdOrSlug: String, date: String): RelistenShowWithSources =
         json.decodeFromString(get(path("v2", "artists", artistIdOrSlug, "shows", date).build()))
+
+    /** [term] goes in `q`, a query parameter — unlike phish.in's `/search/{term}` path segment. */
+    suspend fun search(term: String): RelistenSearchResults {
+        val url = baseUrl.newBuilder().addPathSegment("v3").addPathSegment("search")
+            .addQueryParameter("q", term).build()
+        return json.decodeFromString(get(url))
+    }
+
+    suspend fun song(artistIdOrSlug: String, songUuid: String): RelistenSliceWithShows =
+        json.decodeFromString(get(path("v3", "artists", artistIdOrSlug, "songs", songUuid).build()))
+
+    suspend fun venue(artistIdOrSlug: String, venueUuid: String): RelistenSliceWithShows =
+        json.decodeFromString(get(path("v3", "artists", artistIdOrSlug, "venues", venueUuid).build()))
 }
 
 /**
@@ -255,9 +356,18 @@ object RelistenCatalogSource : MusicSource {
     override suspend fun periods(artist: ArtistRef): List<PeriodRef> =
         RelistenApi.years(artist.id).map { it.toPeriodRef() }
 
-    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> =
-        RelistenApi.year(artist.id, period.id).shows.map { it.toShowSummary(artist) }
+    /** A [period] id namespaced `song:`/`venue:` (from a search hit) routes to the matching
+     *  entity endpoint instead of the ordinary year lookup — see the prefix constants above. */
+    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> = when {
+        period.id.startsWith(SONG_PREFIX) ->
+            RelistenApi.song(artist.id, period.id.removePrefix(SONG_PREFIX)).toShowSummaries(artist)
+        period.id.startsWith(VENUE_PREFIX) ->
+            RelistenApi.venue(artist.id, period.id.removePrefix(VENUE_PREFIX)).toShowSummaries(artist)
+        else -> RelistenApi.year(artist.id, period.id).shows.map { it.toShowSummary(artist) }
+    }
 
     override suspend fun show(artist: ArtistRef, date: String, recordingId: String?): ShowDetail =
         RelistenApi.show(artist.id, date).toShowDetail(artist, recordingId)
+
+    override suspend fun search(term: String): SearchHits = RelistenApi.search(term).toSearchHits()
 }
