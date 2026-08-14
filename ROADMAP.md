@@ -25,7 +25,13 @@ but have no screen.
   covers phish.in tracks.
 - Playlists: create and save playlists for Relisten tracks, similar to phish.in's playlist
   feature; playlists should be able to mix phish.in and Relisten tracks together.
-- Home screen: an "on this date" playlist/section.
+- Home screen "on this date" playlist — a random selection of shows played by the user's
+  favorited artists on the same month and day, across past years.
+- Favorite artists, akin to the Relisten app — favorited artists surface on the home screen
+  and pinned to the top of the browse-artists list.
+- Spotify Live Releases support. Ideally in-app playback; if that isn't feasible, at minimum
+  track which Spotify Live tracks have been listened to, leaning on Last.fm for that if
+  needed.
 
 ## Multi-artist follow-ups
 
