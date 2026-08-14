@@ -14,7 +14,6 @@ API but have no screen.
 - Should a show auto-advance into the next show, or stop at the encore?
 - Do you want the waveform images (`waveform_image_url`) in the player, or is a plain
   scrubber enough?
-- Is search worth adding, given you picked browse-by-year as the MVP's entry point?
 - Desktop support (browser, Electron, or a native macOS app — must stay free), with
   playback history and resume synced with mobile.
 
@@ -27,3 +26,11 @@ Detailed in [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) (O3–O5):
 - A real catalog cache, beyond the single `@Volatile`-cached artist list.
 - Approach Relisten's operators about the API use, the same courtesy phish.in's maintainer
   extended, before a store release.
+- Unify Android Auto's separate "Artists" and "Years" browse roots
+  (`PlaybackService.kt`'s `yearChildren`/`tourChildren`) with the phone's single merged
+  artist list (D83) — the car still browses Phish and Relisten as two trees.
+- Relisten shows have no artwork (`RelistenShowSummary.toShowSummary` sets no `artUrl`), so
+  every non-Phish show falls back to a plain `primaryContainer` background in the player
+  (D86) and a placeholder icon everywhere else.
+- The Now Playing screen (D86) has no like button — `LikeButton` needs a track id and liked
+  state that `PlayerState` doesn't carry today, and only phish.in tracks are likable at all.

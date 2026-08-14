@@ -135,6 +135,23 @@ internal fun sourceFor(backend: Backend): MusicSource = when (backend) {
     Backend.RELISTEN -> RelistenCatalogSource
 }
 
+/**
+ * Every artist across every backend, for the Home screen's artist list. Phish is pinned
+ * first — it is the only artist with an account, likes, and playlists behind it — and the
+ * rest sort by how much tape exists (most-recorded first).
+ *
+ * Relisten separately archives Phish too (its own taper-community collection, slug "phish",
+ * a different show count than phish.in's) — so without filtering, "Phish" would appear
+ * twice with two different numbers. The pinned phish.in entry wins; Relisten's copy is
+ * dropped rather than shown as a second, confusing "Phish".
+ */
+internal fun mergeArtists(perBackend: Map<Backend, List<ArtistRef>>): List<ArtistRef> {
+    val phish = perBackend[Backend.PHISHIN].orEmpty()
+    val rest = perBackend.filterKeys { it != Backend.PHISHIN }.values.flatten()
+        .filterNot { it.name.equals(PHISH.name, ignoreCase = true) }
+    return phish + rest.sortedByDescending { it.showCount }
+}
+
 // ------------------------------------------------------------------- phish.in
 
 /** phish.in is a single-artist archive, so its artist is a constant rather than a fetch. */

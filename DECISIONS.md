@@ -600,5 +600,48 @@ See [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) for the full working history �
 facts pinned down against the live service, the phase-by-phase build order, and the open
 questions O1 through O5.
 
+## Iteration 16 — Home becomes an artist list, and a real player
+
+**D83 — Home is a merged artist list, Phish pinned first.** P7's "Artists" screen
+deliberately left Phish out of its own list because Home was already Phish's page
+(`ArtistsScreen`'s old doc comment said so explicitly). That made Home and Auto's browse
+root disagree — Auto already puts Artists above Years, on the reasoning that Relisten
+carries far more artists than phish.in has years. `mergeArtists` (`Catalog.kt`) merges
+`PhishInSource.artists()` and `RelistenCatalogSource.artists()`, keeping Phish first — it's
+the only artist with an account, likes, and playlists behind it — and sorting the rest by
+show count. If one backend fails, the other still renders; only failure on both surfaces an
+error, so a Relisten outage can't hide Phish.
+
+**D84 — Phish keeps its own show/track screens rather than folding into the generic
+Relisten path.** Both paths already share `ArtistScreen` for year browsing (`ArtistScreen`
+already worked for any backend via `sourceFor(backend).periods(artist)`), but a period tap
+branches: Phish goes to `shows/{period}` → `show/{date}`, Relisten goes to
+`artist/{backend}/{id}/{period}` → `recording/…`. The Phish-only screens carry the
+`LikeButton` and the "partial" audio-status badge, neither of which exists on the Relisten
+DTOs — collapsing to one screen would mean adding backend branches inside it rather than
+keeping two small ones.
+
+**D85 — The theme stopped being `darkColorScheme()` with zero overrides.** The player's
+small text was `Color.Gray` (`#888888`) hardcoded over `surfaceVariant` (`#49454F`) — a
+2.9:1 contrast ratio, under WCAG AA's 4.5:1 floor, at 11–12sp on the timestamps and queue
+line. `Theme.kt` replaces the M3 baseline-purple scheme with a dark-only palette built from
+the launcher icon's green (`colors.xml`'s `#1B3A2F`), and every `Color.Gray`/`Color.LightGray`
+literal (25 call sites) became `MaterialTheme.colorScheme.onSurfaceVariant`, ~9:1 against
+the new `surfaceContainer` tokens. `themes.xml` keeps its `android:Theme.Material.NoActionBar`
+parent — the Cast chooser's chooser dialog depends on not being AppCompat (D-earlier in
+Iteration 9) — and only gains a matching `windowBackground` plus transparent system bars for
+`enableEdgeToEdge()`.
+
+**D86 — The bottom bar shrank to a compact strip; a full Now Playing screen does what the
+bar used to.** The whole player used to be one 200dp+ bottom bar: art, title, waveform,
+timestamps, and an oversized 60/68/60dp transport row, all stacked. `MiniPlayer` is now ~72dp
+— art, title, one play/pause button, a 2dp progress line — and tapping it opens
+`NowPlayingScreen` (`NowPlaying.kt`) with the waveform, full transport, and a background
+gradient tinted from the artwork's dark-vibrant swatch (`androidx.palette`, falling back to
+`primaryContainer` when there's no art — every Relisten show today). This also fixed a real
+bug: `EXTRA_OPEN_NOW_PLAYING` waited for a queue *key* and opened the show's track list, so
+shuffle queues (no key) never opened anything and even a keyed queue landed one screen short
+of the player. It now waits for `hasQueue` and navigates straight to `NowPlayingScreen`.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

@@ -12,7 +12,7 @@ hosted on archive.org.
 
 ## What works (MVP)
 
-- Browse by year/era → shows → tracks, grouped by set
+- Browse artist → year/era → shows → tracks, grouped by set
 - Search songs, venues, and dates; tap a hit to play it inside its show
 - Tap any track to queue the whole show from that point
 - Playback stops at the end of the show rather than rolling into the next one
@@ -28,7 +28,8 @@ hosted on archive.org.
   for open / mark completed / remove
 - "Shuffle all" on My tracks plays your liked tracks in random order
 - Like shows, tracks, and playlists, with like counts shown throughout
-- Tap the now-playing cover, or the media notification, to jump to what's playing
+- Tap the mini-player, or the media notification, to open the full-screen Now Playing
+  view, with a background tinted from the current artwork
 - Log in to your phish.in account to see your liked shows, liked tracks, and playlists
   (both created by you and liked)
 - Browse and search public playlists; playlist excerpts are clipped correctly
@@ -39,10 +40,10 @@ hosted on archive.org.
   scrobbling carry on
 - Android Auto: browse Years → shows → tracks and Continue Listening from the car head
   unit, with the same playback controls as the phone
-- Browse other artists — Grateful Dead, Widespread Panic, and the rest of Relisten's ~200 —
-  via an "Artists" row on Home, with the same resume, history, and Android Auto support as
-  Phish. Shows with more than one taped recording get a tape switcher, and each tape keeps
-  its own resume point. Likes, playlists, and login stay phish.in-only
+- Home is an artist list — Phish first, then Grateful Dead, Widespread Panic, and the rest
+  of Relisten's ~200, most-recorded first — with the same resume, history, and Android Auto
+  support across all of them. Shows with more than one taped recording get a tape switcher,
+  and each tape keeps its own resume point. Likes, playlists, and login stay phish.in-only
 
 ## Not in yet
 
@@ -98,7 +99,7 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Tests
 
-274 unit tests, no device or emulator required:
+277 unit tests, no device or emulator required:
 
 ```bash
 ./gradlew testDebugUnitTest

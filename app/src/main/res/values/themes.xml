@@ -1,3 +1,8 @@
 <resources>
-    <style name="Theme.CouchTour" parent="android:Theme.Material.NoActionBar" />
+    <style name="Theme.CouchTour" parent="android:Theme.Material.NoActionBar">
+        <!-- Matches Theme.kt's background, so there's no light flash before Compose paints. -->
+        <item name="android:windowBackground">#0F1513</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

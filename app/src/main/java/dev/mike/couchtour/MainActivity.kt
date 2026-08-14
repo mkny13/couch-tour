@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,7 +56,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -83,6 +84,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import coil.compose.AsyncImage
@@ -106,6 +108,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         openNowPlaying.value = intent?.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false) == true
 
         // Without this the media notification (and therefore the lockscreen controls)
@@ -115,7 +118,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            CouchTourTheme {
                 Surface(modifier = Modifier.fillMaxSize()) { App(openNowPlaying = openNowPlaying) }
             }
         }
@@ -134,12 +137,11 @@ fun App(
     val nav = rememberNavController()
     val state by vm.state.collectAsState()
 
-    // Arriving from the media notification. Waits for the queue key, which isn't known
-    // until the MediaController has connected, then navigates once and clears the flag.
-    LaunchedEffect(openNowPlaying.value, state.queueKey) {
-        val key = state.queueKey
-        if (openNowPlaying.value && key != null) {
-            openQueueKey(key, nav)
+    // Arriving from the media notification. Waits for the queue to be known — not just the
+    // key, since shuffle queues have none — then opens the player once and clears the flag.
+    LaunchedEffect(openNowPlaying.value, state.hasQueue) {
+        if (openNowPlaying.value && state.hasQueue) {
+            nav.navigate("player")
             openNowPlaying.value = false
         }
     }
@@ -152,14 +154,20 @@ fun App(
         }
     }
 
+    val currentRoute by nav.currentBackStackEntryAsState()
     Scaffold(
-        bottomBar = { if (state.hasQueue) MiniPlayer(state, vm, nav) }
+        // The full player already shows everything the bar does — stacking both is redundant.
+        bottomBar = {
+            if (state.hasQueue && currentRoute?.destination?.route != "player") {
+                MiniPlayer(state, vm, nav)
+            }
+        }
     ) { padding ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
+            composable("player") { NowPlayingScreen(vm, nav) }
             composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }
-            composable("artists") { ArtistsScreen(nav) }
             composable("artist/{backend}/{id}") { entry ->
                 ArtistScreen(
                     backendId = entry.arguments?.getString("backend").orEmpty(),
@@ -217,7 +225,7 @@ fun App(
 
 @Composable
 fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val years = loadOnce { PhishInApi.years() }
+    val artists = loadOnce { loadAllArtists() }
     val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
     val historyCount by vm.progressDao.historyCount().collectAsState(initial = 0)
     val username by Session.username.collectAsState()
@@ -231,9 +239,8 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Phish.in",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
+                "Couch Tour",
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f)
             )
             CastButton()
@@ -283,7 +290,25 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
-            item { SectionHeader("Your phish.in", divided = true) }
+            item { SectionHeader("Artists", divided = true) }
+            when (val r = artists.value) {
+                null -> item { Loading() }
+                else -> r.fold(
+                    onSuccess = { list ->
+                        items(list, key = { "${it.backend.id}-${it.id}" }) { artist ->
+                            RowItem(
+                                title = artist.name,
+                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                                artUrl = null,
+                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                            )
+                        }
+                    },
+                    onFailure = { item { ErrorText(it) } }
+                )
+            }
+
+            item { SectionHeader("Your phish.in account", divided = true) }
             if (username == null) {
                 item {
                     RowItem(
@@ -309,40 +334,33 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                     RowItem("Signed in as $username", "Tap to log out", null) { Session.logout() }
                 }
             }
-
-            item { SectionHeader("Browse", divided = true) }
             item {
                 RowItem("Browse playlists", "Public playlists on phish.in", null) {
                     nav.navigate("playlists")
                 }
             }
-            item {
-                RowItem("Artists", "Grateful Dead, Widespread Panic, and more", null) {
-                    nav.navigate("artists")
-                }
-            }
-
-            item { SectionHeader("Browse by year", divided = true) }
-
-            when (val r = years.value) {
-                null -> item { Loading() }
-                else -> r.fold(
-                    onSuccess = { periods ->
-                        // Newest first.
-                        items(periods.reversed(), key = { it.period }) { p ->
-                            RowItem(
-                                title = p.period,
-                                subtitle = "${p.showsWithAudioCount} shows with audio",
-                                artUrl = p.coverArtUrls?.small,
-                                onClick = { nav.navigate("shows/${p.period}") }
-                            )
-                        }
-                    },
-                    onFailure = { item { ErrorText(it) } }
-                )
-            }
         }
     }
+}
+
+/**
+ * Merges Phish (a phish.in constant with its show count summed from `years()`) with every
+ * Relisten artist. A Relisten outage still leaves Phish browsable; only surfaces an error if
+ * *both* backends fail.
+ */
+private suspend fun loadAllArtists(): List<ArtistRef> {
+    val phishShows = runCatching { PhishInApi.years().sumOf { it.showsWithAudioCount } }
+    val relistenArtists = runCatching { RelistenCatalogSource.artists() }
+    if (phishShows.isFailure && relistenArtists.isFailure) {
+        throw relistenArtists.exceptionOrNull() ?: phishShows.exceptionOrNull()!!
+    }
+    val phish = PHISH.copy(showCount = phishShows.getOrDefault(0))
+    return mergeArtists(
+        mapOf(
+            Backend.PHISHIN to listOf(phish),
+            Backend.RELISTEN to relistenArtists.getOrDefault(emptyList()),
+        )
+    )
 }
 
 @Composable
@@ -409,37 +427,7 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
     }
 }
 
-/** Relisten's artist list. phish.in itself doesn't appear here — it's the Home screen. */
-@Composable
-fun ArtistsScreen(nav: NavHostController) {
-    val artists = loadOnce { RelistenCatalogSource.artists() }
-
-    Column(Modifier.fillMaxSize()) {
-        Header("Artists", nav)
-        when (val r = artists.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { list ->
-                    LazyColumn {
-                        // Most-recorded first, so Grateful Dead and other heavily-archived
-                        // artists surface before ones with a handful of shows.
-                        items(list.sortedByDescending { it.showCount }, key = { it.id }) { artist ->
-                            RowItem(
-                                title = artist.name,
-                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                                artUrl = null,
-                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
-                            )
-                        }
-                    }
-                },
-                onFailure = { ErrorText(it) }
-            )
-        }
-    }
-}
-
-/** Years (or ranged periods) for one Relisten artist. */
+/** Years (or ranged periods) for one artist of either backend. */
 @Composable
 fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
     val backend = Backend.from(backendId)
@@ -462,7 +450,16 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
                                 title = period.label,
                                 subtitle = "${period.showCount} ${plural(period.showCount, "show")}",
                                 artUrl = period.artUrl,
-                                onClick = { nav.navigate("artist/$backendId/$artistId/${period.id}") }
+                                onClick = {
+                                    // Phish keeps its own show/track screens so likes and the
+                                    // "partial" audio badge — features Relisten has no
+                                    // analogue for — still work.
+                                    if (backend == Backend.PHISHIN) {
+                                        nav.navigate("shows/${period.id}")
+                                    } else {
+                                        nav.navigate("artist/$backendId/$artistId/${period.id}")
+                                    }
+                                }
                             )
                         }
                     }
@@ -570,10 +567,10 @@ private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: Str
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(summary.venue.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                Text(summary.location.orEmpty(), color = Color.Gray, fontSize = 14.sp)
-                Text("${detail.tracks.size} tracks", color = Color.Gray, fontSize = 13.sp)
+                Text(summary.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                Text("${detail.tracks.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 detail.recording?.let { rec ->
-                    Text(recordingLabel(rec), color = Color.Gray, fontSize = 13.sp)
+                    Text(recordingLabel(rec), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
             }
         }
@@ -622,9 +619,9 @@ private fun RecordingTrackRow(track: PlayableTrack, number: Int, onClick: () -> 
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("$number", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.width(28.dp))
+        Text("$number", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.width(28.dp))
         Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
-        Text(fmt(track.durationMs), color = Color.Gray, fontSize = 13.sp)
+        Text(fmt(track.durationMs), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
     }
 }
 
@@ -640,7 +637,7 @@ private fun SearchResultsList(
         else -> {
             val r = results.getOrThrow()
             if (r.isEmpty) {
-                Text("No shows or tracks matched.", color = Color.Gray, modifier = Modifier.padding(16.dp))
+                Text("No shows or tracks matched.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
                 return
             }
             LazyColumn {
@@ -694,12 +691,14 @@ fun LoginScreen(nav: NavHostController) {
     val scope = rememberCoroutineScope()
 
     Column(Modifier.fillMaxSize()) {
-        Header("Log in", nav)
+        Header("Log in to phish.in", nav)
         Text(
-            "Your phish.in account. The password is sent once to get a token and is never " +
-                "stored; only the token is kept, encrypted on this device.",
+            "phish.in is a separate website hosting the Phish archive. Logging in shows your " +
+                "liked shows, tracks, and playlists — for Phish only, not the other artists in " +
+                "this app. The password is sent once to get a token and is never stored; only " +
+                "the token is kept, encrypted on this device.",
             fontSize = 13.sp,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
         OutlinedTextField(
@@ -756,7 +755,7 @@ fun PlaylistsScreen(title: String, nav: NavHostController, load: suspend () -> L
             else -> r.fold(
                 onSuccess = { lists ->
                     if (lists.isEmpty()) {
-                        Text("Nothing here yet.", color = Color.Gray, modifier = Modifier.padding(16.dp))
+                        Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
                     } else {
                         LazyColumn { items(lists, key = { it.slug }) { PlaylistRow(it, nav) } }
                     }
@@ -808,10 +807,10 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
                                         "${entries.size} tracks",
                                         fmt(pl.duration),
                                     ).joinToString(" · "),
-                                        color = Color.Gray, fontSize = 13.sp
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp
                                     )
                                     pl.description?.takeIf { it.isNotBlank() }?.let {
-                                        Text(it, color = Color.Gray, fontSize = 13.sp,
+                                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp,
                                             modifier = Modifier.padding(top = 6.dp))
                                     }
                                 }
@@ -862,7 +861,7 @@ fun MyShowsScreen(nav: NavHostController) {
                     if (shows.isEmpty()) {
                         Text(
                             "No liked shows yet. Like them on phish.in and they'll appear here.",
-                            color = Color.Gray, modifier = Modifier.padding(16.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
                         )
                     } else {
                         LazyColumn {
@@ -896,7 +895,7 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
                     if (tracks.isEmpty()) {
                         Text(
                             "No liked tracks yet. Like them on phish.in and they'll appear here.",
-                            color = Color.Gray, modifier = Modifier.padding(16.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
                         )
                     } else {
                         val playable = tracks.filter { it.playable }
@@ -952,8 +951,8 @@ private fun ShowHeader(show: Show, trackCount: Int) {
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(show.venueName.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text(show.location.orEmpty(), color = Color.Gray, fontSize = 14.sp)
-            Text("$trackCount tracks · ${fmt(show.duration)}", color = Color.Gray, fontSize = 13.sp)
+            Text(show.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            Text("$trackCount tracks · ${fmt(show.duration)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         }
         LikeButton(Likable.Show, show.id, show.likedByUser, show.likesCount)
     }
@@ -969,14 +968,18 @@ private fun ResumeBanner(progress: Progress, onResume: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.PlayArrow, null)
+        Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
         Spacer(Modifier.width(10.dp))
-        Text("Resume “${progress.trackTitle}” at ${fmt(progress.positionMs)}", fontSize = 14.sp)
+        Text(
+            "Resume “${progress.trackTitle}” at ${fmt(progress.positionMs)}",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
     }
 }
 
 /** Navigates to whatever a queue key points at. */
-private fun openQueueKey(key: String, nav: NavHostController) {
+internal fun openQueueKey(key: String, nav: NavHostController) {
     val ref = parseQueueKey(key) ?: return
     when (ref.kind) {
         QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
@@ -1048,7 +1051,7 @@ private fun ResumeCard(progress: Progress, vm: PlayerViewModel, nav: NavHostCont
         }
         Spacer(Modifier.height(6.dp))
         Text(progress.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(progress.trackTitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+        Text(progress.trackTitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
 
@@ -1065,7 +1068,7 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
         if (history.isEmpty()) {
             Text(
                 "Shows and playlists you've played will appear here.",
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp)
             )
             return
@@ -1090,7 +1093,7 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
                         Icon(
                             Icons.Default.Close,
                             "Delete ${p.title} from history",
-                            tint = Color.Gray,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -1106,10 +1109,10 @@ private fun TrackRow(track: Track, number: Int, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("$number", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.width(28.dp))
+        Text("$number", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.width(28.dp))
         // The set is already the section header above; repeating it per row is noise.
         Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
-        Text(fmt(track.duration), color = Color.Gray, fontSize = 13.sp)
+        Text(fmt(track.duration), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         LikeButton(Likable.Track, track.id, track.likedByUser, track.likesCount)
     }
 }
@@ -1154,108 +1157,77 @@ private fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initial
         Icon(
             if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
             if (liked) "Unlike" else "Like",
-            tint = if (liked) MaterialTheme.colorScheme.primary else Color.Gray,
+            tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp)
         )
         if (count > 0) {
             Spacer(Modifier.width(4.dp))
-            Text("$count", fontSize = 12.sp, color = Color.Gray)
+            Text("$count", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
 private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
-    val castDevice by Casting.deviceName.collectAsState()
-    Column(Modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
-        HorizontalDivider()
+    Column(
+        Modifier
+            .background(
+                MaterialTheme.colorScheme.surfaceContainer,
+                RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            )
+            .navigationBarsPadding()
+    ) {
+        if (state.durationMs > 0) {
+            val fraction = (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction)
+                        .height(2.dp)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            Modifier
+                .fillMaxWidth()
+                .clickable { nav.navigate("player") }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = state.artUrl,
+            ArtworkBox(
+                artUrl = state.artUrl,
                 contentDescription = "Open ${state.queueTitle}",
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    // Shuffle has no queue key and so nowhere to go.
-                    .then(
-                        state.queueKey?.let { key ->
-                            Modifier.clickable { openQueueKey(key, nav) }
-                        } ?: Modifier
-                    )
+                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
             )
             Spacer(Modifier.width(10.dp))
-            // Full width: the transport sits on its own row below, so neither the show nor
-            // the queue line gets squeezed out by the buttons.
             Column(Modifier.weight(1f)) {
                 Text(
                     state.trackTitle,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (state.showTitle.isNotEmpty()) {
                     Text(
                         state.showTitle,
-                        fontSize = 13.sp,
-                        color = Color.LightGray,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                // While casting, where the audio is coming out matters more than the queue
-                // name — the queue is one tap away on the cover, the device isn't. The show
-                // line above stays either way; it's the queue line that gives up its slot.
-                Text(
-                    if (castDevice != null) "Casting to $castDevice" else state.queueTitle,
-                    fontSize = 12.sp,
-                    color = if (castDevice != null) MaterialTheme.colorScheme.primary else Color.Gray,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
-        }
-        if (state.durationMs > 0) {
-            WaveformScrubber(
-                waveformUrl = state.waveformUrl,
-                positionMs = state.positionMs,
-                durationMs = state.durationMs,
-                playedColor = MaterialTheme.colorScheme.primary,
-                unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                onSeek = { vm.seekTo(it) },
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(fmt(state.positionMs), fontSize = 11.sp, color = Color.Gray)
-                Text(fmt(state.durationMs), fontSize = 11.sp, color = Color.Gray)
-            }
-        }
-        // Bottom of the screen, where the thumb already is.
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 6.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { vm.previous() }, modifier = Modifier.size(60.dp)) {
-                Icon(Icons.Default.SkipPrevious, "Previous", Modifier.size(38.dp))
-            }
-            Spacer(Modifier.width(20.dp))
-            IconButton(onClick = { vm.togglePlayPause() }, modifier = Modifier.size(68.dp)) {
+            IconButton(onClick = { vm.togglePlayPause() }, modifier = Modifier.size(44.dp)) {
                 Icon(
                     if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     if (state.isPlaying) "Pause" else "Play",
-                    Modifier.size(52.dp)
                 )
-            }
-            Spacer(Modifier.width(20.dp))
-            IconButton(onClick = { vm.next() }, modifier = Modifier.size(60.dp)) {
-                Icon(Icons.Default.SkipNext, "Next", Modifier.size(38.dp))
             }
         }
     }
@@ -1326,9 +1298,9 @@ private fun RowItem(
         }
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            if (subtitle.isNotBlank()) Text(subtitle, fontSize = 13.sp, color = Color.Gray, maxLines = 1)
+            if (subtitle.isNotBlank()) Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        if (trailing != null) Text(trailing, fontSize = 11.sp, color = Color.Gray)
+        if (trailing != null) Text(trailing, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         trailingContent?.invoke()
     }
 }

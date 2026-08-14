@@ -163,4 +163,45 @@ class CatalogTest {
         val detail = ShowDetail(summary = ShowSummary(artist = artist, date = "2001-04-22"))
         assertNull(detail.queueKey)
     }
+
+    // ------------------------------------------------------------ mergeArtists
+
+    @Test
+    fun `phish is pinned first regardless of show count`() {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val merged = mergeArtists(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(dead))
+        )
+        assertEquals(listOf(PHISH, dead), merged)
+    }
+
+    @Test
+    fun `everything after phish sorts by show count descending`() {
+        val small = ArtistRef(Backend.RELISTEN, "goose", "Goose", showCount = 412)
+        val big = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val merged = mergeArtists(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(small, big))
+        )
+        assertEquals(listOf(PHISH, big, small), merged)
+    }
+
+    @Test
+    fun `a relisten outage still leaves phish in the merged list`() {
+        val merged = mergeArtists(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to emptyList())
+        )
+        assertEquals(listOf(PHISH), merged)
+    }
+
+    @Test
+    fun `relisten's own separate phish archive is dropped, not shown twice`() {
+        // Relisten has its own taper-community Phish collection (slug "phish", a different
+        // show count than phish.in's) — without this filter, "Phish" would appear twice.
+        val relistenPhish = ArtistRef(Backend.RELISTEN, "phish", "Phish", showCount = 1884)
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val merged = mergeArtists(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(relistenPhish, dead))
+        )
+        assertEquals(listOf(PHISH, dead), merged)
+    }
 }

@@ -19,6 +19,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +66,16 @@ fun WaveformScrubber(
         modifier
             .fillMaxWidth()
             .height(56.dp)
+            .semantics {
+                contentDescription = "Playback position"
+                if (durationMs > 0) {
+                    progressBarRangeInfo = ProgressBarRangeInfo(
+                        current = positionMs.toFloat(),
+                        range = 0f..durationMs.toFloat(),
+                    )
+                    setProgress { value -> onSeek(value.toLong()); true }
+                }
+            }
             .pointerInput(durationMs) {
                 detectTapGestures { offset ->
                     if (durationMs > 0) onSeek(positionAt(offset.x, size.width, durationMs))

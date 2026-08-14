@@ -128,7 +128,7 @@ private fun CastPicker(
             // silently loses the ones past the fold without this.
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (routes.isEmpty()) {
-                    Text("Looking for devices…", color = Color.Gray)
+                    Text("Looking for devices…", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 for (route in routes) {
                     Row(
@@ -155,7 +155,7 @@ private fun CastPicker(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             route.description?.let {
-                                Text(it, fontSize = 12.sp, color = Color.Gray)
+                                Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
