@@ -85,6 +85,42 @@ replace earlier guesses — several of them contradicted what seemed obvious.
 `ArtistRef` therefore needs `hasSets` and `hasMultipleSources` — an additive change to the
 model already landed in P2.
 
+Checked again on 2026-08-13, this time against `/v3/search`, for the search-across-every-
+artist work:
+
+- **`GET /v3/search?q={term}`** — the term is a **query parameter**, not a path segment, the
+  opposite of phish.in's `/api/v2/search/{term}`. Returns six capitalised buckets:
+  `Artists`, `Shows`, `Songs`, `Sources`, `Tours`, `Venues`. No auth, no key.
+- **Each bucket is capped at 20.** `q=the` returns exactly 20 in every non-empty bucket.
+- **Terms under 3 characters return all-empty buckets** (`ab` → nothing, `abc` → results).
+  Same effective floor as phish.in, which rejects them outright, so the existing UI gate at
+  3 characters covers both.
+- **`artist=` is not a supported filter.** Passing it changes nothing — `q=tweezer&artist=phish`
+  still returns Holly Bowling's songs. Any artist scoping is client-side.
+- **`Shows` entries have `venue: null`.** They carry `slim_artist`, `display_date`,
+  `source_count` and `avg_rating`, but the venue is only a `venue_uuid`. A show row from
+  search can therefore show the date and band but not the hall — unlike a show row reached
+  by browsing a year.
+- **`Songs` and `Venues` are entity hits, not playable.** A song carries `slim_artist`,
+  `name`, `uuid` and `shows_played_at` (Grateful Dead's "Scarlet Begonias" = 312); a venue
+  carries `name`, `location` and `uuid`, with **no** show count.
+- **Both resolve to shows through a matching pair of endpoints:**
+  `GET /v3/artists/{slug}/songs/{songUuid}` and `GET /v3/artists/{slug}/venues/{venueUuid}`
+  each return the entity's own fields plus `shows: [...]`. Those show objects have
+  `display_date`, a **populated** `venue`, and `source_count` — the existing
+  `RelistenShowSummary` DTO parses them unchanged. Only the `/v3` form works; `/v2` 404s.
+- **`Sources` matches free text in `description` and `taper_notes`**, which is why
+  "scarlet begonias" returns 20 tapes whose notes list the song. Useful-looking and
+  arbitrary — capped at 20 out of hundreds, repeating the same shows.
+- **`Songs` arrives sorted by `shows_played_at` descending** — Dead 312, Dark Star Orchestra
+  95, Ratdog 59, … Phish 4. No client-side sort needed.
+- **`featured` is 1 for exactly two artists** (Grateful Dead, Phish) and 0 for the other 224.
+  It is a highlight flag, not a relevance rank — not useful for ordering results.
+- **Every artist slug appearing in search results also appears in `/v3/artists`**, so a hit
+  can be joined to a full `ArtistRef` if needed. Search's own artist objects omit
+  `show_count` and `features`, so the ones built from a hit carry defaults — fine, because
+  every destination screen re-resolves the real `ArtistRef` through `source.artists()`.
+
 ### Traps — each fails silently if missed
 
 1. **Seconds against milliseconds**, as above.

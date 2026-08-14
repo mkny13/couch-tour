@@ -1,13 +1,17 @@
 package dev.mike.couchtour
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+
 /**
  * The backend-neutral catalog: just enough of a model to browse to a playable track.
  *
  * The app has never had a domain layer — phish.in's `@Serializable` DTOs went straight into
  * the UI, which was right while there was one backend. A second one needs somewhere for the
- * two to meet, but only on the browse path. Login, likes, playlists and search stay on the
- * raw phish.in DTOs, because they are phish.in account features and routing them through an
- * abstraction with one implementation would buy nothing.
+ * two to meet, on the browse path and now the search path too. Login, likes, and playlists
+ * stay on the raw phish.in DTOs, because they are phish.in account features and routing them
+ * through an abstraction with one implementation would buy nothing.
  *
  * The mapping lives in pure functions rather than inside the [MusicSource] implementations
  * so it can be tested without a network call (D36).
@@ -127,6 +131,10 @@ interface MusicSource {
 
     /** [recordingId] null takes the source's own default — the best tape, where there's a choice. */
     suspend fun show(artist: ArtistRef, date: String, recordingId: String? = null): ShowDetail
+
+    /** [term] is at least 3 characters — both APIs return nothing below that. A backend
+     *  with nothing to offer returns empty hits rather than throwing. */
+    suspend fun search(term: String): SearchHits
 }
 
 /** Shared by MainActivity's screens and PlaybackService's Auto browse tree — one seam, two callers. */
@@ -152,6 +160,76 @@ internal fun mergeArtists(perBackend: Map<Backend, List<ArtistRef>>): List<Artis
     return phish + rest.sortedByDescending { it.showCount }
 }
 
+/** What a song or venue hit resolves to: a named slice of one artist's catalog. */
+enum class SliceKind(val heading: String) { SONG("Songs"), VENUE("Venues") }
+
+data class SliceHit(val kind: SliceKind, val artist: ArtistRef, val period: PeriodRef)
+
+/**
+ * The merged result of searching every backend. Kept flat (not grouped by artist) so
+ * [SearchResultsList] can render one section per type, matching the phish.in-only layout it
+ * already had; [artistsPresent] and [filteredTo] are what let the UI narrow to one artist
+ * without a second fetch.
+ */
+data class SearchHits(
+    val artists: List<ArtistRef> = emptyList(),
+    val shows: List<ShowSummary> = emptyList(),
+    val slices: List<SliceHit> = emptyList(),
+    /** phish.in only, raw DTOs on purpose: playing a hit queues its whole show
+     *  (PlayerViewModel.playTrack) and the row carries a like button — both account
+     *  features with no Relisten analogue. */
+    val tracks: List<Track> = emptyList(),
+    val playlists: List<Playlist> = emptyList(),
+    /** Backends whose search failed, so partial results can say so instead of reading as
+     *  "nothing matched". */
+    val failed: Set<Backend> = emptySet(),
+) {
+    val isEmpty: Boolean
+        get() = artists.isEmpty() && shows.isEmpty() && slices.isEmpty() &&
+            tracks.isEmpty() && playlists.isEmpty()
+
+    operator fun plus(other: SearchHits) = SearchHits(
+        artists = artists + other.artists,
+        shows = shows + other.shows,
+        slices = slices + other.slices,
+        tracks = tracks + other.tracks,
+        playlists = playlists + other.playlists,
+        failed = failed + other.failed,
+    )
+
+    /** The chip row's contents — every backend+artist that produced at least one hit. */
+    val artistsPresent: List<ArtistRef>
+        get() = (artists + shows.map { it.artist } + slices.map { it.artist } +
+            tracks.map { PHISH } + playlists.map { PHISH })
+            .distinctBy { it.backend to it.id }
+
+    /** Narrows to one artist's hits, or returns everything for a null [key]. phish.in's
+     *  tracks and playlists are Phish's alone, so they drop out for any other artist. */
+    fun filteredTo(key: ArtistRef?): SearchHits {
+        if (key == null) return this
+        return SearchHits(
+            artists = artists.filter { it.backend == key.backend && it.id == key.id },
+            shows = shows.filter { it.artist.backend == key.backend && it.artist.id == key.id },
+            slices = slices.filter { it.artist.backend == key.backend && it.artist.id == key.id },
+            tracks = if (key.backend == Backend.PHISHIN && key.id == PHISH.id) tracks else emptyList(),
+            playlists = if (key.backend == Backend.PHISHIN && key.id == PHISH.id) playlists else emptyList(),
+            failed = failed,
+        )
+    }
+}
+
+/** Fans out a search across every backend; one backend's failure doesn't cost the rest. */
+suspend fun searchAll(term: String): SearchHits = coroutineScope {
+    Backend.entries
+        .map { b ->
+            async {
+                runCatching { sourceFor(b).search(term) }.getOrElse { SearchHits(failed = setOf(b)) }
+            }
+        }
+        .awaitAll()
+        .fold(SearchHits()) { acc, hits -> acc + hits }
+}
+
 // ------------------------------------------------------------------- phish.in
 
 /** phish.in is a single-artist archive, so its artist is a constant rather than a fetch. */
@@ -175,6 +253,8 @@ object PhishInSource : MusicSource {
 
     override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) =
         PhishInApi.show(date).toShowDetail()
+
+    override suspend fun search(term: String) = PhishInApi.search(term).toSearchHits()
 }
 
 internal fun Period.toPeriodRef() =
@@ -200,6 +280,12 @@ internal fun Show.toShowDetail(): ShowDetail {
         tracks = tracks.filter { it.playable }.map { it.toPlayableTrack(summary.artUrl) },
     )
 }
+
+internal fun SearchResults.toSearchHits() = SearchHits(
+    shows = shows.map { it.toShowSummary() },
+    tracks = tracks,
+    playlists = playlists,
+)
 
 internal fun Track.toPlayableTrack(showArt: String?) = PlayableTrack(
     id = id.toString(),

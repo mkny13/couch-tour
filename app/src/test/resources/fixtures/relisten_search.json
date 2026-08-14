@@ -1,0 +1,52 @@
+{
+  "Artists": [
+    {
+      "uuid": "6226fac7-51f5-f85a-ad30-90c3e28686a2",
+      "slug": "goose",
+      "name": "Goose",
+      "show_count": 187,
+      "features": { "sets": true, "multiple_sources": true }
+    }
+  ],
+  "Shows": [
+    {
+      "slim_artist": { "slug": "grateful-dead", "name": "Grateful Dead" },
+      "display_date": "1977-05-08",
+      "source_count": 10
+    }
+  ],
+  "Songs": [
+    {
+      "slim_artist": { "slug": "grateful-dead", "name": "Grateful Dead" },
+      "name": "Scarlet Begonias",
+      "uuid": "73a1f1ec-0e2c-2b68-839f-946193fb3565",
+      "shows_played_at": 312
+    },
+    {
+      "slim_artist": { "slug": "dark-star-orchestra", "name": "Dark Star Orchestra" },
+      "name": "Scarlet Begonias",
+      "uuid": "4cbf3719-5feb-1b29-ff45-37312081130b",
+      "shows_played_at": 95
+    },
+    {
+      "slim_artist": { "slug": "phish", "name": "Phish" },
+      "name": "Scarlet Begonias",
+      "uuid": "f2b20515-4ac7-1df7-4eef-c9eae6f8797d",
+      "shows_played_at": 4
+    }
+  ],
+  "Venues": [
+    {
+      "slim_artist": { "slug": "grateful-dead", "name": "Grateful Dead" },
+      "name": "Barton Hall, Cornell University",
+      "location": "Ithaca, NY, USA",
+      "uuid": "29f9f7c0-102a-48df-4df5-033823561a09"
+    }
+  ],
+  "Sources": [
+    {
+      "description": "Disc #1\n\tSet 1\n1.Sugaree\n2.Cassidy\n3.Loser"
+    }
+  ],
+  "Tours": []
+}

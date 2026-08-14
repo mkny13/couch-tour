@@ -6,8 +6,8 @@ which is a log of choices already made.
 ## Not in the app yet
 
 Offline downloads, sleep timer, creating or editing playlists, liking things from inside the
-app. Search covers shows, tracks, and playlists; songs, venues, and tags are returned by the
-API but have no screen.
+app. Search covers shows, tracks, playlists, songs, and venues; tags are returned by the API
+but have no screen.
 
 ## Open questions
 
@@ -28,9 +28,9 @@ Detailed in [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) (O3–O5):
   extended, before a store release.
 - Unify Android Auto's separate "Artists" and "Years" browse roots
   (`PlaybackService.kt`'s `yearChildren`/`tourChildren`) with the phone's single merged
-  artist list (D83) — the car still browses Phish and Relisten as two trees.
+  artist list (D89) — the car still browses Phish and Relisten as two trees.
 - Relisten shows have no artwork (`RelistenShowSummary.toShowSummary` sets no `artUrl`), so
   every non-Phish show falls back to a plain `primaryContainer` background in the player
-  (D86) and a placeholder icon everywhere else.
-- The Now Playing screen (D86) has no like button — `LikeButton` needs a track id and liked
+  (D92) and a placeholder icon everywhere else.
+- The Now Playing screen (D92) has no like button — `LikeButton` needs a track id and liked
   state that `PlayerState` doesn't carry today, and only phish.in tracks are likable at all.

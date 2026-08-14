@@ -1,0 +1,38 @@
+{
+  "name": "Scarlet Begonias",
+  "shows": [
+    {
+      "display_date": "1974-03-23",
+      "venue": {
+        "name": "Cow Palace",
+        "location": "Daly City, CA, USA"
+      },
+      "tour": {
+        "name": "Not Part of a Tour"
+      },
+      "source_count": 6
+    },
+    {
+      "display_date": "1974-05-14",
+      "venue": {
+        "name": "Adams Field House, U. of Montana",
+        "location": "Missoula, MT, USA"
+      },
+      "tour": {
+        "name": "Not Part of a Tour"
+      },
+      "source_count": 5
+    },
+    {
+      "display_date": "1974-05-19",
+      "venue": {
+        "name": "Portland Memorial Coliseum",
+        "location": "Portland, OR, USA"
+      },
+      "tour": {
+        "name": "Not Part of a Tour"
+      },
+      "source_count": 5
+    }
+  ]
+}

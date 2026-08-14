@@ -1,0 +1,38 @@
+{
+  "name": "Barton Hall, Cornell University",
+  "shows": [
+    {
+      "display_date": "1977-05-08",
+      "venue": {
+        "name": "Barton Hall, Cornell University",
+        "location": "Ithaca, NY, USA"
+      },
+      "tour": {
+        "name": "Spring 1977"
+      },
+      "source_count": 10
+    },
+    {
+      "display_date": "1980-05-07",
+      "venue": {
+        "name": "Barton Hall, Cornell University",
+        "location": "Ithaca, NY, USA"
+      },
+      "tour": {
+        "name": "Not Part of a Tour"
+      },
+      "source_count": 4
+    },
+    {
+      "display_date": "1981-05-16",
+      "venue": {
+        "name": "Barton Hall, Cornell University",
+        "location": "Ithaca, NY, USA"
+      },
+      "tour": {
+        "name": "Not Part of a Tour"
+      },
+      "source_count": 8
+    }
+  ]
+}

@@ -600,9 +600,53 @@ See [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) for the full working history �
 facts pinned down against the live service, the phase-by-phase build order, and the open
 questions O1 through O5.
 
-## Iteration 16 — Home becomes an artist list, and a real player
+## Iteration 16 — search across every artist
 
-**D83 — Home is a merged artist list, Phish pinned first.** P7's "Artists" screen
+**D83 — `MusicSource` gained a `search` capability, fanned out by `searchAll` with
+per-backend failure isolation.** Iteration 15 gave every backend a shared browse seam but
+left `searchFor` calling `PhishInApi.search` alone, so Relisten's ~200 artists were
+unreachable from the search box. `searchAll` runs both backends' `search(term)`
+concurrently and merges the results with `SearchHits.plus`; a backend that throws
+contributes `SearchHits(failed = setOf(that backend))` instead of failing the whole query,
+so one backend being down costs its own section, not the other's results.
+
+**D84 — Results are grouped by type, with an artist filter-chip row, not grouped by
+artist.** The existing Shows/Tracks/Playlists section layout stayed rather than being
+replaced by per-artist grouping, which keeps the phish.in-only path visually unchanged. A
+`FilterChip` row appears only when a query's hits span more than one artist — "Scarlet
+Begonias" hits eight — and filtering is pure and client-side over the already-fetched
+`SearchHits`, so switching chips costs no refetch.
+
+**D85 — Relisten's own Phish hits are dropped from search, same as browsing.** phish.in is
+the Phish backend (D75); a Relisten hit for the `phish` slug would be a near-duplicate row
+leading to a screen with no waveform, cover art, likes, or playlists. `toSearchHits()`
+filters every bucket on the slug before mapping.
+
+**D86 — Songs and venues travel as `song:`/`venue:`-namespaced `PeriodRef` ids, reusing the
+existing shows route rather than a new screen.** `PeriodRef.id` was already opaque to
+everything but the backend that issues it (phish.in already branches on shape to pick
+`year_range=` over `year=`), so a song or venue hit becomes a `PeriodRef` whose id carries a
+prefix `RelistenCatalogSource.shows()` dispatches on to `/v3/artists/{slug}/songs/{uuid}` or
+`.../venues/{uuid}` instead of the ordinary year lookup. Tapping a hit lands on
+`ArtistShowsScreen` exactly as browsing a year does — no new screen, no new route, and
+nothing for Android Auto's browse tree to learn about.
+
+**D87 — The `Sources` and `Tours` search buckets are ignored.** `Sources` matches free text
+in taper notes and descriptions — a "scarlet begonias" query returns 20 tapes whose notes
+happen to mention the song, capped and arbitrary against the hundreds that exist, and
+strictly worse than the precise `Songs` hit for the same query. `Tours` has no destination
+screen in the app, same reasoning as D14 for tags. `RelistenSearchResults` declares no DTO
+for either bucket; `ignoreUnknownKeys` drops them for free.
+
+**D88 — A Relisten "Shows" search hit has no venue, unlike a browsed show.** `/v3/search`'s
+`Shows` bucket carries `slim_artist`, `display_date`, `source_count`, and `avg_rating`, but
+only a `venue_uuid` — no populated venue. A show row reached from search therefore shows
+just the date and band; the venue only appears once the show itself is opened and fetched
+through the ordinary per-show endpoint, which does return one.
+
+## Iteration 17 — Home becomes an artist list, and a real player
+
+**D89 — Home is a merged artist list, Phish pinned first.** P7's "Artists" screen
 deliberately left Phish out of its own list because Home was already Phish's page
 (`ArtistsScreen`'s old doc comment said so explicitly). That made Home and Auto's browse
 root disagree — Auto already puts Artists above Years, on the reasoning that Relisten
@@ -610,9 +654,12 @@ carries far more artists than phish.in has years. `mergeArtists` (`Catalog.kt`) 
 `PhishInSource.artists()` and `RelistenCatalogSource.artists()`, keeping Phish first — it's
 the only artist with an account, likes, and playlists behind it — and sorting the rest by
 show count. If one backend fails, the other still renders; only failure on both surfaces an
-error, so a Relisten outage can't hide Phish.
+error, so a Relisten outage can't hide Phish. Relisten separately archives its own Phish
+collection (slug `phish`, a different show count than phish.in's — the same fact D85 in
+Iteration 16 found for search), so `mergeArtists` drops it by name rather than showing
+"Phish" twice.
 
-**D84 — Phish keeps its own show/track screens rather than folding into the generic
+**D90 — Phish keeps its own show/track screens rather than folding into the generic
 Relisten path.** Both paths already share `ArtistScreen` for year browsing (`ArtistScreen`
 already worked for any backend via `sourceFor(backend).periods(artist)`), but a period tap
 branches: Phish goes to `shows/{period}` → `show/{date}`, Relisten goes to
@@ -621,7 +668,7 @@ branches: Phish goes to `shows/{period}` → `show/{date}`, Relisten goes to
 DTOs — collapsing to one screen would mean adding backend branches inside it rather than
 keeping two small ones.
 
-**D85 — The theme stopped being `darkColorScheme()` with zero overrides.** The player's
+**D91 — The theme stopped being `darkColorScheme()` with zero overrides.** The player's
 small text was `Color.Gray` (`#888888`) hardcoded over `surfaceVariant` (`#49454F`) — a
 2.9:1 contrast ratio, under WCAG AA's 4.5:1 floor, at 11–12sp on the timestamps and queue
 line. `Theme.kt` replaces the M3 baseline-purple scheme with a dark-only palette built from
@@ -632,7 +679,7 @@ parent — the Cast chooser's chooser dialog depends on not being AppCompat (D-e
 Iteration 9) — and only gains a matching `windowBackground` plus transparent system bars for
 `enableEdgeToEdge()`.
 
-**D86 — The bottom bar shrank to a compact strip; a full Now Playing screen does what the
+**D92 — The bottom bar shrank to a compact strip; a full Now Playing screen does what the
 bar used to.** The whole player used to be one 200dp+ bottom bar: art, title, waveform,
 timestamps, and an oversized 60/68/60dp transport row, all stacked. `MiniPlayer` is now ~72dp
 — art, title, one play/pause button, a 2dp progress line — and tapping it opens
@@ -641,7 +688,10 @@ gradient tinted from the artwork's dark-vibrant swatch (`androidx.palette`, fall
 `primaryContainer` when there's no art — every Relisten show today). This also fixed a real
 bug: `EXTRA_OPEN_NOW_PLAYING` waited for a queue *key* and opened the show's track list, so
 shuffle queues (no key) never opened anything and even a keyed queue landed one screen short
-of the player. It now waits for `hasQueue` and navigates straight to `NowPlayingScreen`.
+of the player. It now waits for `hasQueue` and navigates straight to `NowPlayingScreen`. The
+`Scaffold`'s bottom bar also now hides on the `player` route itself — otherwise the compact
+bar and the full player it opens into would show stacked on top of each other, caught by
+running the app in the emulator rather than by the unit suite, which has no Compose UI tests.
 
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

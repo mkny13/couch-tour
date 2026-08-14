@@ -47,6 +47,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -175,11 +176,15 @@ fun App(
                     nav = nav,
                 )
             }
-            composable("artist/{backend}/{id}/{period}") { entry ->
+            composable(
+                "artist/{backend}/{id}/{period}?label={label}",
+                arguments = listOf(navArgument("label") { type = NavType.StringType; nullable = true }),
+            ) { entry ->
                 ArtistShowsScreen(
                     backendId = entry.arguments?.getString("backend").orEmpty(),
                     artistId = entry.arguments?.getString("id").orEmpty(),
                     periodId = entry.arguments?.getString("period").orEmpty(),
+                    periodLabel = entry.arguments?.getString("label"),
                     nav = nav,
                 )
             }
@@ -250,7 +255,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             value = query,
             onValueChange = { query = it },
             singleLine = true,
-            placeholder = { Text("Songs, venues, dates…") },
+            placeholder = { Text("Artists, songs, venues, dates…") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
@@ -472,12 +477,22 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
 
 /** Shows within one period of one Relisten artist. */
 @Composable
-fun ArtistShowsScreen(backendId: String, artistId: String, periodId: String, nav: NavHostController) {
+fun ArtistShowsScreen(
+    backendId: String,
+    artistId: String,
+    periodId: String,
+    /** Set when arriving from a search hit (a song or venue): the period id isn't in
+     *  [MusicSource.periods]' ordinary list, so its label travels with the route instead of
+     *  being looked up — and skips the wasted years fetch that lookup would cost. */
+    periodLabel: String? = null,
+    nav: NavHostController,
+) {
     val backend = Backend.from(backendId)
     val loaded = loadOnce(periodId) {
         val source = sourceFor(backend ?: error("Unknown backend $backendId"))
         val artist = source.artists().firstOrNull { it.id == artistId } ?: error("Unknown artist $artistId")
-        val period = source.periods(artist).firstOrNull { it.id == periodId } ?: error("Unknown period $periodId")
+        val period = periodLabel?.let { PeriodRef(periodId, it) }
+            ?: source.periods(artist).firstOrNull { it.id == periodId } ?: error("Unknown period $periodId")
         Triple(artist, period, source.shows(artist, period))
     }
 
@@ -627,55 +642,129 @@ private fun RecordingTrackRow(track: PlayableTrack, number: Int, onClick: () -> 
 
 @Composable
 private fun SearchResultsList(
-    results: Result<SearchResults>?,
+    results: SearchHits?,
     vm: PlayerViewModel,
     nav: NavHostController,
 ) {
-    when {
-        results == null -> Loading()
-        results.isFailure -> ErrorText(results.exceptionOrNull()!!)
-        else -> {
-            val r = results.getOrThrow()
-            if (r.isEmpty) {
-                Text("No shows or tracks matched.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
-                return
+    if (results == null) {
+        Loading()
+        return
+    }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    val artistsPresent = results.artistsPresent
+    // Selection survives to a different query only by accident of key reuse — clear it once
+    // the artist it named is no longer among the hits.
+    val selectedArtist = artistsPresent.firstOrNull { "${it.backend.id}/${it.id}" == selected }
+    val r = results.filteredTo(selectedArtist)
+
+    Column(Modifier.fillMaxSize()) {
+        if (artistsPresent.size > 1) {
+            LazyRow(
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item {
+                    FilterChip(
+                        selected = selected == null,
+                        onClick = { selected = null },
+                        label = { Text("All") },
+                    )
+                }
+                items(artistsPresent, key = { "${it.backend.id}/${it.id}" }) { artist ->
+                    val key = "${artist.backend.id}/${artist.id}"
+                    FilterChip(
+                        selected = selected == key,
+                        onClick = { selected = if (selected == key) null else key },
+                        label = { Text(artist.name) },
+                    )
+                }
             }
-            LazyColumn {
-                if (r.shows.isNotEmpty()) {
-                    item { SectionHeader("Shows") }
-                    items(r.shows, key = { "show-${it.date}" }) { show ->
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (r.isEmpty) {
+            val message = if (results.failed.isNotEmpty()) {
+                "Couldn't search " + results.failed.joinToString(" or ") {
+                    if (it == Backend.PHISHIN) "Phish" else "Relisten"
+                } + "."
+            } else {
+                "Nothing matched."
+            }
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
+            return
+        }
+
+        LazyColumn {
+            if (r.artists.isNotEmpty()) {
+                item { SectionHeader("Artists") }
+                items(r.artists, key = { "artist-${it.backend.id}-${it.id}" }) { artist ->
+                    RowItem(
+                        title = artist.name,
+                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                        artUrl = null,
+                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                    )
+                }
+            }
+            if (r.shows.isNotEmpty()) {
+                item { SectionHeader("Shows") }
+                items(r.shows, key = { "show-${it.artist.backend.id}-${it.artist.id}-${it.date}" }) { show ->
+                    RowItem(
+                        title = show.date,
+                        subtitle = listOfNotNull(
+                            if (show.artist.backend != Backend.PHISHIN) show.artist.name else null,
+                            show.where.ifBlank { null },
+                        ).joinToString(" · "),
+                        artUrl = show.artUrl,
+                        onClick = {
+                            when (show.artist.backend) {
+                                Backend.PHISHIN -> nav.navigate("show/${show.date}")
+                                Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                            }
+                        }
+                    )
+                }
+            }
+            SliceKind.entries.forEach { kind ->
+                val slices = r.slices.filter { it.kind == kind }
+                if (slices.isNotEmpty()) {
+                    item { SectionHeader(kind.heading) }
+                    items(slices, key = { "${kind.name}-${it.artist.backend.id}-${it.artist.id}-${it.period.id}" }) { slice ->
                         RowItem(
-                            title = show.date,
-                            subtitle = listOfNotNull(show.venueName, show.location)
-                                .joinToString(" · "),
-                            artUrl = show.coverArtUrls?.small,
-                            onClick = { nav.navigate("show/${show.date}") }
+                            title = slice.period.label,
+                            subtitle = "${slice.artist.name} · ${slice.period.showCount} ${plural(slice.period.showCount, "show")}",
+                            artUrl = null,
+                            onClick = {
+                                val encodedPeriod = android.net.Uri.encode(slice.period.id)
+                                val encodedLabel = android.net.Uri.encode(slice.period.label)
+                                nav.navigate("artist/${slice.artist.backend.id}/${slice.artist.id}/$encodedPeriod?label=$encodedLabel")
+                            }
                         )
                     }
                 }
-                if (r.playlists.isNotEmpty()) {
-                    item { SectionHeader("Playlists") }
-                    items(r.playlists, key = { "pl-${it.slug}" }) { PlaylistRow(it, nav) }
-                }
-                if (r.tracks.isNotEmpty()) {
-                    item { SectionHeader("Tracks") }
-                    items(r.tracks, key = { "track-${it.id}" }) { track ->
-                        RowItem(
-                            title = track.title,
-                            subtitle = listOfNotNull(
-                                track.showDate, track.venueName, track.venueLocation
-                            ).joinToString(" · "),
-                            artUrl = track.showAlbumCoverUrl,
-                            trailing = fmt(track.duration),
-                            trailingContent = {
-                                LikeButton(
-                                    Likable.Track, track.id,
-                                    track.likedByUser, track.likesCount,
-                                )
-                            },
-                            onClick = { vm.playTrack(track) }
-                        )
-                    }
+            }
+            if (r.playlists.isNotEmpty()) {
+                item { SectionHeader("Playlists") }
+                items(r.playlists, key = { "pl-${it.slug}" }) { PlaylistRow(it, nav) }
+            }
+            if (r.tracks.isNotEmpty()) {
+                item { SectionHeader("Tracks") }
+                items(r.tracks, key = { "track-${it.id}" }) { track ->
+                    RowItem(
+                        title = track.title,
+                        subtitle = listOfNotNull(
+                            track.showDate, track.venueName, track.venueLocation
+                        ).joinToString(" · "),
+                        artUrl = track.showAlbumCoverUrl,
+                        trailing = fmt(track.duration),
+                        trailingContent = {
+                            LikeButton(
+                                Likable.Track, track.id,
+                                track.likedByUser, track.likesCount,
+                            )
+                        },
+                        onClick = { vm.playTrack(track) }
+                    )
                 }
             }
         }
@@ -1324,19 +1413,21 @@ private fun ErrorText(t: Throwable) {
 // ---------------------------------------------------------------- helpers
 
 /**
- * Debounced search. produceState cancels the previous coroutine whenever [term] changes,
- * so the delay collapses a burst of keystrokes into one request.
+ * Debounced search across every backend. produceState cancels the previous coroutine
+ * whenever [term] changes, so the delay collapses a burst of keystrokes into one request.
+ * [searchAll] already degrades per backend on failure, so this doesn't need a `runCatching`
+ * of its own — [SearchHits.failed] carries what didn't answer.
  */
 @Composable
-private fun searchFor(term: String): State<Result<SearchResults>?> =
-    produceState<Result<SearchResults>?>(initialValue = null, key1 = term) {
+private fun searchFor(term: String): State<SearchHits?> =
+    produceState<SearchHits?>(initialValue = null, key1 = term) {
         if (term.length < 3) {
             value = null
             return@produceState
         }
         value = null
         delay(300)
-        value = runCatching { PhishInApi.search(term) }
+        value = searchAll(term)
     }
 
 /** Runs [block] once per [key], exposing null while in flight. */
