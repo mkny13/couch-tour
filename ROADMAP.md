@@ -17,6 +17,16 @@ but have no screen.
 - Desktop support (browser, Electron, or a native macOS app — must stay free), with
   playback history and resume synced with mobile.
 
+## Feature ideas
+
+- Google TV app.
+- Cast from desktop.
+- Likes for Relisten tracks — mirror phish.in's built-in like functionality, which today only
+  covers phish.in tracks.
+- Playlists: create and save playlists for Relisten tracks, similar to phish.in's playlist
+  feature; playlists should be able to mix phish.in and Relisten tracks together.
+- Home screen: an "on this date" playlist/section.
+
 ## Multi-artist follow-ups
 
 Detailed in [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) (O3–O5):
