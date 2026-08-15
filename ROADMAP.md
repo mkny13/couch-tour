@@ -32,6 +32,20 @@ but have no screen.
 - Spotify Live Releases support. Ideally in-app playback; if that isn't feasible, at minimum
   track which Spotify Live tracks have been listened to, leaning on Last.fm for that if
   needed.
+- YouTube video support — playable as video or audio-only, ideally with a toggle between the
+  two.
+- "Switch tape" rework: relabel to "Source" to match etree usage, include source details
+  (taper, lineage, etc.), and highlight SBD and matrix sources.
+- Source/show-level volume leveling — not traditional per-track leveling, but matching
+  average sound levels across quiet and loud recordings so different sources/shows play back
+  at comparable volume.
+- Share a show or track — no `Intent.ACTION_SEND` today; Relisten parity.
+- "Surprise me" / random show button.
+- Browse shows by top rated (and popular/trending) — Relisten sorts by rating and popularity;
+  Couch Tour only uses Relisten's pre-sorted rating internally for the tape picker, with no
+  user-facing browse-by-rating surface.
+- "Next Couch Tour stop" button — surfaces the oldest unplayed show from the current tours of
+  your favorited artists (depends on favorite artists, above).
 
 ## Multi-artist follow-ups
 
