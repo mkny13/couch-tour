@@ -693,5 +693,17 @@ of the player. It now waits for `hasQueue` and navigates straight to `NowPlaying
 bar and the full player it opens into would show stacked on top of each other, caught by
 running the app in the emulator rather than by the unit suite, which has no Compose UI tests.
 
+**D93 — Audio focus is requested by hand instead of via ExoPlayer's `handleAudioFocus = true`
+(issue #23).** `PlaybackService`'s audio attributes use `AUDIO_CONTENT_TYPE_MUSIC`, which
+Media3's `AudioFocusManager` marks `willPauseWhenDucked = false` when building the platform
+`AudioFocusRequest`. On API 26+ that tells the OS it may duck the stream itself at the mixer
+without ever calling back into the app — so `AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK` never
+reaches ExoPlayer's own duck-to-20% code path, and mixer-level ducking turned out to be
+inaudible on real hardware. `PlaybackService` now builds the player with
+`handleAudioFocus = false` and runs its own `AudioFocusRequest`/`OnAudioFocusChangeListener`,
+setting `player.volume` to `0.2f`/`1f` directly on duck/regain and pausing (remembering to
+resume) on a full transient loss. Scoped to `localPlayer` only — casting doesn't touch phone
+audio, so `RemoteCastPlayer` is untouched.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

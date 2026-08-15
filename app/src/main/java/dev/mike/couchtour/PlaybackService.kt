@@ -2,6 +2,8 @@ package dev.mike.couchtour
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.net.Uri
 import androidx.media3.cast.RemoteCastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
@@ -71,6 +73,62 @@ class PlaybackService : MediaLibraryService() {
     private var handoff: Handoff? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    // -------------------------------------------------------------- audio focus / ducking
+    // Cast doesn't touch phone audio, so focus is only ever requested for localPlayer.
+
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    /** Set only when we paused *because* of a transient loss, so regaining focus resumes. */
+    private var pausedByAudioFocusLoss = false
+
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        val player = localPlayer ?: return@OnAudioFocusChangeListener
+        when (change) {
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                player.volume = 1f
+                if (pausedByAudioFocusLoss) {
+                    pausedByAudioFocusLoss = false
+                    player.play()
+                }
+            }
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                pausedByAudioFocusLoss = false
+                player.pause()
+                abandonAudioFocus()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                if (player.isPlaying) pausedByAudioFocusLoss = true
+                player.pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> player.volume = 0.2f
+        }
+    }
+
+    private fun requestAudioFocus() {
+        if (audioFocusRequest != null) return
+        val audioManager = getSystemService(AudioManager::class.java) ?: return
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener(audioFocusListener)
+            .build()
+        if (audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            audioFocusRequest = request
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val request = audioFocusRequest ?: return
+        getSystemService(AudioManager::class.java)?.abandonAudioFocusRequest(request)
+        audioFocusRequest = null
+        pausedByAudioFocusLoss = false
+        localPlayer?.volume = 1f
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -80,7 +138,14 @@ class PlaybackService : MediaLibraryService() {
                     .setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                     .build(),
-                /* handleAudioFocus = */ true
+                // Handled by hand below instead: Media3's own AudioFocusManager marks
+                // MUSIC-content requests as willPauseWhenDucked = false, which tells the
+                // platform it may duck us silently at the mixer on API 26+ — and having
+                // said that, the platform never delivers AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
+                // to us at all, so ExoPlayer's own duck-to-20% code path never runs. Mixer
+                // ducking is real but device/OEM-dependent and was inaudible on at least one
+                // device (#23); requesting focus ourselves makes the duck deterministic.
+                /* handleAudioFocus = */ false
             )
             .setHandleAudioBecomingNoisy(true)
             .build()
@@ -128,6 +193,9 @@ class PlaybackService : MediaLibraryService() {
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             saveNow()
+            if (session?.player === localPlayer) {
+                if (isPlaying) requestAudioFocus() else if (!pausedByAudioFocusLoss) abandonAudioFocus()
+            }
         }
 
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
@@ -467,6 +535,7 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onDestroy() {
         saveNow()
+        abandonAudioFocus()
         castPlayer?.run {
             setSessionAvailabilityListener(null)
             release()
