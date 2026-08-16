@@ -39,14 +39,16 @@ SwiftUI + AVFoundation (D94), not Electron or a browser client.
   different tapes of the same Grateful Dead date produced two independent History rows, each
   resuming its own tape correctly, never the other's.
 
+**Sync of playback history and resume with mobile shipped** (D116-D135): pairing, push/pull
+with last-write-wins conflict resolution, token rotation and instant revocation, wired into
+both clients with a background sync cadence — the live backend is
+`https://couch-tour-sync.mkastellec.workers.dev` (`sync/`).
+
 **What's next for desktop:**
 
-- Sync of playback history and resume with mobile. The `deletedAt` tombstone both clients
-  need to sync removals is in (D116-D118); the backend itself — pairing, push/pull, token
-  rotation and revocation — is built and deployed at
-  `https://couch-tour-sync.mkastellec.workers.dev` (D119-D125, `sync/`), but not wired into
-  either client yet. That's the remaining piece: background sync scheduling, the pairing UI,
-  and Keychain/EncryptedSharedPreferences token storage on each client.
+- QR pairing. Today's pairing is text-code only — type the code shown on the other device
+  (D131). A QR is a pure follow-up, not a protocol change: generating one is trivial, scanning
+  one on Android needs a camera permission and a scanning library.
 - Artwork in Now Playing (D107).
 - History grouped by artist, matching Android, once there's enough real history to want it.
 - Login, likes, playlists, search, and casting on desktop — out of scope for the MVP,
@@ -71,6 +73,11 @@ SwiftUI + AVFoundation (D94), not Electron or a browser client.
   two.
 - "Switch tape" rework: relabel to "Source" to match etree usage, include source details
   (taper, lineage, etc.), and highlight SBD and matrix sources.
+- Better source selection beyond the rework above: surface whatever signals help identify
+  the best source for a show (ratings, review counts/text, taper reputation); a way to
+  quickly compare snippets of the same track across all available tapers/sources side by
+  side; and letting the user flag preferred (and avoided) tapers, which then influences
+  source ordering or highlighting.
 - Source/show-level volume leveling — not traditional per-track leveling, but matching
   average sound levels across quiet and loud recordings so different sources/shows play back
   at comparable volume.

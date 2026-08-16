@@ -18,9 +18,12 @@ final class MockServer {
 
     private static var active: MockServer?
 
-    private var responses: [(code: Int, body: String)] = []
+    private var responses: [(code: Int, body: String, headers: [String: String])] = []
     private(set) var requests: [URLRequest] = []
     private let lock = NSLock()
+    /// Total requests ever received, unlike `requests.count` which shrinks as `takeRequest`
+    /// drains the queue — mirrors OkHttp MockWebServer's `requestCount`.
+    private(set) var requestCount = 0
 
     func start() {
         MockServer.active = self
@@ -32,9 +35,9 @@ final class MockServer {
         MockServer.active = nil
     }
 
-    func enqueue(_ body: String, code: Int = 200) {
+    func enqueue(_ body: String, code: Int = 200, headers: [String: String] = [:]) {
         lock.lock(); defer { lock.unlock() }
-        responses.append((code, body))
+        responses.append((code, body, headers))
     }
 
     func takeRequest() -> URLRequest? {
@@ -46,6 +49,7 @@ final class MockServer {
     fileprivate func handle(_ protocolInstance: URLProtocol) {
         lock.lock()
         requests.append(protocolInstance.request)
+        requestCount += 1
         let next = responses.isEmpty ? nil : responses.removeFirst()
         lock.unlock()
 
@@ -54,7 +58,7 @@ final class MockServer {
             return
         }
         let url = protocolInstance.request.url!
-        let response = HTTPURLResponse(url: url, statusCode: next.code, httpVersion: "HTTP/1.1", headerFields: nil)!
+        let response = HTTPURLResponse(url: url, statusCode: next.code, httpVersion: "HTTP/1.1", headerFields: next.headers)!
         protocolInstance.client?.urlProtocol(protocolInstance, didReceive: response, cacheStoragePolicy: .notAllowed)
         protocolInstance.client?.urlProtocol(protocolInstance, didLoad: Data(next.body.utf8))
         protocolInstance.client?.urlProtocolDidFinishLoading(protocolInstance)
@@ -69,5 +73,25 @@ extension URLRequest {
 
     var pathSegments: [String] {
         (url?.path ?? "").split(separator: "/").map(String.init)
+    }
+
+    /// A POST/DELETE body's text, from wherever URLSession actually put it. `httpBody` is
+    /// nil for requests that have passed through a custom `URLProtocol` — Foundation
+    /// converts it to `httpBodyStream` first, which `URLRequest.httpBody` never reflects
+    /// back, only the original request object before interception did.
+    var bodyString: String? {
+        if let httpBody { return String(data: httpBody, encoding: .utf8) }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 4096
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: bufferSize)
+            guard read > 0 else { break }
+            data.append(buffer, count: read)
+        }
+        return String(data: data, encoding: .utf8)
     }
 }

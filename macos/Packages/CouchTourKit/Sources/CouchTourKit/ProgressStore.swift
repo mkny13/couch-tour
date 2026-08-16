@@ -209,4 +209,16 @@ public final class ProgressStore {
             try Row.fetchOne(db, sql: "SELECT * FROM progress WHERE queueKey = ?", arguments: [key])
         }
     }
+
+    /// Rows to push on the next sync: everything touched since the last successful push,
+    /// tombstones included — a delete has to reach the other device too. Deliberately does
+    /// NOT filter `deletedAt IS NULL`, unlike every other read here — see Android's
+    /// `ProgressDao.changedSince` for the same query.
+    public func changedSince(_ since: Int64) throws -> [PlaybackProgress] {
+        try dbQueue.read { db in
+            try PlaybackProgress
+                .filter(Column("updatedAt") > since)
+                .fetchAll(db)
+        }
+    }
 }

@@ -56,10 +56,10 @@ locally built `.app`.
 
 ## Building (sync backend)
 
-`sync/` is a Cloudflare Worker + D1 service (D119-D125) that both clients will eventually
-sync progress through, deployed at `https://couch-tour-sync.mkastellec.workers.dev` under
-Mike's Cloudflare account. `npm install` once, then day-to-day work runs locally with no
-Cloudflare account needed:
+`sync/` is a Cloudflare Worker + D1 service (D119-D127) that both clients sync progress
+through (client wiring: D128-D135), deployed at
+`https://couch-tour-sync.mkastellec.workers.dev` under Mike's Cloudflare account. `npm install`
+once, then day-to-day work runs locally with no Cloudflare account needed:
 
 ```
 cd sync && npm install
@@ -69,7 +69,7 @@ npm run dev                 # wrangler dev on http://localhost:8787
 
 `wrangler dev`'s local mode never contacts Cloudflare's API. `npm run typecheck` runs
 `tsc --noEmit`; there's no automated test suite yet — the endpoints were verified by hand
-against `wrangler dev` locally, then smoke-tested against the real deployment (D124-D125).
+against `wrangler dev` locally, then smoke-tested against the real deployment (D124-D127).
 
 Redeploying after a change to `src/` or `schema.sql`:
 

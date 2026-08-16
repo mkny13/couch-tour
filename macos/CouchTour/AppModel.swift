@@ -8,6 +8,7 @@ import Foundation
 final class AppModel: ObservableObject {
     let progressStore: ProgressStore?
     let progressStoreError: String?
+    let syncSession = SyncSession()
 
     init() {
         do {
@@ -17,5 +18,14 @@ final class AppModel: ObservableObject {
             progressStore = nil
             progressStoreError = "Couldn't open the listening history database: \(error)"
         }
+    }
+
+    /// One push-then-pull cycle. Fire-and-forget: `sync` is a no-op if unpaired, and any
+    /// network failure here is caught and dropped — nothing surfaces a sync error to the UI
+    /// in this MVP, matching macOS's own "Task on activate plus a timer" cadence rather than
+    /// a guaranteed-background mechanism.
+    func syncNow() {
+        guard let progressStore else { return }
+        Task { try? await syncSession.sync(progressStore) }
     }
 }

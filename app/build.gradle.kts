@@ -121,6 +121,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.palette.ktx)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

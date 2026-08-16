@@ -1,0 +1,128 @@
+import CouchTourKit
+import SwiftUI
+
+/// Pairing and device management for progress sync (D119-D127). No QR yet — the code is
+/// short enough to type, and adding a scanner is its own follow-up (ROADMAP.md).
+struct SyncView: View {
+    @ObservedObject var syncSession: SyncSession
+
+    @State private var pairingResult: PairStartResponse?
+    @State private var claimCode = ""
+    @State private var busy = false
+    @State private var error: String?
+    @State private var devices: [DeviceInfo] = []
+
+    var body: some View {
+        Form {
+            Section {
+                Text(
+                    "Sync keeps listening history and resume position in step across your " +
+                        "paired devices. Pairing is one-time; after that, devices sync on their own."
+                )
+                .foregroundStyle(.secondary)
+            }
+
+            if syncSession.paired {
+                Section {
+                    Button("Unlink this device") {
+                        syncSession.unlink()
+                        pairingResult = nil
+                    }
+                }
+            }
+
+            if let result = pairingResult {
+                Section("Enter this code on the other device") {
+                    Text(result.code)
+                        .font(.system(.largeTitle, design: .monospaced))
+                        .bold()
+                    Text("Expires in 10 minutes").foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button(syncSession.paired ? "Add another device" : "Pair this device") {
+                    startPairing()
+                }
+                .disabled(busy)
+            }
+
+            if !syncSession.paired {
+                Section("Have a code from another device?") {
+                    TextField("Code", text: $claimCode)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { claimPairing() }
+                    Button("Join") { claimPairing() }
+                        .disabled(busy || claimCode.isEmpty)
+                }
+            }
+
+            if let error {
+                Text(error).foregroundStyle(.red)
+            }
+
+            if syncSession.paired {
+                Section("Devices") {
+                    ForEach(devices) { device in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(device.name + (device.isSelf ? " (this device)" : ""))
+                                Text(device.platform).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Revoke") { revoke(device.deviceId) }
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Sync")
+        .task { if syncSession.paired { await refreshDevices() } }
+        .onChange(of: syncSession.paired) { _, paired in
+            if paired { Task { await refreshDevices() } }
+        }
+    }
+
+    private func startPairing() {
+        busy = true
+        error = nil
+        Task {
+            do {
+                pairingResult = try await syncSession.startPairing(deviceName: Host.current().localizedName ?? "Mac", platform: "macos")
+            } catch {
+                self.error = "Couldn't start pairing: \(error.localizedDescription)"
+            }
+            busy = false
+        }
+    }
+
+    private func claimPairing() {
+        busy = true
+        error = nil
+        Task {
+            do {
+                try await syncSession.claimPairing(
+                    code: claimCode.trimmingCharacters(in: .whitespaces),
+                    deviceName: Host.current().localizedName ?? "Mac",
+                    platform: "macos"
+                )
+                claimCode = ""
+            } catch {
+                self.error = "Couldn't join: \(error.localizedDescription)"
+            }
+            busy = false
+        }
+    }
+
+    private func revoke(_ deviceId: String) {
+        Task {
+            try? await syncSession.revoke(deviceId: deviceId)
+            await refreshDevices()
+        }
+    }
+
+    private func refreshDevices() async {
+        devices = (try? await syncSession.devices()) ?? []
+    }
+}

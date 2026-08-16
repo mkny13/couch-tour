@@ -893,7 +893,7 @@ only migrations a given database hasn't seen, so folding the new column into the
 migration would mean an existing install never runs it. Same reasoning as why `MIGRATION_6_7`
 is a new migration on the Android side rather than a change to `MIGRATION_5_6`.
 
-## Iteration 20 — the sync backend, built and deployed (D119-D125)
+## Iteration 20 — the sync backend, built and deployed (D119-D127)
 
 A Cloudflare Worker + D1 service at `sync/`, built and exercised end to end against a local
 D1 instance first (`wrangler dev`, no Cloudflare account touched), then deployed for real
@@ -924,11 +924,12 @@ permanently 0 today and this path cannot fire in practice. It's implemented and 
 (by hand-setting the floor in a local DB) so the contract exists before the purge job does,
 rather than being retrofitted around whatever the job happens to produce.
 
-**D122 — `POST /pair/claim` takes a `pairingId` alongside the code, not the code alone.** A
-wrong-code guess against a bare code has no row to attach an attempt count to — `codeHash`
-only matches on an exact hit, so there's nothing to increment on a miss. Carrying the pairing
-id (embedded in the same QR/deep-link payload as the code) gives the five-attempts-then-burn
-rule an actual row to burn.
+**D122 — `POST /pair/claim` takes a `pairingId` alongside the code, not the code alone.**
+**Superseded by D127** — a UUID pairing id isn't something a human can type, which broke the
+one thing text-entry pairing exists for. A wrong-code guess against a bare code has no row to
+attach an attempt count to — `codeHash` only matches on an exact hit, so there's nothing to
+increment on a miss. Carrying the pairing id (embedded in the same QR/deep-link payload as the
+code) gives the five-attempts-then-burn rule an actual row to burn.
 
 **D123 — conflict resolution accepts an incoming write when `updatedAt >= existing.updatedAt`,
 not `>`.** On an exact tie this favors whichever push reaches the server later, which is
@@ -958,6 +959,115 @@ attempt; the service is live at `https://couch-tour-sync.mkastellec.workers.dev`
 run against production to confirm the deployed Worker actually answers (not just that `wrangler
 deploy` exited 0), then deleted by hand — the one thing this MVP has no delete-a-whole-group
 endpoint for yet, so cleanup went straight through `wrangler d1 execute --remote`.
+
+**D126 — `since = 0` never triggers the retention-floor `410`, no matter how far
+`retentionFloorSeq` has moved.** Found and fixed while starting the client work, before any
+purge job existed to expose it live: the check as first written was `since <
+retentionFloorSeq`, which rejects every brand-new pairing the instant the floor ever moves off
+0, since 0 is less than any positive number. A fresh client has nothing to distrust — it isn't
+resuming an old cursor, it's asking for the entire current table — so the floor only applies
+once `since` is actually a prior position, not the starting one. Verified both sides of the
+boundary against local D1 (`since=0` succeeds under a floor of 5; `since=1` still 410s), then
+redeployed to production.
+
+**D127 — pairing is claimed by the code alone; `pairingId` is gone from the wire contract
+(supersedes D122).** Caught while starting the Android pairing screen: D122's fix for
+attempt-counting needed a `pairingId` on the claim request, but that id is a UUID — asking
+someone to type it defeats the entire reason "the code is also shown as text so it can be
+typed" was a requirement in the first place. `POST /pair/claim` now looks the pairing up by
+`codeHash` directly, and the per-row `attempts` counter (and its column) is gone with it — an
+8-character base32 code is roughly 10^12 possibilities against a 10-minute TTL, which is
+already impractical to brute-force without a counter bolted on. `pairings.attempts` was
+dropped via `ALTER TABLE ... DROP COLUMN` on both local and production D1 rather than left as
+dead weight; production had zero real rows at the time, so this cost nothing to do cleanly.
+Re-verified end to end against production after redeploying: bootstrap, claim by code alone,
+cleanup.
+
+## Iteration 21 — wiring sync into both clients (D128-D136)
+
+The backend from Iteration 20 talks to nothing yet. This iteration adds the client half on
+both platforms: pairing, the push/pull cycle, token storage, background cadence, and a
+minimal settings screen — text-code pairing only, no QR (D131).
+
+**D128 — Android's sync client mirrors `Api.kt`/`Auth.kt`'s existing shape exactly.**
+`SyncApi` is OkHttp + kotlinx.serialization with `Authorization: Bearer`, its own client
+deliberately separate from `PhishInApi`'s `X-Auth-Token` JWT — an unrelated service with an
+unrelated identity. `SyncTokenStore` is `EncryptedSharedPreferences` under `couchtour_sync`,
+not `phishin_auth`, so signing out of phish.in can't unpair this device from sync.
+
+**D129 — `lastSeq`/`lastPushWatermark` were missing the memory fallback `deviceToken`/`deviceId`
+already had; found by a real test failure, not by inspection.** `EncryptedSharedPreferences
+.create()` itself throws under Robolectric (no real Android Keystore in the test JVM) — which
+`TokenStore` survives because every field falls back to an in-memory copy when the encrypted
+store is unavailable, and `SyncTokenStore` copied that pattern for `deviceToken`/`deviceId`
+but not the two cursor fields, whose setters silently no-op'd instead. A round-trip test
+caught it immediately (`expected:<42> but was:<0>`). Fixed with the same
+`memoryLastSeq`/`memoryLastPushWatermark` shape, so all four fields now degrade consistently
+— on a real device this only matters if the Keystore itself is in a bad state, but it's the
+same resilience the rest of the class already promises.
+
+**D130 — `androidx.work` (2.11.2) is a new dependency, for a periodic sync job constrained to
+`NetworkType.CONNECTED`; scheduling it is wrapped in try/catch.** 15 minutes is WorkManager's
+own floor for periodic work, matched on the macOS side (D133) for the same cadence on both
+platforms. `WorkManager.getInstance()` throws when WorkManager's own initialization hasn't
+run — true of every Robolectric test (deliberately: no `Configuration.Provider` wired up for
+tests, so no other test needs to know sync exists) and conceivably true of a real device in
+some unanticipated state. Background scheduling failing is not a reason to crash app
+startup — the immediate on-launch sync in `CouchTourApp` runs regardless, so pairing still
+becomes useful even if the periodic job never registers.
+
+**D131 — pairing is claimed by typing the code; no QR in this pass, on either platform.**
+Generating a QR (a new dependency, trivial) and scanning one (camera + a scanning library,
+not trivial on Android) don't change the wire protocol at all — D127 already made the code
+alone sufficient — so this is a pure follow-up rather than something blocking the rest of the
+feature. Tracked in ROADMAP.md.
+
+**D132 — macOS Keychain access sits behind a `KeychainStoring` protocol so `swift test` never
+touches the real system keychain.** `SystemKeychain` is the real `SecItem`-based
+implementation; tests inject `InMemoryKeychain`. An unattended CI or dev run should not be
+able to trigger a Keychain access prompt, which a raw `SecItemAdd`/`SecItemCopyMatching` call
+against the real login keychain risks doing depending on the machine's state. The same
+reasoning extended to `SyncTokenStore`'s non-secret cursors: they're constructor-injectable
+`UserDefaults`, defaulting to `.standard` in the app but a freshly-named suite per test in
+`SyncTests.swift` (`removePersistentDomain` in `tearDown`) — an earlier draft reused `#file`
+as the suite name, which would have shared one real on-disk UserDefaults domain across every
+test in the file and left it there after the run, since unlike `.standard` a named suite is
+real persistent storage, not something Xcode resets between runs on its own.
+
+**D133 — macOS sync cadence is a `Task` loop plus `NSApplication.didBecomeActiveNotification`,
+not `BGTaskScheduler`.** The MVP has no background-execution entitlement request, and
+`RootView`'s `.task` modifier already spans the whole app run in practice, so a 15-minute
+`Task.sleep` loop (matching Android's WorkManager floor, D130) needs nothing extra — sync
+fires immediately on launch, again whenever the app returns to the foreground, and every 15
+minutes it stays open. A real background-refresh mechanism is a bigger, separate piece of
+work than this MVP needed to unblock the rest of the feature.
+
+**D134 — `MockServer`'s `URLProtocol` shim needed a body reader, because `httpBody` comes
+back `nil` for exactly the requests that pass through it.** Every existing use of
+`MockServer` was GET-only, so nothing had exercised a POST/DELETE body until `Sync.swift`'s
+tests — the first attempt asserted directly against `request.httpBody` and failed
+(`"{"since":1,...}" is not equal to ""`) because Foundation converts a request's body to
+`httpBodyStream` before handing the canonical request to a custom `URLProtocol`, and
+`URLRequest.httpBody` never reflects that back. `MockServer.swift` gained
+`URLRequest.bodyString`, draining the stream by hand when `httpBody` is absent.
+
+**D135 — verified with real builds on both platforms, not just the unit suites.**
+`./gradlew assembleDebug` succeeds (`testDebugUnitTest` is 214/214 — 21 new sync tests over
+Iteration 20's baseline). `xcodebuild` succeeds for the macOS app target, and the built app
+was launched and left running for several seconds with nothing in the system log — the
+Keychain calls `AppModel.init()` makes via `SyncSession()` happen on literally every launch,
+so this exercised the real `SystemKeychain` path, not a mock. `swift test` is 117/117.
+
+**D136 — a Swift test flaked on rerun from an assertion this codebase's own conventions
+should have caught: exact-string equality against `JSONEncoder` output.** `testSyncDoesNot
+RepushARowAlreadyAtTheWatermark` passed the first time and failed the next `swift test` run
+with the identical JSON content in a different key order
+(`{"since":1,"changes":[]}` vs. `{"changes":[],"since":1}`) — `JSONEncoder`'s key order is not
+guaranteed stable across process launches on Apple's Foundation, unlike kotlinx.serialization
+on the Android side, which does guarantee declaration order (confirmed: the equivalent Kotlin
+test asserts exact-string equality safely). Fixed by checking content
+(`body.contains(#""since":1"#)`) rather than the exact byte layout, the same approach the
+sibling push-test already used. Re-run five times clean afterward before trusting it.
 
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

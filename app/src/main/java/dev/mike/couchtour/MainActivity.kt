@@ -222,6 +222,7 @@ fun App(
             }
             composable("mine/shows") { MyShowsScreen(nav) }
             composable("mine/tracks") { MyTracksScreen(vm, nav) }
+            composable("sync") { SyncScreen(nav) }
         }
     }
 }
@@ -343,6 +344,17 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 RowItem("Browse playlists", "Public playlists on phish.in", null) {
                     nav.navigate("playlists")
                 }
+            }
+
+            item { SectionHeader("Sync", divided = true) }
+            item {
+                val paired by SyncSession.paired.collectAsState()
+                RowItem(
+                    title = "Sync across devices",
+                    subtitle = if (paired) "Paired — manage devices" else "Not paired",
+                    artUrl = null,
+                    onClick = { nav.navigate("sync") }
+                )
             }
         }
     }
@@ -830,6 +842,141 @@ fun LoginScreen(nav: NavHostController) {
 
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+        }
+    }
+}
+
+/**
+ * Pairing and device management for progress sync (D119-D127). No QR yet — the code is
+ * short enough to type, and adding camera scanning is its own follow-up (ROADMAP.md).
+ */
+@Composable
+fun SyncScreen(nav: NavHostController) {
+    val paired by SyncSession.paired.collectAsState()
+    var pairingResult by remember { mutableStateOf<PairStartResponse?>(null) }
+    var claimCode by rememberSaveable { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Sync", nav)
+        Text(
+            "Sync keeps listening history and resume position in step across your paired " +
+                "devices. Pairing is one-time; after that, devices sync on their own.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        if (paired) {
+            RowItem("This device is paired", "Tap to unlink", null) {
+                SyncSession.unlink()
+                pairingResult = null
+            }
+        }
+
+        pairingResult?.let { result ->
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    "Enter this code on the other device:",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    result.code,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 4.sp,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Text(
+                    "Expires in 10 minutes",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Button(
+            enabled = !busy,
+            onClick = {
+                busy = true
+                error = null
+                scope.launch {
+                    runCatching { SyncSession.startPairing() }
+                        .onSuccess { pairingResult = it }
+                        .onFailure { error = "Couldn't start pairing: ${it.message}" }
+                    busy = false
+                }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) { Text(if (paired) "Add another device" else "Pair this device") }
+
+        if (!paired) {
+            HorizontalDivider(
+                color = Color.White.copy(alpha = 0.10f),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+            )
+            Text(
+                "Have a code from another device?",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            OutlinedTextField(
+                value = claimCode,
+                onValueChange = { claimCode = it.uppercase(); error = null },
+                label = { Text("Code") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            Button(
+                enabled = !busy && claimCode.isNotBlank(),
+                onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        runCatching { SyncSession.claimPairing(claimCode.trim()) }
+                            .onSuccess { claimCode = "" }
+                            .onFailure { error = "Couldn't join: ${it.message}" }
+                        busy = false
+                    }
+                },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            ) { Text(if (busy) "Joining…" else "Join") }
+        }
+
+        error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+        }
+
+        if (paired) {
+            val devices = loadOnce(paired to refreshKey) { SyncSession.devices() }
+            SectionHeader("Devices", divided = true)
+            when (val r = devices.value) {
+                null -> Loading()
+                else -> r.fold(
+                    onSuccess = { list ->
+                        list.forEach { device ->
+                            RowItem(
+                                title = device.name + if (device.isSelf) " (this device)" else "",
+                                subtitle = device.platform,
+                                artUrl = null,
+                                trailing = "Revoke",
+                                onClick = {
+                                    scope.launch {
+                                        runCatching { SyncSession.revoke(device.deviceId) }
+                                        refreshKey++
+                                    }
+                                }
+                            )
+                        }
+                    },
+                    onFailure = { ErrorText(it) }
+                )
+            }
         }
     }
 }

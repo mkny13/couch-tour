@@ -92,6 +92,15 @@ interface ProgressDao {
      */
     @Query("UPDATE progress SET deletedAt = :now, updatedAt = :now WHERE queueKey = :key")
     suspend fun clear(key: String, now: Long)
+
+    /**
+     * Rows to push on the next sync: everything touched since the last successful push,
+     * tombstones included — a delete has to reach the other device too. Unlike every other
+     * query here, this deliberately does NOT filter `deletedAt IS NULL`; that filter is what
+     * makes the rest of the app forget a cleared row, but sync needs to see it.
+     */
+    @Query("SELECT * FROM progress WHERE updatedAt > :since")
+    suspend fun changedSince(since: Long): List<Progress>
 }
 
 @Database(

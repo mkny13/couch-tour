@@ -30,16 +30,17 @@ CREATE TABLE devices (
 );
 CREATE INDEX devices_previousTokenHash ON devices(previousTokenHash);
 
--- A short-lived pairing code, single-use. codeHash is SHA-256 of the code shown on screen —
--- same reasoning as devices.tokenHash, and it also means a leaked database row can't be used
--- to claim a pairing after the fact.
+-- A short-lived pairing code, single-use, looked up by the code alone (D127) — no separate
+-- pairing id, so a human can type the whole thing. codeHash is SHA-256 of the code shown on
+-- screen, same reasoning as devices.tokenHash: a leaked database row can't be used to claim a
+-- pairing after the fact. No per-row attempt counter either — the code space (8 base32
+-- characters, ~10^12 possibilities) against a 10-minute TTL is the actual defense.
 CREATE TABLE pairings (
     id TEXT PRIMARY KEY,
     groupId TEXT NOT NULL REFERENCES groups(id),
     codeHash TEXT NOT NULL,
     expiresAt INTEGER NOT NULL,
-    claimedAt INTEGER,
-    attempts INTEGER NOT NULL DEFAULT 0
+    claimedAt INTEGER
 );
 CREATE INDEX pairings_codeHash ON pairings(codeHash);
 

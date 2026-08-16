@@ -3,7 +3,6 @@ import { randomId, randomPairingCode, randomToken, sha256Hex } from "./crypto";
 import type { DeviceRow, Env, ProgressFields, ProgressRow } from "./types";
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
-const MAX_PAIRING_ATTEMPTS = 5;
 const TOKEN_ROTATION_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 const TOKEN_GRACE_MS = 48 * 60 * 60 * 1000;
 const FUTURE_CLOCK_CLAMP_MS = 24 * 60 * 60 * 1000;
@@ -71,7 +70,6 @@ async function handlePairStart(request: Request, env: Env): Promise<Response> {
   }
 
   const now = Date.now();
-  const pairingId = randomId();
   const code = randomPairingCode();
   const codeHash = await sha256Hex(code);
   const expiresAt = now + PAIRING_TTL_MS;
@@ -79,14 +77,13 @@ async function handlePairStart(request: Request, env: Env): Promise<Response> {
   await env.DB.prepare(
     "INSERT INTO pairings (id, groupId, codeHash, expiresAt) VALUES (?, ?, ?, ?)"
   )
-    .bind(pairingId, groupId, codeHash, expiresAt)
+    .bind(randomId(), groupId, codeHash, expiresAt)
     .run();
 
-  return json({ pairingId, code, expiresAt, ...bootstrapped });
+  return json({ code, expiresAt, ...bootstrapped });
 }
 
 interface PairClaimBody {
-  pairingId?: unknown;
   code?: unknown;
   deviceName?: unknown;
   platform?: unknown;
@@ -98,42 +95,34 @@ interface PairingRow {
   codeHash: string;
   expiresAt: number;
   claimedAt: number | null;
-  attempts: number;
 }
 
-/** The second device redeems the code the first device showed, and gets its own token back. */
+/**
+ * The second device redeems the code the first device showed, and gets its own token back.
+ * Looked up by the code alone — no separate pairing id, so a human can type the whole thing
+ * (D127 supersedes D122's pairingId+code design, which a UUID makes untypeable). Brute-forcing
+ * is impractical on its own terms: 8 base32 characters is roughly 10^12 possibilities against
+ * a 10-minute window, so no separate attempt-counting is needed on top of that.
+ */
 async function handlePairClaim(request: Request, env: Env): Promise<Response> {
   const body = await readJson<PairClaimBody>(request);
   if (
-    typeof body?.pairingId !== "string" ||
     typeof body?.code !== "string" ||
     typeof body?.deviceName !== "string" ||
     typeof body?.platform !== "string"
   ) {
-    return badRequest("pairingId, code, deviceName, and platform are required");
+    return badRequest("code, deviceName, and platform are required");
   }
 
-  const pairing = await env.DB.prepare("SELECT * FROM pairings WHERE id = ?")
-    .bind(body.pairingId)
+  const codeHash = await sha256Hex(body.code);
+  const pairing = await env.DB.prepare("SELECT * FROM pairings WHERE codeHash = ?")
+    .bind(codeHash)
     .first<PairingRow>();
-  if (!pairing) return json({ error: "no such pairing" }, 404);
+  if (!pairing) return json({ error: "incorrect code" }, 401);
 
   const now = Date.now();
   if (pairing.claimedAt !== null) return json({ error: "pairing already claimed" }, 410);
   if (now > pairing.expiresAt) return json({ error: "pairing expired" }, 410);
-  if (pairing.attempts >= MAX_PAIRING_ATTEMPTS) {
-    return json({ error: "too many attempts; pairing burned" }, 410);
-  }
-
-  const submittedHash = await sha256Hex(body.code);
-  if (submittedHash !== pairing.codeHash) {
-    const attempts = pairing.attempts + 1;
-    const burn = attempts >= MAX_PAIRING_ATTEMPTS;
-    await env.DB.prepare("UPDATE pairings SET attempts = ?, expiresAt = ? WHERE id = ?")
-      .bind(attempts, burn ? now : pairing.expiresAt, pairing.id)
-      .run();
-    return json({ error: "incorrect code" }, 401);
-  }
 
   const deviceId = randomId();
   const token = randomToken();
@@ -186,7 +175,12 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   // whose cursor sits below it can no longer trust that gap, since a delete it missed might
   // already be gone from this table. Today the floor never moves, so this can't yet fire in
   // production — it's here so the contract exists and is tested before the purge job does.
-  if (since < cursor.retentionFloorSeq) {
+  //
+  // since === 0 is a fresh client doing a full resync already — it has no prior gap to
+  // distrust, so the floor never applies to it. Without this guard, a brand-new pairing would
+  // 410-loop forever the moment the floor ever moves off 0, since 0 is less than anything
+  // positive.
+  if (since > 0 && since < cursor.retentionFloorSeq) {
     return json({ error: "cursor too old; full resync required" }, 410);
   }
 
