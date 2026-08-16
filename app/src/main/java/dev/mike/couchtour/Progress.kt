@@ -44,6 +44,12 @@ data class Progress(
      * contain. Empty only on a row that somehow predates the v6 backfill.
      */
     val artist: String = "",
+    /**
+     * Epoch millis a queue was cleared, or null while it's live. A tombstone rather than a
+     * real `DELETE`: a sync client needs to know a row was removed, not just that it's
+     * absent, to avoid a later push from another device silently bringing it back.
+     */
+    val deletedAt: Long? = null,
 )
 
 @Dao
@@ -52,24 +58,24 @@ interface ProgressDao {
     suspend fun put(progress: Progress)
 
     /** The "Continue listening" row: still going, and not hidden by hand. */
-    @Query("SELECT * FROM progress WHERE finished = 0 AND dismissed = 0 ORDER BY updatedAt DESC LIMIT 25")
+    @Query("SELECT * FROM progress WHERE finished = 0 AND dismissed = 0 AND deletedAt IS NULL ORDER BY updatedAt DESC LIMIT 25")
     fun inProgress(): Flow<List<Progress>>
 
     /** Everything ever played, including finished and dismissed queues. */
-    @Query("SELECT * FROM progress ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM progress WHERE deletedAt IS NULL ORDER BY updatedAt DESC")
     fun history(): Flow<List<Progress>>
 
-    @Query("SELECT COUNT(*) FROM progress")
+    @Query("SELECT COUNT(*) FROM progress WHERE deletedAt IS NULL")
     fun historyCount(): Flow<Int>
 
     /** The bands in history, for grouping it. Blank artists are skipped — see [Progress.artist]. */
-    @Query("SELECT DISTINCT artist FROM progress WHERE artist != '' ORDER BY artist")
+    @Query("SELECT DISTINCT artist FROM progress WHERE artist != '' AND deletedAt IS NULL ORDER BY artist")
     fun artists(): Flow<List<String>>
 
-    @Query("SELECT * FROM progress WHERE artist = :artist ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM progress WHERE artist = :artist AND deletedAt IS NULL ORDER BY updatedAt DESC")
     fun historyFor(artist: String): Flow<List<Progress>>
 
-    @Query("SELECT * FROM progress WHERE queueKey = :key")
+    @Query("SELECT * FROM progress WHERE queueKey = :key AND deletedAt IS NULL")
     suspend fun get(key: String): Progress?
 
     @Query("UPDATE progress SET dismissed = 1 WHERE queueKey = :key")
@@ -78,13 +84,19 @@ interface ProgressDao {
     @Query("UPDATE progress SET finished = 1 WHERE queueKey = :key")
     suspend fun markFinished(key: String)
 
-    @Query("DELETE FROM progress WHERE queueKey = :key")
-    suspend fun clear(key: String)
+    /**
+     * Tombstones the row rather than deleting it, so a sync client can tell "removed" apart
+     * from "never existed" — see [Progress.deletedAt]. Every read query filters it back out,
+     * so this is invisible to the rest of the app; [put] un-deletes by writing a fresh row
+     * with `deletedAt = null`, the same way it already clears `dismissed`.
+     */
+    @Query("UPDATE progress SET deletedAt = :now, updatedAt = :now WHERE queueKey = :key")
+    suspend fun clear(key: String, now: Long)
 }
 
 @Database(
     entities = [Progress::class],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
@@ -148,6 +160,19 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the [Progress.deletedAt] tombstone. Existing rows get NULL, meaning live —
+         * nothing in the table has actually been cleared by this migration. `clear()` itself
+         * switches from a `DELETE` to setting this column, so a future sync client can tell
+         * "removed" apart from "never existed" instead of a deletion silently reappearing
+         * from a device that hadn't seen it yet.
+         */
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE progress ADD COLUMN deletedAt INTEGER")
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -160,6 +185,7 @@ abstract class PhishInDb : RoomDatabase() {
                 "phishin.db"
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                MIGRATION_6_7,
             )
                 .build().also { instance = it }
         }

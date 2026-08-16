@@ -1,4 +1,5 @@
 import XCTest
+import GRDB
 @testable import CouchTourKit
 
 /// Port of ProgressDaoTest.kt against an in-memory `ProgressStore`, pinning the same query
@@ -167,20 +168,52 @@ final class ProgressStoreTests: XCTestCase {
     func testClearingForgetsAQueueEntirely() throws {
         try store.put(progress(key: "show:1997-02-13"))
 
-        try store.clear(key: "show:1997-02-13")
+        try store.clear(key: "show:1997-02-13", now: 5_000)
 
-        // Unlike dismissing, this leaves no trace in history either.
+        // Unlike dismissing, this leaves no trace in history either — from the store's
+        // perspective. The row itself survives as a tombstone; see the deletedAt tests below.
         XCTAssertNil(try store.get(key: "show:1997-02-13"))
         XCTAssertEqual(0, try store.inProgress().count)
         XCTAssertEqual(0, try store.history().count)
+        XCTAssertEqual(0, try store.historyCount())
+        XCTAssertEqual([], try store.artists())
+        XCTAssertEqual([], try store.historyFor(artist: "Phish").map { $0.queueKey })
     }
 
     func testClearingAnAbsentKeyIsANoOp() throws {
         try store.put(progress(key: "show:1997-02-13"))
 
-        try store.clear(key: "show:nonexistent")
+        try store.clear(key: "show:nonexistent", now: 5_000)
 
         XCTAssertEqual(1, try store.inProgress().count)
+    }
+
+    func testClearingStampsATombstoneRatherThanDeletingTheRow() throws {
+        try store.put(progress(key: "show:1997-02-13", trackIndex: 5, positionMs: 35_342))
+
+        try store.clear(key: "show:1997-02-13", now: 9_999)
+
+        // Bypass the store's own deletedAt filter to see the raw row underneath.
+        let row = try store.rawRow(key: "show:1997-02-13")!
+        XCTAssertEqual(9_999, row["deletedAt"] as Int64?)
+        XCTAssertEqual(9_999, row["updatedAt"] as Int64?)
+        // The position it was cleared at survives, even though nothing reads it.
+        XCTAssertEqual(5, row["trackIndex"] as Int64?)
+    }
+
+    func testPlayingAClearedQueueAgainBringsItBack() throws {
+        try store.put(progress(key: "show:1997-02-13"))
+        try store.clear(key: "show:1997-02-13", now: 5_000)
+        XCTAssertNil(try store.get(key: "show:1997-02-13"))
+
+        // put() replaces the whole row, including deletedAt back to nil — the same
+        // un-delete-by-replaying semantic dismissed already has.
+        try store.put(progress(key: "show:1997-02-13", positionMs: 8_000))
+
+        XCTAssertEqual(1, try store.inProgress().count)
+        let row = try store.get(key: "show:1997-02-13")!
+        XCTAssertNil(row.deletedAt)
+        XCTAssertEqual(8_000, row.positionMs)
     }
 
     func testShowsAndPlaylistsCoexistUnderOneTable() throws {

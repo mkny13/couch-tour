@@ -9,6 +9,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -75,6 +76,18 @@ class MigrationTest {
     // with pending_scrobbles dropped.
     private val v5CreateTable = v4CreateTable
     private val v5IdentityHash = "2748fc6495e0489eaa1ea10e27656425"
+
+    // From app/schemas/dev.mike.couchtour.PhishInDb/6.json.
+    private val v6CreateTable = """
+        CREATE TABLE IF NOT EXISTS `progress` (
+            `queueKey` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
+            `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
+            `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL,
+            `finished` INTEGER NOT NULL, `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL,
+            PRIMARY KEY(`queueKey`)
+        )
+    """.trimIndent()
+    private val v6IdentityHash = "4d896ba9c2e33ae0f04a776ea8820b5f"
 
     @Before
     fun setUp() {
@@ -183,6 +196,28 @@ class MigrationTest {
         db.close()
     }
 
+    private fun createV6DatabaseWithRows() {
+        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        db.execSQL(v6CreateTable)
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+        db.execSQL(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            arrayOf(v6IdentityHash),
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist)
+               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish')"""
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist)
+               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish')"""
+        )
+        db.version = 6
+        db.close()
+    }
+
     private fun openWithCurrentSchema(): PhishInDb =
         Room.databaseBuilder(context, PhishInDb::class.java, dbFile.name)
             .addMigrations(
@@ -191,6 +226,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_3_4,
                 PhishInDb.MIGRATION_4_5,
                 PhishInDb.MIGRATION_5_6,
+                PhishInDb.MIGRATION_6_7,
             )
             .allowMainThreadQueries()
             .build()
@@ -381,6 +417,39 @@ class MigrationTest {
             assertEquals(2, rows.size)
             assertTrue(rows.all { it.artist == "Phish" })
             assertEquals(listOf("Phish"), db.progressDao().artists().first())
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v6 -> v7
+
+    @Test
+    fun `migrating from v6 keeps every row, live and not deleted`() = runBlocking {
+        createV6DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val dao = db.progressDao()
+            assertEquals(2, dao.history().first().size)
+            assertNull(dao.get("show:1992-12-02")!!.deletedAt)
+            assertNull(dao.get("show:1997-02-13")!!.deletedAt)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `clearing works on a database migrated from v6`() = runBlocking {
+        createV6DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val dao = db.progressDao()
+            dao.clear("show:1997-02-13", now = 9_999)
+
+            assertNull(dao.get("show:1997-02-13"))
+            assertEquals(1, dao.history().first().size)
         } finally {
             db.close()
         }

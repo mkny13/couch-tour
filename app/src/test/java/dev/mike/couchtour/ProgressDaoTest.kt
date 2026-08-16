@@ -211,21 +211,60 @@ class ProgressDaoTest {
     fun `clearing forgets a queue entirely`() = runBlocking {
         dao.put(progress("show:1997-02-13"))
 
-        dao.clear("show:1997-02-13")
+        dao.clear("show:1997-02-13", now = 5_000)
 
-        // Unlike dismissing, this leaves no trace in history either.
+        // Unlike dismissing, this leaves no trace in history either — from the DAO's
+        // perspective. The row itself survives as a tombstone; see the deletedAt tests below.
         assertNull(dao.get("show:1997-02-13"))
         assertEquals(0, dao.inProgress().first().size)
         assertEquals(0, dao.history().first().size)
+        assertEquals(0, dao.historyCount().first())
+        assertEquals(emptyList<String>(), dao.artists().first())
+        assertEquals(emptyList<String>(), dao.historyFor("Phish").first().map { it.queueKey })
     }
 
     @Test
     fun `clearing an absent key is a no-op`() = runBlocking {
         dao.put(progress("show:1997-02-13"))
 
-        dao.clear("show:nonexistent")
+        dao.clear("show:nonexistent", now = 5_000)
 
         assertEquals(1, dao.inProgress().first().size)
+    }
+
+    @Test
+    fun `clearing stamps a tombstone rather than deleting the row`() = runBlocking {
+        dao.put(progress("show:1997-02-13", trackIndex = 5, positionMs = 35_342))
+
+        dao.clear("show:1997-02-13", now = 9_999)
+
+        // Bypass the DAO's own deletedAt filter to see the raw row underneath.
+        val raw = db.openHelper.readableDatabase.query(
+            "SELECT * FROM progress WHERE queueKey = 'show:1997-02-13'"
+        )
+        raw.use {
+            assertTrue(it.moveToFirst())
+            assertEquals(9_999L, it.getLong(it.getColumnIndexOrThrow("deletedAt")))
+            assertEquals(9_999L, it.getLong(it.getColumnIndexOrThrow("updatedAt")))
+            // The position it was cleared at survives, even though nothing reads it.
+            assertEquals(5, it.getInt(it.getColumnIndexOrThrow("trackIndex")))
+        }
+    }
+
+    @Test
+    fun `playing a cleared queue again brings it back`() = runBlocking {
+        dao.put(progress("show:1997-02-13"))
+        dao.clear("show:1997-02-13", now = 5_000)
+        assertNull(dao.get("show:1997-02-13"))
+
+        // put() replaces the whole row, including deletedAt back to null — the same
+        // un-delete-by-replaying semantic dismissed already has.
+        dao.put(progress("show:1997-02-13", positionMs = 8_000))
+
+        assertEquals(1, dao.inProgress().first().size)
+        val row = dao.get("show:1997-02-13")!!
+        assertNull(row.deletedAt)
+        assertEquals(8_000L, row.positionMs)
     }
 
     @Test

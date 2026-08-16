@@ -30,11 +30,15 @@ public struct PlaybackProgress: Codable, Equatable, FetchableRecord, Persistable
     /// The band, denormalised like the rest of the display fields so history renders without
     /// a network call or a look at which backend the key belongs to.
     public var artist: String
+    /// Epoch milliseconds this queue was cleared, or nil while it's live. A tombstone rather
+    /// than a real row deletion: a sync client needs to know a row was removed, not just that
+    /// it's absent, to avoid a later push from another device silently bringing it back.
+    public var deletedAt: Int64?
 
     public init(
         queueKey: String, title: String, subtitle: String, artUrl: String? = nil, trackIndex: Int,
         positionMs: Int64, trackTitle: String, updatedAt: Int64, finished: Bool = false,
-        dismissed: Bool = false, artist: String = ""
+        dismissed: Bool = false, artist: String = "", deletedAt: Int64? = nil
     ) {
         self.queueKey = queueKey
         self.title = title
@@ -47,6 +51,7 @@ public struct PlaybackProgress: Codable, Equatable, FetchableRecord, Persistable
         self.finished = finished
         self.dismissed = dismissed
         self.artist = artist
+        self.deletedAt = deletedAt
     }
 }
 
@@ -101,6 +106,14 @@ public final class ProgressStore {
                 t.column("artist", .text).notNull().defaults(to: "")
             }
         }
+        // Adds the deletedAt tombstone (Android's MIGRATION_6_7). A separate registered
+        // migration, not folded into v6_initial, because existing desktop installs have
+        // already run that one — GRDB replays only migrations a database hasn't seen yet.
+        migrator.registerMigration("v7_deletedAt") { db in
+            try db.alter(table: "progress") { t in
+                t.add(column: "deletedAt", .integer)
+            }
+        }
         return migrator
     }
 
@@ -112,7 +125,8 @@ public final class ProgressStore {
     public func inProgress() throws -> [PlaybackProgress] {
         try dbQueue.read { db in
             try PlaybackProgress
-                .filter(Column("finished") == false && Column("dismissed") == false)
+                .filter(Column("finished") == false && Column("dismissed") == false
+                    && Column("deletedAt") == nil)
                 .order(Column("updatedAt").desc)
                 .limit(25)
                 .fetchAll(db)
@@ -122,12 +136,17 @@ public final class ProgressStore {
     /// Everything ever played, including finished and dismissed queues.
     public func history() throws -> [PlaybackProgress] {
         try dbQueue.read { db in
-            try PlaybackProgress.order(Column("updatedAt").desc).fetchAll(db)
+            try PlaybackProgress
+                .filter(Column("deletedAt") == nil)
+                .order(Column("updatedAt").desc)
+                .fetchAll(db)
         }
     }
 
     public func historyCount() throws -> Int {
-        try dbQueue.read { db in try PlaybackProgress.fetchCount(db) }
+        try dbQueue.read { db in
+            try PlaybackProgress.filter(Column("deletedAt") == nil).fetchCount(db)
+        }
     }
 
     /// The bands in history, for grouping it. Blank artists are skipped — see `PlaybackProgress.artist`.
@@ -135,7 +154,7 @@ public final class ProgressStore {
         try dbQueue.read { db in
             try String.fetchAll(
                 db,
-                sql: "SELECT DISTINCT artist FROM progress WHERE artist != '' ORDER BY artist"
+                sql: "SELECT DISTINCT artist FROM progress WHERE artist != '' AND deletedAt IS NULL ORDER BY artist"
             )
         }
     }
@@ -143,14 +162,18 @@ public final class ProgressStore {
     public func historyFor(artist: String) throws -> [PlaybackProgress] {
         try dbQueue.read { db in
             try PlaybackProgress
-                .filter(Column("artist") == artist)
+                .filter(Column("artist") == artist && Column("deletedAt") == nil)
                 .order(Column("updatedAt").desc)
                 .fetchAll(db)
         }
     }
 
     public func get(key: String) throws -> PlaybackProgress? {
-        try dbQueue.read { db in try PlaybackProgress.fetchOne(db, key: key) }
+        try dbQueue.read { db in
+            try PlaybackProgress
+                .filter(Column("queueKey") == key && Column("deletedAt") == nil)
+                .fetchOne(db)
+        }
     }
 
     public func dismiss(key: String) throws {
@@ -165,9 +188,25 @@ public final class ProgressStore {
         }
     }
 
-    public func clear(key: String) throws {
+    /// Tombstones the row rather than deleting it, so a sync client can tell "removed" apart
+    /// from "never existed" — see `PlaybackProgress.deletedAt`. Every read query filters it
+    /// back out, so this is invisible to the rest of the app; `put` un-deletes by writing a
+    /// fresh row with `deletedAt = nil`, the same way it already clears `dismissed`.
+    public func clear(key: String, now: Int64) throws {
         try dbQueue.write { db in
-            try db.execute(sql: "DELETE FROM progress WHERE queueKey = ?", arguments: [key])
+            try db.execute(
+                sql: "UPDATE progress SET deletedAt = ?, updatedAt = ? WHERE queueKey = ?",
+                arguments: [now, now, key]
+            )
+        }
+    }
+
+    /// Test-only: the raw row bypassing every public read's `deletedAt` filter, to verify the
+    /// tombstone itself rather than what the rest of the app can see. Internal, not public —
+    /// visible to the test target via `@testable import`.
+    func rawRow(key: String) throws -> Row? {
+        try dbQueue.read { db in
+            try Row.fetchOne(db, sql: "SELECT * FROM progress WHERE queueKey = ?", arguments: [key])
         }
     }
 }

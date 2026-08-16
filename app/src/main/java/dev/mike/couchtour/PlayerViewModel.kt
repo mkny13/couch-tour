@@ -168,7 +168,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Erase from history entirely. */
     fun forget(progress: Progress) {
-        viewModelScope.launch { progressDao.clear(progress.queueKey) }
+        viewModelScope.launch { progressDao.clear(progress.queueKey, System.currentTimeMillis()) }
     }
 
     /** Mark as played through without actually playing to the end. */

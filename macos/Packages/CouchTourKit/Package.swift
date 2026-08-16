@@ -19,7 +19,10 @@ let package = Package(
         ),
         .testTarget(
             name: "CouchTourKitTests",
-            dependencies: ["CouchTourKit"],
+            dependencies: [
+                "CouchTourKit",
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ],
             resources: [.copy("Fixtures")]
         ),
     ]

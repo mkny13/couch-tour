@@ -865,5 +865,33 @@ first real attempt. If a future session hits the identical `PackageDescription.P
 .__allocating_init` linker error, the fix is the same: install Xcode, don't debug the Command
 Line Tools install.
 
+## Iteration 19 — the deletedAt tombstone (D116-D118)
+
+First step of cross-client progress sync, designed but not yet built beyond this: the schema
+change D98 flagged as a prerequisite, landed on both clients ahead of any network code so it
+can be exercised and tested on its own.
+
+**D116 — `clear()` tombstones the row instead of deleting it; every read query filters the
+tombstone back out.** A real `DELETE` is indistinguishable, to a future sync client, from a
+row that was simply never pushed yet — nothing left behind to say "this was removed," so a
+device that synced before the delete would push its own copy back and silently resurrect it.
+Filtering `deletedAt IS NULL` into `inProgress`, `history`, `historyCount`, `artists`,
+`historyFor`, and `get` keeps the tombstone invisible to the rest of the app; only a raw query
+against the table sees it, which is exactly what the new tests exercise to pin the behavior
+down. `clear()` also bumps `updatedAt`, the same field any other write would, so a delete
+competes on equal footing with a concurrent play under ordinary last-write-wins.
+
+**D117 — `deletedAt` is a nullable epoch-millis column, not a boolean alongside a separate
+timestamp.** `NULL` means live, a value means "cleared at this time," in one column instead of
+two that could disagree. `finished` and `dismissed` stay boolean because both are pure UI
+state a user can toggle back and forth; `deletedAt` is closer to `updatedAt` in kind — a fact
+about when something happened — so it follows that column's shape instead.
+
+**D118 — macOS registers the tombstone as a second migration, `v7_deletedAt`, not folded into
+`v6_initial`.** The MVP shipped and is presumably already installed; GRDB's migrator replays
+only migrations a given database hasn't seen, so folding the new column into the first
+migration would mean an existing install never runs it. Same reasoning as why `MIGRATION_6_7`
+is a new migration on the Android side rather than a change to `MIGRATION_5_6`.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.
