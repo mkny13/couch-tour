@@ -3,9 +3,10 @@
 An unofficial native client for [phish.in](https://phish.in), the open-source live Phish
 archive, and for Relisten's other-artist catalog. Two clients live in this repo: an Android
 app (Kotlin, Jetpack Compose, Media3, Room) and a macOS app (Swift, SwiftUI, AVFoundation,
-GRDB). See [README.md](README.md) for what the app does, [DECISIONS.md](DECISIONS.md) for why
-it does it that way, and [ROADMAP.md](ROADMAP.md) for what's not built yet — one log covers
-both clients; entries are tagged by platform where it isn't obvious from context.
+GRDB), plus `sync/`, a Cloudflare Worker + D1 backend the two will sync progress through. See
+[README.md](README.md) for what the app does, [DECISIONS.md](DECISIONS.md) for why it does it
+that way, and [ROADMAP.md](ROADMAP.md) for what's not built yet — one log covers all three;
+entries are tagged by platform where it isn't obvious from context.
 
 ## Building (Android)
 
@@ -52,6 +53,33 @@ macos/scripts/install.sh
 It's ad-hoc signed (D113) — no paid Apple Developer account is configured, and none is needed
 for local use; Gatekeeper only quarantines files downloaded from the internet, never a
 locally built `.app`.
+
+## Building (sync backend)
+
+`sync/` is a Cloudflare Worker + D1 service (D119-D125) that both clients will eventually
+sync progress through, deployed at `https://couch-tour-sync.mkastellec.workers.dev` under
+Mike's Cloudflare account. `npm install` once, then day-to-day work runs locally with no
+Cloudflare account needed:
+
+```
+cd sync && npm install
+npm run db:migrate:local   # apply schema.sql to a local D1 instance
+npm run dev                 # wrangler dev on http://localhost:8787
+```
+
+`wrangler dev`'s local mode never contacts Cloudflare's API. `npm run typecheck` runs
+`tsc --noEmit`; there's no automated test suite yet — the endpoints were verified by hand
+against `wrangler dev` locally, then smoke-tested against the real deployment (D124-D125).
+
+Redeploying after a change to `src/` or `schema.sql`:
+
+```
+npm run db:migrate:remote   # only if schema.sql changed
+npm run deploy
+```
+
+`wrangler login` is already done on this machine (`~/Library/Preferences/.wrangler/config/`);
+`wrangler.toml`'s `database_id` points at the real database, not a placeholder.
 
 ## Names that look wrong and are not
 

@@ -893,5 +893,71 @@ only migrations a given database hasn't seen, so folding the new column into the
 migration would mean an existing install never runs it. Same reasoning as why `MIGRATION_6_7`
 is a new migration on the Android side rather than a change to `MIGRATION_5_6`.
 
+## Iteration 20 — the sync backend, built and deployed (D119-D125)
+
+A Cloudflare Worker + D1 service at `sync/`, built and exercised end to end against a local
+D1 instance first (`wrangler dev`, no Cloudflare account touched), then deployed for real
+once Mike authenticated `wrangler login` under his own account.
+
+**D119 — Cloudflare Workers + D1, signed off before any code.** $0 at this scale (100k
+requests/day free tier against a two-device app doing maybe 50/day), no idle-pause unlike a
+free-tier Supabase project pausing after 7 days, and D1 being SQLite means the server's
+`progress` table is the client's table plus two columns rather than a schema translation.
+
+**D120 — Device tokens are opaque random strings hashed at rest, not JWTs, with two-slot
+rotation.** `devices.tokenHash` is `SHA-256` of the live token; a database leak yields no
+working credentials. Not a JWT: there's no third party to verify one against, and JWT
+revocation needs a denylist anyway, so a row lookup is both simpler and instantly revocable —
+`DELETE /devices/{id}` takes effect on literally the next request. Rotation (past 90 days)
+writes the old hash into `previousTokenHash`/`previousTokenExpiresAt` rather than just
+overwriting `tokenHash`, so a client that crashes between receiving `X-Sync-Token-Rotated` and
+persisting it has 48 hours to retry before it's actually locked out.
+
+**D121 — the stale-cursor check compares `since` against a seq-scale `retentionFloorSeq`, not
+a timestamp.** The first implementation compared `since` (a `seq` value — a small monotonic
+per-group counter) against `now - 180 days` (an epoch-millis threshold), which is a unit
+mismatch: it fired the `410 Gone` path on every request, caught by the very first live test
+against local D1 rather than by `tsc`, since both sides were typed as plain `number`.
+`retentionFloorSeq` lives on the `seqs` table, one seq-scale value per group, and rises only
+when a future purge job removes old tombstones — which doesn't exist yet, so the floor is
+permanently 0 today and this path cannot fire in practice. It's implemented and tested now
+(by hand-setting the floor in a local DB) so the contract exists before the purge job does,
+rather than being retrofitted around whatever the job happens to produce.
+
+**D122 — `POST /pair/claim` takes a `pairingId` alongside the code, not the code alone.** A
+wrong-code guess against a bare code has no row to attach an attempt count to — `codeHash`
+only matches on an exact hit, so there's nothing to increment on a miss. Carrying the pairing
+id (embedded in the same QR/deep-link payload as the code) gives the five-attempts-then-burn
+rule an actual row to burn.
+
+**D123 — conflict resolution accepts an incoming write when `updatedAt >= existing.updatedAt`,
+not `>`.** On an exact tie this favors whichever push reaches the server later, which is
+`seq`'s tie-break in effect without a separate comparison: the later arrival is, by
+construction, the one being applied right now. Applying accepted rows and bumping the `seqs`
+counter happen in one `env.DB.batch()` — D1 has no interactive transactions, so a
+read-the-counter-then-write-the-rows sequence across two round trips would race if two devices
+pushed to the same group at once.
+
+**D124 — verified live against local D1, every path exercised with real HTTP requests, not
+just written and typechecked:** bootstrap pairing and claim, a device joining an existing
+group, wrong-code attempts burning a pairing on the fifth try, a push/pull round trip between
+two devices, an older write losing to a newer one and a newer one overwriting it, `GET
+/devices` listing both with the right `isSelf`, `DELETE /devices/{id}` taking effect on the
+very next request, the `410` path at and around the retention floor, and token rotation
+(backdating `tokenIssuedAt` past 90 days) confirming both the rotated and the pre-rotation
+token work afterward.
+
+**D125 — deployed to production, smoke-tested, and the test data cleaned back out.**
+`wrangler login` (OAuth) needed a second attempt: the first run was launched with a shell `&`
+inside one tool call rather than kept alive as its own tracked process, so the callback
+listener was already dead by the time the browser redirected back to it — "localhost refused
+to connect" was that death, not a Cloudflare-side failure. Once actually kept running,
+`wrangler d1 create couch-tour-sync` and `wrangler deploy` succeeded on the first real
+attempt; the service is live at `https://couch-tour-sync.mkastellec.workers.dev`.
+`wrangler.toml`'s `database_id` now points at the real database. A smoke-test pairing was
+run against production to confirm the deployed Worker actually answers (not just that `wrangler
+deploy` exited 0), then deleted by hand — the one thing this MVP has no delete-a-whole-group
+endpoint for yet, so cleanup went straight through `wrangler d1 execute --remote`.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

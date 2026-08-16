@@ -41,10 +41,12 @@ SwiftUI + AVFoundation (D94), not Electron or a browser client.
 
 **What's next for desktop:**
 
-- Sync of playback history and resume with mobile. Deliberately deferred (D98); the schema
-  and queue-key grammar are kept identical to Android's so it stays additive. The `deletedAt`
-  tombstone both clients will need to sync removals is in (D116-D118); the sync mechanism
-  itself — a backend, pairing, token lifecycle — is still just designed, not built.
+- Sync of playback history and resume with mobile. The `deletedAt` tombstone both clients
+  need to sync removals is in (D116-D118); the backend itself — pairing, push/pull, token
+  rotation and revocation — is built and deployed at
+  `https://couch-tour-sync.mkastellec.workers.dev` (D119-D125, `sync/`), but not wired into
+  either client yet. That's the remaining piece: background sync scheduling, the pairing UI,
+  and Keychain/EncryptedSharedPreferences token storage on each client.
 - Artwork in Now Playing (D107).
 - History grouped by artist, matching Android, once there's enough real history to want it.
 - Login, likes, playlists, search, and casting on desktop — out of scope for the MVP,
