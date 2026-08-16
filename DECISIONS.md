@@ -1069,5 +1069,26 @@ test asserts exact-string equality safely). Fixed by checking content
 (`body.contains(#""since":1"#)`) rather than the exact byte layout, the same approach the
 sibling push-test already used. Re-run five times clean afterward before trusting it.
 
+## Iteration 22 — a side-installable beta build (D137)
+
+**D137 — `-PsideInstall=true` builds `dev.mike.couchtour.beta` ("Couch Tour Beta"), gated
+behind a Gradle property so every ordinary debug build is untouched.** Wanted for exactly one
+reason: testing the new sync feature (Iteration 21) without disturbing the working v0.12
+sideload — every prior release has shared one `applicationId` and one debug signing key
+specifically so a new CI build updates the previous install in place (see
+`build-debug-apk.yml`'s own comment on that, and the v0.2a incident that motivated it), which
+is right for normal releases but wrong for a beta the tester wants to run *alongside* the
+known-good build. `android:label` moved from `@string/app_name` to a manifest placeholder
+(`${appLabel}`) so the two installs are distinguishable in the launcher without a duplicate
+resource declaration — `resValue` was the first attempt and fails outright, since `app_name`
+already exists in `strings.xml`; a manifest placeholder is a separate mechanism from generated
+resources and doesn't collide. `strings.xml` itself is now empty of purpose and was removed
+rather than left holding a value nothing reads. `namespace` (the compiled Kotlin package,
+`dev.mike.couchtour`) is untouched — only `applicationId` (the install identity) changes, so
+the one fully-qualified class reference in the manifest (`CastOptionsProvider`) keeps
+resolving correctly. Wired into `build-debug-apk.yml` as an opt-in `side_install` input,
+alongside a `prerelease` input (existing releases v0.1-v0.12 never used GitHub's own
+pre-release flag; this one does, being genuinely experimental).
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

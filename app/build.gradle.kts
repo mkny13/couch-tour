@@ -31,6 +31,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["appLabel"] = "Couch Tour"
     }
 
     signingConfigs {
@@ -53,6 +54,19 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Opt-in only (-PsideInstall=true): a distinct applicationId so this build
+            // installs alongside the regular debug sideload rather than updating over it —
+            // for trying a risky change without disturbing the working install. Every
+            // ordinary debug build (local or CI) is unaffected and keeps sharing one
+            // applicationId/signing key so it always updates in place, per
+            // build-debug-apk.yml's own reasoning.
+            if (project.findProperty("sideInstall") == "true") {
+                applicationIdSuffix = ".beta"
+                versionNameSuffix = "-beta"
+                manifestPlaceholders["appLabel"] = "Couch Tour Beta"
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
