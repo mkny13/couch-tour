@@ -1,0 +1,503 @@
+{
+ "shows": [
+  {
+   "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+   "venue": {
+    "shows_at_venue": 5,
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "latitude": null,
+    "longitude": null,
+    "name": "The Palladium",
+    "location": "New York, NY, USA",
+    "upstream_identifier": "jerrygarcia.com_The Palladium::New York, NY, USA",
+    "slug": "the-palladium",
+    "past_names": null,
+    "sortName": "Palladium, The",
+    "uuid": "b252393a-6a82-1ffe-d288-7eca7aec55a7",
+    "created_at": "2025-12-21T21:50:00Z",
+    "updated_at": "2021-06-15T21:53:21Z"
+   },
+   "venue_uuid": "b252393a-6a82-1ffe-d288-7eca7aec55a7",
+   "tour_uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+   "tour": {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "start_date": "1977-04-22T00:00:00Z",
+    "end_date": "1977-06-09T00:00:00Z",
+    "name": "Spring 1977",
+    "slug": "spring-1977",
+    "upstream_identifier": "Spring 1977",
+    "uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+    "created_at": "2017-12-16T10:41:03Z",
+    "updated_at": "2017-05-17T13:14:44Z"
+   },
+   "year_uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+   "year": {
+    "show_count": 57,
+    "source_count": 219,
+    "duration": 2163413,
+    "avg_duration": 11282.995,
+    "avg_rating": 9.095924,
+    "year": "1977",
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+    "popularity": null,
+    "created_at": "2018-10-23T07:01:01Z",
+    "updated_at": "2025-10-20T11:03:27Z"
+   },
+   "era": null,
+   "date": "1977-05-04T00:00:00Z",
+   "avg_rating": 8.846154,
+   "avg_duration": 10303.0,
+   "display_date": "1977-05-04",
+   "most_recent_source_updated_at": "2009-05-12T17:19:42Z",
+   "has_soundboard_source": true,
+   "has_streamable_flac_source": true,
+   "source_count": 3,
+   "uuid": "8f4bb6d5-645a-d98f-5a41-3e4663821f71",
+   "popularity": {
+    "momentum_score": 0.5524,
+    "trend_ratio": 0.7276,
+    "windows": {
+     "48h": {
+      "plays": 118,
+      "hours": 19.0506,
+      "hot_score": 10.8628
+     },
+     "7d": {
+      "plays": 488,
+      "hours": 81.4264,
+      "hot_score": 22.0907
+     },
+     "30d": {
+      "plays": 2003,
+      "hours": 329.8081,
+      "hot_score": 44.7549
+     }
+    }
+   },
+   "created_at": "2018-10-23T07:00:49Z",
+   "updated_at": "2009-05-12T17:19:42Z"
+  },
+  {
+   "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+   "venue": {
+    "shows_at_venue": 11,
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "latitude": null,
+    "longitude": null,
+    "name": "Veterans Memorial Coliseum",
+    "location": "New Haven, CT, USA",
+    "upstream_identifier": "jerrygarcia.com_Veterans Memorial Coliseum::New Haven, CT, USA",
+    "slug": "veterans-memorial-coliseum",
+    "past_names": null,
+    "sortName": "Veterans Memorial Coliseum",
+    "uuid": "e9428f85-1f76-47dd-7e27-88b81917fcae",
+    "created_at": "2025-12-21T21:50:00Z",
+    "updated_at": "2021-06-15T21:53:21Z"
+   },
+   "venue_uuid": "e9428f85-1f76-47dd-7e27-88b81917fcae",
+   "tour_uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+   "tour": {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "start_date": "1977-04-22T00:00:00Z",
+    "end_date": "1977-06-09T00:00:00Z",
+    "name": "Spring 1977",
+    "slug": "spring-1977",
+    "upstream_identifier": "Spring 1977",
+    "uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+    "created_at": "2017-12-16T10:41:03Z",
+    "updated_at": "2017-05-17T13:14:44Z"
+   },
+   "year_uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+   "year": {
+    "show_count": 57,
+    "source_count": 219,
+    "duration": 2163413,
+    "avg_duration": 11282.995,
+    "avg_rating": 9.095924,
+    "year": "1977",
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+    "popularity": null,
+    "created_at": "2018-10-23T07:01:01Z",
+    "updated_at": "2025-10-20T11:03:27Z"
+   },
+   "era": null,
+   "date": "1977-05-05T00:00:00Z",
+   "avg_rating": 9.692307,
+   "avg_duration": 10864.0,
+   "display_date": "1977-05-05",
+   "most_recent_source_updated_at": "2025-04-23T10:20:06Z",
+   "has_soundboard_source": true,
+   "has_streamable_flac_source": true,
+   "source_count": 4,
+   "uuid": "deead198-79cf-56c0-ac0e-49786e76ecf3",
+   "popularity": {
+    "momentum_score": 0.4742,
+    "trend_ratio": 0.4314,
+    "windows": {
+     "48h": {
+      "plays": 79,
+      "hours": 12.0903,
+      "hot_score": 8.8882
+     },
+     "7d": {
+      "plays": 386,
+      "hours": 59.63,
+      "hot_score": 19.6469
+     },
+     "30d": {
+      "plays": 1880,
+      "hours": 288.0744,
+      "hot_score": 43.359
+     }
+    }
+   },
+   "created_at": "2018-10-23T07:00:49Z",
+   "updated_at": "2008-03-19T04:13:53Z"
+  },
+  {
+   "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+   "venue": {
+    "shows_at_venue": 24,
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "latitude": null,
+    "longitude": null,
+    "name": "Boston Garden",
+    "location": "Boston, MA, USA",
+    "upstream_identifier": "jerrygarcia.com_Boston Garden::Boston, MA, USA",
+    "slug": "boston-garden",
+    "past_names": null,
+    "sortName": "Boston Garden",
+    "uuid": "79993c34-f4d2-fe38-ace7-a112b7d45230",
+    "created_at": "2025-12-21T21:49:38Z",
+    "updated_at": "2021-06-15T21:53:19Z"
+   },
+   "venue_uuid": "79993c34-f4d2-fe38-ace7-a112b7d45230",
+   "tour_uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+   "tour": {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "start_date": "1977-04-22T00:00:00Z",
+    "end_date": "1977-06-09T00:00:00Z",
+    "name": "Spring 1977",
+    "slug": "spring-1977",
+    "upstream_identifier": "Spring 1977",
+    "uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+    "created_at": "2017-12-16T10:41:03Z",
+    "updated_at": "2017-05-17T13:14:44Z"
+   },
+   "year_uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+   "year": {
+    "show_count": 57,
+    "source_count": 219,
+    "duration": 2163413,
+    "avg_duration": 11282.995,
+    "avg_rating": 9.095924,
+    "year": "1977",
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+    "popularity": null,
+    "created_at": "2018-10-23T07:01:01Z",
+    "updated_at": "2025-10-20T11:03:27Z"
+   },
+   "era": null,
+   "date": "1977-05-07T00:00:00Z",
+   "avg_rating": 9.803922,
+   "avg_duration": 11728.0,
+   "display_date": "1977-05-07",
+   "most_recent_source_updated_at": "2024-06-03T19:49:33Z",
+   "has_soundboard_source": true,
+   "has_streamable_flac_source": true,
+   "source_count": 7,
+   "uuid": "589524dc-1045-651c-2361-1b8c1737a86d",
+   "popularity": {
+    "momentum_score": 0.6644,
+    "trend_ratio": 0.4347,
+    "windows": {
+     "48h": {
+      "plays": 201,
+      "hours": 29.0122,
+      "hot_score": 14.1774
+     },
+     "7d": {
+      "plays": 1069,
+      "hours": 155.8614,
+      "hot_score": 32.6956
+     },
+     "30d": {
+      "plays": 4648,
+      "hours": 684.0036,
+      "hot_score": 68.1762
+     }
+    }
+   },
+   "created_at": "2018-10-23T07:00:49Z",
+   "updated_at": "2008-12-12T01:55:11Z"
+  },
+  {
+   "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+   "venue": {
+    "shows_at_venue": 3,
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "latitude": null,
+    "longitude": null,
+    "name": "Barton Hall, Cornell University",
+    "location": "Ithaca, NY, USA",
+    "upstream_identifier": "jerrygarcia.com_Barton Hall, Cornell University::Ithaca, NY, USA",
+    "slug": "barton-hall-cornell-university",
+    "past_names": null,
+    "sortName": "Barton Hall, Cornell University",
+    "uuid": "29f9f7c0-102a-48df-4df5-033823561a09",
+    "created_at": "2025-12-21T21:50:01Z",
+    "updated_at": "2021-06-15T21:53:21Z"
+   },
+   "venue_uuid": "29f9f7c0-102a-48df-4df5-033823561a09",
+   "tour_uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+   "tour": {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "start_date": "1977-04-22T00:00:00Z",
+    "end_date": "1977-06-09T00:00:00Z",
+    "name": "Spring 1977",
+    "slug": "spring-1977",
+    "upstream_identifier": "Spring 1977",
+    "uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+    "created_at": "2017-12-16T10:41:03Z",
+    "updated_at": "2017-05-17T13:14:44Z"
+   },
+   "year_uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+   "year": {
+    "show_count": 57,
+    "source_count": 219,
+    "duration": 2163413,
+    "avg_duration": 11282.995,
+    "avg_rating": 9.095924,
+    "year": "1977",
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+    "popularity": null,
+    "created_at": "2018-10-23T07:01:01Z",
+    "updated_at": "2025-10-20T11:03:27Z"
+   },
+   "era": null,
+   "date": "1977-05-08T00:00:00Z",
+   "avg_rating": 9.438597,
+   "avg_duration": 12267.0,
+   "display_date": "1977-05-08",
+   "most_recent_source_updated_at": "2021-05-03T00:00:50Z",
+   "has_soundboard_source": true,
+   "has_streamable_flac_source": true,
+   "source_count": 10,
+   "uuid": "104c96e5-719f-366f-b72d-8d53709c80e0",
+   "popularity": {
+    "momentum_score": 0.7806,
+    "trend_ratio": 0.8673,
+    "windows": {
+     "48h": {
+      "plays": 612,
+      "hours": 95.3917,
+      "hot_score": 24.7386
+     },
+     "7d": {
+      "plays": 1640,
+      "hours": 251.5275,
+      "hot_score": 40.4969
+     },
+     "30d": {
+      "plays": 8457,
+      "hours": 1311.8942,
+      "hot_score": 91.9619
+     }
+    }
+   },
+   "created_at": "2018-10-23T07:00:49Z",
+   "updated_at": "2005-11-13T05:19:29Z"
+  },
+  {
+   "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+   "venue": {
+    "shows_at_venue": 5,
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "latitude": null,
+    "longitude": null,
+    "name": "War Memorial Auditorium",
+    "location": "Buffalo, NY, USA",
+    "upstream_identifier": "jerrygarcia.com_War Memorial Auditorium::Buffalo, NY, USA",
+    "slug": "war-memorial-auditorium",
+    "past_names": null,
+    "sortName": "War Memorial Auditorium",
+    "uuid": "2c0fcb24-88cb-24db-bc93-ea70329e1720",
+    "created_at": "2025-12-21T21:49:38Z",
+    "updated_at": "2021-06-15T21:53:19Z"
+   },
+   "venue_uuid": "2c0fcb24-88cb-24db-bc93-ea70329e1720",
+   "tour_uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+   "tour": {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "start_date": "1977-04-22T00:00:00Z",
+    "end_date": "1977-06-09T00:00:00Z",
+    "name": "Spring 1977",
+    "slug": "spring-1977",
+    "upstream_identifier": "Spring 1977",
+    "uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+    "created_at": "2017-12-16T10:41:03Z",
+    "updated_at": "2017-05-17T13:14:44Z"
+   },
+   "year_uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+   "year": {
+    "show_count": 57,
+    "source_count": 219,
+    "duration": 2163413,
+    "avg_duration": 11282.995,
+    "avg_rating": 9.095924,
+    "year": "1977",
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+    "popularity": null,
+    "created_at": "2018-10-23T07:01:01Z",
+    "updated_at": "2025-10-20T11:03:27Z"
+   },
+   "era": null,
+   "date": "1977-05-09T00:00:00Z",
+   "avg_rating": 9.785714,
+   "avg_duration": 18924.0,
+   "display_date": "1977-05-09",
+   "most_recent_source_updated_at": "2016-02-12T23:12:53Z",
+   "has_soundboard_source": true,
+   "has_streamable_flac_source": true,
+   "source_count": 6,
+   "uuid": "7693d03c-049b-993a-9eb6-b13127a93cad",
+   "popularity": {
+    "momentum_score": 0.7285,
+    "trend_ratio": 0.6399,
+    "windows": {
+     "48h": {
+      "plays": 499,
+      "hours": 72.8758,
+      "hot_score": 22.3383
+     },
+     "7d": {
+      "plays": 1496,
+      "hours": 216.6358,
+      "hot_score": 38.6782
+     },
+     "30d": {
+      "plays": 7709,
+      "hours": 1115.1414,
+      "hot_score": 87.8009
+     }
+    }
+   },
+   "created_at": "2018-10-23T07:00:49Z",
+   "updated_at": "2006-04-24T07:25:54Z"
+  },
+  {
+   "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+   "venue": {
+    "shows_at_venue": 5,
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "latitude": null,
+    "longitude": null,
+    "name": "St. Paul Civic Center",
+    "location": "St. Paul, MN, USA",
+    "upstream_identifier": "jerrygarcia.com_St. Paul Civic Center::St. Paul, MN, USA",
+    "slug": "st-paul-civic-center",
+    "past_names": null,
+    "sortName": "St. Paul Civic Center",
+    "uuid": "c46dd6ea-a232-f983-af15-6a6c430230c7",
+    "created_at": "2025-12-21T21:50:01Z",
+    "updated_at": "2021-06-15T21:53:21Z"
+   },
+   "venue_uuid": "c46dd6ea-a232-f983-af15-6a6c430230c7",
+   "tour_uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+   "tour": {
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "start_date": "1977-04-22T00:00:00Z",
+    "end_date": "1977-06-09T00:00:00Z",
+    "name": "Spring 1977",
+    "slug": "spring-1977",
+    "upstream_identifier": "Spring 1977",
+    "uuid": "38143dae-2ecc-c709-0b20-8e58b0105f8c",
+    "created_at": "2017-12-16T10:41:03Z",
+    "updated_at": "2017-05-17T13:14:44Z"
+   },
+   "year_uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+   "year": {
+    "show_count": 57,
+    "source_count": 219,
+    "duration": 2163413,
+    "avg_duration": 11282.995,
+    "avg_rating": 9.095924,
+    "year": "1977",
+    "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+    "uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+    "popularity": null,
+    "created_at": "2018-10-23T07:01:01Z",
+    "updated_at": "2025-10-20T11:03:27Z"
+   },
+   "era": null,
+   "date": "1977-05-11T00:00:00Z",
+   "avg_rating": 9.589744,
+   "avg_duration": 11772.0,
+   "display_date": "1977-05-11",
+   "most_recent_source_updated_at": "2021-02-04T14:55:12Z",
+   "has_soundboard_source": true,
+   "has_streamable_flac_source": true,
+   "source_count": 5,
+   "uuid": "8778cb41-5c7c-f76c-ab33-351edf95d749",
+   "popularity": {
+    "momentum_score": 0.7439,
+    "trend_ratio": 0.7615,
+    "windows": {
+     "48h": {
+      "plays": 222,
+      "hours": 29.1492,
+      "hot_score": 14.8997
+     },
+     "7d": {
+      "plays": 485,
+      "hours": 63.6419,
+      "hot_score": 22.0227
+     },
+     "30d": {
+      "plays": 2433,
+      "hours": 324.4283,
+      "hot_score": 49.3254
+     }
+    }
+   },
+   "created_at": "2018-10-23T07:00:49Z",
+   "updated_at": "2006-04-23T15:11:07Z"
+  }
+ ],
+ "show_count": 57,
+ "source_count": 219,
+ "duration": 2163413,
+ "avg_duration": 11282.995,
+ "avg_rating": 9.095924,
+ "year": "1977",
+ "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+ "uuid": "cb702c5f-ec10-31eb-36cd-42ea7dd50c22",
+ "popularity": {
+  "momentum_score": 0.4867,
+  "trend_ratio": 0.5258,
+  "windows": {
+   "48h": {
+    "plays": 5286,
+    "hours": 744.815,
+    "hot_score": 72.7049
+   },
+   "7d": {
+    "plays": 17011,
+    "hours": 2391.5367,
+    "hot_score": 130.4262
+   },
+   "30d": {
+    "plays": 83655,
+    "hours": 11733.6656,
+    "hot_score": 289.2317
+   }
+  }
+ },
+ "created_at": "2018-10-23T07:01:01Z",
+ "updated_at": "2025-10-20T11:03:27Z"
+}

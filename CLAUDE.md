@@ -1,11 +1,13 @@
 # Couch Tour
 
-An unofficial native Android client for [phish.in](https://phish.in), the open-source live
-Phish archive. Kotlin, Jetpack Compose, Media3, Room. See [README.md](README.md) for what
-the app does, [DECISIONS.md](DECISIONS.md) for why it does it that way, and
-[ROADMAP.md](ROADMAP.md) for what's not built yet.
+An unofficial native client for [phish.in](https://phish.in), the open-source live Phish
+archive, and for Relisten's other-artist catalog. Two clients live in this repo: an Android
+app (Kotlin, Jetpack Compose, Media3, Room) and a macOS app (Swift, SwiftUI, AVFoundation,
+GRDB). See [README.md](README.md) for what the app does, [DECISIONS.md](DECISIONS.md) for why
+it does it that way, and [ROADMAP.md](ROADMAP.md) for what's not built yet — one log covers
+both clients; entries are tagged by platform where it isn't obvious from context.
 
-## Building
+## Building (Android)
 
 **There is no Java on `PATH`.** Every Gradle invocation needs the JDK bundled with Android
 Studio, or it fails with "Unable to locate a Java Runtime":
@@ -16,6 +18,40 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 
 The whole suite is local — Robolectric and MockWebServer, no device or emulator. It runs in
 well under a minute, so run it after any change.
+
+## Building (macOS)
+
+Everything under `macos/Packages/CouchTourKit` is a plain SwiftPM package — API clients, the
+backend-neutral catalog model, the queue-key grammar, and progress storage (GRDB). It needs
+no Xcode project to build or test:
+
+```
+cd macos/Packages/CouchTourKit && swift test
+```
+
+**If `swift build`/`swift test` fails with a `PackageDescription.Package.__allocating_init`
+linker error, Xcode itself isn't installed** — Command Line Tools alone can't compile *any*
+SwiftPM manifest (confirmed with an empty, unrelated package during this repo's own macOS
+bring-up; see D115 in DECISIONS.md). Installing Xcode fixes it; don't spend time debugging the
+Command Line Tools install instead.
+
+The app target (`macos/CouchTour`) needs Xcode. `CouchTour.xcodeproj` is generated, not
+committed (D103) — regenerate it after adding/removing source files:
+
+```
+cd macos && xcodegen generate
+xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build
+```
+
+To build, install to `/Applications`, and relaunch in one step:
+
+```
+macos/scripts/install.sh
+```
+
+It's ad-hoc signed (D113) — no paid Apple Developer account is configured, and none is needed
+for local use; Gatekeeper only quarantines files downloaded from the internet, never a
+locally built `.app`.
 
 ## Names that look wrong and are not
 
@@ -29,6 +65,11 @@ bearing:
   end of the socket, not for this app.
 - **`PhishInDb`** anchors the Room schema export directory,
   `app/schemas/dev.mike.couchtour.PhishInDb/`, which the migration tests read by path.
+
+The macOS client's database file is also named **`phishin.db`** (at
+`~/Library/Application Support/dev.mike.couchtour/`), on purpose and for the same reason
+(D97): same filename, same schema, so a future sync or import step is a row-copy, not a
+translation. Don't "fix" it to something macOS-flavored either.
 
 References to phish.in in comments, docs, and API URLs are correct and should stay. The
 attribution in the README is required framing, not a leftover disclaimer.

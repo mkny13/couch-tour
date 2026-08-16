@@ -1,0 +1,492 @@
+[
+ {
+  "period": "1983-1987",
+  "shows_count": 93,
+  "shows_with_audio_count": 34,
+  "shows_duration": 206032511,
+  "venues_count": 28,
+  "venues_with_audio_count": 14,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/0yeazbkhg0xd47g53iejzugldjj5.jpg",
+   "medium": "https://phish.in/blob/ny37nigznl9f75s1fxrqkjo8ackv.jpg",
+   "small": "https://phish.in/blob/2w17h0v93n1e0d1d6sy7pwgu4105.jpg"
+  }
+ },
+ {
+  "period": "1988",
+  "shows_count": 94,
+  "shows_with_audio_count": 44,
+  "shows_duration": 337009160,
+  "venues_count": 40,
+  "venues_with_audio_count": 21,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/k6qx82mduwxp4qjce0wezru5dsvd.jpg",
+   "medium": "https://phish.in/blob/7xwqyyylhsfacetn917j9x7i2j7w.jpg",
+   "small": "https://phish.in/blob/skrmpigqdh643pkp925yh6xr1g56.jpg"
+  }
+ },
+ {
+  "period": "1989",
+  "shows_count": 123,
+  "shows_with_audio_count": 65,
+  "shows_duration": 437710902,
+  "venues_count": 62,
+  "venues_with_audio_count": 40,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/zumw372mwqvvwf2phymq5ljrlz3f.jpg",
+   "medium": "https://phish.in/blob/4uu1ltvw6a00hc6s7hv7oldnquhx.jpg",
+   "small": "https://phish.in/blob/jjz4v19aeo5pnjus8oe06wnr6pjh.jpg"
+  }
+ },
+ {
+  "period": "1990",
+  "shows_count": 147,
+  "shows_with_audio_count": 100,
+  "shows_duration": 760931193,
+  "venues_count": 87,
+  "venues_with_audio_count": 65,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/jz3xa3nbiah4mp5bjuicbcs8zi6o.jpg",
+   "medium": "https://phish.in/blob/oza7jgnyuh58oh0v2sn7fu3hbuw4.jpg",
+   "small": "https://phish.in/blob/5l1xo2bakkm8tnutlfoz5urpxwz8.jpg"
+  }
+ },
+ {
+  "period": "1991",
+  "shows_count": 128,
+  "shows_with_audio_count": 117,
+  "shows_duration": 957933125,
+  "venues_count": 95,
+  "venues_with_audio_count": 84,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/k36lmvl1myh7poz2v4ecqmw6ur3q.jpg",
+   "medium": "https://phish.in/blob/vhdfpryzqdvxbe76ka2nrl5q0ubc.jpg",
+   "small": "https://phish.in/blob/lbwtywdumssoyavxho7fxx3yuhr5.jpg"
+  }
+ },
+ {
+  "period": "1992",
+  "shows_count": 123,
+  "shows_with_audio_count": 110,
+  "shows_duration": 841290031,
+  "venues_count": 105,
+  "venues_with_audio_count": 92,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/90gzhxwihwc7k5pggl5zy6j4o0nk.jpg",
+   "medium": "https://phish.in/blob/tt5ubpswllk7wiod8wm3blmmet1p.jpg",
+   "small": "https://phish.in/blob/xjlfysqazxu7sgxiff5v3223celx.jpg"
+  }
+ },
+ {
+  "period": "1993",
+  "shows_count": 110,
+  "shows_with_audio_count": 109,
+  "shows_duration": 1022825422,
+  "venues_count": 94,
+  "venues_with_audio_count": 93,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/mrutycixgnlsxi429s2x9wjx5myo.jpg",
+   "medium": "https://phish.in/blob/flwzqvdyoncvlqqijeijn21995wp.jpg",
+   "small": "https://phish.in/blob/3nzh12snga386cmicbl1uuuoqz2b.jpg"
+  }
+ },
+ {
+  "period": "1994",
+  "shows_count": 124,
+  "shows_with_audio_count": 124,
+  "shows_duration": 1099651476,
+  "venues_count": 111,
+  "venues_with_audio_count": 111,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/sxuigxqeypl55ur24ggndw0r6e7h.jpg",
+   "medium": "https://phish.in/blob/4z6ltkqisvktwnbl79zb2pqd7dfy.jpg",
+   "small": "https://phish.in/blob/c8soglyfbekwvlhzutnr0mlbn125.jpg"
+  }
+ },
+ {
+  "period": "1995",
+  "shows_count": 82,
+  "shows_with_audio_count": 82,
+  "shows_duration": 737704283,
+  "venues_count": 69,
+  "venues_with_audio_count": 69,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/kczfr1oi68fso0y8sccapdsp92dj.jpg",
+   "medium": "https://phish.in/blob/r115usmfvqt6638mtg3d3zw1jdlg.jpg",
+   "small": "https://phish.in/blob/u1db7u9lthic43fgmbst8mrqz7z2.jpg"
+  }
+ },
+ {
+  "period": "1996",
+  "shows_count": 71,
+  "shows_with_audio_count": 71,
+  "shows_duration": 570490496,
+  "venues_count": 62,
+  "venues_with_audio_count": 62,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/1immn5i2yc1xff68j8wrcgvxotki.jpg",
+   "medium": "https://phish.in/blob/fy5ua21geffter0m5sra8kmz683x.jpg",
+   "small": "https://phish.in/blob/ffrt56miq4ojhtx7tdhxxdaampc3.jpg"
+  }
+ },
+ {
+  "period": "1997",
+  "shows_count": 81,
+  "shows_with_audio_count": 81,
+  "shows_duration": 731303198,
+  "venues_count": 67,
+  "venues_with_audio_count": 67,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/krjyc5lwd23hkjtosraz1qi7jml0.jpg",
+   "medium": "https://phish.in/blob/z1elqxglbtqo0wg6mg62zigl7ehn.jpg",
+   "small": "https://phish.in/blob/1i8ua0iq2ojaxwtliapdyfq8q2cj.jpg"
+  }
+ },
+ {
+  "period": "1998",
+  "shows_count": 70,
+  "shows_with_audio_count": 70,
+  "shows_duration": 640819578,
+  "venues_count": 48,
+  "venues_with_audio_count": 48,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/qvcl56ckl5j0x8s1ooxhf77rdqc8.jpg",
+   "medium": "https://phish.in/blob/sg2ajlo5ra6quf6192k3g1zjqvc3.jpg",
+   "small": "https://phish.in/blob/ngnjb0cm849kktgontdl918d3j2y.jpg"
+  }
+ },
+ {
+  "period": "1999",
+  "shows_count": 65,
+  "shows_with_audio_count": 65,
+  "shows_duration": 661715854,
+  "venues_count": 48,
+  "venues_with_audio_count": 48,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/ypb9g44stdtzbpy6f1nyexgqtxhz.jpg",
+   "medium": "https://phish.in/blob/fg83hi9fir7tex2kkb92u67vvo4y.jpg",
+   "small": "https://phish.in/blob/n4bn2of2kdwe2gkjnt4y2hgmsaly.jpg"
+  }
+ },
+ {
+  "period": "2000",
+  "shows_count": 56,
+  "shows_with_audio_count": 56,
+  "shows_duration": 499066958,
+  "venues_count": 42,
+  "venues_with_audio_count": 42,
+  "era": "1.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/cx34ucbfimymz66u5vqu5ganz4vq.jpg",
+   "medium": "https://phish.in/blob/9bulhkb9mn6gr4llyxhtnkhmxmfg.jpg",
+   "small": "https://phish.in/blob/h9p4yquxa4c3rzxltucn91c4oudw.jpg"
+  }
+ },
+ {
+  "period": "2002",
+  "shows_count": 3,
+  "shows_with_audio_count": 3,
+  "shows_duration": 13107251,
+  "venues_count": 3,
+  "venues_with_audio_count": 3,
+  "era": "2.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/m5mu6h8eg7znx5043pk15vmbq2dh.jpg",
+   "medium": "https://phish.in/blob/6dlyb3qbv10mx1yad4z2jiiwygzk.jpg",
+   "small": "https://phish.in/blob/1jiec2vzwb8g0887q2639e24idjc.jpg"
+  }
+ },
+ {
+  "period": "2003",
+  "shows_count": 45,
+  "shows_with_audio_count": 45,
+  "shows_duration": 455920386,
+  "venues_count": 28,
+  "venues_with_audio_count": 28,
+  "era": "2.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/u5ggwlolodvcai5pgyg0skn4pszs.jpg",
+   "medium": "https://phish.in/blob/uiqcg9k45ytlglov6exf01e9zlw1.jpg",
+   "small": "https://phish.in/blob/ekwxgozorr77d95ryd665ib4dx8p.jpg"
+  }
+ },
+ {
+  "period": "2004",
+  "shows_count": 20,
+  "shows_with_audio_count": 20,
+  "shows_duration": 187756180,
+  "venues_count": 11,
+  "venues_with_audio_count": 11,
+  "era": "2.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/36f3frufb6s08kgbtpiry9llpczc.jpg",
+   "medium": "https://phish.in/blob/6hwwt0lbh7b3vcqi7h7jwoqk6ru2.jpg",
+   "small": "https://phish.in/blob/z2csnsrso8g7ltwp8aix05nupbud.jpg"
+  }
+ },
+ {
+  "period": "2009",
+  "shows_count": 51,
+  "shows_with_audio_count": 51,
+  "shows_duration": 547163538,
+  "venues_count": 30,
+  "venues_with_audio_count": 30,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/9m42seztxerv5upzmwf09d1477m6.jpg",
+   "medium": "https://phish.in/blob/b5ndwfs4mtjjt0cxcrca1u5xyqo5.jpg",
+   "small": "https://phish.in/blob/2398fckq0y951bz5ponyb4zdvvk3.jpg"
+  }
+ },
+ {
+  "period": "2010",
+  "shows_count": 50,
+  "shows_with_audio_count": 50,
+  "shows_duration": 502658463,
+  "venues_count": 31,
+  "venues_with_audio_count": 31,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/cgs62ihorlgojnyu1ava6k9mxmjn.jpg",
+   "medium": "https://phish.in/blob/w0kk9zdre7xrw1l02oy16h381mrm.jpg",
+   "small": "https://phish.in/blob/etmr6a66n8nvmz1yugs0n6dmoxen.jpg"
+  }
+ },
+ {
+  "period": "2011",
+  "shows_count": 41,
+  "shows_with_audio_count": 41,
+  "shows_duration": 435203370,
+  "venues_count": 22,
+  "venues_with_audio_count": 22,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/hgokwtrdreh0nwgqqj94l4agj950.jpg",
+   "medium": "https://phish.in/blob/570y6drm6v0vp06x10385fxm670m.jpg",
+   "small": "https://phish.in/blob/wt9uzq616ppyj8hw70wzd6ma02wz.jpg"
+  }
+ },
+ {
+  "period": "2012",
+  "shows_count": 37,
+  "shows_with_audio_count": 37,
+  "shows_duration": 393523204,
+  "venues_count": 21,
+  "venues_with_audio_count": 21,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/naclba59nimsm3cwn9a235y1lnvp.jpg",
+   "medium": "https://phish.in/blob/hzxf9z4ilalrvghy4gqjyl1w2uyy.jpg",
+   "small": "https://phish.in/blob/9mkv15f1f9nmz34b971p9iod1kli.jpg"
+  }
+ },
+ {
+  "period": "2013",
+  "shows_count": 41,
+  "shows_with_audio_count": 41,
+  "shows_duration": 435572892,
+  "venues_count": 21,
+  "venues_with_audio_count": 21,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/tk0nflsdae79if6cnjg17kzj9tm4.jpg",
+   "medium": "https://phish.in/blob/us2pks76xreuwdv5fiihhlg6eboq.jpg",
+   "small": "https://phish.in/blob/fdpxrijil28vzu4ic8fbamlmghz1.jpg"
+  }
+ },
+ {
+  "period": "2014",
+  "shows_count": 41,
+  "shows_with_audio_count": 41,
+  "shows_duration": 428053805,
+  "venues_count": 25,
+  "venues_with_audio_count": 25,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/no0e3aqrnuiufg83lpis20567qkr.jpg",
+   "medium": "https://phish.in/blob/mqy4naavwcod4csfzy0trge95hdd.jpg",
+   "small": "https://phish.in/blob/mtq90szrevxvb30fvm3hjvbp09q0.jpg"
+  }
+ },
+ {
+  "period": "2015",
+  "shows_count": 31,
+  "shows_with_audio_count": 31,
+  "shows_duration": 316252870,
+  "venues_count": 18,
+  "venues_with_audio_count": 18,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/qtnxjwt50zwyjzmojmbmpthwwhtr.jpg",
+   "medium": "https://phish.in/blob/4t3zgwvfeoy5bepaeo0bw2jow6n9.jpg",
+   "small": "https://phish.in/blob/701nc7fs0e2186k5zw89em6i9xc4.jpg"
+  }
+ },
+ {
+  "period": "2016",
+  "shows_count": 48,
+  "shows_with_audio_count": 45,
+  "shows_duration": 448097751,
+  "venues_count": 24,
+  "venues_with_audio_count": 23,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/vluadm5r2liju46m9yzv3kpvrkhh.jpg",
+   "medium": "https://phish.in/blob/034hdzige925jhqp3fgxx02l0w01.jpg",
+   "small": "https://phish.in/blob/k9sgvekndycy70hnjmsufn61ovz3.jpg"
+  }
+ },
+ {
+  "period": "2017",
+  "shows_count": 28,
+  "shows_with_audio_count": 28,
+  "shows_duration": 283379908,
+  "venues_count": 6,
+  "venues_with_audio_count": 6,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/tcknv95wtsi67s39txwd65kh8vtu.jpg",
+   "medium": "https://phish.in/blob/0ylfhe061wk9e3zmfexickes5lmy.jpg",
+   "small": "https://phish.in/blob/ohvgjqebka9abv7rrtmldl3q8ocv.jpg"
+  }
+ },
+ {
+  "period": "2018",
+  "shows_count": 39,
+  "shows_with_audio_count": 39,
+  "shows_duration": 399560404,
+  "venues_count": 16,
+  "venues_with_audio_count": 16,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/o2wkqdwt7jd7f78ryn7nfgw5tjqt.jpg",
+   "medium": "https://phish.in/blob/ljmqlfqmc4pm14h3zmh1utu7cp0y.jpg",
+   "small": "https://phish.in/blob/f3xo0hliedyju0c25sjytrufcnjb.jpg"
+  }
+ },
+ {
+  "period": "2019",
+  "shows_count": 41,
+  "shows_with_audio_count": 39,
+  "shows_duration": 408686677,
+  "venues_count": 20,
+  "venues_with_audio_count": 19,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/duixblnsxr3sgkrllx1uxnakuni8.jpg",
+   "medium": "https://phish.in/blob/lvr4abqeh7eu05ovwb0itliv7wi4.jpg",
+   "small": "https://phish.in/blob/v5u9e8y21zz1er42njp97b2qqqrm.jpg"
+  }
+ },
+ {
+  "period": "2020",
+  "shows_count": 4,
+  "shows_with_audio_count": 4,
+  "shows_duration": 41131123,
+  "venues_count": 1,
+  "venues_with_audio_count": 1,
+  "era": "3.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/i9mncqv02wv9w9kaxqzutr0ri9yn.jpg",
+   "medium": "https://phish.in/blob/q6ivjrkmxwcz5gskqk07aafg3ssm.jpg",
+   "small": "https://phish.in/blob/emm1wv5f47twc0a1kocu3a0rgom2.jpg"
+  }
+ },
+ {
+  "period": "2021",
+  "shows_count": 36,
+  "shows_with_audio_count": 35,
+  "shows_duration": 371410494,
+  "venues_count": 19,
+  "venues_with_audio_count": 18,
+  "era": "4.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/oa1h0mh3tzw1t6eeu9rj1dpreskl.jpg",
+   "medium": "https://phish.in/blob/7qsl81cik5e5ulciayt4jlw4qiia.jpg",
+   "small": "https://phish.in/blob/la2dnc1xa7umz5o379qms3i5iaz7.jpg"
+  }
+ },
+ {
+  "period": "2022",
+  "shows_count": 47,
+  "shows_with_audio_count": 47,
+  "shows_duration": 480590189,
+  "venues_count": 19,
+  "venues_with_audio_count": 19,
+  "era": "4.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/s89g6h9fehstvk936e2xaweiau46.jpg",
+   "medium": "https://phish.in/blob/775jg17p6lzw4ekm1wuleovvo868.jpg",
+   "small": "https://phish.in/blob/1i3yt8awts1kxsoxo5ds57pp4r91.jpg"
+  }
+ },
+ {
+  "period": "2023",
+  "shows_count": 49,
+  "shows_with_audio_count": 45,
+  "shows_duration": 478661652,
+  "venues_count": 16,
+  "venues_with_audio_count": 15,
+  "era": "4.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/pod8tgzxjtqiyxxem93yo9pmtvok.jpg",
+   "medium": "https://phish.in/blob/tvmffvugz7tx8wiil5m5x59d5dsn.jpg",
+   "small": "https://phish.in/blob/kx00djymxgzv37cmvzrjpllva2yl.jpg"
+  }
+ },
+ {
+  "period": "2024",
+  "shows_count": 43,
+  "shows_with_audio_count": 39,
+  "shows_duration": 418949348,
+  "venues_count": 13,
+  "venues_with_audio_count": 13,
+  "era": "4.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/5rkmfrsqe1ef82a20o558f46tjzq.jpg",
+   "medium": "https://phish.in/blob/x1atyaneq5yx2918wyv4va3t5pal.jpg",
+   "small": "https://phish.in/blob/76m7r8kpm2lkvlof6h2j6ier2lsw.jpg"
+  }
+ },
+ {
+  "period": "2025",
+  "shows_count": 47,
+  "shows_with_audio_count": 42,
+  "shows_duration": 465392794,
+  "venues_count": 20,
+  "venues_with_audio_count": 18,
+  "era": "4.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/08yis4ba3cdntbto77vklgftjsqa.jpg",
+   "medium": "https://phish.in/blob/zizs470bl66mhs5nzikrj1fb3grk.jpg",
+   "small": "https://phish.in/blob/bpfflscv294nyay7tqluxbt1qyek.jpg"
+  }
+ },
+ {
+  "period": "2026",
+  "shows_count": 24,
+  "shows_with_audio_count": 24,
+  "shows_duration": 262952448,
+  "venues_count": 8,
+  "venues_with_audio_count": 8,
+  "era": "4.0",
+  "cover_art_urls": {
+   "large": "https://phish.in/blob/ygtxbc32ilt4s7uvfo250xoy9sac.jpg",
+   "medium": "https://phish.in/blob/e8ozqji5swnavj7y53mihkd4iqo1.jpg",
+   "small": "https://phish.in/blob/xqlrez0crrzye2uccvrmxeflepa9.jpg"
+  }
+ }
+]

@@ -1,0 +1,222 @@
+{
+ "id": 412,
+ "date": "1997-11-17",
+ "audio_status": "complete",
+ "cover_art_urls": {
+  "large": "https://phish.in/blob/ozwf5gu9sq9ahls1c4fdw0hy88xw.jpg",
+  "medium": "https://phish.in/blob/b9rfzm7nsp3g96q4unbmxgxe5r33.jpg",
+  "small": "https://phish.in/blob/deyuzn0x2hp9fyus0q4wxfwe99cr.jpg"
+ },
+ "album_cover_url": "https://phish.in/blob/ngs7quga1uxe4lrq9l3w4x8m80zx.jpg",
+ "album_zip_url": "https://phish.in/blob/xk66iqg02sp36yeerohvzmx6crt2.zip",
+ "duration": 8971076,
+ "admin_notes": null,
+ "tour_name": "Fall Tour 1997",
+ "venue_name": "McNichols Arena",
+ "venue": {
+  "slug": "mcnichols-arena",
+  "name": "McNichols Arena",
+  "other_names": [],
+  "latitude": 39.737567,
+  "longitude": -104.9847179,
+  "city": "Denver",
+  "state": "CO",
+  "country": "USA",
+  "location": "Denver, CO",
+  "map_snapshot_url": "https://phish.in/blob/vvyzxr3ye5uy05awbevq5c0f0dck.png",
+  "shows_count": 3,
+  "shows_with_audio_count": 3,
+  "created_at": "2013-02-09T22:10:39-05:00",
+  "updated_at": "2026-01-01T21:21:54-05:00"
+ },
+ "taper_notes": "Phish\r\n11.17.97\r\nMcNichols Arena\r\nDenver, Co\r\n\r\nSource:\r\nSchoeps Cmc6/Mk41's > Sx Mx > Da-P1x 2\r\n\r\nTransfer: (8.31.08)\r\nFostex D5 > SoundWave 24/96 > Wavelab 5.01 @ 48k >\r\nResampled to 44.1/Fades > Cd Wave > TLH > FLAC\r\n\r\n*Brought To You By Gotfob*\r\n\r\nSet I/Disc I\r\n01. Tweezer\r\n02. Reba\r\n03. Train Song\r\n04. Ghost >\r\n05. Fire\r\n\r\nSet IIa/Disc II\r\n01. Down With Disease >\r\n02. Oblivious Fool >\r\n03. Johnny Be Goode >\r\n04. Jesus Left Chicago >\r\n05. Circus Comes To Town\r\n06. YEM\r\n\r\nSet IIb/Disc 3\r\n-Encore-\r\n01. Character Zero",
+ "likes_count": 172,
+ "performance_gap_value": 1,
+ "created_at": "2012-10-16T13:41:59-04:00",
+ "updated_at": "2026-05-23T16:46:21-04:00",
+ "tags": [
+  {
+   "name": "Lore",
+   "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+   "color": "#808080",
+   "priority": 22,
+   "notes": "This show was officially released as Live Phish 11."
+  }
+ ],
+ "tracks": [
+  {
+   "id": 8435,
+   "slug": "tweezer",
+   "title": "Tweezer",
+   "position": 1,
+   "duration": 1072274,
+   "jam_starts_at_second": null,
+   "set_name": "Set 1",
+   "exclude_from_stats": false,
+   "likes_count": 89,
+   "audio_status": "complete",
+   "mp3_url": "https://phish.in/blob/o3fpt5pkal0prnwl4kifj1hvkthk.mp3",
+   "waveform_image_url": "https://phish.in/blob/cu6cllxaok20r9zpscae844uz916.png",
+   "tags": [
+    {
+     "name": "Jamcharts",
+     "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+     "color": "#888888",
+     "priority": 4,
+     "notes": "Very popular version, but check out the highlighted versions in this table if this version does IT for you (especially those in fall 1997).",
+     "starts_at_second": null,
+     "ends_at_second": null,
+     "transcript": null
+    }
+   ],
+   "created_at": "2012-10-16T13:42:00-04:00",
+   "updated_at": "2025-10-01T23:24:41-04:00",
+   "show_date": "1997-11-17",
+   "show_cover_art_urls": {
+    "large": "https://phish.in/blob/ozwf5gu9sq9ahls1c4fdw0hy88xw.jpg",
+    "medium": "https://phish.in/blob/b9rfzm7nsp3g96q4unbmxgxe5r33.jpg",
+    "small": "https://phish.in/blob/deyuzn0x2hp9fyus0q4wxfwe99cr.jpg"
+   },
+   "show_album_cover_url": "https://phish.in/blob/ngs7quga1uxe4lrq9l3w4x8m80zx.jpg",
+   "venue_slug": "mcnichols-arena",
+   "venue_name": "McNichols Arena",
+   "venue_location": "Denver, CO",
+   "songs": [
+    {
+     "slug": "tweezer",
+     "title": "Tweezer",
+     "alias": null,
+     "original": true,
+     "artist": null,
+     "tracks_count": 458,
+     "tracks_with_audio_count": 447,
+     "created_at": "2012-08-25T11:01:07-04:00",
+     "updated_at": "2021-05-04T09:35:42-04:00",
+     "previous_performance_gap": 4,
+     "previous_performance_slug": "1997-08-17/tweezer",
+     "next_performance_gap": 3,
+     "next_performance_slug": "1997-11-22/tweezer",
+     "previous_performance_gap_with_audio": 4,
+     "previous_performance_slug_with_audio": "1997-08-17/tweezer",
+     "next_performance_gap_with_audio": 3,
+     "next_performance_slug_with_audio": "1997-11-22/tweezer"
+    }
+   ],
+   "liked_by_user": false
+  },
+  {
+   "id": 8436,
+   "slug": "reba",
+   "title": "Reba",
+   "position": 2,
+   "duration": 850678,
+   "jam_starts_at_second": null,
+   "set_name": "Set 1",
+   "exclude_from_stats": false,
+   "likes_count": 41,
+   "audio_status": "complete",
+   "mp3_url": "https://phish.in/blob/6dwpa0am95ygm28s8wtm795z637w.mp3",
+   "waveform_image_url": "https://phish.in/blob/nfnptrcr2drmmsrm6vrxjt1bb3r6.png",
+   "tags": [
+    {
+     "name": "Unfinished",
+     "description": "Incomplete performance of a composition",
+     "color": "#888888",
+     "priority": 16,
+     "notes": null,
+     "starts_at_second": null,
+     "ends_at_second": null,
+     "transcript": null
+    }
+   ],
+   "created_at": "2012-10-16T13:42:00-04:00",
+   "updated_at": "2026-01-05T22:19:13-05:00",
+   "show_date": "1997-11-17",
+   "show_cover_art_urls": {
+    "large": "https://phish.in/blob/ozwf5gu9sq9ahls1c4fdw0hy88xw.jpg",
+    "medium": "https://phish.in/blob/b9rfzm7nsp3g96q4unbmxgxe5r33.jpg",
+    "small": "https://phish.in/blob/deyuzn0x2hp9fyus0q4wxfwe99cr.jpg"
+   },
+   "show_album_cover_url": "https://phish.in/blob/ngs7quga1uxe4lrq9l3w4x8m80zx.jpg",
+   "venue_slug": "mcnichols-arena",
+   "venue_name": "McNichols Arena",
+   "venue_location": "Denver, CO",
+   "songs": [
+    {
+     "slug": "reba",
+     "title": "Reba",
+     "alias": null,
+     "original": true,
+     "artist": null,
+     "tracks_count": 422,
+     "tracks_with_audio_count": 401,
+     "created_at": "2012-08-25T11:01:06-04:00",
+     "updated_at": "2021-05-04T09:35:41-04:00",
+     "previous_performance_gap": 10,
+     "previous_performance_slug": "1997-08-09/reba",
+     "next_performance_gap": 13,
+     "next_performance_slug": "1997-12-07/reba",
+     "previous_performance_gap_with_audio": 10,
+     "previous_performance_slug_with_audio": "1997-08-09/reba",
+     "next_performance_gap_with_audio": 13,
+     "next_performance_slug_with_audio": "1997-12-07/reba"
+    }
+   ],
+   "liked_by_user": false
+  },
+  {
+   "id": 8437,
+   "slug": "train-song",
+   "title": "Train Song",
+   "position": 3,
+   "duration": 218070,
+   "jam_starts_at_second": null,
+   "set_name": "Set 1",
+   "exclude_from_stats": false,
+   "likes_count": 11,
+   "audio_status": "missing",
+   "mp3_url": null,
+   "waveform_image_url": "https://phish.in/blob/4m670ovajvkw3no2w2ro034cxpbg.png",
+   "tags": [],
+   "created_at": "2012-10-16T13:42:00-04:00",
+   "updated_at": "2025-10-01T23:24:41-04:00",
+   "show_date": "1997-11-17",
+   "show_cover_art_urls": {
+    "large": "https://phish.in/blob/ozwf5gu9sq9ahls1c4fdw0hy88xw.jpg",
+    "medium": "https://phish.in/blob/b9rfzm7nsp3g96q4unbmxgxe5r33.jpg",
+    "small": "https://phish.in/blob/deyuzn0x2hp9fyus0q4wxfwe99cr.jpg"
+   },
+   "show_album_cover_url": "https://phish.in/blob/ngs7quga1uxe4lrq9l3w4x8m80zx.jpg",
+   "venue_slug": "mcnichols-arena",
+   "venue_name": "McNichols Arena",
+   "venue_location": "Denver, CO",
+   "songs": [
+    {
+     "slug": "train-song",
+     "title": "Train Song",
+     "alias": null,
+     "original": true,
+     "artist": null,
+     "tracks_count": 60,
+     "tracks_with_audio_count": 60,
+     "created_at": "2012-08-25T11:01:07-04:00",
+     "updated_at": "2021-05-08T20:53:38-04:00",
+     "previous_performance_gap": 3,
+     "previous_performance_slug": "1997-11-13/train-song",
+     "next_performance_gap": 3,
+     "next_performance_slug": "1997-11-22/train-song",
+     "previous_performance_gap_with_audio": 3,
+     "previous_performance_slug_with_audio": "1997-11-13/train-song",
+     "next_performance_gap_with_audio": 3,
+     "next_performance_slug_with_audio": "1997-11-22/train-song"
+    }
+   ],
+   "liked_by_user": false
+  }
+ ],
+ "liked_by_user": false,
+ "previous_show_date": "1997-11-16",
+ "next_show_date": "1997-11-19",
+ "previous_show_date_with_audio": "1997-11-16",
+ "next_show_date_with_audio": "1997-11-19"
+}

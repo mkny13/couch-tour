@@ -1,0 +1,47 @@
+# Generates CouchTour.xcodeproj. Regenerate after changing this file or adding/removing
+# source files: `cd macos && xcodegen generate`.
+#
+# The .xcodeproj itself is not committed (see .gitignore) — XcodeGen makes it reproducible
+# from this spec instead, the same way the app never hand-edits Room's generated schema JSON.
+name: CouchTour
+options:
+  bundleIdPrefix: dev.mike.couchtour
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  CouchTourKit:
+    path: Packages/CouchTourKit
+
+targets:
+  CouchTour:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: CouchTour
+    dependencies:
+      - package: CouchTourKit
+        product: CouchTourKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.mike.couchtour.mac
+        PRODUCT_NAME: "Couch Tour"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: "Couch Tour"
+        LSApplicationCategoryType: public.app-category.music
+        NSHumanReadableCopyright: ""
+    entitlements:
+      path: Generated/CouchTour.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
