@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -249,6 +250,12 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f)
             )
+            // Always visible regardless of scroll position — the Sync row further down the
+            // list sits below the full artist list (up to ~200 rows) and was effectively
+            // undiscoverable there.
+            IconButton(onClick = { nav.navigate("sync") }) {
+                Icon(Icons.Default.Sync, "Sync")
+            }
             CastButton()
         }
 
