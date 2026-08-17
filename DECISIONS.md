@@ -1215,5 +1215,69 @@ the one macOS target that exists (`ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` 
 no beta-build mechanism analogous to Android's `sideInstall` yet — building one (bundle id,
 signing, `install.sh` changes) is a separate decision.
 
+## Iteration 27 — QR pairing, generation on both platforms, scanning on Android (D147)
+
+**D147 — pairing codes are now also shown as a QR, and Android can scan one to fill the Code
+field.** A pure follow-up on top of D127/D131's existing text-code protocol, not a protocol
+change — the code itself is still the only thing either endpoint ever sees. **Generation**:
+Android encodes with `zxing-core` (`QRCodeWriter` → `BitMatrix` → a hand-painted `Bitmap`,
+`Qr.kt`); macOS uses `CIQRCodeGenerator` directly (`Qr.swift`) — CoreImage already ships with
+the OS, so no new dependency there, matching the ROADMAP's own prediction. Both render at "H"
+error-correction and scale the generator's one-pixel-per-module output up before rasterizing,
+or the result is a handful of pixels blurred across whatever frame SwiftUI/Compose gives it.
+**Scanning** (Android only — ROADMAP.md never called for a macOS scanner, and this iteration
+didn't add one): CameraX + ML Kit's on-device barcode scanner, gated behind a runtime `CAMERA`
+permission request (`ScanScreen` in `Qr.kt`), landing on a new `"scan"` nav route. A scanned
+payload only ever autofills the existing Code field — it's checked against
+`BASE32_NO_AMBIGUOUS` (`sync/src/crypto.ts`)'s exact 8-character alphabet
+(`looksLikePairingCode`) before being trusted, so pointing the camera at an unrelated QR before
+finding the right one doesn't briefly populate the field with garbage. The regex is a UX
+filter, not a security boundary — the server already validates the code independently on
+claim.
+
+Verified two different ways, deliberately not by hand-eyeballing a scan through the emulator's
+synthetic "emulated" camera backend (its default test-pattern feed has nothing to scan a real
+QR from, and reconfiguring it to VirtualScene for one image is disproportionate to what's
+being checked here): the Android encoder's output was decoded back with `pyzbar`
+(a different library from the one that encoded it) and matched the source code exactly; the
+macOS encoder's algorithm was run standalone (outside the signed app, which was mid-fight with
+repeated Keychain re-prompts from an unrelated ad-hoc-signing quirk — same binary, different
+signature every rebuild, D113) through Apple's own `VNDetectBarcodesRequest`, which also
+decoded it correctly. `looksLikePairingCode`'s matching rule and the `qrCodeBitmap` encoder
+both got unit tests of their own (`QrTest.kt`) alongside the live decode checks, so a
+regression here doesn't depend on either external verification path catching it again.
+
+## Iteration 28 — the 180-day tombstone purge, finally wired to a job (D148)
+
+**D148 — a daily Cloudflare Cron Trigger now actually raises `retentionFloorSeq` and deletes
+the tombstones it covers, exercising the `410` path D121/D126 built and tested but that has
+never once fired in production.** `purgeOldTombstones` (`sync/src/index.ts`) finds every
+group with a `deletedAt`-tombstoned row older than 180 days, and per group, in one
+`env.DB.batch()`: raises `retentionFloorSeq` to the highest `seq` among the rows about to be
+purged (never lowers it — `MAX(retentionFloorSeq, ?)`), then deletes those rows. The order
+inside the batch is load-bearing, not incidental: raising the floor *before* deleting means a
+client can never observe a state where the gap exists but nothing has told it to distrust that
+gap yet. Wired to `wrangler.toml`'s `[triggers] crons = ["0 4 * * *"]` (an arbitrary off-peak
+UTC hour — this app has no real peak) via the Worker's `scheduled` export, `ctx.waitUntil`-ed
+so the platform doesn't tear the isolate down mid-purge.
+
+No admin-triggerable HTTP endpoint was added to fire this on demand in production — it would
+be one more unauthenticated surface on a service that currently has none, for a job whose only
+consumer is a cron schedule. Verified instead with `wrangler dev --test-scheduled`'s
+`/__scheduled` endpoint, which runs the exact deployed code against a real (local) D1 instance
+over a real HTTP round trip — not a mock, and a stronger check than a hand-invoked function
+call: seeded a group with an old tombstone at seq 4 flanked by live rows at seq 1-3 and 5,
+confirmed `since=3` synced clean beforehand, ran `/__scheduled`, then confirmed all three
+boundary cases the contract promises actually hold — `since=3` now `410`s exactly as designed,
+`since=4` (a device that had already synced through the tombstone's own seq) still succeeds,
+and `since=0` (D126's full-resync exemption) still succeeds regardless of how far the floor has
+moved. This is the first time any of the three has been observed against the job's real SQL
+rather than a hand-set `retentionFloorSeq` in a unit test. Deployed to production and
+smoke-tested (a disposable pair/start round trip, cleaned up immediately after) to confirm the
+Worker with the new `scheduled` export still serves ordinary requests; the cron itself will
+next fire for real at its scheduled UTC hour, or can be fired early from the Cloudflare
+dashboard's own "Trigger Cron" test button if that's wanted sooner. Harmless either way at the
+current 2-device scale — there are no tombstones anywhere near 180 days old yet.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

@@ -5,7 +5,7 @@ archive, and for Relisten's other-artist catalog. Two clients live in this repo:
 app (Kotlin, Jetpack Compose, Media3, Room) and a macOS app (Swift, SwiftUI, AVFoundation,
 GRDB), plus `sync/`, a Cloudflare Worker + D1 backend the two sync progress through — pairing,
 push/pull, and history/resume now verified working live between a real phone and Mac
-(D116-D143). See
+(D116-D148). See
 [README.md](README.md) for what the app does, [DECISIONS.md](DECISIONS.md) for why it does it
 that way, and [ROADMAP.md](ROADMAP.md) for what's not built yet — one log covers all three;
 entries are tagged by platform where it isn't obvious from context.

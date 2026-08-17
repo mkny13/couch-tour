@@ -49,21 +49,9 @@ emulator round trip (pair → play → force-quit → relaunch → confirm the r
 → confirm a second device pulled it down) now backs the "verified live" claim, not just unit
 tests.
 
-**What's next for sync:**
-
-- Tighten sync latency. Today it only fires on launch, foreground, and a 15-minute background
-  timer, so a phone-to-Mac handoff mid-listen can take up to 15 minutes unless the Mac app is
-  manually reopened. A debounced push after play/pause/track-change — mirroring how local
-  progress already writes every 5s (D97 on macOS, the Android equivalent in
-  `PlaybackService.saveNow()`) — is the highest-value next step and a relatively contained
-  change.
-- QR pairing. Today's pairing is text-code only — type the code shown on the other device
-  (D131). A QR is a pure follow-up, not a protocol change: generating one is trivial, scanning
-  one on Android needs a camera permission and a scanning library.
-- The 180-day tombstone purge job (flagged since D126/D136): `retentionFloorSeq` exists and
-  the `410`/full-resync path is implemented and unit-tested, but nothing has ever raised the
-  floor in production, so that path has never actually fired live. Harmless at the current
-  2-device scale, but worth building and exercising for real before it matters.
+Sync's original three-item punch list (tightened latency, QR pairing, the tombstone purge job)
+is now fully built and verified live — see D144, D147, and D148 respectively. Nothing is
+currently queued up next for sync specifically; future work here will start a fresh list.
 
 **What's next for desktop, unrelated to sync:**
 
