@@ -39,16 +39,34 @@ SwiftUI + AVFoundation (D94), not Electron or a browser client.
   different tapes of the same Grateful Dead date produced two independent History rows, each
   resuming its own tape correctly, never the other's.
 
-**Sync of playback history and resume with mobile shipped** (D116-D135): pairing, push/pull
-with last-write-wins conflict resolution, token rotation and instant revocation, wired into
-both clients with a background sync cadence — the live backend is
-`https://couch-tour-sync.mkastellec.workers.dev` (`sync/`).
+**Sync of playback history and resume with mobile shipped and is verified working live**
+(D116-D143): pairing, push/pull with last-write-wins conflict resolution, token rotation and
+instant revocation, wired into both clients with a background sync cadence — the live backend
+is `https://couch-tour-sync.mkastellec.workers.dev` (`sync/`). D140-D143 were a second pass
+after the first live pairing attempt found sync silently failing every push (a null-field
+encoding mismatch, D140) and crashing Android on relaunch (D141) — both fixed, and a real
+emulator round trip (pair → play → force-quit → relaunch → confirm the row reached the server
+→ confirm a second device pulled it down) now backs the "verified live" claim, not just unit
+tests.
 
-**What's next for desktop:**
+**What's next for sync:**
 
+- Tighten sync latency. Today it only fires on launch, foreground, and a 15-minute background
+  timer, so a phone-to-Mac handoff mid-listen can take up to 15 minutes unless the Mac app is
+  manually reopened. A debounced push after play/pause/track-change — mirroring how local
+  progress already writes every 5s (D97 on macOS, the Android equivalent in
+  `PlaybackService.saveNow()`) — is the highest-value next step and a relatively contained
+  change.
 - QR pairing. Today's pairing is text-code only — type the code shown on the other device
   (D131). A QR is a pure follow-up, not a protocol change: generating one is trivial, scanning
   one on Android needs a camera permission and a scanning library.
+- The 180-day tombstone purge job (flagged since D126/D136): `retentionFloorSeq` exists and
+  the `410`/full-resync path is implemented and unit-tested, but nothing has ever raised the
+  floor in production, so that path has never actually fired live. Harmless at the current
+  2-device scale, but worth building and exercising for real before it matters.
+
+**What's next for desktop, unrelated to sync:**
+
 - Artwork in Now Playing (D107).
 - History grouped by artist, matching Android, once there's enough real history to want it.
 - Login, likes, playlists, search, and casting on desktop — out of scope for the MVP,

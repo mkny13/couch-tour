@@ -3,7 +3,9 @@
 An unofficial native client for [phish.in](https://phish.in), the open-source live Phish
 archive, and for Relisten's other-artist catalog. Two clients live in this repo: an Android
 app (Kotlin, Jetpack Compose, Media3, Room) and a macOS app (Swift, SwiftUI, AVFoundation,
-GRDB), plus `sync/`, a Cloudflare Worker + D1 backend the two will sync progress through. See
+GRDB), plus `sync/`, a Cloudflare Worker + D1 backend the two sync progress through — pairing,
+push/pull, and history/resume now verified working live between a real phone and Mac
+(D116-D143). See
 [README.md](README.md) for what the app does, [DECISIONS.md](DECISIONS.md) for why it does it
 that way, and [ROADMAP.md](ROADMAP.md) for what's not built yet — one log covers all three;
 entries are tagged by platform where it isn't obvious from context.
@@ -19,6 +21,13 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 
 The whole suite is local — Robolectric and MockWebServer, no device or emulator. It runs in
 well under a minute, so run it after any change.
+
+**Cutting a beta release** (`.github/workflows/build-debug-apk.yml`, `workflow_dispatch`):
+`side_install: true` builds `dev.mike.couchtour.beta` ("Couch Tour Beta", D137) so it installs
+alongside the regular app instead of updating over it — the way to let Mike try something
+risky without touching his daily-driver install. Pair it with `prerelease: true` so it doesn't
+become the GitHub "Latest" release. `release_tag`/`release_notes` create the release itself;
+omit `release_tag` to just build and upload the APK as a workflow artifact.
 
 ## Building (macOS)
 
