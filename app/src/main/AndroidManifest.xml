@@ -12,7 +12,7 @@
     <application
         android:name=".CouchTourApp"
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/${appIcon}"
         android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@style/Theme.CouchTour">

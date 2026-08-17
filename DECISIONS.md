@@ -1157,5 +1157,63 @@ with `-dns-server 8.8.8.8`, nothing to do with the app), and the app's own error
 already correct — a DNS failure surfaced "Couldn't start pairing: Unable to resolve host"
 exactly as intended.
 
+## Iteration 25 — tightening sync latency: a debounced push on play/pause/track-change (D144)
+
+**D144 — both clients now push within ~2s of a play/pause/track-change event, instead of
+waiting up to 15 minutes for the next launch/foreground/timer sync.** `SyncSession` on both
+platforms gained `requestDebouncedPush` — cancel any in-flight debounce, wait (2s in
+production, overridable for tests), then run the same `sync()` push/pull cycle. Called from
+exactly the events that already bypass the local 5s throttle: Android's `playerListener`
+(`onIsPlayingChanged`/`onMediaItemTransition`/`onPlaybackStateChanged` in
+`PlaybackService.kt`) and macOS's `saveProgress(force: true)` call sites in `Player.swift`
+(rate change, track change, seek, queue start) — never the periodic 5s local-write tick, which
+would otherwise reset the debounce every half-second while merely sitting on a paused screen.
+The debounce coalesces bursts — several of those listeners fire for the same real event — into
+one push rather than one per callback.
+
+Verified live against the real production backend, not just unit tests (per the project's own
+sync-testing standard): paired the Android emulator fresh, joined its pairing code from a
+`curl`-simulated second device (deliberately not Mike's real Mac, which was already paired to
+his actual Pixel/Mac group — touching that risked disrupting a live pairing to prove a client
+timing change), then toggled play/pause via `adb shell input keyevent
+KEYCODE_MEDIA_PLAY_PAUSE` and polled the sync endpoint. The push's server-recorded `updatedAt`
+landed roughly 1.7s after the toggle — consistent with the 2s debounce plus network/clock
+variance, and nowhere near the old 15-minute worst case. The disposable test group (both
+devices, plus its `progress`/`pairings`/`seqs`/`devices`/`groups` rows) was deleted from
+production D1 afterward via `wrangler d1 execute --remote`; Mike's real Pixel 9 Pro
+XL/Mac Mini group was confirmed untouched (`revokedAt IS NULL` on both, same as before the
+test).
+
+Coalescing behavior itself is covered by a unit test on each platform (`SyncTest.kt`,
+`SyncTests.swift`) — three rapid `requestDebouncedPush` calls with a short test-only delay
+produce exactly one push, using the same mock-server harness the rest of the sync suite uses,
+rather than depending on the live round trip above to catch a regression here.
+
+## Iteration 26 — a beta-badged icon variant (D145)
+
+**D145 — The side-installed beta build gets its own icon, not just its own label.**
+D137 made `-PsideInstall=true` install alongside the regular app under
+`dev.mike.couchtour.beta` with the label "Couch Tour Beta," but both builds still showed the
+identical launcher icon — the only way to tell them apart in the app drawer was reading a
+label that gets truncated ("Couch Tour…" on a narrow grid). `ic_launcher_beta_foreground.png`
+adds a small amber "BETA" pill inside the ring, low enough to sit clear of the adaptive
+icon's circular safe zone (verified against a simulated true-circle mask, the same check the
+base icon used). Wired the same way `appLabel` already was: a new `appIcon` manifest
+placeholder (`ic_launcher` normally, `ic_launcher_beta` under `sideInstall`), with
+`AndroidManifest.xml`'s `android:icon` now `@mipmap/${appIcon}` instead of a literal
+resource.
+
+**D146 — macOS finally has a real app icon, base and beta.** The desktop app has shipped
+since Iteration 18 without ever setting `ASSETCATALOG_COMPILER_APPICON_NAME` — every build
+carried Xcode's default placeholder icon. Added `AppIcon.appiconset` (all mac idiom sizes,
+16 through 512 at 1x/2x) generated from the same source art as the Android icon, and a
+second `AppIcon-Beta.appiconset` with a diagonal ribbon banner — the standard desktop
+convention, since macOS icons aren't circle-masked the way Android's adaptive icons are, so
+Android's inline pill wouldn't read as clearly here. Only the base `AppIcon` is wired into
+the one macOS target that exists (`ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` in
+`project.yml`); the beta set is a ready asset, not yet attached to a target, since macOS has
+no beta-build mechanism analogous to Android's `sideInstall` yet — building one (bundle id,
+signing, `install.sh` changes) is a separate decision.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

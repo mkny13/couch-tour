@@ -32,6 +32,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         manifestPlaceholders["appLabel"] = "Couch Tour"
+        manifestPlaceholders["appIcon"] = "ic_launcher"
     }
 
     signingConfigs {
@@ -65,6 +66,10 @@ android {
                 applicationIdSuffix = ".beta"
                 versionNameSuffix = "-beta"
                 manifestPlaceholders["appLabel"] = "Couch Tour Beta"
+                // A ribboned launcher icon, so the side-installed build is visually
+                // distinguishable from the regular app in the launcher/app drawer, not
+                // just by label text.
+                manifestPlaceholders["appIcon"] = "ic_launcher_beta"
             }
         }
         release {
