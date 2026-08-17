@@ -15,6 +15,9 @@ but have no screen.
 - Do you want the waveform images (`waveform_image_url`) in the player, or is a plain
   scrubber enough?
 - Is search worth adding on macOS, given you picked browse-by-year as the MVP's entry point?
+- Confirm on a real device that audio now audibly ducks for a notification sound (#23, D93) —
+  the fix is a platform audio-focus behavior Robolectric can't exercise, so it's unverified
+  beyond compiling and the existing unit suite passing.
 
 ## Desktop (macOS)
 
@@ -67,9 +70,10 @@ review). Six phases, organized around the Play Store release and the real depend
 between items (favorite artists unlocks two others; the source-picker rework should land
 before the comparison UI that builds on it):
 
-1. **Release gates** — #23 (notification-sound ducking, the only open bug) and #26 (security
-   review of `sync/` and both clients' credential storage, run before more surface area is
-   added, especially to the sync backend).
+1. **Release gates** — #26 (security review of `sync/` and both clients' credential storage,
+   run before more surface area is added, especially to the sync backend). #23
+   (notification-sound ducking) is fixed (D93) and closed, pending the real-device
+   confirmation noted under Open questions above.
 2. **Quick wins** — #19 (share a show/track), #20 ("surprise me"), #21 (browse by top
    rated/popular — the rating data is already fetched for the tape picker, just not
    surfaced).
