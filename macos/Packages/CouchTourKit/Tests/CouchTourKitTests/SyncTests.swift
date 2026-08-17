@@ -184,6 +184,23 @@ final class SyncAPIRequestTests: XCTestCase {
             XCTFail("wrong error type: \(error)")
         }
     }
+
+    // Caught live: without LocalizedError conformance, `error.localizedDescription` on a
+    // SyncException falls back to Swift's generic bridged-NSError text regardless of what
+    // actually went wrong ("The operation couldn't be completed... error 1"), which is exactly
+    // what a wrong pairing code showed instead of "incorrect code".
+    func testLocalizedDescriptionSurfacesTheActualMessage() async {
+        server.enqueue(#"{"error":"incorrect code"}"#, code: 401)
+
+        do {
+            _ = try await SyncAPI.pairClaim(code: "WRONGCOD", deviceName: "Mac", platform: "macos")
+            XCTFail("expected SyncException")
+        } catch let error as SyncException {
+            XCTAssertEqual("incorrect code", error.localizedDescription)
+        } catch {
+            XCTFail("wrong error type: \(error)")
+        }
+    }
 }
 
 /// End-to-end `SyncSession` behaviour against a mock server, an in-memory `ProgressStore`,

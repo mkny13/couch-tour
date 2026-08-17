@@ -1090,5 +1090,29 @@ resolving correctly. Wired into `build-debug-apk.yml` as an opt-in `side_install
 alongside a `prerelease` input (existing releases v0.1-v0.12 never used GitHub's own
 pre-release flag; this one does, being genuinely experimental).
 
+## Iteration 23 — a real pairing attempt, and two bugs it found (D138-D139)
+
+The first actual cross-device pairing attempt — phone code, typed into the Mac app — failed
+immediately, before any of the sync logic itself was exercised. Both bugs were purely in the
+claim path.
+
+**D138 — macOS's code field didn't uppercase input; Android's already did.** Pairing codes
+are generated all-uppercase (`sync/src/crypto.ts`'s `randomPairingCode`) and looked up by
+exact `codeHash`, so a code typed or autocompleted in lowercase hashes to a different value
+and gets a flat 401. Caught live: the phone showed `7S9UGDQP`, the Mac's field held `7s9ugdqp`
+verbatim. Fixed with `.onChange(of: claimCode) { claimCode = $0.uppercased() }` on the
+TextField, matching what Android's `onValueChange` already did — this was an asymmetry
+between the two clients' pairing screens, not a protocol bug.
+
+**D139 — `SyncException` didn't conform to `LocalizedError`, so every failure looked
+identical.** The actual 401 was invisible: `error.localizedDescription` fell back to Swift's
+generic bridged-NSError text, `"The operation couldn't be completed. (CouchTourKit
+.SyncException error 1.)"`, for a plain wrong-code rejection — indistinguishable on screen
+from a network failure or a server bug. Fixed by adding `errorDescription { message }`, so
+the UI shows what the server actually said (`"incorrect code"`, `"pairing expired"`, etc.).
+This is the kind of bug unit tests don't catch on their own — nothing was asserting against
+`localizedDescription` before this, only against `.unauthorized`/`.gone` on the typed error
+directly (D124's tests). A regression test now pins the string itself.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

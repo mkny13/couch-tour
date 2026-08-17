@@ -140,7 +140,7 @@ private struct ErrorResponse: Decodable {
     let error: String
 }
 
-public struct SyncException: Error {
+public struct SyncException: Error, LocalizedError {
     public let message: String
     public let code: Int
 
@@ -148,6 +148,12 @@ public struct SyncException: Error {
         self.message = message
         self.code = code
     }
+
+    // Without this, `error.localizedDescription` falls back to Swift's generic bridged-NSError
+    // text ("The operation couldn't be completed. (CouchTourKit.SyncException error 1.)") for
+    // every failure alike — found live, catching a plain "incorrect code" 401 that looked
+    // identical to a network failure until this was added.
+    public var errorDescription: String? { message }
 
     public var unauthorized: Bool { code == 401 }
     public var gone: Bool { code == 410 }

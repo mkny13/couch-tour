@@ -51,6 +51,13 @@ struct SyncView: View {
                 Section("Have a code from another device?") {
                     TextField("Code", text: $claimCode)
                         .textFieldStyle(.roundedBorder)
+                        // Pairing codes are generated all-uppercase (sync/src/crypto.ts's
+                        // randomPairingCode) and looked up by exact hash — a lowercase entry
+                        // hashes to a different value and just 401s with no hint why. Android's
+                        // TextField already forces this on input; this matches it.
+                        .onChange(of: claimCode) { _, newValue in
+                            claimCode = newValue.uppercased()
+                        }
                         .onSubmit { claimPairing() }
                     Button("Join") { claimPairing() }
                         .disabled(busy || claimCode.isEmpty)
