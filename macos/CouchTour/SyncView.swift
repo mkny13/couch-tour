@@ -6,8 +6,9 @@ import SwiftUI
 /// side only ever shows a code, typed or as a QR, for the other device to consume.
 struct SyncView: View {
     @ObservedObject var syncSession: SyncSession
-    /// Runs one sync cycle right after a successful pair — `AppModel.syncNow` in practice.
-    let onPaired: () -> Void
+    /// Runs one sync cycle — `AppModel.syncNow` in practice. Used both right after a
+    /// successful pair and by the "Sync now" button below.
+    let sync: () -> Void
 
     @State private var pairingResult: PairStartResponse?
     @State private var claimCode = ""
@@ -30,6 +31,15 @@ struct SyncView: View {
                     Button("Unlink this device") {
                         syncSession.unlink()
                         pairingResult = nil
+                    }
+                }
+                Section {
+                    HStack {
+                        Text(syncSession.lastSyncedAt.map { "Last synced \(relativeTime($0))" } ?? "Never synced")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(syncSession.isSyncing ? "Syncing…" : "Sync now") { sync() }
+                            .disabled(syncSession.isSyncing)
                     }
                 }
             }
@@ -131,7 +141,7 @@ struct SyncView: View {
                 // Sync straight away rather than leaving History empty until the 15-minute
                 // timer or a refocus fires — pairing that appears to do nothing reads as
                 // failure, which is exactly how this landed the first time.
-                onPaired()
+                sync()
             } catch {
                 self.error = "Couldn't join: \(error.localizedDescription)"
             }

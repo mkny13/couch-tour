@@ -897,6 +897,24 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
                 SyncSession.unlink()
                 pairingResult = null
             }
+
+            val syncing by SyncSession.syncing.collectAsState()
+            val lastSyncedAt by SyncSession.lastSyncedAt.collectAsState()
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (lastSyncedAt == 0L) "Never synced" else "Last synced ${relativeTime(lastSyncedAt)}",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    enabled = !syncing,
+                    onClick = { scope.launch { runCatching { SyncSession.sync(vm.progressDao) } } }
+                ) { Text(if (syncing) "Syncing…" else "Sync now") }
+            }
         }
 
         pairingResult?.let { result ->
@@ -1329,6 +1347,12 @@ private fun ResumeCard(progress: Progress, vm: PlayerViewModel, nav: NavHostCont
         Spacer(Modifier.height(6.dp))
         Text(progress.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         Text(progress.trackTitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(
+            relativeTime(progress.updatedAt),
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            maxLines = 1
+        )
     }
 }
 
@@ -1364,6 +1388,7 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 p.dismissed -> "removed · ${fmt(p.positionMs)}"
                                 else -> "at ${fmt(p.positionMs)}"
                             },
+                            trailingSecondary = relativeTime(p.updatedAt),
                         )
                     }
                     IconButton(onClick = { vm.forget(p) }) {
@@ -1553,6 +1578,8 @@ private fun RowItem(
     subtitle: String,
     artUrl: String?,
     trailing: String? = null,
+    /** A second, dimmer line under [trailing] — e.g. History's "last played" timestamp. */
+    trailingSecondary: String? = null,
     /** Slot for a control that isn't part of the row's own click target, e.g. a heart. */
     trailingContent: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
@@ -1577,7 +1604,14 @@ private fun RowItem(
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             if (subtitle.isNotBlank()) Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        if (trailing != null) Text(trailing, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (trailing != null) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(trailing, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (trailingSecondary != null) {
+                    Text(trailingSecondary, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                }
+            }
+        }
         trailingContent?.invoke()
     }
 }

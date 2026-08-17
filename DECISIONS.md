@@ -1279,5 +1279,46 @@ next fire for real at its scheduled UTC hour, or can be fired early from the Clo
 dashboard's own "Trigger Cron" test button if that's wanted sooner. Harmless either way at the
 current 2-device scale — there are no tombstones anywhere near 180 days old yet.
 
+## Iteration 29 — sync status visibility: last-synced, sync now, last-played (D149)
+
+**D149 — the Sync screen now shows when it last actually talked to the server, plus a manual
+"Sync now" button; History and Continue Listening tiles show when each show was last played.**
+All of sync's activity was previously invisible between launches — no way to tell "sync is
+working, just hasn't fired yet" apart from "sync is broken." `SyncTokenStore` gained a
+`lastSyncedAt` wall-clock timestamp
+(0/`nil` = never), written at the same point `lastSeq` already is: the end of a *successful*
+`sync()` round trip, not on the unpaired no-op or a failed attempt — the debounced push from
+D144 already syncs frequently enough that this reads as "how long ago sync last actually
+succeeded," not just "the user's own last tap." `SyncSession` also gained `isSyncing`/`syncing`
+(Swift/Kotlin), for the button's disabled/label state — set at the top of `sync()`, cleared in
+a `finally`/`defer` so it can't get stuck true on a thrown `SyncException`. macOS's `SyncView`
+had its `onPaired` closure renamed to `sync` and reused for the new button, rather than adding
+a second closure parameter that would do the exact same thing under a different name.
+
+"Last played" labels ("5m ago", "3h ago", "2d ago", falling back to "MMM d" past a week) use a
+new `relativeTime` helper, ported identically to both platforms' existing `Format.kt`/
+`Format.swift` — no new column needed, since `Progress.updatedAt`/`PlaybackProgress.updatedAt`
+already means "last touched," which is "last played" for a row that isn't actively playing
+(nothing else updates a finished/dismissed row's timestamp). Shown on both History and Continue
+Listening. Android: History's `RowItem` gained an optional `trailingSecondary` slot (default
+`nil`, every other call site unaffected) for a second dimmer line under the existing
+position/status text; `ResumeCard` (Continue Listening) gained a third `Text` line the same
+way. macOS: rather than duplicate it per screen, it lives once in the shared `ProgressRow` —
+used by both `HistoryView` and `ContinueListeningView` — as a third line under the subtitle;
+`HistoryView`'s own trailing column went back to just its status text once the row itself
+started carrying the timestamp, so it isn't shown twice.
+
+Verified live end to end on Android (a disposable test pairing, not Mike's real group):
+"Never synced" showing correctly before any pull/push had happened (pairing only mints a code,
+it doesn't sync until the other side joins), tapping "Sync now" flipping it to "Last synced
+just now," a real history tile showing "at 4:05" over "5h ago", and the same "5h ago" showing
+on that show's Continue Listening card — both against the actual `updatedAt` in the local
+database. Test group deleted from production D1 afterward. The macOS side is covered by
+`SyncTokenStoreTests`/`SyncSessionTests` (round-tripping `lastSyncedAt`,
+`sync()` setting it on success) rather than a live GUI check — the installed app was mid the
+same ad-hoc-signing Keychain-reprompt loop D147 ran into, and denying that prompt makes the
+paired-only UI this feature lives in impossible to reach without either Mike's login password
+(never entered) or touching his real pairing (declined for the same reason as D147).
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

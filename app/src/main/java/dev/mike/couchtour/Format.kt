@@ -12,6 +12,23 @@ fun fmt(ms: Long): String {
 fun plural(n: Int, word: String) = if (n == 1) word else "${word}s"
 
 /**
+ * A short relative-time label ("just now", "5m ago", "3h ago", "2d ago") for last-synced and
+ * last-played timestamps. Falls back to an absolute "MMM d" once it's more than a week old,
+ * since "47d ago" stops being useful at a glance.
+ */
+fun relativeTime(epochMs: Long, nowMs: Long = System.currentTimeMillis()): String {
+    if (epochMs <= 0) return "never"
+    val diffSec = ((nowMs - epochMs) / 1000).coerceAtLeast(0)
+    return when {
+        diffSec < 60 -> "just now"
+        diffSec < 3600 -> "${diffSec / 60}m ago"
+        diffSec < 86400 -> "${diffSec / 3600}h ago"
+        diffSec < 7 * 86400 -> "${diffSec / 86400}d ago"
+        else -> java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(java.util.Date(epochMs))
+    }
+}
+
+/**
  * Maps a horizontal touch on a scrubber of [widthPx] to a position in the track.
  * Clamped, so a drag past either edge lands on the start or the end rather than
  * seeking out of bounds.

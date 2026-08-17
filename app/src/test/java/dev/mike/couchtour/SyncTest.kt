@@ -41,6 +41,7 @@ class SyncTokenStoreTest {
     fun `defaults the cursors to zero`() {
         assertEquals(0L, store().lastSeq)
         assertEquals(0L, store().lastPushWatermark)
+        assertEquals(0L, store().lastSyncedAt)
     }
 
     @Test
@@ -48,8 +49,10 @@ class SyncTokenStoreTest {
         val store = store()
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastSyncedAt = 1_700_000_000_000L
         assertEquals(42L, store.lastSeq)
         assertEquals(7L, store.lastPushWatermark)
+        assertEquals(1_700_000_000_000L, store.lastSyncedAt)
     }
 
     @Test
@@ -59,6 +62,7 @@ class SyncTokenStoreTest {
         store.deviceId = "device-1"
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastSyncedAt = 1_700_000_000_000L
 
         store.clear()
 
@@ -66,6 +70,7 @@ class SyncTokenStoreTest {
         assertNull(store.deviceId)
         assertEquals(0L, store.lastSeq)
         assertEquals(0L, store.lastPushWatermark)
+        assertEquals(0L, store.lastSyncedAt)
     }
 }
 
@@ -284,6 +289,17 @@ class SyncSessionTest {
         claim()
 
         assertTrue(SyncSession.paired.value)
+    }
+
+    @Test
+    fun `sync sets lastSyncedAt on success`() = runBlocking {
+        claim()
+        assertEquals(0L, SyncSession.lastSyncedAt.value)
+        enqueue("""{"seq":1,"changes":[]}""")
+
+        SyncSession.sync(db.progressDao())
+
+        assertTrue(SyncSession.lastSyncedAt.value > 0L)
     }
 
     @Test

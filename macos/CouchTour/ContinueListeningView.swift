@@ -79,6 +79,9 @@ struct ProgressRow: View {
             Text(row.subtitle)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text(relativeTime(row.updatedAt))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 }

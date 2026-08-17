@@ -51,7 +51,7 @@ struct RootView: View {
                     NavigationStack { HistoryView() }
                 case .sync:
                     NavigationStack {
-                        SyncView(syncSession: appModel.syncSession) { appModel.syncNow() }
+                        SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
                     }
                 }
             }

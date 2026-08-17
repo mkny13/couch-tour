@@ -35,14 +35,17 @@ final class SyncTokenStoreTests: XCTestCase {
     func testDefaultsTheCursorsToZero() {
         XCTAssertEqual(0, store().lastSeq)
         XCTAssertEqual(0, store().lastPushWatermark)
+        XCTAssertEqual(0, store().lastSyncedAt)
     }
 
     func testRoundTripsTheCursors() {
         let store = store()
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastSyncedAt = 1_700_000_000_000
         XCTAssertEqual(42, store.lastSeq)
         XCTAssertEqual(7, store.lastPushWatermark)
+        XCTAssertEqual(1_700_000_000_000, store.lastSyncedAt)
     }
 
     func testClearWipesEverything() {
@@ -51,6 +54,7 @@ final class SyncTokenStoreTests: XCTestCase {
         store.deviceId = "device-1"
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastSyncedAt = 1_700_000_000_000
 
         store.clear()
 
@@ -58,6 +62,7 @@ final class SyncTokenStoreTests: XCTestCase {
         XCTAssertNil(store.deviceId)
         XCTAssertEqual(0, store.lastSeq)
         XCTAssertEqual(0, store.lastPushWatermark)
+        XCTAssertEqual(0, store.lastSyncedAt)
     }
 }
 
@@ -263,6 +268,16 @@ final class SyncSessionTests: XCTestCase {
         try await claim()
 
         XCTAssertTrue(session.paired)
+    }
+
+    func testSyncSetsLastSyncedAtOnSuccess() async throws {
+        try await claim()
+        XCTAssertNil(session.lastSyncedAt)
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+
+        try await session.sync(store)
+
+        XCTAssertNotNil(session.lastSyncedAt)
     }
 
     func testSyncPushesRowsChangedSinceTheWatermark() async throws {

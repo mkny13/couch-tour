@@ -202,6 +202,7 @@ private const val KEY_DEVICE_TOKEN = "deviceToken"
 private const val KEY_DEVICE_ID = "deviceId"
 private const val KEY_LAST_SEQ = "lastSeq"
 private const val KEY_LAST_PUSH_WATERMARK = "lastPushWatermark"
+private const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
 
 /**
  * Encrypted-at-rest storage for the sync device token — its own prefs file, deliberately NOT
@@ -220,6 +221,7 @@ class SyncTokenStore(context: Context) {
     private var memoryDeviceId: String? = null
     private var memoryLastSeq: Long = 0L
     private var memoryLastPushWatermark: Long = 0L
+    private var memoryLastSyncedAt: Long = 0L
 
     private fun open(context: Context): SharedPreferences? = try {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -270,11 +272,21 @@ class SyncTokenStore(context: Context) {
             prefs?.edit()?.putLong(KEY_LAST_PUSH_WATERMARK, value)?.apply()
         }
 
+    /** Wall-clock time of the last successful sync round trip, for the "Last synced" UI. 0
+     *  means never. */
+    var lastSyncedAt: Long
+        get() = prefs?.getLong(KEY_LAST_SYNCED_AT, 0L) ?: memoryLastSyncedAt
+        set(value) {
+            memoryLastSyncedAt = value
+            prefs?.edit()?.putLong(KEY_LAST_SYNCED_AT, value)?.apply()
+        }
+
     fun clear() {
         memoryToken = null
         memoryDeviceId = null
         memoryLastSeq = 0L
         memoryLastPushWatermark = 0L
+        memoryLastSyncedAt = 0L
         prefs?.edit()?.clear()?.apply()
     }
 }
@@ -293,9 +305,16 @@ object SyncSession {
     private val _paired = MutableStateFlow(false)
     val paired: StateFlow<Boolean> = _paired.asStateFlow()
 
+    private val _syncing = MutableStateFlow(false)
+    val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
+
+    private val _lastSyncedAt = MutableStateFlow(0L)
+    val lastSyncedAt: StateFlow<Long> = _lastSyncedAt.asStateFlow()
+
     fun init(context: Context) {
         store = SyncTokenStore(context.applicationContext)
         _paired.value = store.deviceToken != null
+        _lastSyncedAt.value = store.lastSyncedAt
     }
 
     /**
@@ -342,6 +361,7 @@ object SyncSession {
     fun unlink() {
         store.clear()
         _paired.value = false
+        _lastSyncedAt.value = 0L
     }
 
     /**
@@ -353,6 +373,7 @@ object SyncSession {
         val token = store.deviceToken ?: return
         val toPush = progressDao.changedSince(store.lastPushWatermark).map { it.toWire() }
 
+        _syncing.value = true
         try {
             val (response, rotatedToken) = SyncApi.sync(token, store.lastSeq, toPush)
             rotatedToken?.let { store.deviceToken = it }
@@ -360,6 +381,10 @@ object SyncSession {
             response.changes.forEach { progressDao.put(it.toEntity()) }
             store.lastSeq = response.seq
             if (toPush.isNotEmpty()) store.lastPushWatermark = toPush.maxOf { it.updatedAt }
+
+            val now = System.currentTimeMillis()
+            store.lastSyncedAt = now
+            _lastSyncedAt.value = now
         } catch (e: SyncException) {
             when {
                 // Revoked from another device (or the token is simply bad): stop trying
@@ -370,6 +395,8 @@ object SyncSession {
                 e.gone -> { store.lastSeq = 0; sync(progressDao) }
                 else -> throw e
             }
+        } finally {
+            _syncing.value = false
         }
     }
 

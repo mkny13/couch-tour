@@ -30,6 +30,8 @@ struct HistoryView: View {
                     } else {
                         List(rows, id: \.queueKey) { row in
                             HStack {
+                                // ProgressRow's own third line already covers "last played" —
+                                // shared with Continue Listening, so it's not repeated here.
                                 ProgressRow(row: row)
                                 Spacer()
                                 Text(status(for: row))

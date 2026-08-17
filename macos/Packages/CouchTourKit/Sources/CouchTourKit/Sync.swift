@@ -273,6 +273,7 @@ public final class SyncTokenStore {
         static let deviceId = "sync.deviceId"
         static let lastSeq = "sync.lastSeq"
         static let lastPushWatermark = "sync.lastPushWatermark"
+        static let lastSyncedAt = "sync.lastSyncedAt"
     }
 
     public init(keychain: KeychainStoring = SystemKeychain(), defaults: UserDefaults = .standard) {
@@ -302,11 +303,19 @@ public final class SyncTokenStore {
         set { defaults.set(Int(newValue), forKey: Key.lastPushWatermark) }
     }
 
+    /// Wall-clock time of the last successful sync round trip, for the "Last synced" UI. 0
+    /// means never.
+    public var lastSyncedAt: Int64 {
+        get { Int64(defaults.integer(forKey: Key.lastSyncedAt)) }
+        set { defaults.set(Int(newValue), forKey: Key.lastSyncedAt) }
+    }
+
     public func clear() {
         keychain.set(nil, forKey: Key.deviceToken)
         keychain.set(nil, forKey: Key.deviceId)
         defaults.removeObject(forKey: Key.lastSeq)
         defaults.removeObject(forKey: Key.lastPushWatermark)
+        defaults.removeObject(forKey: Key.lastSyncedAt)
     }
 }
 
@@ -317,10 +326,14 @@ public final class SyncSession: ObservableObject {
     private let store: SyncTokenStore
 
     @Published public private(set) var paired: Bool
+    @Published public private(set) var isSyncing = false
+    /// `nil` means never synced.
+    @Published public private(set) var lastSyncedAt: Int64?
 
     public init(store: SyncTokenStore = SyncTokenStore()) {
         self.store = store
         self.paired = store.deviceToken != nil
+        self.lastSyncedAt = store.lastSyncedAt > 0 ? store.lastSyncedAt : nil
     }
 
     /// Bootstraps a new group if unpaired, or mints a fresh code inside the existing group if
@@ -361,6 +374,7 @@ public final class SyncSession: ObservableObject {
     public func unlink() {
         store.clear()
         paired = false
+        lastSyncedAt = nil
     }
 
     /// One push-then-pull cycle. Pushes every local row touched since the last successful
@@ -370,6 +384,8 @@ public final class SyncSession: ObservableObject {
         guard let token = store.deviceToken else { return }
         let toPush = try progressStore.changedSince(store.lastPushWatermark).map { $0.toWire() }
 
+        isSyncing = true
+        defer { isSyncing = false }
         do {
             let (response, rotatedToken) = try await SyncAPI.sync(token: token, since: store.lastSeq, changes: toPush)
             if let rotatedToken { store.deviceToken = rotatedToken }
@@ -379,6 +395,10 @@ public final class SyncSession: ObservableObject {
             if let maxUpdatedAt = toPush.map({ $0.updatedAt }).max() {
                 store.lastPushWatermark = maxUpdatedAt
             }
+
+            let now = Int64(Date().timeIntervalSince1970 * 1000)
+            store.lastSyncedAt = now
+            lastSyncedAt = now
         } catch let error as SyncException {
             if error.unauthorized {
                 // Revoked from another device (or the token is simply bad): stop trying
