@@ -6,3 +6,8 @@ compatibility_date = "2026-08-01"
 binding = "DB"
 database_name = "couch-tour-sync"
 database_id = "20840aeb-15d2-4dd8-ba5a-c1e78233cea2"
+
+# Daily tombstone purge (D121/D126's retentionFloorSeq contract, finally wired to a job) — see
+# purgeOldTombstones in src/index.ts. Off-peak UTC hour; this app has no peak hours that matter.
+[triggers]
+crons = ["0 4 * * *"]

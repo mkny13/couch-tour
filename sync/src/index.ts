@@ -6,6 +6,7 @@ const PAIRING_TTL_MS = 10 * 60 * 1000;
 const TOKEN_ROTATION_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 const TOKEN_GRACE_MS = 48 * 60 * 60 * 1000;
 const FUTURE_CLOCK_CLAMP_MS = 24 * 60 * 60 * 1000;
+const TOMBSTONE_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 
 function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
@@ -318,6 +319,48 @@ async function applyIncomingChanges(
   await env.DB.batch(statements);
 }
 
+// -------------------------------------------------------------- retention
+
+/**
+ * Raises `retentionFloorSeq` before deleting the tombstones it covers, per group, in one
+ * `env.DB.batch()` each — never the other order. A client that read the old floor and is
+ * mid-request when the delete alone had already landed could pull a `since` that's now a lie:
+ * a gap it can no longer trust exists (D121), but nothing yet told it to distrust it. Raising
+ * the floor first means that gap always 410s (D126's `since = 0` exemption still applies to
+ * anyone doing a full resync anyway) rather than silently under-syncing.
+ */
+async function purgeOldTombstones(
+  env: Env,
+  now: number
+): Promise<{ groupsPurged: number; rowsPurged: number }> {
+  const cutoff = now - TOMBSTONE_RETENTION_MS;
+  const candidates = await env.DB.prepare(
+    `SELECT groupId, MAX(seq) as maxSeq, COUNT(*) as count
+     FROM progress
+     WHERE deletedAt IS NOT NULL AND deletedAt < ?
+     GROUP BY groupId`
+  )
+    .bind(cutoff)
+    .all<{ groupId: string; maxSeq: number; count: number }>();
+
+  const groups = candidates.results ?? [];
+  let rowsPurged = 0;
+
+  for (const group of groups) {
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE seqs SET retentionFloorSeq = MAX(retentionFloorSeq, ?) WHERE groupId = ?"
+      ).bind(group.maxSeq, group.groupId),
+      env.DB.prepare(
+        "DELETE FROM progress WHERE groupId = ? AND deletedAt IS NOT NULL AND deletedAt < ?"
+      ).bind(group.groupId, cutoff),
+    ]);
+    rowsPurged += group.count;
+  }
+
+  return { groupsPurged: groups.length, rowsPurged };
+}
+
 // -------------------------------------------------------------- devices
 
 async function handleDevicesList(request: Request, env: Env): Promise<Response> {
@@ -379,5 +422,18 @@ export default {
     }
 
     return json({ error: "not found" }, 404);
+  },
+
+  /**
+   * Cloudflare Cron Trigger entry point (`wrangler.toml`'s `[triggers]`) — the 180-day
+   * tombstone purge flagged since D121/D126 and never wired to anything until now. `waitUntil`
+   * so the platform doesn't tear down the Worker mid-purge the moment this returns.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      purgeOldTombstones(env, Date.now()).then((stats) => {
+        console.log(`Tombstone purge: ${stats.rowsPurged} row(s) across ${stats.groupsPurged} group(s)`);
+      })
+    );
   },
 } satisfies ExportedHandler<Env>;
