@@ -394,6 +394,22 @@ public final class SyncSession: ObservableObject {
             }
         }
     }
+
+    private var pushTask: Task<Void, Never>?
+
+    /// Debounced push after a play/pause/track-change event, so a phone-to-Mac handoff
+    /// mid-listen doesn't have to wait for the next launch/foreground/15-minute timer.
+    /// Coalesces bursts — `Player`'s observers fire more than once per real event — into a
+    /// single push. `delay` is overridable so tests don't have to wait out the real debounce
+    /// window.
+    public func requestDebouncedPush(_ progressStore: ProgressStore, delay: Duration = .seconds(2)) {
+        pushTask?.cancel()
+        pushTask = Task {
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            try? await sync(progressStore)
+        }
+    }
 }
 
 private extension SyncProgressWire {

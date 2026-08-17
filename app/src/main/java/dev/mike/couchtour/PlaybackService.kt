@@ -193,6 +193,7 @@ class PlaybackService : MediaLibraryService() {
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             saveNow()
+            SyncSession.requestDebouncedPush(progressDao())
             if (session?.player === localPlayer) {
                 if (isPlaying) requestAudioFocus() else if (!pausedByAudioFocusLoss) abandonAudioFocus()
             }
@@ -200,10 +201,12 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
             saveNow()
+            SyncSession.requestDebouncedPush(progressDao())
         }
 
         override fun onPlaybackStateChanged(state: Int) {
             saveNow()
+            SyncSession.requestDebouncedPush(progressDao())
         }
     }
 

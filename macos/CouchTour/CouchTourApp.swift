@@ -10,7 +10,7 @@ struct CouchTourApp: App {
         // first and handed in rather than each @StateObject initializing independently.
         let model = AppModel()
         _appModel = StateObject(wrappedValue: model)
-        _player = StateObject(wrappedValue: Player(progressStore: model.progressStore))
+        _player = StateObject(wrappedValue: Player(progressStore: model.progressStore, syncSession: model.syncSession))
     }
 
     var body: some Scene {

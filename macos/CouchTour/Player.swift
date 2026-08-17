@@ -31,6 +31,8 @@ final class Player: NSObject, ObservableObject {
 
     private let queuePlayer = AVQueuePlayer()
     private let recorder: ProgressRecorder
+    private let progressStore: ProgressStore?
+    private let syncSession: SyncSession?
     private var artURL: String?
 
     /// Indexed identically to `tracks`, even though only a suffix of it is ever inserted into
@@ -46,8 +48,10 @@ final class Player: NSObject, ObservableObject {
     private var rateObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
 
-    init(progressStore: ProgressStore?) {
+    init(progressStore: ProgressStore?, syncSession: SyncSession?) {
         recorder = ProgressRecorder(store: progressStore)
+        self.progressStore = progressStore
+        self.syncSession = syncSession
         super.init()
         configureRemoteCommands()
         observePlayer()
@@ -170,6 +174,11 @@ final class Player: NSObject, ObservableObject {
             queueKey: queueKey, show: show, track: currentTrack, trackIndex: currentIndex,
             positionMs: positionMs, artURL: artURL, force: force
         )
+        // Only on the same events that bypass the local 5s throttle — the periodic tick
+        // shouldn't also be resetting a sync debounce every half-second.
+        if force, let syncSession, let progressStore {
+            syncSession.requestDebouncedPush(progressStore)
+        }
     }
 
     // MARK: - Now Playing / media keys

@@ -11,6 +11,7 @@ import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -18,6 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.TimeUnit
 
 /** Round-trips [SyncTokenStore], mirroring [TokenStoreTest]'s pattern in SessionTest.kt. */
 @RunWith(RobolectricTestRunner::class)
@@ -378,5 +380,29 @@ class SyncSessionTest {
         // The 410 plus its retry: two requests beyond whatever claim() already made.
         assertEquals(2, server.requestCount - requestsBeforeSync)
         assertTrue(SyncSession.paired.value)
+    }
+
+    @Test
+    fun `requestDebouncedPush coalesces a burst of calls into a single push`() = runBlocking {
+        claim()
+        db.progressDao().put(
+            Progress(
+                queueKey = "show:1997-11-17", title = "t", subtitle = "s", artUrl = null,
+                trackIndex = 0, positionMs = 100, trackTitle = "Track", updatedAt = 5_000,
+                artist = "Phish",
+            )
+        )
+        enqueue("""{"seq":1,"changes":[]}""")
+
+        // Mirrors onIsPlayingChanged/onMediaItemTransition/onPlaybackStateChanged all firing
+        // for the same real event — only the last-scheduled delay should actually land.
+        SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
+        SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
+        SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
+
+        val pushed = server.takeRequest(2, TimeUnit.SECONDS)
+        assertNotNull(pushed)
+        assertTrue(pushed!!.body.readUtf8().contains(""""queueKey":"show:1997-11-17""""))
+        assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS))
     }
 }

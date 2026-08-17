@@ -351,4 +351,26 @@ final class SyncSessionTests: XCTestCase {
         XCTAssertEqual(2, server.requestCount - requestsBeforeSync)
         XCTAssertTrue(session.paired)
     }
+
+    func testRequestDebouncedPushCoalescesABurstOfCallsIntoASinglePush() async throws {
+        try await claim()
+        let requestsBeforeDebounce = server.requestCount
+        try store.put(PlaybackProgress(
+            queueKey: "show:1997-11-17", title: "t", subtitle: "s", trackIndex: 0,
+            positionMs: 100, trackTitle: "Track", updatedAt: 5_000, finished: false, dismissed: false, artist: "Phish"
+        ))
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+
+        // Mirrors Player's rate/currentItem observers all firing for the same real event —
+        // only the last-scheduled delay should actually land.
+        session.requestDebouncedPush(store, delay: .milliseconds(50))
+        session.requestDebouncedPush(store, delay: .milliseconds(50))
+        session.requestDebouncedPush(store, delay: .milliseconds(50))
+
+        try await Task.sleep(for: .milliseconds(300))
+
+        XCTAssertEqual(1, server.requestCount - requestsBeforeDebounce)
+        let pushed = server.takeRequest()!.bodyString!
+        XCTAssertTrue(pushed.contains(#""queueKey":"show:1997-11-17""#))
+    }
 }

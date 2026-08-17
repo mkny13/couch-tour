@@ -13,10 +13,14 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -365,6 +369,30 @@ object SyncSession {
                 // since = 0 never 410s (D126), so this terminates in one extra round trip.
                 e.gone -> { store.lastSeq = 0; sync(progressDao) }
                 else -> throw e
+            }
+        }
+    }
+
+    private var pushJob: Job? = null
+    // Its own scope, not the caller's (PlaybackService's dies with the service): a debounce
+    // in flight must survive whatever component happened to trigger it.
+    private val debounceScope = CoroutineScope(Dispatchers.IO)
+
+    /**
+     * Debounced push after a play/pause/track-change event, so a phone-to-Mac handoff
+     * mid-listen doesn't have to wait for the next launch/foreground/15-minute timer.
+     * Coalesces bursts — [PlaybackService]'s listener fires more than once per real event —
+     * into a single push. `delayMs` is overridable so tests don't have to wait out the real
+     * debounce window.
+     */
+    fun requestDebouncedPush(progressDao: ProgressDao, delayMs: Long = 2_000) {
+        pushJob?.cancel()
+        pushJob = debounceScope.launch {
+            delay(delayMs)
+            try {
+                sync(progressDao)
+            } catch (e: Exception) {
+                Log.w("Sync", "Debounced push failed; the periodic job will retry", e)
             }
         }
     }
