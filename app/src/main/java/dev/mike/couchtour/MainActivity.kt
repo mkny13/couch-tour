@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -57,6 +58,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -224,6 +226,7 @@ fun App(
             composable("mine/shows") { MyShowsScreen(nav) }
             composable("mine/tracks") { MyTracksScreen(vm, nav) }
             composable("sync") { SyncScreen(vm, nav) }
+            composable("scan") { ScanScreen(nav) }
         }
     }
 }
@@ -853,10 +856,7 @@ fun LoginScreen(nav: NavHostController) {
     }
 }
 
-/**
- * Pairing and device management for progress sync (D119-D127). No QR yet — the code is
- * short enough to type, and adding camera scanning is its own follow-up (ROADMAP.md).
- */
+/** Pairing and device management for progress sync (D119-D127, QR pairing D145). */
 @Composable
 fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
     val paired by SyncSession.paired.collectAsState()
@@ -866,6 +866,21 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
     var error by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+
+    // Compose Navigation's standard way to get a result back from a pushed screen: the
+    // scanner writes into *this* entry's SavedStateHandle before popping itself off, since
+    // it can't hand a return value back through the composable call itself.
+    val scannedCode = nav.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getStateFlow<String?>("scannedCode", null)
+        ?.collectAsState()
+    LaunchedEffect(scannedCode?.value) {
+        scannedCode?.value?.let {
+            claimCode = it
+            error = null
+            nav.currentBackStackEntry?.savedStateHandle?.set("scannedCode", null)
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Header("Sync", nav)
@@ -903,6 +918,15 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // White backing behind the QR itself — the surrounding theme is dark, and a
+                // QR scanner needs real light/dark contrast, not whatever the app's palette is.
+                Surface(color = Color.White, modifier = Modifier.padding(top = 16.dp)) {
+                    Image(
+                        bitmap = remember(result.code) { qrCodeBitmap(result.code) },
+                        contentDescription = "QR code for pairing code ${result.code}",
+                        modifier = Modifier.padding(12.dp).size(200.dp)
+                    )
+                }
             }
         }
 
@@ -939,6 +963,10 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             )
+            TextButton(
+                onClick = { nav.navigate("scan") },
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) { Text("Scan QR code instead") }
             Button(
                 enabled = !busy && claimCode.isNotBlank(),
                 onClick = {
@@ -1483,7 +1511,7 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
 }
 
 @Composable
-private fun Header(title: String, nav: NavHostController) {
+fun Header(title: String, nav: NavHostController) {
     Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { nav.popBackStack() }) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")

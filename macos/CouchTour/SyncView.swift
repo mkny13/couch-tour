@@ -1,8 +1,9 @@
 import CouchTourKit
 import SwiftUI
 
-/// Pairing and device management for progress sync (D119-D127). No QR yet — the code is
-/// short enough to type, and adding a scanner is its own follow-up (ROADMAP.md).
+/// Pairing and device management for progress sync (D119-D127, QR pairing D145). No scanner
+/// here — Android is the side that gets a camera and a scanning library (ROADMAP.md); this
+/// side only ever shows a code, typed or as a QR, for the other device to consume.
 struct SyncView: View {
     @ObservedObject var syncSession: SyncSession
     /// Runs one sync cycle right after a successful pair — `AppModel.syncNow` in practice.
@@ -39,6 +40,16 @@ struct SyncView: View {
                         .font(.system(.largeTitle, design: .monospaced))
                         .bold()
                     Text("Expires in 10 minutes").foregroundStyle(.secondary)
+                    if let cgImage = qrCodeImage(result.code) {
+                        Image(decorative: cgImage, scale: 1.0)
+                            .interpolation(.none)
+                            .resizable()
+                            .frame(width: 160, height: 160)
+                            // A scanner needs real light/dark contrast — the form's own
+                            // background shouldn't show through on either side of the code.
+                            .padding(12)
+                            .background(.white)
+                    }
                 }
             }
 
