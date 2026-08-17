@@ -60,53 +60,94 @@ currently queued up next for sync specifically; future work here will start a fr
 - Login, likes, playlists, search, and casting on desktop — out of scope for the MVP,
   unscheduled beyond that.
 
+## Suggested build order
+
+Filed as GitHub issues #9-28 (Android/general) plus #25 (desktop UI) and #26 (security
+review). Six phases, organized around the Play Store release and the real dependencies
+between items (favorite artists unlocks two others; the source-picker rework should land
+before the comparison UI that builds on it):
+
+1. **Release gates** — #23 (notification-sound ducking, the only open bug) and #26 (security
+   review of `sync/` and both clients' credential storage, run before more surface area is
+   added, especially to the sync backend).
+2. **Quick wins** — #19 (share a show/track), #20 ("surprise me"), #21 (browse by top
+   rated/popular — the rating data is already fetched for the tape picker, just not
+   surfaced).
+3. **Source/tape cluster, in order** — #17 (rework "switch tape" into a Source picker) →
+   #24 (comparison, ratings, preferred tapers — explicitly builds on #17) → #18 (source/show
+   volume leveling, independent but adjacent).
+4. **Personal library cluster** — #14 (favorite artists, blocks #13 and #22) → #11 (likes for
+   Relisten tracks) → #12 (playlists spanning both backends — shares its storage layer with
+   #11) → #13 (on-this-date playlist) → #22 (next Couch Tour stop).
+5. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
+   seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` are each
+   small and worth pulling forward.
+6. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
+   (Spotify Live) — each is a new surface rather than a feature on an existing one; #16 and
+   #15 also carry ToS/API risk worth resolving before writing code, and #15's approach-
+   Relisten's-operators prerequisite (below) applies to this whole phase before a store
+   release.
+
+Not yet filed as issues, since they're implementation-detail follow-ups rather than
+user-facing features: a real catalog cache beyond the single `@Volatile`-cached artist list,
+Relisten show artwork (`RelistenShowSummary.toShowSummary` sets no `artUrl`), and a like
+button on the Now Playing screen for Relisten tracks (needs `PlayerState` to carry track id +
+liked state).
+
 ## Feature ideas
 
-- Google TV app.
-- Cast from desktop.
+- Google TV app. (#9)
+- Cast from desktop. (#10)
 - Likes for Relisten tracks — mirror phish.in's built-in like functionality, which today only
-  covers phish.in tracks.
+  covers phish.in tracks. (#11)
 - Playlists: create and save playlists for Relisten tracks, similar to phish.in's playlist
-  feature; playlists should be able to mix phish.in and Relisten tracks together.
+  feature; playlists should be able to mix phish.in and Relisten tracks together. (#12)
 - Home screen "on this date" playlist — a random selection of shows played by the user's
-  favorited artists on the same month and day, across past years.
+  favorited artists on the same month and day, across past years. (#13)
 - Favorite artists, akin to the Relisten app — favorited artists surface on the home screen
-  and pinned to the top of the browse-artists list.
+  and pinned to the top of the browse-artists list. (#14)
 - Spotify Live Releases support. Ideally in-app playback; if that isn't feasible, at minimum
   track which Spotify Live tracks have been listened to, leaning on Last.fm for that if
-  needed.
+  needed. (#15)
 - YouTube video support — playable as video or audio-only, ideally with a toggle between the
-  two.
+  two. (#16)
 - "Switch tape" rework: relabel to "Source" to match etree usage, include source details
-  (taper, lineage, etc.), and highlight SBD and matrix sources.
-- Better source selection beyond the rework above: surface whatever signals help identify
-  the best source for a show (ratings, review counts/text, taper reputation); a way to
-  quickly compare snippets of the same track across all available tapers/sources side by
-  side; and letting the user flag preferred (and avoided) tapers, which then influences
-  source ordering or highlighting.
+  (taper, lineage, etc.), and highlight SBD and matrix sources. (#17)
 - Source/show-level volume leveling — not traditional per-track leveling, but matching
   average sound levels across quiet and loud recordings so different sources/shows play back
-  at comparable volume.
-- Share a show or track — no `Intent.ACTION_SEND` today; Relisten parity.
-- "Surprise me" / random show button.
+  at comparable volume. (#18)
+- Share a show or track — no `Intent.ACTION_SEND` today; Relisten parity. (#19)
+- "Surprise me" / random show button. (#20)
 - Browse shows by top rated (and popular/trending) — Relisten sorts by rating and popularity;
   Couch Tour only uses Relisten's pre-sorted rating internally for the tape picker, with no
-  user-facing browse-by-rating surface.
+  user-facing browse-by-rating surface. (#21)
 - "Next Couch Tour stop" button — surfaces the oldest unplayed show from the current tours of
-  your favorited artists (depends on favorite artists, above).
+  your favorited artists (depends on favorite artists, above). (#22)
+- Better source selection beyond the "switch tape" rework above: surface whatever signals
+  help identify the best source for a show (ratings, review counts/text, taper reputation); a
+  way to quickly compare snippets of the same track across all available tapers/sources side
+  by side; and letting the user flag preferred (and avoided) tapers, which then influences
+  source ordering or highlighting. (#24)
+- Desktop UI improvements — player surface (no full Now Playing view, no artwork, no volume
+  control, scrubber seeks on every drag tick instead of on release), window/macOS idioms (no
+  menu-bar `Commands` or keyboard shortcuts, no toolbar, no Settings scene), and browse (no
+  search, History not grouped by artist, venue/city lost on drill-in, tape switcher needs the
+  same Source-picker rework as #17). (#25)
+- Security review before Play Store release — sync backend rate limiting and request
+  validation, client secret storage verification, log/manifest/dependency audit. (#26)
 
 ## Multi-artist follow-ups
 
 Detailed in [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) (O3–O5):
 
 - FLAC support — Relisten serves `flac_url`; the app is MP3-only today because Cast's MIME
-  type is hardcoded and the stock receiver expects progressive MP3.
+  type is hardcoded and the stock receiver expects progressive MP3. (#27)
 - A real catalog cache, beyond the single `@Volatile`-cached artist list.
 - Approach Relisten's operators about the API use, the same courtesy phish.in's maintainer
   extended, before a store release.
 - Unify Android Auto's separate "Artists" and "Years" browse roots
   (`PlaybackService.kt`'s `yearChildren`/`tourChildren`) with the phone's single merged
-  artist list (D89) — the car still browses Phish and Relisten as two trees.
+  artist list (D89) — the car still browses Phish and Relisten as two trees. (#28)
 - Relisten shows have no artwork (`RelistenShowSummary.toShowSummary` sets no `artUrl`), so
   every non-Phish show falls back to a plain `primaryContainer` background in the player
   (D92) and a placeholder icon everywhere else.
