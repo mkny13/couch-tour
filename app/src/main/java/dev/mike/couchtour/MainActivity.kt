@@ -223,7 +223,7 @@ fun App(
             }
             composable("mine/shows") { MyShowsScreen(nav) }
             composable("mine/tracks") { MyTracksScreen(vm, nav) }
-            composable("sync") { SyncScreen(nav) }
+            composable("sync") { SyncScreen(vm, nav) }
         }
     }
 }
@@ -858,7 +858,7 @@ fun LoginScreen(nav: NavHostController) {
  * short enough to type, and adding camera scanning is its own follow-up (ROADMAP.md).
  */
 @Composable
-fun SyncScreen(nav: NavHostController) {
+fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
     val paired by SyncSession.paired.collectAsState()
     var pairingResult by remember { mutableStateOf<PairStartResponse?>(null) }
     var claimCode by rememberSaveable { mutableStateOf("") }
@@ -946,7 +946,13 @@ fun SyncScreen(nav: NavHostController) {
                     error = null
                     scope.launch {
                         runCatching { SyncSession.claimPairing(claimCode.trim()) }
-                            .onSuccess { claimCode = "" }
+                            .onSuccess {
+                                claimCode = ""
+                                // Sync straight away rather than leaving both devices looking
+                                // empty until a later timer fires — see claimPairing's note.
+                                runCatching { SyncSession.sync(vm.progressDao) }
+                                    .onFailure { error = "Paired, but the first sync failed: ${it.message}" }
+                            }
                             .onFailure { error = "Couldn't join: ${it.message}" }
                         busy = false
                     }

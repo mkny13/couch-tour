@@ -50,7 +50,9 @@ struct RootView: View {
                 case .history:
                     NavigationStack { HistoryView() }
                 case .sync:
-                    NavigationStack { SyncView(syncSession: appModel.syncSession) }
+                    NavigationStack {
+                        SyncView(syncSession: appModel.syncSession) { appModel.syncNow() }
+                    }
                 }
             }
             if player.show != nil {

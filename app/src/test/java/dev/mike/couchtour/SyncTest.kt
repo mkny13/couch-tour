@@ -153,6 +153,27 @@ class SyncApiRequestTest {
     }
 
     @Test
+    fun `a null artUrl and deletedAt are sent as explicit nulls, not omitted`() = runBlocking {
+        // The bug that broke sync entirely: kotlinx.serialization omits any property still
+        // equal to its default unless encodeDefaults is set, so a row with no artwork sent
+        // neither key at all. The server's D1 bind() rejects `undefined`, so every push
+        // containing such a row 500'd — and since artUrl is null for every Relisten row,
+        // that was every push.
+        enqueue("""{"seq":1,"changes":[]}""")
+        val change = SyncProgressWire(
+            queueKey = "show:1997-11-17", title = "t", subtitle = "s", artUrl = null,
+            trackIndex = 0, positionMs = 100, trackTitle = "Track", updatedAt = 1000,
+            finished = false, dismissed = false, artist = "Phish", deletedAt = null,
+        )
+
+        SyncApi.sync("ct_token", since = 0, changes = listOf(change))
+
+        val body = take().body.readUtf8()
+        assertTrue("artUrl missing from $body", body.contains(""""artUrl":null"""))
+        assertTrue("deletedAt missing from $body", body.contains(""""deletedAt":null"""))
+    }
+
+    @Test
     fun `sync surfaces a rotated token from the response header`() = runBlocking {
         enqueue("""{"seq":1,"changes":[]}""", rotatedToken = "ct_new")
 

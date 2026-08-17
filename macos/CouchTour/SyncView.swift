@@ -5,6 +5,8 @@ import SwiftUI
 /// short enough to type, and adding a scanner is its own follow-up (ROADMAP.md).
 struct SyncView: View {
     @ObservedObject var syncSession: SyncSession
+    /// Runs one sync cycle right after a successful pair — `AppModel.syncNow` in practice.
+    let onPaired: () -> Void
 
     @State private var pairingResult: PairStartResponse?
     @State private var claimCode = ""
@@ -115,6 +117,10 @@ struct SyncView: View {
                     platform: "macos"
                 )
                 claimCode = ""
+                // Sync straight away rather than leaving History empty until the 15-minute
+                // timer or a refocus fires — pairing that appears to do nothing reads as
+                // failure, which is exactly how this landed the first time.
+                onPaired()
             } catch {
                 self.error = "Couldn't join: \(error.localizedDescription)"
             }

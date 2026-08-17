@@ -120,7 +120,12 @@ object SyncApi {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
-    private val json = Json { ignoreUnknownKeys = true }
+    // encodeDefaults matters here in a way it doesn't for PhishInApi, which only ever decodes:
+    // without it, kotlinx.serialization omits any property still equal to its default, so a row
+    // with no artwork sent `artUrl`/`deletedAt` as absent keys rather than explicit nulls. The
+    // server's D1 `.bind()` rejects `undefined`, so every push containing such a row 500'd —
+    // which was every push, since artUrl is null for all Relisten rows.
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     private fun path(vararg segments: String) =
         baseUrl.newBuilder().apply { segments.forEach { addPathSegment(it) } }
@@ -303,7 +308,11 @@ object SyncSession {
         return response
     }
 
-    /** Claims a code shown on another device, joining its group. */
+    /**
+     * Claims a code shown on another device, joining its group. Callers should follow this
+     * with a [sync] — pairing that leaves both sides looking empty until some later timer
+     * fires reads as "it didn't work", which is exactly how this landed the first time.
+     */
     suspend fun claimPairing(code: String) {
         val response = SyncApi.pairClaim(code, Build.MODEL, "android")
         store.deviceToken = response.deviceToken

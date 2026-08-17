@@ -129,6 +129,24 @@ final class SyncAPIRequestTests: XCTestCase {
         XCTAssertNil(rotated)
     }
 
+    // Swift's synthesized `encode(to:)` uses `encodeIfPresent` for Optionals, so a nil
+    // artUrl/deletedAt was dropped from the payload entirely — the same shape that made the
+    // server's D1 bind() throw and 500 the whole push on the Android side.
+    func testANilArtUrlAndDeletedAtAreSentAsExplicitNullsNotOmitted() async throws {
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+        let change = SyncProgressWire(
+            queueKey: "show:1997-11-17", title: "t", subtitle: "s", artUrl: nil, trackIndex: 0,
+            positionMs: 100, trackTitle: "Track", updatedAt: 1000, finished: false,
+            dismissed: false, artist: "Phish", deletedAt: nil
+        )
+
+        _ = try await SyncAPI.sync(token: "ct_token", since: 0, changes: [change])
+
+        let body = server.takeRequest()!.bodyString ?? ""
+        XCTAssertTrue(body.contains(#""artUrl":null"#), "artUrl missing from \(body)")
+        XCTAssertTrue(body.contains(#""deletedAt":null"#), "deletedAt missing from \(body)")
+    }
+
     func testSyncSurfacesARotatedTokenFromTheResponseHeader() async throws {
         server.enqueue(#"{"seq":1,"changes":[]}"#, headers: ["X-Sync-Token-Rotated": "ct_new"])
 

@@ -62,6 +62,27 @@ public struct SyncProgressWire: Codable, Equatable {
         artist = try c.decode(String.self, forKey: .artist)
         deletedAt = try c.decodeIfPresent(Int64.self, forKey: .deletedAt)
     }
+
+    /// Hand-written rather than synthesized so nil optionals are sent as explicit `null`
+    /// instead of being dropped: Swift's synthesized `encode(to:)` uses `encodeIfPresent`
+    /// for Optionals, which omits the key entirely. The server treats a missing key and an
+    /// explicit null the same way now, but sending the documented shape keeps the wire format
+    /// identical to Android's and to `ProgressFields` in sync/src/types.ts.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(queueKey, forKey: .queueKey)
+        try c.encode(title, forKey: .title)
+        try c.encode(subtitle, forKey: .subtitle)
+        try c.encode(artUrl, forKey: .artUrl)
+        try c.encode(trackIndex, forKey: .trackIndex)
+        try c.encode(positionMs, forKey: .positionMs)
+        try c.encode(trackTitle, forKey: .trackTitle)
+        try c.encode(updatedAt, forKey: .updatedAt)
+        try c.encode(finished, forKey: .finished)
+        try c.encode(dismissed, forKey: .dismissed)
+        try c.encode(artist, forKey: .artist)
+        try c.encode(deletedAt, forKey: .deletedAt)
+    }
 }
 
 private struct PairStartRequest: Encodable {

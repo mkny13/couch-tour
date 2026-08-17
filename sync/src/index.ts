@@ -252,7 +252,19 @@ async function applyIncomingChanges(
     .map((change) => {
       // A badly clock-skewed device can't permanently pin a row into the future.
       const updatedAt = change.updatedAt > now + FUTURE_CLOCK_CLAMP_MS ? now : change.updatedAt;
-      return { ...change, updatedAt };
+      // Normalize absent nullable fields to explicit null. Both clients omit null-valued
+      // optionals by default rather than sending them — kotlinx.serialization only writes
+      // properties differing from their default unless `encodeDefaults` is set, and Swift's
+      // synthesized `Codable` uses `encodeIfPresent` for Optionals. D1's `.bind()` rejects
+      // `undefined` outright, so an omitted `artUrl`/`deletedAt` threw and the whole push
+      // 500'd. Both clients now send explicit nulls, but the server accepting either shape is
+      // the actual fix: a client that gets this wrong should not be able to 500 the endpoint.
+      return {
+        ...change,
+        updatedAt,
+        artUrl: change.artUrl ?? null,
+        deletedAt: change.deletedAt ?? null,
+      };
     })
     .filter((change) => {
       const existingUpdatedAt = existingByKey.get(change.queueKey);

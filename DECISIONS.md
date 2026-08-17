@@ -1114,5 +1114,48 @@ This is the kind of bug unit tests don't catch on their own — nothing was asse
 `localizedDescription` before this, only against `.unauthorized`/`.gone` on the typed error
 directly (D124's tests). A regression test now pins the string itself.
 
+## Iteration 24 — sync never actually worked; the emulator round trip that proved it (D140-D143)
+
+Pairing succeeded, then nothing synced and the Android app crashed on every subsequent
+launch. One root cause under both symptoms, plus two things that turned a recoverable error
+into an unrecoverable one.
+
+**D140 — both clients omitted null optionals, and D1's `bind()` rejects `undefined`, so every
+push 500'd.** kotlinx.serialization writes only properties differing from their default unless
+`encodeDefaults` is set; Swift's synthesized `encode(to:)` uses `encodeIfPresent` for
+Optionals. Both therefore dropped `artUrl`/`deletedAt` entirely rather than sending null — and
+`artUrl` is null for every Relisten row, so this was every push, not an edge case. Confirmed
+by replaying both payload shapes against production: the documented shape 200s, the shape the
+clients actually sent 500s. Fixed in three places, deliberately: the server normalizes
+`?? null` (a client getting this wrong must not be able to 500 the endpoint), Android sets
+`encodeDefaults = true`, and `SyncProgressWire` gained a hand-written `encode(to:)`. Server
+side alone would have been enough to unbreak it; the client fixes keep the wire format
+matching `ProgressFields` as documented.
+
+**D141 — an exception escaping the launch-sync coroutine took the whole app down.**
+`CoroutineScope(Dispatchers.IO).launch { SyncSession.sync(...) }` with no handler: anything
+`sync` rethrows (D140's 500, an offline device, a captive portal) reached the default uncaught
+handler and killed the process on launch. Unpaired devices were unaffected only because
+`sync` returns early with no token — which is exactly why this appeared the moment pairing
+started working. The comment already claimed failures were "covered by the periodic job's own
+retry"; that is now true rather than aspirational.
+
+**D142 — pairing didn't trigger a sync, so a working pair still looked broken.** Both clients
+only synced on launch, on foreground, or on a 15-minute timer — none of which fire while
+sitting on the Sync screen having just paired. Even with D140 fixed, the first thing a user
+sees after pairing would have been an unchanged, empty History. Both clients now sync
+immediately on a successful claim, surfacing "Paired, but the first sync failed" rather than
+silently doing nothing.
+
+**D143 — verified on a real emulator, end to end, not just by unit test.** `phishin_test` AVD:
+installed the beta, paired via the UI, played a track (Mac muted), force-stopped and
+relaunched — no crash, and the launch sync pushed `show:2026-01-28` / "Hey Stranger" at
+60770ms to the server. A second device then joined by code and pulled that exact row back
+down. Test group and all its rows deleted afterward; the real Pixel/Mac group was never
+touched. Two incidental findings worth keeping: the emulator's default DNS is broken (fixed
+with `-dns-server 8.8.8.8`, nothing to do with the app), and the app's own error reporting was
+already correct — a DNS failure surfaced "Couldn't start pairing: Unable to resolve host"
+exactly as intended.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.
