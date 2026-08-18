@@ -61,6 +61,14 @@ class ApiParsingTest {
     }
 
     @Test
+    fun `reads each track's own url slug, for sharing`() {
+        val tracks = json.decodeFromString<Show>(fixture("show.json")).tracks
+        assertEquals("tweezer", tracks[0].slug)
+        assertEquals("reba", tracks[1].slug)
+        assertEquals("train-song", tracks[2].slug)
+    }
+
+    @Test
     fun `reads like counts and whether the user liked it`() {
         val show = json.decodeFromString<Show>(fixture("show.json"))
         assertEquals(412L, show.id)

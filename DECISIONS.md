@@ -1431,5 +1431,55 @@ boolean extra, and the Media3 service, whose browse tree parses media ids throug
 `BrowseNode.parse` — already returning null for anything unrecognised rather than guessing.
 `npm audit` is clean; the Android release tree has no known-vulnerable dependency.
 
+## Iteration 31 — sharing a show or track (D155-D156)
+
+Standard Android sharing (#19), Relisten parity — the app had no `Intent.ACTION_SEND` at all
+before this. Android-only: no equivalent request exists yet for the macOS client.
+
+### D155 — the share link comes from each backend's real web app, confirmed live, not guessed
+
+`ShowSummary`/`PlayableTrack` are backend-neutral (Catalog.kt) on purpose, so the URL a share
+sheet should link to is a function of `Backend` (`showShareUrl`/`trackShareUrl` in Catalog.kt)
+rather than a field threaded through the model — the same pattern the file already uses for
+its backend-dispatch mapping (D36).
+
+Both URL schemes were checked against the real sites rather than assumed, since a share
+feature whose links don't resolve is worse than no share feature:
+
+- **phish.in** publishes a real page per show (`/<date>`) and per track (`/<date>/<slug>`) —
+  confirmed by fetching both live and checking `og:url`/`og:title` echo back exactly, and
+  that an unrecognised track slug falls back to the show's own title rather than 404ing (so
+  the slug is genuinely validated server-side, not decorative). The slug already existed in
+  every API response `Track` decodes (`show.json`'s fixture had it uncaptured) — it just
+  wasn't mapped to a field. It is now (`Track.slug`).
+- **Relisten**'s web app (`relisten.net`, distinct from the `api.relisten.net` this app
+  already talks to) serves `/<artist-slug>/<date>` for a show — confirmed the same way, and
+  confirmed Relisten's server actually 404s an unknown route (`<title>404 - Page Not
+  Found</title>`) rather than a catch-all SPA shell always returning 200, so a 200 here means
+  the page is real. No equivalent per-track or per-source page exists:
+  `/<artist>/<date>/<source-uuid>` 404s live the same way. `trackShareUrl` returns null for
+  Relisten rather than construct a link to a page that doesn't exist; callers fall back to
+  the show's link, keeping the track's title in the shared text even though the link points
+  at the show.
+
+### D156 — track sharing lives on the track row, not the Now Playing screen
+
+The issue named either placement as acceptable for "share the specific track." Now Playing's
+`PlayerState` carries only display strings and a `queueKey` (which identifies a queue, not an
+individual track within it) — the same gap already noted against the not-yet-built like
+button on that screen (ROADMAP.md). Extending `PlayerState` with a track id was out of scope
+for this issue on its own; the track row already has the full `PlayableTrack`/`Track` in
+hand, so that's where the share action landed, next to the existing like button
+(`TrackRow`/`RecordingTrackRow`), following the same self-contained-row-composable shape
+`LikeButton` already established rather than threading an `onShare` callback up through both
+screens.
+
+Tested at the two levels the issue anticipated: `ShareUrlTest` covers `showShareUrl`/
+`trackShareUrl`/`showShareText`/`trackShareText` as plain functions (including phish.in's
+slug-present/absent cases and Relisten's fallback), and a Robolectric `LaunchShareTest`
+constructs the actual `Intent` and asserts `ACTION_CHOOSER` wraps a `text/plain`
+`ACTION_SEND` with the right `EXTRA_TEXT` — the chooser itself, and whether recipients can
+actually open the link, still need a manual on-device check per the issue's own testing note.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.
