@@ -67,6 +67,12 @@ enum class Likable { Show, Track, Playlist }
 data class Track(
     val id: Long,
     val title: String,
+    /** phish.in's own URL slug for this track's page, e.g. "mikes-song" at
+     *  https://phish.in/1997-11-22/mikes-song (confirmed live: the page's own og:url and
+     *  og:title echo the slug back, and an unrecognised one falls back to the show's title
+     *  rather than 404ing — so this is a real per-track page, not decorative). Used to build
+     *  a share link (#19); nothing else in the app reads it. */
+    val slug: String? = null,
     @SerialName("likes_count") val likesCount: Int = 0,
     @SerialName("liked_by_user") val likedByUser: Boolean = false,
     val position: Int = 0,

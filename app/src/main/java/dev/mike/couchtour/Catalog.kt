@@ -299,3 +299,36 @@ internal fun Track.toPlayableTrack(showArt: String?) = PlayableTrack(
     venueName = venueName,
     artUrl = showAlbumCoverUrl ?: showArt,
 )
+
+// -------------------------------------------------------------------- sharing
+
+/**
+ * The public web page for a show — what a share sheet should link to so a recipient without
+ * the app can still open it. A function of [Backend] rather than a field on [ShowSummary],
+ * matching this file's existing backend-dispatch pattern (D36): it's a derivation of data
+ * the model already carries, not new data of its own.
+ *
+ * Both URLs confirmed live (#19): phish.in's `/<date>` returns its own `og:url` matching
+ * exactly; Relisten's `/<artist-slug>/<date>` renders that show's own `<title>`, while an
+ * unknown artist or date 404s with a real "404 - Page Not Found" page — Relisten has no
+ * catch-all SPA shell here, so a 200 means the page is genuine.
+ */
+fun showShareUrl(artist: ArtistRef, date: String): String = when (artist.backend) {
+    Backend.PHISHIN -> "https://phish.in/$date"
+    Backend.RELISTEN -> "https://relisten.net/${artist.id}/$date"
+}
+
+/**
+ * The public web page for one track, or null when the backend doesn't have one — callers
+ * fall back to [showShareUrl] rather than share a broken link.
+ *
+ * phish.in publishes one per track, `/<date>/<track-slug>` (confirmed live: its own `og:url`
+ * and `og:title` echo the slug back, and an unrecognised slug falls back to the show's own
+ * title rather than 404ing — so the page is real and slug-validated, not decorative).
+ * Relisten has no equivalent: unlike phish.in, `/<artist>/<date>/<source-uuid>` 404s live,
+ * the same as any other unknown Relisten route — there's nothing to link to.
+ */
+fun trackShareUrl(artist: ArtistRef, date: String, trackSlug: String?): String? = when (artist.backend) {
+    Backend.PHISHIN -> trackSlug?.let { "https://phish.in/$date/$it" }
+    Backend.RELISTEN -> null
+}

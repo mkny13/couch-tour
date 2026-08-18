@@ -18,6 +18,10 @@ but have no screen.
 - Confirm on a real device that audio now audibly ducks for a notification sound (#23, D93) —
   the fix is a platform audio-focus behavior Robolectric can't exercise, so it's unverified
   beyond compiling and the existing unit suite passing.
+- Confirm on a real device that the share sheet actually opens for a show and a track (#19,
+  D155-D156) — the Intent's shape (`ACTION_CHOOSER` wrapping a `text/plain` `ACTION_SEND`)
+  and the URL/text it carries are covered by tests, but launching the real chooser and a
+  recipient app actually opening the link isn't something Robolectric exercises.
 
 ## Desktop (macOS)
 

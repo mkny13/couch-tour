@@ -444,7 +444,7 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                             }
                         }
                         tracksGroupedBySet(playable) { index, track ->
-                            TrackRow(track, index + 1) { vm.playShow(s, index, 0) }
+                            TrackRow(track, index + 1, date) { vm.playShow(s, index, 0) }
                         }
                     }
                 },
@@ -581,7 +581,7 @@ fun RecordingScreen(
                             }
                         }
                         groupedBySet(detail.tracks, { it.setName }, { it.id }) { index, track ->
-                            RecordingTrackRow(track, index + 1) { vm.playRecording(detail, index, 0) }
+                            RecordingTrackRow(track, index + 1, detail.summary.artist, date) { vm.playRecording(detail, index, 0) }
                         }
                     }
                 },
@@ -610,6 +610,7 @@ private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: Str
                     Text(recordingLabel(rec), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
             }
+            ShareButton(showShareText(summary.artist, date))
         }
         // No tape to switch on a single-source artist (Phish) or a show with only one.
         if (summary.artist.hasMultipleSources && detail.alternates.isNotEmpty()) {
@@ -651,7 +652,7 @@ private fun TapeSwitcher(detail: ShowDetail, backendId: String, artistId: String
 }
 
 @Composable
-private fun RecordingTrackRow(track: PlayableTrack, number: Int, onClick: () -> Unit) {
+private fun RecordingTrackRow(track: PlayableTrack, number: Int, artist: ArtistRef, date: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -659,6 +660,9 @@ private fun RecordingTrackRow(track: PlayableTrack, number: Int, onClick: () -> 
         Text("$number", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.width(28.dp))
         Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
         Text(fmt(track.durationMs), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        // Relisten has no per-track page (trackShareUrl always null for it) — the share
+        // falls back to the show link, so no trackSlug to pass here.
+        ShareButton(trackShareText(artist, date, track.title, trackSlug = null))
     }
 }
 
@@ -1249,6 +1253,7 @@ private fun ShowHeader(show: Show, trackCount: Int) {
             Text(show.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             Text("$trackCount tracks · ${fmt(show.duration)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         }
+        ShareButton(showShareText(PHISH, show.date))
         LikeButton(Likable.Show, show.id, show.likedByUser, show.likesCount)
     }
 }
@@ -1406,7 +1411,7 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
 
 
 @Composable
-private fun TrackRow(track: Track, number: Int, onClick: () -> Unit) {
+private fun TrackRow(track: Track, number: Int, date: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1415,6 +1420,7 @@ private fun TrackRow(track: Track, number: Int, onClick: () -> Unit) {
         // The set is already the section header above; repeating it per row is noise.
         Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
         Text(fmt(track.duration), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        ShareButton(trackShareText(PHISH, date, track.title, track.slug))
         LikeButton(Likable.Track, track.id, track.likedByUser, track.likesCount)
     }
 }
