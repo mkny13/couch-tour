@@ -8,6 +8,27 @@ const TOKEN_GRACE_MS = 48 * 60 * 60 * 1000;
 const FUTURE_CLOCK_CLAMP_MS = 24 * 60 * 60 * 1000;
 const TOMBSTONE_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 
+/**
+ * Request-shape limits. Workers will happily hand us a 100 MB body (that's the account-plan
+ * default), and `changes` used to be an unbounded array cast straight to `ProgressFields[]`
+ * and written to D1 — so these are the only thing standing between a malformed or hostile
+ * push and the database.
+ *
+ * MAX_CHANGES_PER_SYNC is a product limit, not a platform one: both clients chunk their
+ * pushes below it (see `MAX_PUSH_BATCH` on either side), so a client only trips this by
+ * being broken or hostile. KEY_LOOKUP_CHUNK is the platform one — D1 allows at most 100
+ * bound parameters per query, and the pre-push existence lookup binds one per queueKey plus
+ * the groupId. Before chunking, any push of 100+ rows died on `D1_ERROR: too many SQL
+ * variables`, which a first pair with a long listening history hit for real.
+ */
+const MAX_SYNC_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_CHANGES_PER_SYNC = 500;
+const KEY_LOOKUP_CHUNK = 90;
+
+/** Bounds on individual field sizes, so one row can't approach D1's 2 MB per-row ceiling. */
+const MAX_QUEUE_KEY_CHARS = 512;
+const MAX_TEXT_CHARS = 1024;
+
 function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -17,6 +38,10 @@ function json(data: unknown, status = 200, headers: Record<string, string> = {})
 
 function badRequest(message: string): Response {
   return json({ error: message }, 400);
+}
+
+function tooLarge(message: string): Response {
+  return json({ error: message }, 413);
 }
 
 async function readJson<T>(request: Request): Promise<T | null> {
@@ -49,6 +74,13 @@ async function handlePairStart(request: Request, env: Env): Promise<Response> {
   if (caller) {
     groupId = caller.groupId;
   } else {
+    // Only the unauthenticated branch is limited: this is the one path where a caller with no
+    // credentials makes the database grow, four rows at a time (D150). An authenticated device
+    // minting an extra pairing code is already bounded by owning a token we can revoke.
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const { success } = await env.PAIR_START_LIMITER.limit({ key: `pair-start:${ip}` });
+    if (!success) return json({ error: "too many pairing attempts; try again shortly" }, 429);
+
     if (typeof body?.deviceName !== "string" || typeof body?.platform !== "string") {
       return badRequest("deviceName and platform are required to start a new group");
     }
@@ -147,6 +179,79 @@ interface SyncBody {
   changes?: unknown;
 }
 
+// ------------------------------------------------------- incoming change validation
+
+function isSafeInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value);
+}
+
+function text(value: unknown, field: string, max: number): string {
+  if (typeof value !== "string") throw new ValidationError(`${field} must be a string`);
+  if (value.length > max) throw new ValidationError(`${field} exceeds ${max} characters`);
+  return value;
+}
+
+function optionalText(value: unknown, field: string, max: number): string | null {
+  if (value === null || value === undefined) return null;
+  return text(value, field, max);
+}
+
+function int(value: unknown, field: string): number {
+  if (!isSafeInt(value)) throw new ValidationError(`${field} must be an integer`);
+  return value;
+}
+
+function optionalInt(value: unknown, field: string): number | null {
+  if (value === null || value === undefined) return null;
+  return int(value, field);
+}
+
+function bool(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") throw new ValidationError(`${field} must be a boolean`);
+  return value;
+}
+
+/** Thrown by the field helpers above and turned into a 400 by `handleSync`. */
+class ValidationError extends Error {}
+
+/**
+ * Validates one incoming change, field by field. `handleSync` used to cast the whole array
+ * `as ProgressFields[]` and hand it to D1 — a lie the type system happily accepted, since
+ * nothing had actually checked the wire data. A row with a numeric `title` or a missing
+ * `queueKey` would then either write nonsense or throw inside `.bind()` and 500 the endpoint.
+ *
+ * Absent nullable fields are normalized to explicit null here rather than in
+ * `applyIncomingChanges`: both clients omit null-valued optionals by default
+ * (kotlinx.serialization only writes properties differing from their default without
+ * `encodeDefaults`; Swift's synthesized `Codable` uses `encodeIfPresent`), and D1's `.bind()`
+ * rejects `undefined` outright.
+ */
+function parseProgressFields(value: unknown, index: number): ProgressFields {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new ValidationError(`changes[${index}] must be an object`);
+  }
+  const c = value as Record<string, unknown>;
+  const at = (field: string) => `changes[${index}].${field}`;
+
+  const queueKey = text(c.queueKey, at("queueKey"), MAX_QUEUE_KEY_CHARS);
+  if (queueKey.length === 0) throw new ValidationError(`${at("queueKey")} must not be empty`);
+
+  return {
+    queueKey,
+    title: text(c.title, at("title"), MAX_TEXT_CHARS),
+    subtitle: text(c.subtitle, at("subtitle"), MAX_TEXT_CHARS),
+    artUrl: optionalText(c.artUrl, at("artUrl"), MAX_TEXT_CHARS),
+    trackIndex: int(c.trackIndex, at("trackIndex")),
+    positionMs: int(c.positionMs, at("positionMs")),
+    trackTitle: text(c.trackTitle, at("trackTitle"), MAX_TEXT_CHARS),
+    updatedAt: int(c.updatedAt, at("updatedAt")),
+    finished: bool(c.finished, at("finished")),
+    dismissed: bool(c.dismissed, at("dismissed")),
+    artist: text(c.artist, at("artist"), MAX_TEXT_CHARS),
+    deletedAt: optionalInt(c.deletedAt, at("deletedAt")),
+  };
+}
+
 /**
  * Push-then-pull in one round trip. Incoming changes are merged with row-level
  * last-write-wins on `updatedAt` (ties go to whichever arrives at the server later, i.e. gets
@@ -157,12 +262,32 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   const device = await authenticate(request, env);
   if (!device) return json({ error: "unauthorized" }, 401);
 
+  // Cheap pre-read rejection: a declared oversize body never gets parsed, let alone reaches
+  // D1. Content-Length is absent on a chunked upload, so it's a fast path rather than the
+  // actual guarantee — MAX_CHANGES_PER_SYNC below is what bounds the work either way.
+  const declaredLength = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_SYNC_BODY_BYTES) {
+    return tooLarge(`request body exceeds ${MAX_SYNC_BODY_BYTES} bytes`);
+  }
+
   const body = await readJson<SyncBody>(request);
-  if (typeof body?.since !== "number" || !Array.isArray(body?.changes)) {
-    return badRequest("since (number) and changes (array) are required");
+  if (!isSafeInt(body?.since) || !Array.isArray(body?.changes)) {
+    return badRequest("since (integer) and changes (array) are required");
   }
   const since = body.since;
-  const incoming = body.changes as ProgressFields[];
+  if (since < 0) return badRequest("since must not be negative");
+
+  if (body.changes.length > MAX_CHANGES_PER_SYNC) {
+    return tooLarge(`changes exceeds ${MAX_CHANGES_PER_SYNC} entries; push in smaller batches`);
+  }
+
+  let incoming: ProgressFields[];
+  try {
+    incoming = body.changes.map(parseProgressFields);
+  } catch (e) {
+    if (e instanceof ValidationError) return badRequest(e.message);
+    throw e;
+  }
 
   const now = Date.now();
 
@@ -240,14 +365,22 @@ async function applyIncomingChanges(
   incoming: ProgressFields[],
   now: number
 ): Promise<void> {
+  // Chunked because D1 allows at most 100 bound parameters per query and this binds one per
+  // key plus the groupId. A single `IN (...)` over every incoming key 500'd the whole push
+  // the moment a client had 100+ changed rows — which is exactly what a first pair with a
+  // long listening history looks like.
   const keys = incoming.map((c) => c.queueKey);
-  const placeholders = keys.map(() => "?").join(",");
-  const existingRows = await env.DB.prepare(
-    `SELECT queueKey, updatedAt FROM progress WHERE groupId = ? AND queueKey IN (${placeholders})`
-  )
-    .bind(device.groupId, ...keys)
-    .all<{ queueKey: string; updatedAt: number }>();
-  const existingByKey = new Map((existingRows.results ?? []).map((r) => [r.queueKey, r.updatedAt]));
+  const existingByKey = new Map<string, number>();
+  for (let i = 0; i < keys.length; i += KEY_LOOKUP_CHUNK) {
+    const chunk = keys.slice(i, i + KEY_LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => "?").join(",");
+    const existingRows = await env.DB.prepare(
+      `SELECT queueKey, updatedAt FROM progress WHERE groupId = ? AND queueKey IN (${placeholders})`
+    )
+      .bind(device.groupId, ...chunk)
+      .all<{ queueKey: string; updatedAt: number }>();
+    for (const r of existingRows.results ?? []) existingByKey.set(r.queueKey, r.updatedAt);
+  }
 
   const accepted = incoming
     .map((change) => {
@@ -405,23 +538,45 @@ async function handleDeviceRevoke(request: Request, env: Env, targetId: string):
 
 // ------------------------------------------------------------------ router
 
+async function route(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const { pathname } = url;
+  const { method } = request;
+
+  if (method === "POST" && pathname === "/pair/start") return handlePairStart(request, env);
+  if (method === "POST" && pathname === "/pair/claim") return handlePairClaim(request, env);
+  if (method === "POST" && pathname === "/sync") return handleSync(request, env);
+  if (method === "GET" && pathname === "/devices") return handleDevicesList(request, env);
+
+  const deviceMatch = pathname.match(/^\/devices\/([^/]+)$/);
+  if (method === "DELETE" && deviceMatch) {
+    return handleDeviceRevoke(request, env, decodeURIComponent(deviceMatch[1]));
+  }
+
+  return json({ error: "not found" }, 404);
+}
+
 export default {
+  /**
+   * No CORS headers anywhere, deliberately: both clients are native (OkHttp on Android,
+   * URLSession on macOS) and no browser ever calls this. Omitting `Access-Control-Allow-Origin`
+   * means a page on any origin can still *send* a request but cannot read the response, which
+   * is the correct default for an API whose entire auth model is a bearer token. Adding
+   * permissive CORS "just in case" would be a strict downgrade — see D149.
+   *
+   * The catch is what keeps internals off the wire. An uncaught throw leaves the response to
+   * the platform: `wrangler dev` returns the exception with a full stack trace and the
+   * developer's absolute filesystem paths, and production returns Cloudflare's generic 1101
+   * page. Neither is ours to rely on, and the `no seq counter for group ${groupId}` throw
+   * below would have been the thing leaking. Details go to the log; the client gets a bare 500.
+   */
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const { pathname } = url;
-    const { method } = request;
-
-    if (method === "POST" && pathname === "/pair/start") return handlePairStart(request, env);
-    if (method === "POST" && pathname === "/pair/claim") return handlePairClaim(request, env);
-    if (method === "POST" && pathname === "/sync") return handleSync(request, env);
-    if (method === "GET" && pathname === "/devices") return handleDevicesList(request, env);
-
-    const deviceMatch = pathname.match(/^\/devices\/([^/]+)$/);
-    if (method === "DELETE" && deviceMatch) {
-      return handleDeviceRevoke(request, env, decodeURIComponent(deviceMatch[1]));
+    try {
+      return await route(request, env);
+    } catch (e) {
+      console.error("Unhandled error", e);
+      return json({ error: "internal error" }, 500);
     }
-
-    return json({ error: "not found" }, 404);
   },
 
   /**

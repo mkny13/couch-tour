@@ -388,4 +388,76 @@ final class SyncSessionTests: XCTestCase {
         let pushed = server.takeRequest()!.bodyString!
         XCTAssertTrue(pushed.contains(#""queueKey":"show:1997-11-17""#))
     }
+
+    // ------------------------------------------------------------------ push chunking
+    //
+    // The server caps a push at 500 entries because D1 allows only 100 bound parameters per
+    // query; before either limit existed, a first pair with 100+ rows of history 500'd the
+    // sync endpoint outright. These cover the client half of that fix, mirroring the Kotlin
+    // `SyncSessionTest` cases of the same names.
+
+    private func seedProgress(_ count: Int, updatedAt: (Int) -> Int64) throws {
+        for i in 0..<count {
+            try store.put(PlaybackProgress(
+                queueKey: "show:seed-\(i)", title: "t", subtitle: "s", trackIndex: 0,
+                positionMs: 0, trackTitle: "Track", updatedAt: updatedAt(i), artist: "Phish"
+            ))
+        }
+    }
+
+    private func pushedKeyCount(_ body: String) -> Int {
+        body.components(separatedBy: "\"queueKey\"").count - 1
+    }
+
+    func testABacklogOverTheBatchSizeIsPushedAcrossSeveralRequests() async throws {
+        try await claim()
+        try seedProgress(950) { 1_000 + Int64($0) }
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+        server.enqueue(#"{"seq":2,"changes":[]}"#)
+        server.enqueue(#"{"seq":3,"changes":[]}"#)
+
+        try await session.sync(store)
+
+        // 400 + 400 + 150, then the loop stops because the last batch was short.
+        XCTAssertEqual(400, pushedKeyCount(server.takeRequest()!.bodyString ?? ""))
+        XCTAssertEqual(400, pushedKeyCount(server.takeRequest()!.bodyString ?? ""))
+        XCTAssertEqual(150, pushedKeyCount(server.takeRequest()!.bodyString ?? ""))
+    }
+
+    func testABatchBoundaryNeverSplitsRowsSharingOneUpdatedAt() async throws {
+        try await claim()
+        // Sorted ascending this lays out as 1_000..1_379, then forty rows all on 1_380, then
+        // 1_381..1_460 — so the shared-timestamp run straddles the 400-row boundary. Splitting
+        // it would advance the watermark past 1_380 and `changedSince` is strictly `>`, so the
+        // leftovers would never be offered again: a silent lost write.
+        try seedProgress(500) { i in
+            if i < 380 { return 1_000 + Int64(i) }
+            if i < 420 { return 1_380 }
+            return 1_381 + Int64(i - 420)
+        }
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+        server.enqueue(#"{"seq":2,"changes":[]}"#)
+
+        try await session.sync(store)
+
+        let first = pushedKeyCount(server.takeRequest()!.bodyString ?? "")
+        let second = pushedKeyCount(server.takeRequest()!.bodyString ?? "")
+        // Trimmed back off the shared-timestamp run rather than cutting through it, and
+        // everything still reaches the server across the two pushes: nothing was dropped.
+        XCTAssertEqual(380, first)
+        XCTAssertEqual(500, first + second)
+    }
+
+    func testASingleUpdatedAtBiggerThanTheBatchIsSentWholeRatherThanStalling() async throws {
+        try await claim()
+        // 450 rows on one millisecond: trimming to the run boundary would empty the batch, so
+        // the run goes out whole — still under the server's 500 cap.
+        try seedProgress(450) { _ in 3_000 }
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+
+        try await session.sync(store)
+
+        XCTAssertEqual(450, pushedKeyCount(server.takeRequest()!.bodyString ?? ""))
+        XCTAssertNil(server.takeRequest())
+    }
 }

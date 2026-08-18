@@ -377,28 +377,19 @@ public final class SyncSession: ObservableObject {
         lastSyncedAt = nil
     }
 
-    /// One push-then-pull cycle. Pushes every local row touched since the last successful
-    /// push (tombstones included — see `ProgressStore.changedSince`), applies whatever the
-    /// server sends back, and advances both cursors only on success.
+    /// Push-then-pull until the local backlog is drained. Pushes every local row touched since
+    /// the last successful push (tombstones included — see `ProgressStore.changedSince`),
+    /// applies whatever the server sends back, and advances both cursors only on success.
+    ///
+    /// Usually one round trip: only a first pair (watermark 0, so the whole progress table is
+    /// "changed") has enough backlog to need more than one.
     public func sync(_ progressStore: ProgressStore) async throws {
         guard let token = store.deviceToken else { return }
-        let toPush = try progressStore.changedSince(store.lastPushWatermark).map { $0.toWire() }
 
         isSyncing = true
         defer { isSyncing = false }
         do {
-            let (response, rotatedToken) = try await SyncAPI.sync(token: token, since: store.lastSeq, changes: toPush)
-            if let rotatedToken { store.deviceToken = rotatedToken }
-
-            for change in response.changes { try progressStore.put(change.toEntity()) }
-            store.lastSeq = response.seq
-            if let maxUpdatedAt = toPush.map({ $0.updatedAt }).max() {
-                store.lastPushWatermark = maxUpdatedAt
-            }
-
-            let now = Int64(Date().timeIntervalSince1970 * 1000)
-            store.lastSyncedAt = now
-            lastSyncedAt = now
+            while try await syncOnce(token: token, progressStore) {}
         } catch let error as SyncException {
             if error.unauthorized {
                 // Revoked from another device (or the token is simply bad): stop trying
@@ -413,6 +404,56 @@ public final class SyncSession: ObservableObject {
                 throw error
             }
         }
+    }
+
+    /// One push-then-pull round trip. Returns true when the push hit `maxPushBatch` and more
+    /// local rows are still waiting, so `sync` knows to come back for them.
+    private func syncOnce(token: String, _ progressStore: ProgressStore) async throws -> Bool {
+        let pending = try progressStore.changedSince(store.lastPushWatermark)
+            .sorted { $0.updatedAt < $1.updatedAt }
+        let chunk = Self.chunkToPush(pending)
+        let toPush = chunk.map { $0.toWire() }
+
+        let (response, rotatedToken) = try await SyncAPI.sync(token: token, since: store.lastSeq, changes: toPush)
+        if let rotatedToken { store.deviceToken = rotatedToken }
+
+        for change in response.changes { try progressStore.put(change.toEntity()) }
+        store.lastSeq = response.seq
+        if let maxUpdatedAt = toPush.map({ $0.updatedAt }).max() {
+            store.lastPushWatermark = maxUpdatedAt
+        }
+
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        store.lastSyncedAt = now
+        lastSyncedAt = now
+
+        return pending.count > chunk.count
+    }
+
+    /// How many rows one push may carry. Deliberately under the server's own 500-entry cap
+    /// (`MAX_CHANGES_PER_SYNC` in sync/src/index.ts), which exists because D1 allows only 100
+    /// bound parameters per query — before both limits, a first pair with 100+ rows of history
+    /// 500'd the endpoint outright. Mirrors Android's `MAX_PUSH_BATCH`.
+    static let maxPushBatch = 400
+
+    /// The next batch to push, from rows already sorted by `updatedAt` ascending.
+    ///
+    /// Never splits a run of rows sharing one `updatedAt`: the watermark advances to the
+    /// batch's highest `updatedAt`, and `ProgressStore.changedSince` is strictly `>`, so any
+    /// leftover row with that same millisecond would never be offered again — a silent lost
+    /// write in the one table this app exists to never lose. Trimming back to the run boundary
+    /// keeps them for the next batch; a single millisecond holding more rows than the batch
+    /// size is sent whole rather than stalling forever, which the gap to the server's cap
+    /// leaves room for. Mirrors Android's `chunkToPush`.
+    static func chunkToPush(_ pending: [PlaybackProgress]) -> [PlaybackProgress] {
+        guard pending.count > maxPushBatch else { return pending }
+        let capped = pending.prefix(maxPushBatch)
+        guard let lastAt = capped.last?.updatedAt else { return Array(capped) }
+        // Only trim when the run actually continues past the cut; otherwise the boundary
+        // already falls between two distinct timestamps and the full batch is safe to send.
+        guard pending[maxPushBatch].updatedAt == lastAt else { return Array(capped) }
+        let trimmed = capped.prefix { $0.updatedAt != lastAt }
+        return trimmed.isEmpty ? Array(pending.prefix { $0.updatedAt == lastAt }) : Array(trimmed)
     }
 
     private var pushTask: Task<Void, Never>?

@@ -11,3 +11,19 @@ database_id = "20840aeb-15d2-4dd8-ba5a-c1e78233cea2"
 # purgeOldTombstones in src/index.ts. Off-peak UTC hour; this app has no peak hours that matter.
 [triggers]
 crons = ["0 4 * * *"]
+
+# Rate limit on the one endpoint an unauthenticated caller can make the database grow through:
+# POST /pair/start with no token bootstraps a group + device + seq + pairing row every time
+# (D150). Authenticated endpoints don't need one — abusing them costs an attacker a valid
+# device token first, and revoking it is a one-request fix.
+#
+# 5 per 10s per IP is far above real use (a human taps "Pair" and reads a code) and far below
+# useful abuse. Note the binding is per-Cloudflare-location, not global — it raises the cost of
+# scripted bootstrap, it doesn't make it impossible.
+[[ratelimits]]
+name = "PAIR_START_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 10

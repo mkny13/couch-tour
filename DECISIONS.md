@@ -1320,5 +1320,116 @@ same ad-hoc-signing Keychain-reprompt loop D147 ran into, and denying that promp
 paired-only UI this feature lives in impossible to reach without either Mike's login password
 (never entered) or touching his real pairing (declined for the same reason as D147).
 
+## Iteration 30 — a pre-release security pass over sync (D150-D154)
+
+A deliberate sweep across the sync backend and both clients ahead of the Play Store release
+(issue #26) — not a hunt for a known vulnerability, but a walk through each attack surface to
+confirm what already held and fix what didn't. Most of it held. What follows is what changed.
+
+### D150 — rate limiting only the one unauthenticated path that grows the database
+
+`POST /pair/start` with no bearer token bootstraps a group, a device, a seq counter, and a
+pairing row on every call. That is the only endpoint where a caller holding no credentials can
+make D1 grow, and nothing capped it: a script could have filled the 10 GB database with orphan
+groups. `/pair/claim` needs no limit of its own — D127's argument still holds, 8 base32
+characters against a 10-minute window — and `/sync` and `/devices` need none either, since
+abusing them costs an attacker a valid device token first and revoking one is a single request.
+
+Implemented with the Workers `ratelimit` binding (`[[ratelimits]]` in `wrangler.toml`) rather
+than a Cloudflare Rate Limiting rule or a D1-backed counter. A dashboard rule would be
+configuration living outside the repo, invisible to anyone reading this code and lost on any
+account rebuild; a D1 counter would answer a flood of requests by adding a database write to
+each one, which is the thing being defended against. 5 per 10s per IP sits far above a human
+tapping "Pair" and far below useful abuse. The binding counts per Cloudflare location rather
+than globally, so this raises the cost of scripted bootstrap rather than making it impossible
+— worth stating plainly, since the limit reads stricter than it is.
+
+### D151 — `POST /sync` validates every element, and caps how many it will take
+
+`handleSync` type-checked `since` and `changes` at the top level and then cast the array
+`as ProgressFields[]` — a claim the type system accepted and nothing had checked. A row with a
+numeric `title` or a missing `queueKey` would either write nonsense into D1 or throw inside
+`.bind()` and 500 the endpoint. Every field is now parsed individually (`parseProgressFields`),
+with lengths bounded so a single row can't approach D1's 2 MB per-row ceiling, and a malformed
+element returns a 400 naming the offending field and index rather than a 500.
+
+`changes` was also unbounded. It now caps at 500 entries with a 413, plus a cheap
+`Content-Length` pre-check that rejects an oversized body before it is ever parsed. The
+Content-Length check is a fast path, not the guarantee — it is absent on a chunked upload — so
+the entry cap is what actually bounds the work.
+
+### D152 — the D1 bound-parameter limit was a live bug, not just a hardening gap
+
+Found while auditing the above, and the most consequential thing in this pass: D1 allows at
+most **100 bound parameters per query**, and `applyIncomingChanges` built a
+`queueKey IN (?, ?, …)` lookup binding one per incoming row plus the `groupId`. Any push of 100
+or more rows died on `D1_ERROR: too many SQL variables`. Confirmed against `wrangler dev`: 99
+changes returned 200, 100 returned 500, and the boundary sat exactly where the arithmetic said
+it would.
+
+This was reachable in normal use, not just under attack. Both clients pushed the entire
+`changedSince` result in one request, and a first pair starts from watermark 0 — so the whole
+progress table is "changed." Any user with 100+ shows of history would have had their first
+sync fail permanently, in the one table this app exists to never lose. It had not been hit only
+because no test pairing had ever carried that much history.
+
+The lookup is now chunked at 90 keys per query. The clients chunk too (D153), so the two limits
+are independent: the server no longer breaks regardless of what a client sends, and a
+well-behaved client never approaches the cap anyway.
+
+### D153 — both clients drain a push backlog across several round trips
+
+With the server capping a push at 500, a client that sent everything at once would simply fail
+differently, so `sync` on both platforms now loops: push a bounded batch (400, leaving headroom
+under the server's own 500), apply what comes back, and go again while rows remain. In normal
+use this is still one round trip — only a first pair has the backlog to need more.
+
+The subtle part is the batch boundary. The push watermark advances to the batch's highest
+`updatedAt`, and `changedSince` is strictly `>`, so cutting through a run of rows that share one
+millisecond would leave the remainder permanently unoffered — a silent lost write. A batch is
+therefore trimmed back to the run boundary, and only when the run actually continues past the
+cut; a single millisecond holding more rows than the batch size is sent whole rather than
+stalling forever, which the gap between 400 and 500 leaves room for. The first cut of this
+trimmed unconditionally and quietly dropped one row per batch, which is exactly the class of
+bug this table cannot afford — the tests covering all four cases exist because of it.
+
+### D154 — errors are ours to shape, and CORS stays absent on purpose
+
+An uncaught throw left the response to the platform. Under `wrangler dev` that means the
+exception, the stack trace, and the developer's absolute filesystem paths returned to the
+client; in production it means Cloudflare's generic 1101 page. The second is fine and the first
+is not, but neither is ours to depend on, and the `no seq counter for group ${groupId}` throw
+was the thing standing to leak. The `fetch` handler now wraps its router: details go to
+`console.error`, the client gets a bare `{"error":"internal error"}` 500. Verified by forcing
+that throw locally.
+
+No `Access-Control-*` headers anywhere, and that stays deliberate rather than accidental. Both
+clients are native — OkHttp and URLSession — and no browser ever calls this. Omitting
+`Access-Control-Allow-Origin` means a page on any origin can still send a request but cannot
+read the response, which is the right default for an API whose entire auth model is a bearer
+token. Adding permissive CORS "just in case" would be a strict downgrade.
+
+### What was checked and found already correct
+
+Recorded because the value of a security pass is as much in what it rules out as in what it
+changes. Every D1 query is `groupId`-scoped to the authenticated device, with two deliberate
+exceptions that are correct: the pairing lookup is by code alone (the claimer has no group
+yet — the code is the authorization), and the revoke path looks a device up by id and then
+403s if it isn't in the caller's group. Every query is parameterized; no user data is ever
+interpolated into SQL. The cron-only tombstone purge is not reachable over `fetch` —
+`/cdn-cgi/handler/scheduled` is a `wrangler dev` affordance, and production returns Cloudflare
+error 1042 without the request ever reaching the Worker.
+
+On the clients: Android's `EncryptedSharedPreferences` fallback degrades to memory-only and
+never writes a token in the clear, and the only thing it logs is that the store was
+unavailable. macOS keeps the device token and id in Keychain (not synchronizable, so a future
+iOS client can't silently inherit this Mac's identity) and only non-sensitive cursors in
+`UserDefaults`. No token, JWT, or pairing code reaches `Log.*`, `os_log`, or `print` on either
+platform. All three services are HTTPS-only with no cleartext fallback and no ATS exemption.
+The two `exported="true"` manifest components are the launcher activity, which reads a single
+boolean extra, and the Media3 service, whose browse tree parses media ids through
+`BrowseNode.parse` — already returning null for anything unrecognised rather than guessing.
+`npm audit` is clean; the Android release tree has no known-vulnerable dependency.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.

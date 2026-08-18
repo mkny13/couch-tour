@@ -365,26 +365,20 @@ object SyncSession {
     }
 
     /**
-     * One push-then-pull cycle. Pushes every local row touched since the last successful
-     * push (tombstones included — see [ProgressDao.changedSince]), applies whatever the
-     * server sends back, and advances both cursors only on success.
+     * Push-then-pull until the local backlog is drained. Pushes every local row touched since
+     * the last successful push (tombstones included — see [ProgressDao.changedSince]), applies
+     * whatever the server sends back, and advances both cursors only on success.
+     *
+     * Usually one round trip: only a first pair (watermark 0, so the whole progress table is
+     * "changed") has enough backlog to need more than one.
      */
     suspend fun sync(progressDao: ProgressDao) {
         val token = store.deviceToken ?: return
-        val toPush = progressDao.changedSince(store.lastPushWatermark).map { it.toWire() }
 
         _syncing.value = true
         try {
-            val (response, rotatedToken) = SyncApi.sync(token, store.lastSeq, toPush)
-            rotatedToken?.let { store.deviceToken = it }
-
-            response.changes.forEach { progressDao.put(it.toEntity()) }
-            store.lastSeq = response.seq
-            if (toPush.isNotEmpty()) store.lastPushWatermark = toPush.maxOf { it.updatedAt }
-
-            val now = System.currentTimeMillis()
-            store.lastSyncedAt = now
-            _lastSyncedAt.value = now
+            @Suppress("ControlFlowWithEmptyBody")
+            while (syncOnce(token, progressDao)) { }
         } catch (e: SyncException) {
             when {
                 // Revoked from another device (or the token is simply bad): stop trying
@@ -398,6 +392,29 @@ object SyncSession {
         } finally {
             _syncing.value = false
         }
+    }
+
+    /**
+     * One push-then-pull round trip. Returns true when the push hit [MAX_PUSH_BATCH] and more
+     * local rows are still waiting, so [sync] knows to come back for them.
+     */
+    private suspend fun syncOnce(token: String, progressDao: ProgressDao): Boolean {
+        val pending = progressDao.changedSince(store.lastPushWatermark).sortedBy { it.updatedAt }
+        val chunk = pending.chunkToPush()
+        val toPush = chunk.map { it.toWire() }
+
+        val (response, rotatedToken) = SyncApi.sync(token, store.lastSeq, toPush)
+        rotatedToken?.let { store.deviceToken = it }
+
+        response.changes.forEach { progressDao.put(it.toEntity()) }
+        store.lastSeq = response.seq
+        if (toPush.isNotEmpty()) store.lastPushWatermark = toPush.maxOf { it.updatedAt }
+
+        val now = System.currentTimeMillis()
+        store.lastSyncedAt = now
+        _lastSyncedAt.value = now
+
+        return pending.size > chunk.size
     }
 
     private var pushJob: Job? = null
@@ -423,6 +440,35 @@ object SyncSession {
             }
         }
     }
+}
+
+/**
+ * How many rows one push may carry. Deliberately under the server's own 500-entry cap
+ * (`MAX_CHANGES_PER_SYNC` in sync/src/index.ts), which exists because D1 allows only 100 bound
+ * parameters per query — before both limits, a first pair with 100+ rows of history 500'd the
+ * endpoint outright.
+ */
+private const val MAX_PUSH_BATCH = 400
+
+/**
+ * The next batch to push, from rows already sorted by `updatedAt` ascending.
+ *
+ * Never splits a run of rows sharing one `updatedAt`: the watermark advances to the batch's
+ * highest `updatedAt`, and [ProgressDao.changedSince] is strictly `>`, so any leftover row
+ * with that same millisecond would never be offered again — a silent lost write in the one
+ * table this app exists to never lose. Trimming back to the run boundary keeps them for the
+ * next batch; a single millisecond holding more rows than the batch size is sent whole rather
+ * than stalling forever, which the gap to the server's cap leaves room for.
+ */
+private fun List<Progress>.chunkToPush(): List<Progress> {
+    if (size <= MAX_PUSH_BATCH) return this
+    val capped = take(MAX_PUSH_BATCH)
+    val lastAt = capped.last().updatedAt
+    // Only trim when the run actually continues past the cut; otherwise the boundary already
+    // falls between two distinct timestamps and the full batch is safe to send.
+    if (this[MAX_PUSH_BATCH].updatedAt != lastAt) return capped
+    return capped.dropLastWhile { it.updatedAt == lastAt }
+        .ifEmpty { takeWhile { it.updatedAt == lastAt } }
 }
 
 private fun Progress.toWire() = SyncProgressWire(

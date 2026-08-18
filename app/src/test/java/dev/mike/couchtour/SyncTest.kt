@@ -421,4 +421,98 @@ class SyncSessionTest {
         assertTrue(pushed!!.body.readUtf8().contains(""""queueKey":"show:1997-11-17""""))
         assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS))
     }
+
+    // ------------------------------------------------------------------ push chunking
+    //
+    // The server caps a push at 500 entries because D1 allows only 100 bound parameters per
+    // query; before either limit existed, a first pair with 100+ rows of history 500'd the
+    // sync endpoint outright. These cover the client half of that fix.
+
+    private suspend fun seedProgress(count: Int, updatedAtFor: (Int) -> Long) {
+        repeat(count) { i ->
+            db.progressDao().put(
+                Progress(
+                    queueKey = "show:seed-$i", title = "t", subtitle = "s", artUrl = null,
+                    trackIndex = 0, positionMs = 0, trackTitle = "Track",
+                    updatedAt = updatedAtFor(i), artist = "Phish",
+                )
+            )
+        }
+    }
+
+    private fun pushedKeyCount(request: RecordedRequest): Int =
+        Regex(""""queueKey"""").findAll(request.body.readUtf8()).count()
+
+    @Test
+    fun `a backlog over the batch size is pushed across several requests`() = runBlocking {
+        claim()
+        val requestsBeforeSync = server.requestCount
+        seedProgress(950) { i -> 1_000L + i }
+        enqueue("""{"seq":1,"changes":[]}""")
+        enqueue("""{"seq":2,"changes":[]}""")
+        enqueue("""{"seq":3,"changes":[]}""")
+
+        SyncSession.sync(db.progressDao())
+
+        // 400 + 400 + 150, then the loop stops because the last batch was short.
+        assertEquals(3, server.requestCount - requestsBeforeSync)
+        assertEquals(400, pushedKeyCount(server.takeRequest()))
+        assertEquals(400, pushedKeyCount(server.takeRequest()))
+        assertEquals(150, pushedKeyCount(server.takeRequest()))
+    }
+
+    @Test
+    fun `no request exceeds the server's own cap`() = runBlocking {
+        claim()
+        seedProgress(600) { i -> 1_000L + i }
+        enqueue("""{"seq":1,"changes":[]}""")
+        enqueue("""{"seq":2,"changes":[]}""")
+
+        SyncSession.sync(db.progressDao())
+
+        assertTrue(pushedKeyCount(server.takeRequest()) <= 500)
+        assertTrue(pushedKeyCount(server.takeRequest()) <= 500)
+    }
+
+    @Test
+    fun `a batch boundary never splits rows sharing one updatedAt`() = runBlocking {
+        claim()
+        // Sorted ascending this lays out as 1_000..1_379, then forty rows all on 1_380, then
+        // 1_381..1_460 — so the shared-timestamp run straddles the 400-row boundary. Splitting
+        // it would advance the watermark past 1_380 and `changedSince` is strictly `>`, so the
+        // leftovers would never be offered again: a silent lost write.
+        seedProgress(500) { i ->
+            when {
+                i < 380 -> 1_000L + i
+                i < 420 -> 1_380L
+                else -> 1_381L + (i - 420)
+            }
+        }
+        enqueue("""{"seq":1,"changes":[]}""")
+        enqueue("""{"seq":2,"changes":[]}""")
+
+        SyncSession.sync(db.progressDao())
+
+        val first = server.takeRequest()
+        val second = server.takeRequest()
+        // Trimmed back off the shared-timestamp run rather than cutting through it.
+        assertEquals(380, pushedKeyCount(first))
+        // Everything still reaches the server across the two pushes: nothing was dropped.
+        assertEquals(500, 380 + pushedKeyCount(second))
+    }
+
+    @Test
+    fun `a single updatedAt bigger than the batch is sent whole rather than stalling`() = runBlocking {
+        claim()
+        val requestsBeforeSync = server.requestCount
+        // 450 rows on one millisecond: trimming to the run boundary would empty the batch, so
+        // the run goes out whole — still under the server's 500 cap.
+        seedProgress(450) { 3_000L }
+        enqueue("""{"seq":1,"changes":[]}""")
+
+        SyncSession.sync(db.progressDao())
+
+        assertEquals(1, server.requestCount - requestsBeforeSync)
+        assertEquals(450, pushedKeyCount(server.takeRequest()))
+    }
 }

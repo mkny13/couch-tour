@@ -1,5 +1,7 @@
 export interface Env {
   DB: D1Database;
+  /** See the `[[ratelimits]]` block in wrangler.toml, and D150. */
+  PAIR_START_LIMITER: RateLimit;
 }
 
 export interface DeviceRow {
