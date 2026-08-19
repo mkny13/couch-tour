@@ -88,7 +88,17 @@ data class RecordingRef(
     val reviewCount: Int = 0,
     val taper: String? = null,
     val lineage: String? = null,
-)
+) {
+    /**
+     * Relisten has no structured "matrix" flag — only [isSoundboard]. Where a matrix mix
+     * exists at all, it's folded into free text on [taper] or [lineage] (e.g. "SBD/AUD
+     * Matrix"). This is a heuristic substring match on that text, not a guaranteed signal:
+     * it can miss a matrix worded some other way, or flag something that mentions "matrix"
+     * for an unrelated reason. Treat it as a hint in the UI, not a fact.
+     */
+    val looksLikeMatrix: Boolean
+        get() = listOfNotNull(taper, lineage).any { it.contains("matrix", ignoreCase = true) }
+}
 
 data class PlayableTrack(
     val id: String,
