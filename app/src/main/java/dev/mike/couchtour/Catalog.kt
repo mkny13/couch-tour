@@ -3,6 +3,7 @@ package dev.mike.couchtour
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlin.random.Random
 
 /**
  * The backend-neutral catalog: just enough of a model to browse to a playable track.
@@ -158,6 +159,30 @@ internal fun mergeArtists(perBackend: Map<Backend, List<ArtistRef>>): List<Artis
     val rest = perBackend.filterKeys { it != Backend.PHISHIN }.values.flatten()
         .filterNot { it.name.equals(PHISH.name, ignoreCase = true) }
     return phish + rest.sortedByDescending { it.showCount }
+}
+
+/**
+ * Picks a random show for the Home screen's "Surprise me" button (#20). Neither backend
+ * exposes a random-show endpoint, so this walks the same artist → period → show path the
+ * browse screens do: a random artist from the merged list, a random period of that artist,
+ * then a random show within it — 2-3 sequential calls, same as browsing by hand.
+ *
+ * [random] and [source] are parameters rather than the real [sourceFor] so the selection is
+ * deterministic and network-free in tests. A period with only partial-audio shows falls back
+ * to picking among them anyway, rather than costing another round trip to find a period that
+ * has a complete one.
+ */
+suspend fun pickRandomShow(
+    artists: List<ArtistRef>,
+    random: Random = Random,
+    source: (Backend) -> MusicSource = ::sourceFor,
+): ShowSummary {
+    val artist = artists.random(random)
+    val src = source(artist.backend)
+    val period = src.periods(artist).random(random)
+    val shows = src.shows(artist, period)
+    val candidates = shows.filterNot { it.partial }.ifEmpty { shows }
+    return candidates.random(random)
 }
 
 /** What a song or venue hit resolves to: a named slice of one artist's catalog. */

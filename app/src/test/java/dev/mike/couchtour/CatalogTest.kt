@@ -1,5 +1,7 @@
 package dev.mike.couchtour
 
+import kotlinx.coroutines.runBlocking
+import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -262,5 +264,70 @@ class CatalogTest {
     fun `filteredTo a null key returns everything unchanged`() {
         val hits = SearchHits(artists = listOf(dead, wsp))
         assertEquals(hits, hits.filteredTo(null))
+    }
+
+    // ------------------------------------------------------------ pickRandomShow
+
+    /** Only [periods] and [shows] are exercised by [pickRandomShow]; the rest just satisfy
+     *  the interface. Both fakes are keyed by artist id, so one instance covers a merged set
+     *  of artists spanning both backends. */
+    private class FakeSource(
+        private val periodsByArtist: Map<String, List<PeriodRef>>,
+        private val showsByPeriod: Map<String, List<ShowSummary>>,
+    ) : MusicSource {
+        override val backend = Backend.RELISTEN
+        override suspend fun artists() = emptyList<ArtistRef>()
+        override suspend fun periods(artist: ArtistRef) = periodsByArtist.getValue(artist.id)
+        override suspend fun shows(artist: ArtistRef, period: PeriodRef) = showsByPeriod.getValue(period.id)
+        override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) =
+            error("not used by pickRandomShow")
+        override suspend fun search(term: String) = SearchHits()
+    }
+
+    @Test
+    fun `pickRandomShow can land on every artist in the merged set`() = runBlocking {
+        val a = ArtistRef(Backend.RELISTEN, "artist-a", "Artist A")
+        val b = ArtistRef(Backend.RELISTEN, "artist-b", "Artist B")
+        val periodA = PeriodRef("pa", "Period A")
+        val periodB = PeriodRef("pb", "Period B")
+        val showA = ShowSummary(artist = a, date = "2001-01-01")
+        val showB = ShowSummary(artist = b, date = "2002-02-02")
+        val source = FakeSource(
+            periodsByArtist = mapOf("artist-a" to listOf(periodA), "artist-b" to listOf(periodB)),
+            showsByPeriod = mapOf("pa" to listOf(showA), "pb" to listOf(showB)),
+        )
+        val picked = (0 until 50).map { seed ->
+            pickRandomShow(listOf(a, b), random = Random(seed.toLong())) { source }.artist.id
+        }.toSet()
+        assertEquals(setOf("artist-a", "artist-b"), picked)
+    }
+
+    @Test
+    fun `pickRandomShow skips a partial show when a complete one is available in the same period`() = runBlocking {
+        val artist = ArtistRef(Backend.RELISTEN, "artist-a", "Artist A")
+        val period = PeriodRef("p", "Period")
+        val complete = ShowSummary(artist = artist, date = "2001-01-01", partial = false)
+        val partial = ShowSummary(artist = artist, date = "2001-01-02", partial = true)
+        val source = FakeSource(
+            periodsByArtist = mapOf("artist-a" to listOf(period)),
+            showsByPeriod = mapOf("p" to listOf(complete, partial)),
+        )
+        repeat(20) { seed ->
+            val picked = pickRandomShow(listOf(artist), random = Random(seed.toLong())) { source }
+            assertFalse(picked.partial)
+        }
+    }
+
+    @Test
+    fun `pickRandomShow falls back to a partial show when the period has nothing else`() = runBlocking {
+        val artist = ArtistRef(Backend.RELISTEN, "artist-a", "Artist A")
+        val period = PeriodRef("p", "Period")
+        val onlyPartial = ShowSummary(artist = artist, date = "2001-01-02", partial = true)
+        val source = FakeSource(
+            periodsByArtist = mapOf("artist-a" to listOf(period)),
+            showsByPeriod = mapOf("p" to listOf(onlyPartial)),
+        )
+        val picked = pickRandomShow(listOf(artist), random = Random(0)) { source }
+        assertEquals(onlyPartial, picked)
     }
 }
