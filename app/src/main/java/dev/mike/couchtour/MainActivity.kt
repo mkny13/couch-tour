@@ -841,6 +841,26 @@ private fun RecordingTrackRow(track: PlayableTrack, number: Int, artist: ArtistR
         // Relisten has no per-track page (trackShareUrl always null for it) — the share
         // falls back to the show link, so no trackSlug to pass here.
         ShareButton(trackShareText(artist, date, track.title, trackSlug = null))
+        LikeTrackButton(track.id)
+    }
+}
+
+/**
+ * Heart toggle for a Relisten [PlayableTrack] (#11), backed by [LikedTracks]. Deliberately
+ * separate from phish.in's [LikeButton]: no account gate, no server round-trip, no public
+ * count — just a local like.
+ */
+@Composable
+private fun LikeTrackButton(trackId: String) {
+    val likedIds by LikedTracks.ids.collectAsState()
+    val liked = trackId in likedIds
+    IconButton(onClick = { LikedTracks.toggle(trackId) }) {
+        Icon(
+            if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            if (liked) "Unlike" else "Like",
+            tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
