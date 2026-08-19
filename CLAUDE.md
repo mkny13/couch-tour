@@ -131,6 +131,33 @@ migration is never the right answer here. Add a `MIGRATION_n_n+1`, register it i
 - **The README states a unit-test count.** It goes stale; update it when adding or removing
   tests.
 
+## Working through open issues
+
+Mike drives the backlog by asking for "the next issue" or "the next batch," works from the
+prompts given for each one, and can't review code himself — so the merge/release loop is
+autonomous by default, not a proposal he approves each time:
+
+- **Merge PRs without asking first**, once CI is green and a self-review of the diff (read the
+  actual changes, not just the description) turns up nothing that looks wrong — matches the
+  issue, touches only what it should, has real tests, doesn't contradict something documented
+  elsewhere (this file, DECISIONS.md). Only hold a PR for Mike when something in the diff looks
+  genuinely risky or ambiguous, not merely "could be nicer."
+- **Cut a release at the end of each batch of work**, not just when asked: `workflow_dispatch`
+  on `build-debug-apk.yml` with `side_install: true` and `prerelease: true` (see "Cutting a
+  beta release" above), tag bumped by one (`v0.NN`), release notes summarizing what merged.
+  This is how Mike gets a build onto his own devices to test — treat it as part of finishing
+  the batch, not a separate ask.
+- **Multiple worktrees can run in parallel without active coordination.** Don't have one
+  agent's prompt tell it to "coordinate" with another running elsewhere — that spends tokens
+  re-deriving context for no real benefit. Instead, when handing out a batch for a second
+  worktree, name the specific file(s)/function(s) the other one is already working in and tell
+  the new one to avoid those; git resolves everything else at merge time. If a real conflict
+  does show up, it gets resolved then, not preemptively negotiated between agents.
+- **ROADMAP.md's "Suggested build order"** is the standing prioritization — pick the next
+  unclaimed item from there rather than re-deriving priority from scratch each time, and update
+  it (plus the Feature ideas issue-number cross-references) when the picture changes enough to
+  matter.
+
 ## Publishing constraints
 
 Being prepared for a Google Play release. Two constraints come from outside the code:
