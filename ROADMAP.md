@@ -85,9 +85,9 @@ blocked on the rest of it landing soon:
    (notification-sound ducking) is fixed (D93) and closed, pending the real-device
    confirmation noted under Open questions above.
 2. **Quick wins — done.** #19 (share a show/track), #20 ("surprise me"), #21 (browse by top
-   rated/popular — trending is still open, see the Feature ideas entry). #30 (extract the
-   ten-screen repeated load/loading/error scaffold in `MainActivity.kt`) was filed once this
-   phase landed, deliberately sequenced to pay for itself before phase 3 adds more screens.
+   rated/popular — trending is still open, see the Feature ideas entry), #30 (extract the
+   ten-screen repeated load/loading/error scaffold in `MainActivity.kt` into a shared `Loaded`
+   composable, done ahead of phase 3 adding more screens).
 3. **Personal library cluster** — #14 (favorite artists, blocks #13 and #22) → #11 (likes for
    Relisten tracks) → #12 (playlists spanning both backends — shares its storage layer with
    #11) → #13 (on-this-date playlist) → #22 (next Couch Tour stop).
