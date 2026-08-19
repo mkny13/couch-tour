@@ -138,6 +138,31 @@ class CatalogTest {
         assertEquals("https://phish.in/w.png", t.waveformUrl)
     }
 
+    // ----------------------------------------------------------- recordings
+
+    @Test
+    fun `looksLikeMatrix flags a source whose lineage mentions matrix`() {
+        val rec = RecordingRef(id = "1", label = "SBD/AUD Matrix", lineage = "SBD/AUD Matrix > CDR")
+        assertTrue(rec.looksLikeMatrix)
+    }
+
+    @Test
+    fun `looksLikeMatrix checks taper too, case-insensitively`() {
+        val rec = RecordingRef(id = "1", label = "Unknown MATRIX mix", taper = "Unknown MATRIX mix")
+        assertTrue(rec.looksLikeMatrix)
+    }
+
+    @Test
+    fun `looksLikeMatrix is false with no matrix mention`() {
+        val rec = RecordingRef(id = "1", label = "Jimmy Page", taper = "Jimmy Page", lineage = "DAT > CDR")
+        assertFalse(rec.looksLikeMatrix)
+    }
+
+    @Test
+    fun `looksLikeMatrix is false when taper and lineage are both null`() {
+        assertFalse(RecordingRef(id = "1", label = "Soundboard").looksLikeMatrix)
+    }
+
     // -------------------------------------------------------------- queue key
 
     @Test

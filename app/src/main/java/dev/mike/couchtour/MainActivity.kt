@@ -49,11 +49,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -192,14 +194,23 @@ fun App(
                 )
             }
             composable(
-                "recording/{backend}/{artistId}/{date}?src={src}",
-                arguments = listOf(navArgument("src") { type = NavType.StringType; nullable = true }),
+                "recording/{backend}/{artistId}/{date}?src={src}&resumeIndex={resumeIndex}&resumeMs={resumeMs}",
+                arguments = listOf(
+                    navArgument("src") { type = NavType.StringType; nullable = true },
+                    // Carried by the source picker when it catches this show mid-playback
+                    // (#17) — a query param, not an Int/Long NavType, because those can't be
+                    // nullable and most navigations to this route have neither.
+                    navArgument("resumeIndex") { type = NavType.StringType; nullable = true },
+                    navArgument("resumeMs") { type = NavType.StringType; nullable = true },
+                ),
             ) { entry ->
                 RecordingScreen(
                     backendId = entry.arguments?.getString("backend").orEmpty(),
                     artistId = entry.arguments?.getString("artistId").orEmpty(),
                     date = entry.arguments?.getString("date").orEmpty(),
                     recordingId = entry.arguments?.getString("src"),
+                    resumeIndex = entry.arguments?.getString("resumeIndex")?.toIntOrNull(),
+                    resumeMs = entry.arguments?.getString("resumeMs")?.toLongOrNull(),
                     vm = vm,
                     nav = nav,
                 )
@@ -635,6 +646,11 @@ fun RecordingScreen(
     artistId: String,
     date: String,
     recordingId: String?,
+    /** Set by the source picker when it caught this show mid-playback on the source being
+     *  switched away from (#17) — where in [ShowDetail.tracks] to pick up once this source
+     *  loads. Null on every other navigation here (first visit, resume banner, track tap). */
+    resumeIndex: Int? = null,
+    resumeMs: Long? = null,
     vm: PlayerViewModel,
     nav: NavHostController,
 ) {
@@ -654,8 +670,16 @@ fun RecordingScreen(
             null -> Loading()
             else -> r.fold(
                 onSuccess = { (detail, progress) ->
+                    // Keyed on detail, which is a fresh instance exactly once per navigation
+                    // here (produceState only re-runs when the Triple key above changes) — so
+                    // this fires once per switch rather than on every recomposition.
+                    LaunchedEffect(detail) {
+                        if (resumeIndex != null && detail.tracks.isNotEmpty()) {
+                            vm.playRecording(detail, resumeIndex.coerceIn(0, detail.tracks.lastIndex), resumeMs ?: 0)
+                        }
+                    }
                     LazyColumn {
-                        item { RecordingHeader(detail, backendId, artistId, date, nav) }
+                        item { RecordingHeader(detail, backendId, artistId, date, vm, nav) }
                         if (progress != null) {
                             item {
                                 ResumeBanner(progress) {
@@ -675,7 +699,7 @@ fun RecordingScreen(
 }
 
 @Composable
-private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: String, date: String, nav: NavHostController) {
+private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: String, date: String, vm: PlayerViewModel, nav: NavHostController) {
     val summary = detail.summary
     Column {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -695,9 +719,9 @@ private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: Str
             }
             ShareButton(showShareText(summary.artist, date))
         }
-        // No tape to switch on a single-source artist (Phish) or a show with only one.
+        // No source to switch on a single-source artist (Phish) or a show with only one.
         if (summary.artist.hasMultipleSources && detail.alternates.isNotEmpty()) {
-            TapeSwitcher(detail, backendId, artistId, date, nav)
+            SourcePicker(detail, backendId, artistId, date, vm, nav)
         }
     }
 }
@@ -707,30 +731,106 @@ private fun recordingLabel(rec: RecordingRef): String {
     return rec.label + rating
 }
 
+/**
+ * etree-style "Source" picker (#17): every tape of this show, with the taper/lineage detail
+ * that used to be on [RecordingRef] but never rendered anywhere. A bottom sheet rather than
+ * [DropdownMenu] because rows here run 2-4 lines once taper, lineage, and badges are in —
+ * cramped in a menu built for single-line items.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TapeSwitcher(detail: ShowDetail, backendId: String, artistId: String, date: String, nav: NavHostController) {
+private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String, date: String, vm: PlayerViewModel, nav: NavHostController) {
     var open by remember { mutableStateOf(false) }
-    val tapes = listOfNotNull(detail.recording) + detail.alternates
+    val sources = listOfNotNull(detail.recording) + detail.alternates
 
     Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
         RowItem(
-            title = "Switch tape",
-            subtitle = "${tapes.size} ${plural(tapes.size, "recording")} of this show",
+            title = "Source",
+            subtitle = "${sources.size} ${plural(sources.size, "source")} for this show",
             artUrl = null,
             onClick = { open = true },
         )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            tapes.forEach { tape ->
-                val current = tape.id == detail.recording?.id
-                DropdownMenuItem(
-                    text = { Text((if (current) "✓ " else "") + recordingLabel(tape)) },
-                    onClick = {
-                        open = false
-                        if (!current) nav.navigate("recording/$backendId/$artistId/$date?src=${tape.id}")
+        if (open) {
+            ModalBottomSheet(onDismissRequest = { open = false }) {
+                LazyColumn {
+                    items(sources, key = { it.id }) { source ->
+                        val current = source.id == detail.recording?.id
+                        SourceRow(source, current) {
+                            open = false
+                            if (!current) {
+                                // If this show is playing (or paused) right now, carry the
+                                // position into the same track index on the new source — an
+                                // approximation, since tapers split tracks differently (#17).
+                                // Waveform-matched resume is future work, not attempted here.
+                                val playing = vm.state.value
+                                val resume = "&resumeIndex=${playing.trackIndex}&resumeMs=${playing.positionMs}"
+                                    .takeIf { detail.queueKey != null && playing.queueKey == detail.queueKey }
+                                    .orEmpty()
+                                nav.navigate("recording/$backendId/$artistId/$date?src=${source.id}$resume")
+                            }
+                        }
                     }
-                )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                (if (current) "✓ " else "") + source.label,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (source.isSoundboard) SourceBadge("SBD", MaterialTheme.colorScheme.primary)
+            // Heuristic, not a real field — see RecordingRef.looksLikeMatrix. Labelled with
+            // a "?" so it reads as a guess rather than a confirmed fact.
+            if (source.looksLikeMatrix) SourceBadge("Matrix?", MaterialTheme.colorScheme.tertiary)
+        }
+        if (source.rating > 0) {
+            val reviews = if (source.reviewCount > 0) " · ${source.reviewCount} ${plural(source.reviewCount, "review")}" else ""
+            Text(
+                "★ %.1f".format(source.rating) + reviews,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+            )
+        }
+        // Redundant when the label already is the taper's name (RelistenSource.toRecordingRef
+        // defaults label to taper) — only shown when it adds information the title didn't.
+        if (source.taper != null && source.taper != source.label) {
+            Text("Taper: ${source.taper}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        }
+        source.lineage?.let {
+            Text("Lineage: $it", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun SourceBadge(text: String, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.15f),
+        contentColor = color,
+        shape = RoundedCornerShape(4.dp),
+        modifier = Modifier.padding(start = 6.dp),
+    ) {
+        Text(
+            text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }
 

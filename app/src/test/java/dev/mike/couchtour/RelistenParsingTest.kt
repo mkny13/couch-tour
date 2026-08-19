@@ -110,6 +110,30 @@ class RelistenParsingTest {
     }
 
     @Test
+    fun `a blank taper falls back to the SBD-AUD label same as a missing one`() {
+        // Relisten sends "" rather than omitting the field on plenty of sources — a plain
+        // `taper ?: fallback` doesn't catch that, since "" is non-null.
+        val blank = RelistenSource(uuid = "1", taper = "", isSoundboard = true)
+        assertEquals("Soundboard", blank.toRecordingRef().label)
+        assertNull(blank.toRecordingRef().taper)
+    }
+
+    @Test
+    fun `a blank lineage is treated the same as a missing one`() {
+        val blank = RelistenSource(uuid = "1", lineage = "  ")
+        assertNull(blank.toRecordingRef().lineage)
+    }
+
+    @Test
+    fun `a real taper and lineage pass through untouched`() {
+        val source = RelistenSource(uuid = "1", taper = "Jimmy Page", lineage = "DAT > CDR")
+        val rec = source.toRecordingRef()
+        assertEquals("Jimmy Page", rec.label)
+        assertEquals("Jimmy Page", rec.taper)
+        assertEquals("DAT > CDR", rec.lineage)
+    }
+
+    @Test
     fun `converts track duration from seconds to milliseconds`() {
         // 325 seconds = 5:25. Everything else in the app is milliseconds; a track this far
         // off is the kind of bug that looks fine until someone opens the scrubber.
