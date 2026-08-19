@@ -207,6 +207,41 @@ class CatalogTest {
         assertEquals(listOf(PHISH, dead), merged)
     }
 
+    @Test
+    fun `a favorited artist is pinned right after phish, ahead of bigger unfavorited artists`() {
+        val small = ArtistRef(Backend.RELISTEN, "goose", "Goose", showCount = 412)
+        val big = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val merged = mergeArtists(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(small, big)),
+            favorites = setOf(small.key),
+        )
+        assertEquals(listOf(PHISH, small, big), merged)
+    }
+
+    @Test
+    fun `favoriting an artist never displaces phish from position 1`() {
+        // Phish's pinned slot is earned by its account/likes/playlists features, not by
+        // being liked — favoriting is orthogonal to that and never moves it.
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val merged = mergeArtists(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(dead)),
+            favorites = setOf(dead.key),
+        )
+        assertEquals(listOf(PHISH, dead), merged)
+    }
+
+    @Test
+    fun `multiple favorited artists still sort by show count among themselves`() {
+        val smallFav = ArtistRef(Backend.RELISTEN, "goose", "Goose", showCount = 412)
+        val bigFav = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val unfavoritedBiggest = ArtistRef(Backend.RELISTEN, "wsp", "Widespread Panic", showCount = 3000)
+        val merged = mergeArtists(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(smallFav, bigFav, unfavoritedBiggest)),
+            favorites = setOf(smallFav.key, bigFav.key),
+        )
+        assertEquals(listOf(PHISH, bigFav, smallFav, unfavoritedBiggest), merged)
+    }
+
     // ----------------------------------------------------------------- search
 
     @Test
