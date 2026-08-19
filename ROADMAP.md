@@ -66,6 +66,11 @@ currently queued up next for sync specifically; future work here will start a fr
 - History grouped by artist, matching Android, once there's enough real history to want it.
 - Login, likes, playlists, search, and casting on desktop — out of scope for the MVP,
   unscheduled beyond that.
+- Auto-updates. There's no update mechanism today — the app is ad-hoc signed, not
+  distributed, and a copy of the `.app` on another Mac has no way to learn a newer build
+  exists. The standard fix is bundling [Sparkle](https://sparkle-project.org) with a hosted
+  appcast feed, which needs signing keys and somewhere to host the feed/builds — real setup,
+  not yet started.
 
 ## Suggested build order
 
@@ -78,9 +83,10 @@ before the comparison UI that builds on it):
    run before more surface area is added, especially to the sync backend). #23
    (notification-sound ducking) is fixed (D93) and closed, pending the real-device
    confirmation noted under Open questions above.
-2. **Quick wins** — #19 (share a show/track), #20 ("surprise me"), #21 (browse by top
-   rated/popular — the rating data is already fetched for the tape picker, just not
-   surfaced).
+2. **Quick wins — done.** #19 (share a show/track), #20 ("surprise me"), #21 (browse by top
+   rated/popular — trending is still open, see the Feature ideas entry). #30 (extract the
+   ten-screen repeated load/loading/error scaffold in `MainActivity.kt`) was filed once this
+   phase landed, deliberately sequenced to pay for itself before phase 4 adds more screens.
 3. **Source/tape cluster, in order** — #17 (rework "switch tape" into a Source picker) →
    #24 (comparison, ratings, preferred tapers — explicitly builds on #17) → #18 (source/show
    volume leveling, independent but adjacent).
@@ -124,8 +130,16 @@ liked state).
 - Source/show-level volume leveling — not traditional per-track leveling, but matching
   average sound levels across quiet and loud recordings so different sources/shows play back
   at comparable volume. (#18)
-- Share a show or track — no `Intent.ACTION_SEND` today; Relisten parity. (#19)
-- "Surprise me" / random show button. (#20)
+- ~~Share a show or track~~ — shipped (#19, D155-D156). phish.in links to the real `/<date>`
+  and `/<date>/<slug>` pages (confirmed live); Relisten has no per-track page, so track shares
+  fall back to the show's `/<artist-slug>/<date>` link with the track's title kept in the
+  shared text. Lives on the track row next to the like button, not on Now Playing (that
+  screen doesn't carry a track id). The chooser `Intent` is covered by tests; actually
+  launching it and opening the link on a device is still unverified — see Open questions.
+- ~~"Surprise me" / random show button~~ — shipped (#20, D157). Global across the full merged
+  artist catalog rather than scoped to whichever artist you're browsing (Phish isn't
+  weighted any higher than the rest), lives at the top of the Home screen, picks a random
+  artist → period → show with no caching or weighting.
 - ~~Browse shows by top rated (and popular/trending)~~ — shipped for phish.in (a "Popular"
   browse entry, sorted server-side by likes) and, bounded, for Relisten (a Date/Top rated
   toggle on an already-loaded period's shows, using `avg_rating` — confirmed live to be on
