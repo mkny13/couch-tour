@@ -282,6 +282,8 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
 
         LazyColumn(Modifier.fillMaxSize()) {
+            item { SurpriseMeButton(artists.value?.getOrNull().orEmpty(), nav) }
+
             if (recent.isNotEmpty()) {
                 item { SectionHeader("Continue listening") }
                 item {
@@ -388,6 +390,47 @@ private suspend fun loadAllArtists(): List<ArtistRef> {
             Backend.RELISTEN to relistenArtists.getOrDefault(emptyList()),
         )
     )
+}
+
+/**
+ * Home screen's "Surprise me" action (#20). [artists] is the same merged list the Artists
+ * section below already loaded, not a second fetch — picking still costs its own network
+ * calls (period, then shows) since neither backend exposes a random-show endpoint.
+ */
+@Composable
+private fun SurpriseMeButton(artists: List<ArtistRef>, nav: NavHostController) {
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Button(
+            enabled = !busy && artists.isNotEmpty(),
+            onClick = {
+                busy = true
+                error = null
+                scope.launch {
+                    runCatching { pickRandomShow(artists) }
+                        .onSuccess { show ->
+                            when (show.artist.backend) {
+                                Backend.PHISHIN -> nav.navigate("show/${show.date}")
+                                Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                            }
+                        }
+                        .onFailure { error = "Couldn't find a show: ${it.message}" }
+                    busy = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Shuffle, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (busy) "Finding a show…" else "Surprise me")
+        }
+        error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
 }
 
 @Composable

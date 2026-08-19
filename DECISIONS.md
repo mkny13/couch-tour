@@ -1481,5 +1481,29 @@ constructs the actual `Intent` and asserts `ACTION_CHOOSER` wraps a `text/plain`
 `ACTION_SEND` with the right `EXTRA_TEXT` — the chooser itself, and whether recipients can
 actually open the link, still need a manual on-device check per the issue's own testing note.
 
+### D157 — "Surprise me" pulls from the full merged catalog, not just the browsed artist
+
+Neither `PhishInApi` nor `Relisten.kt` exposes a random-show endpoint, so `pickRandomShow`
+(Catalog.kt) walks the same artist → period → show path the browse screens do: a random
+artist from `mergeArtists()`'s merged list, then a random period, then a random show — 2-3
+sequential calls, same cost as browsing by hand, and no attempt to weight or cache across
+artists for a first pass.
+
+Global rather than scoped to whatever artist is currently being browsed: the button lives on
+the Home screen, one level above any single artist's screens, and Relisten's own version is
+global too. Phish being pinned first in the merged list (D-noted in `mergeArtists`'s doc
+comment) doesn't change the odds here — every artist gets an equal, not weighted, chance,
+same as any other entry in the list.
+
+A period whose shows are all `partial` (audio known incomplete) still returns one of them
+rather than costing another round trip to find a period with a complete show — an edge case,
+not the common path, so it wasn't worth a second fetch to avoid.
+
+Tested with a fake `MusicSource` and an injected `Random` (`CatalogTest.kt`): one test
+confirms every artist in a merged set is reachable across many seeds, two more confirm the
+partial-audio filter and its fallback. The button itself (`SurpriseMeButton`, MainActivity.kt)
+follows the same busy/error-state shape `LoginScreen` already established, and is the first
+item in the Home screen's list — always the first thing visible below the search field.
+
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.
