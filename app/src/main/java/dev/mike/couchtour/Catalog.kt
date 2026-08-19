@@ -39,7 +39,12 @@ data class ArtistRef(
     val hasSets: Boolean = true,
     /** Relisten's `features.multiple_sources`. False means there is no tape to switch. */
     val hasMultipleSources: Boolean = false,
-)
+) {
+    /** Identifies this artist across backends for favoriting (#14) — stable, storable, and
+     *  distinct from [name], which two artists on different backends can share (see
+     *  [mergeArtists]'s Relisten-Phish dedup). */
+    val key: String get() = "${backend.id}:$id"
+}
 
 /**
  * A browsable slice of an artist's catalog. On phish.in this is a *period* and may be a range
@@ -167,12 +172,21 @@ internal fun sourceFor(backend: Backend): MusicSource = when (backend) {
  * a different show count than phish.in's) — so without filtering, "Phish" would appear
  * twice with two different numbers. The pinned phish.in entry wins; Relisten's copy is
  * dropped rather than shown as a second, confusing "Phish".
+ *
+ * [favorites] (#14, [ArtistRef.key]s) pin their artists to the front of the *rest* of the
+ * list, right after Phish rather than ahead of it — Phish's position-1 slot is earned by its
+ * special account features, not by being liked, so favoriting never displaces it. Within each
+ * group (favorited, then not) the existing show-count-descending order still applies.
  */
-internal fun mergeArtists(perBackend: Map<Backend, List<ArtistRef>>): List<ArtistRef> {
+internal fun mergeArtists(
+    perBackend: Map<Backend, List<ArtistRef>>,
+    favorites: Set<String> = emptySet(),
+): List<ArtistRef> {
     val phish = perBackend[Backend.PHISHIN].orEmpty()
     val rest = perBackend.filterKeys { it != Backend.PHISHIN }.values.flatten()
         .filterNot { it.name.equals(PHISH.name, ignoreCase = true) }
-    return phish + rest.sortedByDescending { it.showCount }
+    val (favorited, unfavorited) = rest.partition { it.key in favorites }
+    return phish + favorited.sortedByDescending { it.showCount } + unfavorited.sortedByDescending { it.showCount }
 }
 
 /**

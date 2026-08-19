@@ -44,6 +44,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -246,7 +248,13 @@ fun App(
 
 @Composable
 fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val artists = loadOnce { loadAllArtists() }
+    val rawArtists = loadOnce { loadArtistsByBackend() }
+    val favoriteKeys by Favorites.keys.collectAsState()
+    // A derived merge rather than part of loadOnce's cached fetch: it must re-run whenever
+    // the user favorites/unfavorites an artist, not just once per screen load.
+    val artists = remember(rawArtists.value, favoriteKeys) {
+        rawArtists.value?.map { mergeArtists(it, favoriteKeys) }
+    }
     val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
     val historyCount by vm.progressDao.historyCount().collectAsState(initial = 0)
     val username by Session.username.collectAsState()
@@ -292,8 +300,10 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             return@Column
         }
 
+        val favoritedArtists = artists?.getOrNull()?.filter { it.key in favoriteKeys }.orEmpty()
+
         LazyColumn(Modifier.fillMaxSize()) {
-            item { SurpriseMeButton(artists.value?.getOrNull().orEmpty(), nav) }
+            item { SurpriseMeButton(artists?.getOrNull().orEmpty(), nav) }
 
             if (recent.isNotEmpty()) {
                 item { SectionHeader("Continue listening") }
@@ -319,6 +329,22 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
+            // Separate from the full "Artists" list below (Relisten parity, #14) — quick
+            // access to the bands the user cares about, rather than scrolling a merged list
+            // that can run to hundreds of entries. Favoriting doesn't remove an artist from
+            // that full list, so it still shows up in both places.
+            if (favoritedArtists.isNotEmpty()) {
+                item { SectionHeader("Favorites", divided = true) }
+                items(favoritedArtists, key = { "favorite-${it.backend.id}-${it.id}" }) { artist ->
+                    RowItem(
+                        title = artist.name,
+                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                        artUrl = null,
+                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                    )
+                }
+            }
+
             item { SectionHeader("Artists", divided = true) }
             loaded(artists) { list ->
                 items(list, key = { "${it.backend.id}-${it.id}" }) { artist ->
@@ -326,6 +352,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                         title = artist.name,
                         subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
                         artUrl = null,
+                        trailingContent = { FavoriteButton(artist) },
                         onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
                     )
                 }
@@ -378,22 +405,24 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
 }
 
 /**
- * Merges Phish (a phish.in constant with its show count summed from `years()`) with every
- * Relisten artist. A Relisten outage still leaves Phish browsable; only surfaces an error if
- * *both* backends fail.
+ * Fetches Phish (a phish.in constant with its show count summed from `years()`) alongside
+ * every Relisten artist. A Relisten outage still leaves Phish browsable; only surfaces an
+ * error if *both* backends fail.
+ *
+ * Returns the raw per-backend map rather than calling [mergeArtists] itself — merging also
+ * needs the favorited set, which is a [Favorites]-backed [kotlinx.coroutines.flow.StateFlow]
+ * the caller recomposes on, not something to fetch once and cache alongside the network data.
  */
-private suspend fun loadAllArtists(): List<ArtistRef> {
+private suspend fun loadArtistsByBackend(): Map<Backend, List<ArtistRef>> {
     val phishShows = runCatching { PhishInApi.years().sumOf { it.showsWithAudioCount } }
     val relistenArtists = runCatching { RelistenCatalogSource.artists() }
     if (phishShows.isFailure && relistenArtists.isFailure) {
         throw relistenArtists.exceptionOrNull() ?: phishShows.exceptionOrNull()!!
     }
     val phish = PHISH.copy(showCount = phishShows.getOrDefault(0))
-    return mergeArtists(
-        mapOf(
-            Backend.PHISHIN to listOf(phish),
-            Backend.RELISTEN to relistenArtists.getOrDefault(emptyList()),
-        )
+    return mapOf(
+        Backend.PHISHIN to listOf(phish),
+        Backend.RELISTEN to relistenArtists.getOrDefault(emptyList()),
     )
 }
 
@@ -447,7 +476,7 @@ fun ShowsScreen(period: String, nav: NavHostController) {
 
     Column(Modifier.fillMaxSize()) {
         Header(if (isPopular) POPULAR_PERIOD_LABEL else period, nav)
-        Loaded(shows) { list ->
+        Loaded(shows.value) { list ->
             LazyColumn {
                 items(list, key = { it.date }) { show ->
                     val isPartial = show.audioStatus == "partial"
@@ -477,7 +506,7 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
 
     Column(Modifier.fillMaxSize()) {
         Header(date, nav)
-        Loaded(show) { s ->
+        Loaded(show.value) { s ->
             val playable = s.tracks.filter { it.playable }
             // A finished show's stored position is the end of the encore, so
             // offering to resume it would just stop again immediately.
@@ -510,8 +539,10 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Header(loaded.value?.getOrNull()?.first?.name ?: artistId, nav)
-        Loaded(loaded) { (_, periods) ->
+        Header(loaded.value?.getOrNull()?.first?.name ?: artistId, nav, trailing = {
+            loaded.value?.getOrNull()?.first?.let { FavoriteButton(it) }
+        })
+        Loaded(loaded.value) { (_, periods) ->
             LazyColumn {
                 // Newest first, matching the phish.in years screen.
                 items(periods.sortedByDescending { it.label }, key = { it.id }) { period ->
@@ -564,7 +595,7 @@ fun ArtistShowsScreen(
 
     Column(Modifier.fillMaxSize()) {
         Header(loaded.value?.getOrNull()?.second?.label ?: periodId, nav)
-        Loaded(loaded) { (_, _, shows) ->
+        Loaded(loaded.value) { (_, _, shows) ->
             val ordered = if (sortByRating) shows.sortedByDescending { it.rating } else shows
             LazyColumn {
                 item {
@@ -636,7 +667,7 @@ fun RecordingScreen(
 
     Column(Modifier.fillMaxSize()) {
         Header(date, nav)
-        Loaded(loaded) { (detail, progress) ->
+        Loaded(loaded.value) { (detail, progress) ->
             // Keyed on detail, which is a fresh instance exactly once per navigation
             // here (produceState only re-runs when the Triple key above changes) — so
             // this fires once per switch rather than on every recomposition.
@@ -1165,7 +1196,7 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
         if (paired) {
             val devices = loadOnce(paired to refreshKey) { SyncSession.devices() }
             SectionHeader("Devices", divided = true)
-            Loaded(devices) { list ->
+            Loaded(devices.value) { list ->
                 list.forEach { device ->
                     RowItem(
                         title = device.name + if (device.isSelf) " (this device)" else "",
@@ -1190,7 +1221,7 @@ fun PlaylistsScreen(title: String, nav: NavHostController, load: suspend () -> L
     val data = loadOnce(title) { load() }
     Column(Modifier.fillMaxSize()) {
         Header(title, nav)
-        Loaded(data) { lists ->
+        Loaded(data.value) { lists ->
             if (lists.isEmpty()) {
                 Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
             } else {
@@ -1221,7 +1252,7 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
 
     Column(Modifier.fillMaxSize()) {
         Header("Playlist", nav)
-        Loaded(data) { pl ->
+        Loaded(data.value) { pl ->
             val entries = pl.entries.filter { it.track.playable }
             val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
             LazyColumn {
@@ -1282,7 +1313,7 @@ fun MyShowsScreen(nav: NavHostController) {
     val data = loadOnce("my-shows") { PhishInApi.likedShows() }
     Column(Modifier.fillMaxSize()) {
         Header("My shows", nav)
-        Loaded(data) { shows ->
+        Loaded(data.value) { shows ->
             if (shows.isEmpty()) {
                 Text(
                     "No liked shows yet. Like them on phish.in and they'll appear here.",
@@ -1310,7 +1341,7 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
     val data = loadOnce("my-tracks") { PhishInApi.likedTracks() }
     Column(Modifier.fillMaxSize()) {
         Header("My tracks", nav)
-        Loaded(data) { tracks ->
+        Loaded(data.value) { tracks ->
             if (tracks.isEmpty()) {
                 Text(
                     "No liked tracks yet. Like them on phish.in and they'll appear here.",
@@ -1592,6 +1623,24 @@ private fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initial
     }
 }
 
+/**
+ * Star toggle for [ArtistRef]s (#14). A star rather than [LikeButton]'s heart, deliberately:
+ * favoriting is local-only, works signed out, and applies to both backends, so it shouldn't
+ * look like the phish.in-account "like" it has nothing to do with.
+ */
+@Composable
+private fun FavoriteButton(artist: ArtistRef) {
+    val favoriteKeys by Favorites.keys.collectAsState()
+    val favorited = artist.key in favoriteKeys
+    IconButton(onClick = { Favorites.toggle(artist.key) }) {
+        Icon(
+            if (favorited) Icons.Filled.Star else Icons.Filled.StarBorder,
+            if (favorited) "Unfavorite ${artist.name}" else "Favorite ${artist.name}",
+            tint = if (favorited) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 @Composable
 private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
     Column(
@@ -1659,12 +1708,18 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
 }
 
 @Composable
-fun Header(title: String, nav: NavHostController) {
+fun Header(
+    title: String,
+    nav: NavHostController,
+    /** Slot for a per-screen control, e.g. ArtistScreen's favorite star. */
+    trailing: (@Composable () -> Unit)? = null,
+) {
     Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { nav.popBackStack() }) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
         }
         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        trailing?.invoke()
         CastButton()
         // Back only unwinds one step; from a playlist four levels deep that's tedious.
         IconButton(onClick = { nav.popBackStack("home", inclusive = false) }) {
@@ -1756,24 +1811,24 @@ private fun ErrorText(t: Throwable) {
 }
 
 /** Collapses the load/loading/error scaffold every detail screen repeats: nothing while
- *  [state] is in flight ([Loading]), [ErrorText] on failure, [content] once it resolves. */
+ *  [result] is in flight (null), [ErrorText] on failure, [content] once it resolves. */
 @Composable
-private fun <T> Loaded(state: State<Result<T>?>, content: @Composable (T) -> Unit) {
-    when (val r = state.value) {
+private fun <T> Loaded(result: Result<T>?, content: @Composable (T) -> Unit) {
+    when (result) {
         null -> Loading()
-        else -> r.fold(onSuccess = { content(it) }, onFailure = { ErrorText(it) })
+        else -> result.fold(onSuccess = { content(it) }, onFailure = { ErrorText(it) })
     }
 }
 
 /** [Loaded]'s form for a section embedded in a longer [androidx.compose.foundation.lazy.LazyListScope.item]
  *  list, which can't wrap itself in its own [Loading]/[ErrorText] outside the list. */
 private fun <T> androidx.compose.foundation.lazy.LazyListScope.loaded(
-    state: State<Result<T>?>,
+    result: Result<T>?,
     content: androidx.compose.foundation.lazy.LazyListScope.(T) -> Unit,
 ) {
-    when (val r = state.value) {
+    when (result) {
         null -> item { Loading() }
-        else -> r.fold(onSuccess = { content(it) }, onFailure = { item { ErrorText(it) } })
+        else -> result.fold(onSuccess = { content(it) }, onFailure = { item { ErrorText(it) } })
     }
 }
 
