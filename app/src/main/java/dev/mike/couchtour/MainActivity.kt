@@ -346,22 +346,16 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
 
             item { SectionHeader("Artists", divided = true) }
-            when (val r = artists) {
-                null -> item { Loading() }
-                else -> r.fold(
-                    onSuccess = { list ->
-                        items(list, key = { "${it.backend.id}-${it.id}" }) { artist ->
-                            RowItem(
-                                title = artist.name,
-                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                                artUrl = null,
-                                trailingContent = { FavoriteButton(artist) },
-                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
-                            )
-                        }
-                    },
-                    onFailure = { item { ErrorText(it) } }
-                )
+            loaded(artists) { list ->
+                items(list, key = { "${it.backend.id}-${it.id}" }) { artist ->
+                    RowItem(
+                        title = artist.name,
+                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                        artUrl = null,
+                        trailingContent = { FavoriteButton(artist) },
+                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                    )
+                }
             }
 
             item { SectionHeader("Your phish.in account", divided = true) }
@@ -482,31 +476,25 @@ fun ShowsScreen(period: String, nav: NavHostController) {
 
     Column(Modifier.fillMaxSize()) {
         Header(if (isPopular) POPULAR_PERIOD_LABEL else period, nav)
-        when (val r = shows.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { list ->
-                    LazyColumn {
-                        items(list, key = { it.date }) { show ->
-                            val isPartial = show.audioStatus == "partial"
-                            RowItem(
-                                title = show.date,
-                                subtitle = listOfNotNull(show.venueName, show.location)
-                                    .joinToString(" · "),
-                                artUrl = show.coverArtUrls?.small,
-                                trailing = when {
-                                    isPopular -> "♥ ${show.likesCount}"
-                                    isPartial -> "partial"
-                                    else -> null
-                                },
-                                trailingSecondary = if (isPopular && isPartial) "partial" else null,
-                                onClick = { nav.navigate("show/${show.date}") }
-                            )
-                        }
-                    }
-                },
-                onFailure = { ErrorText(it) }
-            )
+        Loaded(shows.value) { list ->
+            LazyColumn {
+                items(list, key = { it.date }) { show ->
+                    val isPartial = show.audioStatus == "partial"
+                    RowItem(
+                        title = show.date,
+                        subtitle = listOfNotNull(show.venueName, show.location)
+                            .joinToString(" · "),
+                        artUrl = show.coverArtUrls?.small,
+                        trailing = when {
+                            isPopular -> "♥ ${show.likesCount}"
+                            isPartial -> "partial"
+                            else -> null
+                        },
+                        trailingSecondary = if (isPopular && isPartial) "partial" else null,
+                        onClick = { nav.navigate("show/${show.date}") }
+                    )
+                }
+            }
         }
     }
 }
@@ -518,30 +506,24 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
 
     Column(Modifier.fillMaxSize()) {
         Header(date, nav)
-        when (val r = show.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { s ->
-                    val playable = s.tracks.filter { it.playable }
-                    // A finished show's stored position is the end of the encore, so
-                    // offering to resume it would just stop again immediately.
-                    val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
-                    LazyColumn {
-                        item { ShowHeader(s, playable.size) }
-                        if (progress != null) {
-                            item {
-                                ResumeBanner(progress) {
-                                    vm.playShow(s, progress.trackIndex, progress.positionMs)
-                                }
-                            }
-                        }
-                        tracksGroupedBySet(playable) { index, track ->
-                            TrackRow(track, index + 1, date) { vm.playShow(s, index, 0) }
+        Loaded(show.value) { s ->
+            val playable = s.tracks.filter { it.playable }
+            // A finished show's stored position is the end of the encore, so
+            // offering to resume it would just stop again immediately.
+            val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
+            LazyColumn {
+                item { ShowHeader(s, playable.size) }
+                if (progress != null) {
+                    item {
+                        ResumeBanner(progress) {
+                            vm.playShow(s, progress.trackIndex, progress.positionMs)
                         }
                     }
-                },
-                onFailure = { ErrorText(it) }
-            )
+                }
+                tracksGroupedBySet(playable) { index, track ->
+                    TrackRow(track, index + 1, date) { vm.playShow(s, index, 0) }
+                }
+            }
         }
     }
 }
@@ -560,34 +542,28 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
         Header(loaded.value?.getOrNull()?.first?.name ?: artistId, nav, trailing = {
             loaded.value?.getOrNull()?.first?.let { FavoriteButton(it) }
         })
-        when (val r = loaded.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { (_, periods) ->
-                    LazyColumn {
-                        // Newest first, matching the phish.in years screen.
-                        items(periods.sortedByDescending { it.label }, key = { it.id }) { period ->
-                            RowItem(
-                                title = period.label,
-                                subtitle = if (period.id == POPULAR_PERIOD_ID) POPULAR_PERIOD_SUBTITLE
-                                    else "${period.showCount} ${plural(period.showCount, "show")}",
-                                artUrl = period.artUrl,
-                                onClick = {
-                                    // Phish keeps its own show/track screens so likes and the
-                                    // "partial" audio badge — features Relisten has no
-                                    // analogue for — still work.
-                                    if (backend == Backend.PHISHIN) {
-                                        nav.navigate("shows/${period.id}")
-                                    } else {
-                                        nav.navigate("artist/$backendId/$artistId/${period.id}")
-                                    }
-                                }
-                            )
+        Loaded(loaded.value) { (_, periods) ->
+            LazyColumn {
+                // Newest first, matching the phish.in years screen.
+                items(periods.sortedByDescending { it.label }, key = { it.id }) { period ->
+                    RowItem(
+                        title = period.label,
+                        subtitle = if (period.id == POPULAR_PERIOD_ID) POPULAR_PERIOD_SUBTITLE
+                            else "${period.showCount} ${plural(period.showCount, "show")}",
+                        artUrl = period.artUrl,
+                        onClick = {
+                            // Phish keeps its own show/track screens so likes and the
+                            // "partial" audio badge — features Relisten has no
+                            // analogue for — still work.
+                            if (backend == Backend.PHISHIN) {
+                                nav.navigate("shows/${period.id}")
+                            } else {
+                                nav.navigate("artist/$backendId/$artistId/${period.id}")
+                            }
                         }
-                    }
-                },
-                onFailure = { ErrorText(it) }
-            )
+                    )
+                }
+            }
         }
     }
 }
@@ -619,50 +595,44 @@ fun ArtistShowsScreen(
 
     Column(Modifier.fillMaxSize()) {
         Header(loaded.value?.getOrNull()?.second?.label ?: periodId, nav)
-        when (val r = loaded.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { (_, _, shows) ->
-                    val ordered = if (sortByRating) shows.sortedByDescending { it.rating } else shows
-                    LazyColumn {
+        Loaded(loaded.value) { (_, _, shows) ->
+            val ordered = if (sortByRating) shows.sortedByDescending { it.rating } else shows
+            LazyColumn {
+                item {
+                    LazyRow(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    ) {
                         item {
-                            LazyRow(
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(vertical = 8.dp),
-                            ) {
-                                item {
-                                    FilterChip(
-                                        selected = !sortByRating,
-                                        onClick = { sortByRating = false },
-                                        label = { Text("Date") },
-                                    )
-                                }
-                                item {
-                                    FilterChip(
-                                        selected = sortByRating,
-                                        onClick = { sortByRating = true },
-                                        label = { Text("Top rated") },
-                                    )
-                                }
-                            }
+                            FilterChip(
+                                selected = !sortByRating,
+                                onClick = { sortByRating = false },
+                                label = { Text("Date") },
+                            )
                         }
-                        items(ordered, key = { it.date }) { show ->
-                            val hasRating = show.rating > 0
-                            val tapesLabel = if (show.recordingCount > 1) "${show.recordingCount} tapes" else null
-                            RowItem(
-                                title = show.date,
-                                subtitle = show.where,
-                                artUrl = show.artUrl,
-                                trailing = if (hasRating) "★ ${"%.1f".format(show.rating)}" else tapesLabel,
-                                trailingSecondary = if (hasRating) tapesLabel else null,
-                                onClick = { nav.navigate("recording/$backendId/$artistId/${show.date}") }
+                        item {
+                            FilterChip(
+                                selected = sortByRating,
+                                onClick = { sortByRating = true },
+                                label = { Text("Top rated") },
                             )
                         }
                     }
-                },
-                onFailure = { ErrorText(it) }
-            )
+                }
+                items(ordered, key = { it.date }) { show ->
+                    val hasRating = show.rating > 0
+                    val tapesLabel = if (show.recordingCount > 1) "${show.recordingCount} tapes" else null
+                    RowItem(
+                        title = show.date,
+                        subtitle = show.where,
+                        artUrl = show.artUrl,
+                        trailing = if (hasRating) "★ ${"%.1f".format(show.rating)}" else tapesLabel,
+                        trailingSecondary = if (hasRating) tapesLabel else null,
+                        onClick = { nav.navigate("recording/$backendId/$artistId/${show.date}") }
+                    )
+                }
+            }
         }
     }
 }
@@ -697,34 +667,28 @@ fun RecordingScreen(
 
     Column(Modifier.fillMaxSize()) {
         Header(date, nav)
-        when (val r = loaded.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { (detail, progress) ->
-                    // Keyed on detail, which is a fresh instance exactly once per navigation
-                    // here (produceState only re-runs when the Triple key above changes) — so
-                    // this fires once per switch rather than on every recomposition.
-                    LaunchedEffect(detail) {
-                        if (resumeIndex != null && detail.tracks.isNotEmpty()) {
-                            vm.playRecording(detail, resumeIndex.coerceIn(0, detail.tracks.lastIndex), resumeMs ?: 0)
+        Loaded(loaded.value) { (detail, progress) ->
+            // Keyed on detail, which is a fresh instance exactly once per navigation
+            // here (produceState only re-runs when the Triple key above changes) — so
+            // this fires once per switch rather than on every recomposition.
+            LaunchedEffect(detail) {
+                if (resumeIndex != null && detail.tracks.isNotEmpty()) {
+                    vm.playRecording(detail, resumeIndex.coerceIn(0, detail.tracks.lastIndex), resumeMs ?: 0)
+                }
+            }
+            LazyColumn {
+                item { RecordingHeader(detail, backendId, artistId, date, vm, nav) }
+                if (progress != null) {
+                    item {
+                        ResumeBanner(progress) {
+                            vm.playRecording(detail, progress.trackIndex, progress.positionMs)
                         }
                     }
-                    LazyColumn {
-                        item { RecordingHeader(detail, backendId, artistId, date, vm, nav) }
-                        if (progress != null) {
-                            item {
-                                ResumeBanner(progress) {
-                                    vm.playRecording(detail, progress.trackIndex, progress.positionMs)
-                                }
-                            }
-                        }
-                        groupedBySet(detail.tracks, { it.setName }, { it.id }) { index, track ->
-                            RecordingTrackRow(track, index + 1, detail.summary.artist, date) { vm.playRecording(detail, index, 0) }
-                        }
-                    }
-                },
-                onFailure = { ErrorText(it) }
-            )
+                }
+                groupedBySet(detail.tracks, { it.setName }, { it.id }) { index, track ->
+                    RecordingTrackRow(track, index + 1, detail.summary.artist, date) { vm.playRecording(detail, index, 0) }
+                }
+            }
         }
     }
 }
@@ -1232,27 +1196,21 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
         if (paired) {
             val devices = loadOnce(paired to refreshKey) { SyncSession.devices() }
             SectionHeader("Devices", divided = true)
-            when (val r = devices.value) {
-                null -> Loading()
-                else -> r.fold(
-                    onSuccess = { list ->
-                        list.forEach { device ->
-                            RowItem(
-                                title = device.name + if (device.isSelf) " (this device)" else "",
-                                subtitle = device.platform,
-                                artUrl = null,
-                                trailing = "Revoke",
-                                onClick = {
-                                    scope.launch {
-                                        runCatching { SyncSession.revoke(device.deviceId) }
-                                        refreshKey++
-                                    }
-                                }
-                            )
+            Loaded(devices.value) { list ->
+                list.forEach { device ->
+                    RowItem(
+                        title = device.name + if (device.isSelf) " (this device)" else "",
+                        subtitle = device.platform,
+                        artUrl = null,
+                        trailing = "Revoke",
+                        onClick = {
+                            scope.launch {
+                                runCatching { SyncSession.revoke(device.deviceId) }
+                                refreshKey++
+                            }
                         }
-                    },
-                    onFailure = { ErrorText(it) }
-                )
+                    )
+                }
             }
         }
     }
@@ -1263,18 +1221,12 @@ fun PlaylistsScreen(title: String, nav: NavHostController, load: suspend () -> L
     val data = loadOnce(title) { load() }
     Column(Modifier.fillMaxSize()) {
         Header(title, nav)
-        when (val r = data.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { lists ->
-                    if (lists.isEmpty()) {
-                        Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
-                    } else {
-                        LazyColumn { items(lists, key = { it.slug }) { PlaylistRow(it, nav) } }
-                    }
-                },
-                onFailure = { ErrorText(it) }
-            )
+        Loaded(data.value) { lists ->
+            if (lists.isEmpty()) {
+                Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
+            } else {
+                LazyColumn { items(lists, key = { it.slug }) { PlaylistRow(it, nav) } }
+            }
         }
     }
 }
@@ -1300,64 +1252,58 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
 
     Column(Modifier.fillMaxSize()) {
         Header("Playlist", nav)
-        when (val r = data.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { pl ->
-                    val entries = pl.entries.filter { it.track.playable }
-                    val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
-                    LazyColumn {
-                        item {
-                            Row(
-                                Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(pl.name, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-                                Text(
-                                    listOfNotNull(
-                                        pl.username?.let { "by $it" },
-                                        "${entries.size} tracks",
-                                        fmt(pl.duration),
-                                    ).joinToString(" · "),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp
-                                    )
-                                    pl.description?.takeIf { it.isNotBlank() }?.let {
-                                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp,
-                                            modifier = Modifier.padding(top = 6.dp))
-                                    }
-                                }
-                                LikeButton(Likable.Playlist, pl.id, pl.likedByUser, pl.likesCount)
-                            }
-                        }
-                        if (progress != null) {
-                            item {
-                                ResumeBanner(progress) {
-                                    vm.playPlaylist(pl, progress.trackIndex, progress.positionMs)
-                                }
-                            }
-                        }
-                        itemsIndexed(entries, key = { _, e -> "e-${e.position}-${e.track.id}" }) { i, e ->
-                            RowItem(
-                                title = e.track.title,
-                                subtitle = listOfNotNull(
-                                    e.track.showDate, e.track.venueName
-                                ).joinToString(" · "),
-                                artUrl = e.track.showAlbumCoverUrl,
-                                trailing = fmt(e.duration),
-                                trailingContent = {
-                                    LikeButton(
-                                        Likable.Track, e.track.id,
-                                        e.track.likedByUser, e.track.likesCount,
-                                    )
-                                },
-                                onClick = { vm.playPlaylist(pl, i, 0) }
+        Loaded(data.value) { pl ->
+            val entries = pl.entries.filter { it.track.playable }
+            val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
+            LazyColumn {
+                item {
+                    Row(
+                        Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(pl.name, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                        Text(
+                            listOfNotNull(
+                                pl.username?.let { "by $it" },
+                                "${entries.size} tracks",
+                                fmt(pl.duration),
+                            ).joinToString(" · "),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp
                             )
+                            pl.description?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp,
+                                    modifier = Modifier.padding(top = 6.dp))
+                            }
+                        }
+                        LikeButton(Likable.Playlist, pl.id, pl.likedByUser, pl.likesCount)
+                    }
+                }
+                if (progress != null) {
+                    item {
+                        ResumeBanner(progress) {
+                            vm.playPlaylist(pl, progress.trackIndex, progress.positionMs)
                         }
                     }
-                },
-                onFailure = { ErrorText(it) }
-            )
+                }
+                itemsIndexed(entries, key = { _, e -> "e-${e.position}-${e.track.id}" }) { i, e ->
+                    RowItem(
+                        title = e.track.title,
+                        subtitle = listOfNotNull(
+                            e.track.showDate, e.track.venueName
+                        ).joinToString(" · "),
+                        artUrl = e.track.showAlbumCoverUrl,
+                        trailing = fmt(e.duration),
+                        trailingContent = {
+                            LikeButton(
+                                Likable.Track, e.track.id,
+                                e.track.likedByUser, e.track.likesCount,
+                            )
+                        },
+                        onClick = { vm.playPlaylist(pl, i, 0) }
+                    )
+                }
+            }
         }
     }
 }
@@ -1367,31 +1313,25 @@ fun MyShowsScreen(nav: NavHostController) {
     val data = loadOnce("my-shows") { PhishInApi.likedShows() }
     Column(Modifier.fillMaxSize()) {
         Header("My shows", nav)
-        when (val r = data.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { shows ->
-                    if (shows.isEmpty()) {
-                        Text(
-                            "No liked shows yet. Like them on phish.in and they'll appear here.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
+        Loaded(data.value) { shows ->
+            if (shows.isEmpty()) {
+                Text(
+                    "No liked shows yet. Like them on phish.in and they'll appear here.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
+                )
+            } else {
+                LazyColumn {
+                    items(shows, key = { it.date }) { show ->
+                        RowItem(
+                            title = show.date,
+                            subtitle = listOfNotNull(show.venueName, show.location)
+                                .joinToString(" · "),
+                            artUrl = show.coverArtUrls?.small,
+                            onClick = { nav.navigate("show/${show.date}") }
                         )
-                    } else {
-                        LazyColumn {
-                            items(shows, key = { it.date }) { show ->
-                                RowItem(
-                                    title = show.date,
-                                    subtitle = listOfNotNull(show.venueName, show.location)
-                                        .joinToString(" · "),
-                                    artUrl = show.coverArtUrls?.small,
-                                    onClick = { nav.navigate("show/${show.date}") }
-                                )
-                            }
-                        }
                     }
-                },
-                onFailure = { ErrorText(it) }
-            )
+                }
+            }
         }
     }
 }
@@ -1401,52 +1341,46 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
     val data = loadOnce("my-tracks") { PhishInApi.likedTracks() }
     Column(Modifier.fillMaxSize()) {
         Header("My tracks", nav)
-        when (val r = data.value) {
-            null -> Loading()
-            else -> r.fold(
-                onSuccess = { tracks ->
-                    if (tracks.isEmpty()) {
-                        Text(
-                            "No liked tracks yet. Like them on phish.in and they'll appear here.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
-                        )
-                    } else {
-                        val playable = tracks.filter { it.playable }
-                        LazyColumn {
-                            item {
-                                Button(
-                                    onClick = { vm.shuffle(playable, "My tracks") },
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Icon(Icons.Default.Shuffle, null, Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Shuffle all ${playable.size}")
-                                }
-                            }
-                            items(tracks, key = { it.id }) { track ->
-                                RowItem(
-                                    title = track.title,
-                                    subtitle = listOfNotNull(
-                                        track.showDate, track.venueName, track.venueLocation
-                                    ).joinToString(" · "),
-                                    artUrl = track.showAlbumCoverUrl,
-                                    trailing = fmt(track.duration),
-                                    trailingContent = {
-                                        LikeButton(
-                                            Likable.Track, track.id,
-                                            track.likedByUser, track.likesCount,
-                                        )
-                                    },
-                                    // A single liked track plays inside its show; shuffle
-                                    // above plays the liked tracks themselves.
-                                    onClick = { vm.playTrack(track) }
-                                )
-                            }
+        Loaded(data.value) { tracks ->
+            if (tracks.isEmpty()) {
+                Text(
+                    "No liked tracks yet. Like them on phish.in and they'll appear here.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
+                )
+            } else {
+                val playable = tracks.filter { it.playable }
+                LazyColumn {
+                    item {
+                        Button(
+                            onClick = { vm.shuffle(playable, "My tracks") },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Shuffle, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Shuffle all ${playable.size}")
                         }
                     }
-                },
-                onFailure = { ErrorText(it) }
-            )
+                    items(tracks, key = { it.id }) { track ->
+                        RowItem(
+                            title = track.title,
+                            subtitle = listOfNotNull(
+                                track.showDate, track.venueName, track.venueLocation
+                            ).joinToString(" · "),
+                            artUrl = track.showAlbumCoverUrl,
+                            trailing = fmt(track.duration),
+                            trailingContent = {
+                                LikeButton(
+                                    Likable.Track, track.id,
+                                    track.likedByUser, track.likesCount,
+                                )
+                            },
+                            // A single liked track plays inside its show; shuffle
+                            // above plays the liked tracks themselves.
+                            onClick = { vm.playTrack(track) }
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1874,6 +1808,28 @@ private fun ErrorText(t: Throwable) {
         color = MaterialTheme.colorScheme.error,
         modifier = Modifier.padding(16.dp)
     )
+}
+
+/** Collapses the load/loading/error scaffold every detail screen repeats: nothing while
+ *  [result] is in flight (null), [ErrorText] on failure, [content] once it resolves. */
+@Composable
+private fun <T> Loaded(result: Result<T>?, content: @Composable (T) -> Unit) {
+    when (result) {
+        null -> Loading()
+        else -> result.fold(onSuccess = { content(it) }, onFailure = { ErrorText(it) })
+    }
+}
+
+/** [Loaded]'s form for a section embedded in a longer [androidx.compose.foundation.lazy.LazyListScope.item]
+ *  list, which can't wrap itself in its own [Loading]/[ErrorText] outside the list. */
+private fun <T> androidx.compose.foundation.lazy.LazyListScope.loaded(
+    result: Result<T>?,
+    content: androidx.compose.foundation.lazy.LazyListScope.(T) -> Unit,
+) {
+    when (result) {
+        null -> item { Loading() }
+        else -> result.fold(onSuccess = { content(it) }, onFailure = { item { ErrorText(it) } })
+    }
 }
 
 // ---------------------------------------------------------------- helpers
