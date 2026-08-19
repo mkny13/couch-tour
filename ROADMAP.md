@@ -76,8 +76,9 @@ currently queued up next for sync specifically; future work here will start a fr
 
 Filed as GitHub issues #9-28 (Android/general) plus #25 (desktop UI) and #26 (security
 review). Six phases, organized around the Play Store release and the real dependencies
-between items (favorite artists unlocks two others; the source-picker rework should land
-before the comparison UI that builds on it):
+between items (favorite artists unlocks two others). The source/tape cluster was pushed to
+lowest priority — #17, the part it was gating, already shipped, so nothing downstream is
+blocked on the rest of it landing soon:
 
 1. **Release gates** — #26 (security review of `sync/` and both clients' credential storage,
    run before more surface area is added, especially to the sync backend). #23
@@ -86,21 +87,21 @@ before the comparison UI that builds on it):
 2. **Quick wins — done.** #19 (share a show/track), #20 ("surprise me"), #21 (browse by top
    rated/popular — trending is still open, see the Feature ideas entry). #30 (extract the
    ten-screen repeated load/loading/error scaffold in `MainActivity.kt`) was filed once this
-   phase landed, deliberately sequenced to pay for itself before phase 4 adds more screens.
-3. **Source/tape cluster, in order** — #17 (rework "switch tape" into a Source picker) is
-   done on Android. Next: #24 (comparison, ratings, preferred tapers — explicitly builds on
-   #17, now unblocked) → #18 (source/show volume leveling, independent but adjacent).
-4. **Personal library cluster** — #14 (favorite artists, blocks #13 and #22) → #11 (likes for
+   phase landed, deliberately sequenced to pay for itself before phase 3 adds more screens.
+3. **Personal library cluster** — #14 (favorite artists, blocks #13 and #22) → #11 (likes for
    Relisten tracks) → #12 (playlists spanning both backends — shares its storage layer with
    #11) → #13 (on-this-date playlist) → #22 (next Couch Tour stop).
-5. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
+4. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
    seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` are each
    small and worth pulling forward.
-6. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
+5. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
    (Spotify Live) — each is a new surface rather than a feature on an existing one; #16 and
    #15 also carry ToS/API risk worth resolving before writing code, and #15's approach-
    Relisten's-operators prerequisite (below) applies to this whole phase before a store
    release.
+6. **Source/tape cluster (lowest priority)** — #17 (rework "switch tape" into a Source
+   picker) is done on Android. What's left: #24 (comparison, ratings, preferred tapers —
+   explicitly builds on #17) → #18 (source/show volume leveling, independent but adjacent).
 
 Not yet filed as issues, since they're implementation-detail follow-ups rather than
 user-facing features: a real catalog cache beyond the single `@Volatile`-cached artist list,
