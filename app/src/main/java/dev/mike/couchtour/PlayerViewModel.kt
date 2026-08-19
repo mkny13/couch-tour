@@ -28,6 +28,9 @@ data class PlayerState(
     val waveformUrl: String? = null,
     val positionMs: Long = 0,
     val durationMs: Long = 0,
+    /** Index into the current queue — what the source picker reads to carry a mid-track
+     *  position across a source switch (#17). */
+    val trackIndex: Int = 0,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -73,6 +76,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             waveformUrl = meta?.extras?.getString(Keys.WAVEFORM),
             positionMs = c.currentPosition.coerceAtLeast(0),
             durationMs = c.duration.coerceAtLeast(0),
+            trackIndex = c.currentMediaItemIndex,
         )
     }
 

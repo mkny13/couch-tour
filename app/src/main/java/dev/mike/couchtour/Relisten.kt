@@ -206,12 +206,14 @@ internal fun RelistenShowSummary.toShowSummary(artist: ArtistRef) = ShowSummary(
 
 internal fun RelistenSource.toRecordingRef() = RecordingRef(
     id = uuid,
-    label = taper ?: if (isSoundboard) "Soundboard" else "Audience",
+    // Relisten sends "" rather than omitting the field on plenty of sources — blank, not
+    // just null, has to fall through to the SBD/AUD label or every one of them shows empty.
+    label = taper?.takeIf { it.isNotBlank() } ?: if (isSoundboard) "Soundboard" else "Audience",
     isSoundboard = isSoundboard,
     rating = avgRatingWeighted,
     reviewCount = numReviews,
-    taper = taper,
-    lineage = lineage,
+    taper = taper?.takeIf { it.isNotBlank() },
+    lineage = lineage?.takeIf { it.isNotBlank() },
 )
 
 internal fun RelistenSourceTrack.toPlayableTrack(artist: ArtistRef, showDate: String, venueName: String?, setName: String) =

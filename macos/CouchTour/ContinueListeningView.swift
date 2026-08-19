@@ -75,8 +75,11 @@ struct ProgressRow: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text(row.title)
+            Text(row.artist.isEmpty ? row.title : "\(row.artist) · \(row.title)")
             Text(row.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(row.trackTitle)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(relativeTime(row.updatedAt))
