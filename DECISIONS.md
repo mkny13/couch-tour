@@ -1560,3 +1560,30 @@ query params, and `PhishInSource.periods()`/`.shows()` routing the synthetic per
 correctly). Both browse surfaces were also driven live end-to-end on the `phishin_test`
 emulator, not just unit-tested: Phish → Popular shows Big Cypress '99 (428 likes) first, and
 Grateful Dead → 1995 → Top rated re-sorts around a real 10.0.
+
+**D150 — Likes for Relisten tracks (#11) are local-only, following #14's favorites pattern
+rather than phish.in's `LikeButton`.** phish.in's existing `LikeButton` (MainActivity.kt) is
+gated on a signed-in `Session.username` and calls `PhishInApi.like`/`.unlike` with a `Long`
+id against a server-side, public `likesCount` — none of that holds for Relisten, which has no
+account system, no server-side likes, and a `String` (`uuid`) track id
+(`PlayableTrack.id`). Rather than bend `LikeButton`/`Likable`/`PhishInApi` to fit, this adds a
+second, Relisten-only store, `LikedTracks` (LikedTracks.kt) — a `SharedPreferences`-backed
+`Set<String>` of track ids with a `MutableStateFlow`, `init(context)` called from
+`CouchTourApp.onCreate()` alongside `Favorites.init` — and a plain heart `IconButton`
+(`LikeTrackButton`) on `RecordingTrackRow`, where phish.in's own `LikeButton` already lives on
+its equivalent (`TrackRow`).
+
+Scope was deliberately kept to track-row screens that already hold a `PlayableTrack`, not
+extended into `PlayerState`/`NowPlayingScreen`: the issue and ROADMAP.md both flag that
+`PlayerState` (PlayerViewModel.kt) carries no track id or liked-state field at all today, so
+*neither* backend's likes show up on Now Playing — that gap predates this change and isn't
+specific to Relisten. Closing it means adding a track id (and, per backend, its liked state)
+to `PlayerState` and reading it from both `LikeButton` and `LikedTracks`, which is real,
+separable work; folding it into this pass would have mixed a wiring change with a new
+account-free feature. Left as the open ROADMAP.md follow-up it already was.
+
+`LikedTracks`'s shape — a settable/queryable `Set<String>` of track keys — is deliberately the
+same as `Favorites`'s, since #12 (cross-backend playlists) is expected to share this storage
+layer per ROADMAP.md; #12 can build on it as-is rather than needing rework.
+Tested the same way as `Favorites` (`LikedTracksTest.kt`, Robolectric + `ApplicationProvider`):
+toggle on/off, and persistence across a fresh `init` on the same context.

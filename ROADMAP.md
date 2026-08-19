@@ -113,8 +113,14 @@ liked state).
 
 - Google TV app. (#9)
 - Cast from desktop. (#10)
-- Likes for Relisten tracks — mirror phish.in's built-in like functionality, which today only
-  covers phish.in tracks. (#11)
+- ~~Likes for Relisten tracks~~ — shipped (#11). Local-only, mirroring #14's favorites
+  pattern rather than phish.in's account-gated `LikeButton`: no account, no server round-trip,
+  no public count, just a `LikedTracks` `SharedPreferences` set of `PlayableTrack.id`s (the
+  Relisten track `uuid`), with a heart toggle on `RecordingTrackRow` (where phish.in's own
+  `LikeButton` already lives, e.g. `TrackRow`). Scoped to track rows that already hold a
+  `PlayableTrack`; the Now Playing screen still has no like button of any kind, phish.in or
+  Relisten — that's the open `PlayerState` gap noted below, left as a follow-up rather than
+  folded into this pass.
 - Playlists: create and save playlists for Relisten tracks, similar to phish.in's playlist
   feature; playlists should be able to mix phish.in and Relisten tracks together. (#12)
 - Home screen "on this date" playlist — a random selection of shows played by the user's
@@ -187,5 +193,7 @@ Detailed in [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) (O3–O5):
 - Relisten shows have no artwork (`RelistenShowSummary.toShowSummary` sets no `artUrl`), so
   every non-Phish show falls back to a plain `primaryContainer` background in the player
   (D92) and a placeholder icon everywhere else.
-- The Now Playing screen (D92) has no like button — `LikeButton` needs a track id and liked
-  state that `PlayerState` doesn't carry today, and only phish.in tracks are likable at all.
+- The Now Playing screen (D92) has no like button for either backend — `LikeButton` and
+  `LikedTracks` (#11) both need a track id and liked state that `PlayerState` doesn't carry
+  today; likes only work today from the track-row screens that already hold a `Track` or
+  `PlayableTrack` directly.
