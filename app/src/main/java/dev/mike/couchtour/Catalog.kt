@@ -63,6 +63,10 @@ data class ShowSummary(
     /** Some of the audio is missing. phish.in's `audio_status`; Relisten has no analogue. */
     val partial: Boolean = false,
     val recordingCount: Int = 1,
+    /** Relisten's `avg_rating` (0-10), fetched free alongside the rest of a period's shows —
+     *  there's no per-show equivalent on phish.in, where popularity means [Show.likesCount]
+     *  and is queried server-side instead (see [POPULAR_PERIOD_ID]). */
+    val rating: Double = 0.0,
 ) {
     /** "McNichols Arena · Denver, CO" */
     val where: String get() = listOfNotNull(venue, location).joinToString(" · ")
@@ -261,6 +265,20 @@ suspend fun searchAll(term: String): SearchHits = coroutineScope {
 val PHISH = ArtistRef(Backend.PHISHIN, "phish", "Phish")
 
 /**
+ * A synthetic [PeriodRef.id], not a real year — [PhishInSource.periods] prepends it so
+ * "Popular" (#21) rides the same periods()/shows() seam MainActivity and Android Auto's
+ * browse tree already consume, rather than a one-off screen bolted on beside it. "Popular"
+ * sorts ahead of every numeric year label when a caller orders periods by label descending
+ * (`'P' > '9'`), so no separate pinning logic is needed to keep it first.
+ */
+const val POPULAR_PERIOD_ID = "popular"
+const val POPULAR_PERIOD_LABEL = "Popular"
+/** What every UI shows in place of a show count for [POPULAR_PERIOD_ID] — it has none of
+ *  its own, unlike a real year (MainActivity.kt's `ArtistScreen`, PlaybackService.kt's
+ *  `yearsChildren`/`artistPeriodsChildren` all render this rather than "0 shows"). */
+const val POPULAR_PERIOD_SUBTITLE = "Top rated by likes"
+
+/**
  * Adapts the existing [PhishInApi] to the seam. Deliberately thin: it reuses the client
  * untouched, including the period/year-range branch and the audio filtering, so nothing
  * about the Phish path changes and none of the existing tests move.
@@ -270,11 +288,12 @@ object PhishInSource : MusicSource {
 
     override suspend fun artists() = listOf(PHISH)
 
-    override suspend fun periods(artist: ArtistRef) =
-        PhishInApi.years().map { it.toPeriodRef() }
+    override suspend fun periods(artist: ArtistRef): List<PeriodRef> =
+        listOf(PeriodRef(POPULAR_PERIOD_ID, POPULAR_PERIOD_LABEL)) + PhishInApi.years().map { it.toPeriodRef() }
 
-    override suspend fun shows(artist: ArtistRef, period: PeriodRef) =
-        PhishInApi.showsForPeriod(period.id).map { it.toShowSummary() }
+    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> =
+        if (period.id == POPULAR_PERIOD_ID) PhishInApi.popularShows().map { it.toShowSummary() }
+        else PhishInApi.showsForPeriod(period.id).map { it.toShowSummary() }
 
     override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) =
         PhishInApi.show(date).toShowDetail()

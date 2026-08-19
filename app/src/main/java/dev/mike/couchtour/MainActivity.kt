@@ -435,22 +435,31 @@ private fun SurpriseMeButton(artists: List<ArtistRef>, nav: NavHostController) {
 
 @Composable
 fun ShowsScreen(period: String, nav: NavHostController) {
-    val shows = loadOnce(period) { PhishInApi.showsForPeriod(period) }
+    val isPopular = period == POPULAR_PERIOD_ID
+    val shows = loadOnce(period) {
+        if (isPopular) PhishInApi.popularShows() else PhishInApi.showsForPeriod(period)
+    }
 
     Column(Modifier.fillMaxSize()) {
-        Header(period, nav)
+        Header(if (isPopular) POPULAR_PERIOD_LABEL else period, nav)
         when (val r = shows.value) {
             null -> Loading()
             else -> r.fold(
                 onSuccess = { list ->
                     LazyColumn {
                         items(list, key = { it.date }) { show ->
+                            val isPartial = show.audioStatus == "partial"
                             RowItem(
                                 title = show.date,
                                 subtitle = listOfNotNull(show.venueName, show.location)
                                     .joinToString(" · "),
                                 artUrl = show.coverArtUrls?.small,
-                                trailing = if (show.audioStatus == "partial") "partial" else null,
+                                trailing = when {
+                                    isPopular -> "♥ ${show.likesCount}"
+                                    isPartial -> "partial"
+                                    else -> null
+                                },
+                                trailingSecondary = if (isPopular && isPartial) "partial" else null,
                                 onClick = { nav.navigate("show/${show.date}") }
                             )
                         }
@@ -518,7 +527,8 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
                         items(periods.sortedByDescending { it.label }, key = { it.id }) { period ->
                             RowItem(
                                 title = period.label,
-                                subtitle = "${period.showCount} ${plural(period.showCount, "show")}",
+                                subtitle = if (period.id == POPULAR_PERIOD_ID) POPULAR_PERIOD_SUBTITLE
+                                    else "${period.showCount} ${plural(period.showCount, "show")}",
                                 artUrl = period.artUrl,
                                 onClick = {
                                     // Phish keeps its own show/track screens so likes and the
@@ -560,6 +570,10 @@ fun ArtistShowsScreen(
             ?: source.periods(artist).firstOrNull { it.id == periodId } ?: error("Unknown period $periodId")
         Triple(artist, period, source.shows(artist, period))
     }
+    // Relisten's shows list already carries avg_rating (confirmed live, #21) — sorting here
+    // is free, no extra fetch, which is why this is scoped to a period already drilled into
+    // rather than a global "top rated" browse like phish.in's.
+    var sortByRating by rememberSaveable(periodId) { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         Header(loaded.value?.getOrNull()?.second?.label ?: periodId, nav)
@@ -567,13 +581,39 @@ fun ArtistShowsScreen(
             null -> Loading()
             else -> r.fold(
                 onSuccess = { (_, _, shows) ->
+                    val ordered = if (sortByRating) shows.sortedByDescending { it.rating } else shows
                     LazyColumn {
-                        items(shows, key = { it.date }) { show ->
+                        item {
+                            LazyRow(
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            ) {
+                                item {
+                                    FilterChip(
+                                        selected = !sortByRating,
+                                        onClick = { sortByRating = false },
+                                        label = { Text("Date") },
+                                    )
+                                }
+                                item {
+                                    FilterChip(
+                                        selected = sortByRating,
+                                        onClick = { sortByRating = true },
+                                        label = { Text("Top rated") },
+                                    )
+                                }
+                            }
+                        }
+                        items(ordered, key = { it.date }) { show ->
+                            val hasRating = show.rating > 0
+                            val tapesLabel = if (show.recordingCount > 1) "${show.recordingCount} tapes" else null
                             RowItem(
                                 title = show.date,
                                 subtitle = show.where,
                                 artUrl = show.artUrl,
-                                trailing = if (show.recordingCount > 1) "${show.recordingCount} tapes" else null,
+                                trailing = if (hasRating) "★ ${"%.1f".format(show.rating)}" else tapesLabel,
+                                trailingSecondary = if (hasRating) tapesLabel else null,
                                 onClick = { nav.navigate("recording/$backendId/$artistId/${show.date}") }
                             )
                         }

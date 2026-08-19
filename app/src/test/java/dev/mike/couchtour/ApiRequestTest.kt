@@ -190,6 +190,19 @@ class ApiRequestTest {
     }
 
     @Test
+    fun `popular shows sorts by likes rather than date, and is not scoped to a year`() = runBlocking {
+        enqueue("""{"shows":[]}""")
+
+        PhishInApi.popularShows()
+
+        val url = take().requestUrl!!
+        assertEquals("likes_count:desc", url.queryParameter("sort"))
+        assertEquals("complete_or_partial", url.queryParameter("audio_status"))
+        assertNull(url.queryParameter("year"))
+        assertNull(url.queryParameter("year_range"))
+    }
+
+    @Test
     fun `puts the show date in the path`() = runBlocking {
         enqueue("""{"date":"1997-02-13"}""")
 
@@ -199,6 +212,40 @@ class ApiRequestTest {
             listOf("api", "v2", "shows", "1997-02-13"),
             take().requestUrl!!.pathSegments
         )
+    }
+
+    // ------------------------------------------------------- popular (MusicSource seam)
+
+    @Test
+    fun `PhishInSource prepends a synthetic Popular period ahead of every year`() = runBlocking {
+        enqueue("""[{"period":"1997","shows_with_audio_count":81}]""")
+
+        val periods = PhishInSource.periods(PHISH)
+
+        assertEquals(listOf(POPULAR_PERIOD_ID, "1997"), periods.map { it.id })
+        assertEquals("Popular", periods.first().label)
+    }
+
+    @Test
+    fun `PhishInSource routes the Popular period to the popular-shows endpoint, not showsForPeriod`() = runBlocking {
+        enqueue("""{"shows":[{"date":"1999-12-31"}]}""")
+
+        val shows = PhishInSource.shows(PHISH, PeriodRef(POPULAR_PERIOD_ID, "Popular"))
+
+        assertEquals("likes_count:desc", take().requestUrl!!.queryParameter("sort"))
+        assertEquals(listOf("1999-12-31"), shows.map { it.date })
+    }
+
+    @Test
+    fun `PhishInSource routes an ordinary period to showsForPeriod, unaffected by the seam`() = runBlocking {
+        enqueue("""{"shows":[{"date":"1997-11-17"}]}""")
+
+        val shows = PhishInSource.shows(PHISH, PeriodRef("1997", "1997"))
+
+        val url = take().requestUrl!!
+        assertEquals("1997", url.queryParameter("year"))
+        assertEquals("date:asc", url.queryParameter("sort"))
+        assertEquals(listOf("1997-11-17"), shows.map { it.date })
     }
 
     // ---------------------------------------------------------------- search

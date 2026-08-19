@@ -419,7 +419,12 @@ class PlaybackService : MediaLibraryService() {
             browsableItem(
                 id = BrowseNode.ArtistPeriod(node.backend, node.artistId, period.id).id,
                 title = period.label,
-                subtitle = "${period.showCount} ${plural(period.showCount, "show")}",
+                // periods() is the same seam yearsChildren's own "Popular" entry rides
+                // (D158) — this generic path doesn't special-case it today (Auto's own
+                // "Artists" root never lists Phish, per artistsChildren below), but a period
+                // with a real showCount of 0 must not read the same as one with none.
+                subtitle = if (period.id == POPULAR_PERIOD_ID) POPULAR_PERIOD_SUBTITLE
+                    else "${period.showCount} ${plural(period.showCount, "show")}",
                 artUri = period.artUrl,
             )
         }
@@ -460,8 +465,13 @@ class PlaybackService : MediaLibraryService() {
             )
         }
 
-    private suspend fun yearsChildren(): List<MediaItem> =
-        PhishInApi.years().map { period ->
+    private suspend fun yearsChildren(): List<MediaItem> {
+        val popular = browsableItem(
+            id = BrowseNode.Year(POPULAR_PERIOD_ID).id,
+            title = POPULAR_PERIOD_LABEL,
+            subtitle = POPULAR_PERIOD_SUBTITLE,
+        )
+        val years = PhishInApi.years().map { period ->
             browsableItem(
                 id = BrowseNode.Year(period.period).id,
                 title = period.period,
@@ -469,13 +479,20 @@ class PlaybackService : MediaLibraryService() {
                 artUri = period.coverArtUrls?.medium,
             )
         }
+        return listOf(popular) + years
+    }
 
     /**
      * Most periods are one continuous run with a single (or no) tour name, so the year opens
      * straight onto its shows. Early, multi-tour years — several of the ranged periods like
      * "1983-1987" cover more than one — get an extra layer of tour nodes instead.
+     *
+     * [POPULAR_PERIOD_ID] (#21) short-circuits straight to a flat show list: its shows span
+     * every year, so grouping by tour name the way a real year does would produce a folder
+     * per show instead of a handful of tours.
      */
     private suspend fun yearChildren(period: String): List<MediaItem> {
+        if (period == POPULAR_PERIOD_ID) return PhishInApi.popularShows().map { showItem(it) }
         val shows = PhishInApi.showsForPeriod(period)
         val tourNames = shows.mapNotNull { it.tourName }.distinct()
         if (tourNames.size <= 1) return shows.map { showItem(it) }
