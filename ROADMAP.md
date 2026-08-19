@@ -87,9 +87,9 @@ before the comparison UI that builds on it):
    rated/popular — trending is still open, see the Feature ideas entry). #30 (extract the
    ten-screen repeated load/loading/error scaffold in `MainActivity.kt`) was filed once this
    phase landed, deliberately sequenced to pay for itself before phase 4 adds more screens.
-3. **Source/tape cluster, in order** — #17 (rework "switch tape" into a Source picker) →
-   #24 (comparison, ratings, preferred tapers — explicitly builds on #17) → #18 (source/show
-   volume leveling, independent but adjacent).
+3. **Source/tape cluster, in order** — #17 (rework "switch tape" into a Source picker) is
+   done on Android. Next: #24 (comparison, ratings, preferred tapers — explicitly builds on
+   #17, now unblocked) → #18 (source/show volume leveling, independent but adjacent).
 4. **Personal library cluster** — #14 (favorite artists, blocks #13 and #22) → #11 (likes for
    Relisten tracks) → #12 (playlists spanning both backends — shares its storage layer with
    #11) → #13 (on-this-date playlist) → #22 (next Couch Tour stop).
@@ -125,8 +125,12 @@ liked state).
   needed. (#15)
 - YouTube video support — playable as video or audio-only, ideally with a toggle between the
   two. (#16)
-- "Switch tape" rework: relabel to "Source" to match etree usage, include source details
-  (taper, lineage, etc.), and highlight SBD and matrix sources. (#17)
+- ~~"Switch tape" rework~~ — shipped on Android (#17). Relabeled to "Source" (etree
+  terminology); a `ModalBottomSheet` replaced the single-line `DropdownMenu` so each row can
+  show taper, lineage, rating, and review count; SBD sources get a badge, and a lineage/taper
+  substring match for "matrix" gets a second one (marked "?" since Relisten has no structured
+  matrix flag). Switching sources mid-playback carries the position to the same track index
+  on the new source. Desktop (macOS) still has the old tape switcher — see #25.
 - Source/show-level volume leveling — not traditional per-track leveling, but matching
   average sound levels across quiet and loud recordings so different sources/shows play back
   at comparable volume. (#18)
