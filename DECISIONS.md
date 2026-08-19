@@ -1507,3 +1507,56 @@ item in the Home screen's list — always the first thing visible below the sear
 
 See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
 next.
+
+## Iteration 32 — browse shows by top rated / popular (#21, D158-D159)
+
+### D158 — the two backends' data shapes are genuinely asymmetric, so the two browse surfaces are too
+
+phish.in's `/shows` endpoint already sorts server-side (`sort=likes_count:desc`, confirmed
+live), so "Popular" is one query with a different sort param — no client-side work at all.
+Relisten's per-tape rating (`RelistenSource.avgRatingWeighted`) is one fetch per show, which
+doesn't scale to a global "top rated" browse, so the two features aren't the same shape and
+weren't forced into one.
+
+Implemented as a synthetic period rather than a new screen: `PhishInSource.periods()`
+prepends `PeriodRef(POPULAR_PERIOD_ID, "Popular")` ahead of the real years (Catalog.kt),
+so "Popular" rides the same `periods()`/`shows()` seam MainActivity's `ArtistScreen` and
+Android Auto's `yearsChildren`/`yearChildren` already consume, rather than a one-off route
+bolted on beside it. `"Popular" > "2024"` lexicographically (`'P' > '9'`), so it sorts first
+wherever periods are ordered by label descending, with no separate pinning logic. Auto's
+`yearChildren` short-circuits the popular id straight to a flat show list rather than the
+usual tour-grouping branch — grouping ~100 shows spanning 30-some years by tour name would
+produce close to one folder per show, not the handful of tours a real year produces.
+
+### D159 — Relisten's shows list carries `avg_rating` and `popularity` for free; only the first is used this pass
+
+The issue that opened this work assumed Relisten had no bulk-rated endpoint and rating lived
+only on `RelistenSource` (fetched per show, one round trip each) — reasonable, since that's
+all `RelistenShowSummary` (Relisten.kt) captured, and `ignoreUnknownKeys` had been silently
+dropping the rest. Checking the live API (`/v3/artists/{uuid}/years/{yearUuid}`) directly
+found otherwise: every show in a year's list already carries `avg_rating` (0-10, populated
+for the near-totality of shows checked) and a `popularity` object — `momentum_score`,
+`trend_ratio`, and a `hot_score` per 48h/7d/30d window. Both ride along in the exact fetch
+`ArtistShowsScreen` already makes; sorting by either costs nothing extra.
+
+Only `avg_rating` shipped this pass, as a Date/Top rated toggle (`FilterChip` row, matching
+the pattern `SearchResultsList`'s artist chips already established) on `ArtistShowsScreen` —
+scoped to a period already drilled into, same as the issue's own fallback suggestion, except
+it turned out to need no bounding at all since the data was already in hand. `popularity` was
+deliberately left unused: which window makes a good "trending" signal is a real product
+call (48h swings on tour-opener hype vs. 30d for something more stable), not a decision to
+make silently inside an unrelated PR, and phish.in has no equivalent recency-weighted number
+against it (`likes_count` is a raw, unweighted total) — a Relisten-only "Trending" mode would
+be another backend asymmetry to justify. Left concrete for a follow-up (field names,
+`RelistenSourceSet` reasoning, ROADMAP.md's #21 entry) rather than re-flagged as "no data
+source", which is what the original issue text assumed and is no longer true.
+
+`RelistenShowSummary.avgRating` maps straight to a new `ShowSummary.rating` (Catalog.kt,
+default `0.0` — meaningless for phish.in, which has no per-show rating concept). Pinned
+against the real `relisten_year.json` fixture already in the test suite, which turned out to
+already contain the field: Cornell 5/8/77 rates `9.438597` (`RelistenParsingTest`).
+Request-shape coverage for the phish.in side lives in `ApiRequestTest` (`popularShows()`'s
+query params, and `PhishInSource.periods()`/`.shows()` routing the synthetic period
+correctly). Both browse surfaces were also driven live end-to-end on the `phishin_test`
+emulator, not just unit-tested: Phish → Popular shows Big Cypress '99 (428 likes) first, and
+Grateful Dead → 1995 → Top rated re-sorts around a real 10.0.

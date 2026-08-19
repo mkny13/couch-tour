@@ -62,13 +62,19 @@ data class RelistenTour(
     val name: String? = null,
 )
 
-/** A show as it appears in a year's `shows` list — no sources, just enough to browse. */
+/** A show as it appears in a year's `shows` list — no sources, just enough to browse.
+ *  [avgRating] (0-10) is a genuine field on this endpoint, confirmed live (#21) — the show
+ *  detail endpoint's per-source `avg_rating_weighted` was long assumed to be the only place
+ *  Relisten exposes rating, which would have made "top rated" require a fetch per show. It
+ *  doesn't: this list already carries it, so sorting a period's shows by rating costs nothing
+ *  beyond the fetch the browse screen makes anyway. */
 @Serializable
 data class RelistenShowSummary(
     @SerialName("display_date") val displayDate: String,
     val venue: RelistenVenue? = null,
     val tour: RelistenTour? = null,
     @SerialName("source_count") val sourceCount: Int = 0,
+    @SerialName("avg_rating") val avgRating: Double = 0.0,
 )
 
 /** `/v3/artists/{artistUuid}/years/{yearUuid}` */
@@ -195,6 +201,7 @@ internal fun RelistenShowSummary.toShowSummary(artist: ArtistRef) = ShowSummary(
     location = venue?.location,
     tourName = tour?.name,
     recordingCount = sourceCount.coerceAtLeast(1),
+    rating = avgRating,
 )
 
 internal fun RelistenSource.toRecordingRef() = RecordingRef(

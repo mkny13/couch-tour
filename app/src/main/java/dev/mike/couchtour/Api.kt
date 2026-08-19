@@ -247,6 +247,17 @@ object PhishInApi {
     suspend fun show(date: String): Show =
         json.decodeFromString(get(path("shows", date).build()))
 
+    /** The archive-wide popular/top-rated browse (#21) — sorted server-side by like count,
+     *  not scoped to any one year, unlike [showsForPeriod]. */
+    suspend fun popularShows(): List<Show> {
+        val url = path("shows")
+            .addQueryParameter("audio_status", "complete_or_partial")
+            .addQueryParameter("sort", "likes_count:desc")
+            .addQueryParameter("per_page", "100")
+            .build()
+        return json.decodeFromString<ShowsPage>(get(url)).shows
+    }
+
     /** The API rejects terms shorter than 3 characters. */
     suspend fun search(term: String): SearchResults {
         val url = path("search", term)

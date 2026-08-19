@@ -126,9 +126,18 @@ liked state).
   at comparable volume. (#18)
 - Share a show or track — no `Intent.ACTION_SEND` today; Relisten parity. (#19)
 - "Surprise me" / random show button. (#20)
-- Browse shows by top rated (and popular/trending) — Relisten sorts by rating and popularity;
-  Couch Tour only uses Relisten's pre-sorted rating internally for the tape picker, with no
-  user-facing browse-by-rating surface. (#21)
+- ~~Browse shows by top rated (and popular/trending)~~ — shipped for phish.in (a "Popular"
+  browse entry, sorted server-side by likes) and, bounded, for Relisten (a Date/Top rated
+  toggle on an already-loaded period's shows, using `avg_rating` — confirmed live to be on
+  the years-list endpoint already, not source-detail-only as assumed when this was filed).
+  Trending is still open: the same live check found Relisten's show entries also carry a
+  `popularity` object (`momentum_score`, `trend_ratio`, and `hot_score` per 48h/7d/30d
+  window) that would support a real recency-weighted sort, but picking the right window and
+  wiring a third sort mode was left for a follow-up rather than folded into this pass.
+  phish.in has no analogous recency-weighted signal — `likes_count` is a raw, unweighted
+  total. Android Auto's browse tree got phish.in's "Popular" node (mirrors the mobile UI, no
+  seam changes needed) but not Relisten's Top rated toggle — Auto has no sort-toggle
+  mechanism today, so a Relisten artist's shows list there stays date-ordered. (#21)
 - "Next Couch Tour stop" button — surfaces the oldest unplayed show from the current tours of
   your favorited artists (depends on favorite artists, above). (#22)
 - Better source selection beyond the "switch tape" rework above: surface whatever signals

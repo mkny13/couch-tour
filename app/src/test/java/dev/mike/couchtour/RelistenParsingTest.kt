@@ -67,6 +67,16 @@ class RelistenParsingTest {
         assertEquals(10, cornell.recordingCount)
     }
 
+    @Test
+    fun `a year's shows carry avg_rating, confirmed live on this endpoint (#21)`() {
+        // Rating was assumed to live only on RelistenSource (per-tape, one fetch per show)
+        // until the live API was checked — the years-list endpoint already returns it for
+        // free, which is what makes sorting a drilled-into period by rating free too.
+        val detail = json.decodeFromString<RelistenYearWithShows>(fixture("relisten_year.json"))
+        val cornell = detail.shows.first { it.displayDate == "1977-05-08" }.toShowSummary(deadArtist)
+        assertEquals(9.438597, cornell.rating, 0.0001)
+    }
+
     // ------------------------------------------------------------- show + tapes
 
     @Test
