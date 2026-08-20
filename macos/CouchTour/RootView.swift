@@ -4,6 +4,7 @@ import SwiftUI
 enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case continueListening = "Continue Listening"
     case artists = "Artists"
+    case search = "Search"
     case history = "History"
     case sync = "Sync"
 
@@ -13,6 +14,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .continueListening: return "play.circle"
         case .artists: return "music.mic"
+        case .search: return "magnifyingglass"
         case .history: return "clock.arrow.circlepath"
         case .sync: return "arrow.triangle.2.circlepath"
         }
@@ -26,14 +28,16 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
 private let periodicSyncInterval: Duration = .seconds(15 * 60)
 
 struct RootView: View {
-    @State private var selection: SidebarSection? = .artists
     @EnvironmentObject private var player: Player
     @EnvironmentObject private var appModel: AppModel
 
     var body: some View {
         VStack(spacing: 0) {
             NavigationSplitView {
-                List(SidebarSection.allCases, selection: $selection) { section in
+                // Bound through AppModel, not local @State — CouchTourApp's ⌘F command
+                // needs to switch to Search from outside this view, the same reason
+                // showNowPlaying lives there rather than as local state.
+                List(SidebarSection.allCases, selection: $appModel.selection) { section in
                     Label(section.rawValue, systemImage: section.systemImage).tag(section)
                 }
                 .navigationTitle("Couch Tour")
@@ -43,9 +47,11 @@ struct RootView: View {
                 // content, so drill-down state (Artists → Periods → Shows → Show) doesn't
                 // leak across sidebar sections and resets when you switch away and back.
                 Group {
-                    switch selection ?? .artists {
+                    switch appModel.selection ?? .artists {
                     case .artists:
                         NavigationStack { ArtistsView() }
+                    case .search:
+                        NavigationStack { SearchView() }
                     case .continueListening:
                         NavigationStack { ContinueListeningView() }
                     case .history:

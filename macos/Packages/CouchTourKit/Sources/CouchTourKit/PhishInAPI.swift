@@ -127,7 +127,7 @@ public struct Show: Codable, Equatable {
     }
 }
 
-public struct Track: Codable, Equatable {
+public struct Track: Codable, Equatable, Sendable {
     public let id: Int64
     public let title: String
     public let likesCount: Int
@@ -206,6 +206,45 @@ public struct Track: Codable, Equatable {
     }
 }
 
+// -------------------------------------------------------------------- search
+
+/// Port of Api.kt's `SearchResults`. phish.in's search response also carries `songs`/
+/// `venues`/`tags`/`playlists` — Android ignores all four (no song/venue browse endpoint on
+/// this backend, and this MVP has no playlists screen, D5) and so does this: they're simply
+/// omitted from `CodingKeys`, and Swift ignores unknown keys by default.
+public struct SearchResults: Decodable, Equatable {
+    public let exactShow: Show?
+    public let otherShows: [Show]
+    public let tracks: [Track]
+
+    enum CodingKeys: String, CodingKey {
+        case exactShow = "exact_show"
+        case otherShows = "other_shows"
+        case tracks
+    }
+
+    public init(exactShow: Show? = nil, otherShows: [Show] = [], tracks: [Track] = []) {
+        self.exactShow = exactShow
+        self.otherShows = otherShows
+        self.tracks = tracks
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        exactShow = try c.decodeIfPresent(Show.self, forKey: .exactShow)
+        otherShows = try c.decodeIfPresent([Show].self, forKey: .otherShows) ?? []
+        tracks = try c.decodeIfPresent([Track].self, forKey: .tracks) ?? []
+    }
+
+    public var shows: [Show] { [exactShow].compactMap { $0 } + otherShows }
+}
+
+extension SearchResults {
+    public func toSearchHits() -> SearchHits {
+        SearchHits(shows: shows.map { $0.toShowSummary() }, tracks: tracks)
+    }
+}
+
 private struct ShowsPage: Decodable {
     let shows: [Show]
 
@@ -280,5 +319,18 @@ public enum PhishInAPI {
     public static func show(_ date: String) async throws -> Show {
         let url = path("shows", date).url!
         return try decoder.decode(Show.self, from: try await get(url))
+    }
+
+    /// The API rejects terms shorter than 3 characters. `term` goes in the path, not a query
+    /// param — and `path(_:)`'s `URL.appendPathComponent` treats "/" as a separator, so a raw
+    /// slash would silently become an extra path segment and 404. Percent-encoded by hand,
+    /// keeping "/" escaped rather than treated as one, instead of routing through `path(_:)`.
+    public static func search(_ term: String) async throws -> SearchResults {
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+        let encodedTerm = term.addingPercentEncoding(withAllowedCharacters: allowed) ?? term
+        components.percentEncodedPath += "/search/" + encodedTerm
+        components.queryItems = [URLQueryItem(name: "audio_status", value: "complete_or_partial")]
+        return try decoder.decode(SearchResults.self, from: try await get(components.url!))
     }
 }

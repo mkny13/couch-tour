@@ -286,6 +286,161 @@ public struct RelistenShowWithSources: Codable, Equatable {
     }
 }
 
+// -------------------------------------------------------------------- search
+
+/// The artist embedded in a search hit — a slimmer projection than `RelistenArtist`, missing
+/// `showCount`/`features`, which is fine since every destination screen re-resolves the real
+/// `ArtistRef` through `artists()`.
+public struct RelistenSlimArtist: Codable, Equatable {
+    public let slug: String
+    public let name: String
+
+    public init(slug: String, name: String) {
+        self.slug = slug
+        self.name = name
+    }
+}
+
+public struct RelistenSearchShow: Codable, Equatable {
+    public let slimArtist: RelistenSlimArtist
+    public let displayDate: String
+    public let sourceCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case slimArtist = "slim_artist"
+        case displayDate = "display_date"
+        case sourceCount = "source_count"
+    }
+
+    public init(slimArtist: RelistenSlimArtist, displayDate: String, sourceCount: Int = 0) {
+        self.slimArtist = slimArtist
+        self.displayDate = displayDate
+        self.sourceCount = sourceCount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slimArtist = try c.decode(RelistenSlimArtist.self, forKey: .slimArtist)
+        displayDate = try c.decode(String.self, forKey: .displayDate)
+        sourceCount = try c.decodeIfPresent(Int.self, forKey: .sourceCount) ?? 0
+    }
+}
+
+public struct RelistenSearchSong: Codable, Equatable {
+    public let slimArtist: RelistenSlimArtist
+    public let name: String
+    public let uuid: String
+    public let showsPlayedAt: Int
+
+    enum CodingKeys: String, CodingKey {
+        case slimArtist = "slim_artist"
+        case name, uuid
+        case showsPlayedAt = "shows_played_at"
+    }
+
+    public init(slimArtist: RelistenSlimArtist, name: String, uuid: String, showsPlayedAt: Int = 0) {
+        self.slimArtist = slimArtist
+        self.name = name
+        self.uuid = uuid
+        self.showsPlayedAt = showsPlayedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slimArtist = try c.decode(RelistenSlimArtist.self, forKey: .slimArtist)
+        name = try c.decode(String.self, forKey: .name)
+        uuid = try c.decode(String.self, forKey: .uuid)
+        showsPlayedAt = try c.decodeIfPresent(Int.self, forKey: .showsPlayedAt) ?? 0
+    }
+}
+
+public struct RelistenSearchVenue: Codable, Equatable {
+    public let slimArtist: RelistenSlimArtist
+    public let name: String
+    public let location: String?
+    public let uuid: String
+
+    enum CodingKeys: String, CodingKey {
+        case slimArtist = "slim_artist"
+        case name, location, uuid
+    }
+
+    public init(slimArtist: RelistenSlimArtist, name: String, location: String? = nil, uuid: String) {
+        self.slimArtist = slimArtist
+        self.name = name
+        self.location = location
+        self.uuid = uuid
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slimArtist = try c.decode(RelistenSlimArtist.self, forKey: .slimArtist)
+        name = try c.decode(String.self, forKey: .name)
+        location = try c.decodeIfPresent(String.self, forKey: .location)
+        uuid = try c.decode(String.self, forKey: .uuid)
+    }
+}
+
+/// `/v3/search?q=` — six buckets; `Sources` and `Tours` are dropped just by omitting them from
+/// `CodingKeys`, since neither has a screen to land on (see MULTI-ARTIST-PLAN.md).
+public struct RelistenSearchResults: Codable, Equatable {
+    public let artists: [RelistenArtist]
+    public let shows: [RelistenSearchShow]
+    public let songs: [RelistenSearchSong]
+    public let venues: [RelistenSearchVenue]
+
+    enum CodingKeys: String, CodingKey {
+        case artists = "Artists"
+        case shows = "Shows"
+        case songs = "Songs"
+        case venues = "Venues"
+    }
+
+    public init(artists: [RelistenArtist] = [], shows: [RelistenSearchShow] = [], songs: [RelistenSearchSong] = [], venues: [RelistenSearchVenue] = []) {
+        self.artists = artists
+        self.shows = shows
+        self.songs = songs
+        self.venues = venues
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        artists = try c.decodeIfPresent([RelistenArtist].self, forKey: .artists) ?? []
+        shows = try c.decodeIfPresent([RelistenSearchShow].self, forKey: .shows) ?? []
+        songs = try c.decodeIfPresent([RelistenSearchSong].self, forKey: .songs) ?? []
+        venues = try c.decodeIfPresent([RelistenSearchVenue].self, forKey: .venues) ?? []
+    }
+}
+
+/// `/v3/artists/{slug}/songs/{uuid}` and `/v3/artists/{slug}/venues/{uuid}` share this shape:
+/// the entity's own name plus the shows it appears in.
+public struct RelistenSliceWithShows: Codable, Equatable {
+    public let name: String
+    public let shows: [RelistenShowSummary]
+
+    public init(name: String, shows: [RelistenShowSummary] = []) {
+        self.name = name
+        self.shows = shows
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        shows = try c.decodeIfPresent([RelistenShowSummary].self, forKey: .shows) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey { case name, shows }
+}
+
+/// Namespace prefixes for `PeriodRef.id` so `RelistenCatalogSource.shows` can dispatch a song
+/// or venue hit to the right endpoint instead of the ordinary year lookup. A bare uuid (no
+/// prefix) is still a year id — existing routes are untouched.
+private let songPrefix = "song:"
+private let venuePrefix = "venue:"
+
+public func songPeriodID(_ uuid: String) -> String { "\(songPrefix)\(uuid)" }
+public func venuePeriodID(_ uuid: String) -> String { "\(venuePrefix)\(uuid)" }
+
 // ---------------------------------------------------------------- mapping
 
 extension RelistenArtist {
@@ -384,6 +539,40 @@ extension RelistenShowWithSources {
     }
 }
 
+extension RelistenSearchResults {
+    /// Maps every bucket to `SearchHits`, dropping the `phish` slug: phish.in is the Phish
+    /// backend (D-verified, MULTI-ARTIST-PLAN.md decision 2), so a Relisten hit for it would
+    /// be a near-duplicate row missing likes, waveforms, and cover art. Shows and slices
+    /// carry artist-projection `ArtistRef`s built from `RelistenSlimArtist` rather than a
+    /// full lookup — every screen they lead to re-resolves the real one anyway.
+    public func toSearchHits() -> SearchHits {
+        func ref(_ slim: RelistenSlimArtist) -> ArtistRef {
+            ArtistRef(backend: .relisten, id: slim.slug, name: slim.name)
+        }
+
+        return SearchHits(
+            artists: artists.filter { $0.slug != PHISH.id }.map { $0.toArtistRef() },
+            shows: shows.filter { $0.slimArtist.slug != PHISH.id }.map {
+                ShowSummary(artist: ref($0.slimArtist), date: $0.displayDate, recordingCount: max($0.sourceCount, 1))
+            },
+            slices: songs.filter { $0.slimArtist.slug != PHISH.id }.map {
+                SliceHit(
+                    kind: .song, artist: ref($0.slimArtist),
+                    period: PeriodRef(id: songPeriodID($0.uuid), label: $0.name, showCount: $0.showsPlayedAt)
+                )
+            } + venues.filter { $0.slimArtist.slug != PHISH.id }.map {
+                SliceHit(kind: .venue, artist: ref($0.slimArtist), period: PeriodRef(id: venuePeriodID($0.uuid), label: $0.name))
+            }
+        )
+    }
+}
+
+extension RelistenSliceWithShows {
+    public func toShowSummaries(artist: ArtistRef) -> [ShowSummary] {
+        shows.map { $0.toShowSummary(artist: artist) }
+    }
+}
+
 // ------------------------------------------------------------------- requests
 
 /// Plain reads, no key and no auth. `/v3` carries artists and years; the per-show endpoint
@@ -426,6 +615,23 @@ public enum RelistenAPI {
     public static func show(artistIdOrSlug: String, date: String) async throws -> RelistenShowWithSources {
         try decoder.decode(RelistenShowWithSources.self, from: try await get(path("v2", "artists", artistIdOrSlug, "shows", date)))
     }
+
+    public static func song(artistIdOrSlug: String, songUuid: String) async throws -> RelistenSliceWithShows {
+        try decoder.decode(RelistenSliceWithShows.self, from: try await get(path("v3", "artists", artistIdOrSlug, "songs", songUuid)))
+    }
+
+    public static func venue(artistIdOrSlug: String, venueUuid: String) async throws -> RelistenSliceWithShows {
+        try decoder.decode(RelistenSliceWithShows.self, from: try await get(path("v3", "artists", artistIdOrSlug, "venues", venueUuid)))
+    }
+
+    /// `term` goes in `q`, a query parameter — unlike phish.in's `/search/{term}` path
+    /// segment. `path(_:)` returns a bare `URL` here (unlike PhishInAPI's `URLComponents`),
+    /// so this needs its own `URLComponents` to attach a query item.
+    public static func search(_ term: String) async throws -> RelistenSearchResults {
+        var components = URLComponents(url: path("v3", "search"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "q", value: term)]
+        return try decoder.decode(RelistenSearchResults.self, from: try await get(components.url!))
+    }
 }
 
 /// Wires `RelistenAPI` and the mapping above behind the `MusicSource` seam. `/v3/artists/{uuid
@@ -458,11 +664,25 @@ public actor RelistenCatalogSource: MusicSource {
         try await RelistenAPI.years(artistUuid: artist.id).map { $0.toPeriodRef() }
     }
 
+    /// A `period` id namespaced `song:`/`venue:` (from a search hit) routes to the matching
+    /// entity endpoint instead of the ordinary year lookup — see the prefix constants above.
     public func shows(artist: ArtistRef, period: PeriodRef) async throws -> [ShowSummary] {
-        try await RelistenAPI.year(artistUuid: artist.id, yearUuid: period.id).shows.map { $0.toShowSummary(artist: artist) }
+        if period.id.hasPrefix(songPrefix) {
+            let uuid = String(period.id.dropFirst(songPrefix.count))
+            return try await RelistenAPI.song(artistIdOrSlug: artist.id, songUuid: uuid).toShowSummaries(artist: artist)
+        }
+        if period.id.hasPrefix(venuePrefix) {
+            let uuid = String(period.id.dropFirst(venuePrefix.count))
+            return try await RelistenAPI.venue(artistIdOrSlug: artist.id, venueUuid: uuid).toShowSummaries(artist: artist)
+        }
+        return try await RelistenAPI.year(artistUuid: artist.id, yearUuid: period.id).shows.map { $0.toShowSummary(artist: artist) }
     }
 
     public func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
         try await RelistenAPI.show(artistIdOrSlug: artist.id, date: date).toShowDetail(artist: artist, recordingId: recordingId)
+    }
+
+    public func search(term: String) async throws -> SearchHits {
+        try await RelistenAPI.search(term).toSearchHits()
     }
 }

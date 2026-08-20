@@ -4,10 +4,12 @@ import Foundation
 // playable track. The mapping lives in pure functions, tested without a network call, same
 // reasoning as the Kotlin original (D36).
 //
-// The desktop MVP has no login/likes/playlists/search (D5 of this plan), so unlike the Android
+// The desktop MVP has no login/likes/playlists (D5 of this plan), so unlike the Android
 // original this file's neutral model is the *entire* domain layer, not just the browse slice.
+// Search was added in D169 — it rides the same browse seam as everything else (see
+// `SearchHits` below) rather than needing new destination screens.
 
-public enum Backend: String, CaseIterable, Hashable {
+public enum Backend: String, CaseIterable, Hashable, Sendable {
     case phishin
     case relisten
 
@@ -18,7 +20,7 @@ public enum Backend: String, CaseIterable, Hashable {
     }
 }
 
-public struct ArtistRef: Hashable {
+public struct ArtistRef: Hashable, Sendable {
     public let backend: Backend
     /// phish.in has one artist; on Relisten this is the artist's slug, e.g. "grateful-dead".
     public let id: String
@@ -43,7 +45,7 @@ public struct ArtistRef: Hashable {
 /// A browsable slice of an artist's catalog. On phish.in this is a period and may be a range
 /// ("1983-1987"), which is why `id` is carried verbatim — `showsForPeriod` needs it back to
 /// pick `year_range=` over `year=` (D11). On Relisten it is a year's uuid.
-public struct PeriodRef: Hashable {
+public struct PeriodRef: Hashable, Sendable {
     public let id: String
     public let label: String
     public let showCount: Int
@@ -57,7 +59,7 @@ public struct PeriodRef: Hashable {
     }
 }
 
-public struct ShowSummary: Hashable {
+public struct ShowSummary: Hashable, Sendable {
     public let artist: ArtistRef
     public let date: String
     public let venue: String?
@@ -183,6 +185,100 @@ public struct ShowDetail: Equatable {
     }
 }
 
+// ------------------------------------------------------------------- search
+
+/// What a song or venue hit resolves to: a named slice of one artist's catalog.
+public enum SliceKind: Hashable, Sendable {
+    case song
+    case venue
+
+    public var heading: String {
+        switch self {
+        case .song: return "Songs"
+        case .venue: return "Venues"
+        }
+    }
+}
+
+public struct SliceHit: Hashable, Sendable {
+    public let kind: SliceKind
+    public let artist: ArtistRef
+    public let period: PeriodRef
+
+    public init(kind: SliceKind, artist: ArtistRef, period: PeriodRef) {
+        self.kind = kind
+        self.artist = artist
+        self.period = period
+    }
+}
+
+/// The merged result of searching every backend. Kept flat (not grouped by artist) so the UI
+/// can render one section per type; `artistsPresent` and `filteredTo` are what let it narrow
+/// to one artist without a second fetch.
+///
+/// No `playlists` bucket, unlike the Android original — the desktop MVP has no login/likes/
+/// playlists (D5), so there is no playlists screen for a hit to land on.
+public struct SearchHits: Equatable, Sendable {
+    public let artists: [ArtistRef]
+    public let shows: [ShowSummary]
+    public let slices: [SliceHit]
+    /// phish.in only, raw DTOs on purpose: opening a hit navigates to its show
+    /// (`ShowDetailView`), an account feature Relisten has no analogue for.
+    public let tracks: [Track]
+    /// Backends whose search failed, so partial results can say so instead of reading as
+    /// "nothing matched".
+    public let failed: Set<Backend>
+
+    public init(
+        artists: [ArtistRef] = [], shows: [ShowSummary] = [], slices: [SliceHit] = [],
+        tracks: [Track] = [], failed: Set<Backend> = []
+    ) {
+        self.artists = artists
+        self.shows = shows
+        self.slices = slices
+        self.tracks = tracks
+        self.failed = failed
+    }
+
+    public var isEmpty: Bool {
+        artists.isEmpty && shows.isEmpty && slices.isEmpty && tracks.isEmpty
+    }
+
+    public static func + (lhs: SearchHits, rhs: SearchHits) -> SearchHits {
+        SearchHits(
+            artists: lhs.artists + rhs.artists,
+            shows: lhs.shows + rhs.shows,
+            slices: lhs.slices + rhs.slices,
+            tracks: lhs.tracks + rhs.tracks,
+            failed: lhs.failed.union(rhs.failed)
+        )
+    }
+
+    /// The chip row's contents — every backend+artist that produced at least one hit.
+    public var artistsPresent: [ArtistRef] {
+        var seen = Set<String>()
+        var result: [ArtistRef] = []
+        for artist in artists + shows.map(\.artist) + slices.map(\.artist) + tracks.map({ _ in PHISH }) {
+            let key = "\(artist.backend.rawValue)/\(artist.id)"
+            if seen.insert(key).inserted { result.append(artist) }
+        }
+        return result
+    }
+
+    /// Narrows to one artist's hits, or returns everything for a nil `key`. phish.in's tracks
+    /// are Phish's alone, so they drop out for any other artist.
+    public func filteredTo(_ key: ArtistRef?) -> SearchHits {
+        guard let key else { return self }
+        return SearchHits(
+            artists: artists.filter { $0.backend == key.backend && $0.id == key.id },
+            shows: shows.filter { $0.artist.backend == key.backend && $0.artist.id == key.id },
+            slices: slices.filter { $0.artist.backend == key.backend && $0.artist.id == key.id },
+            tracks: (key.backend == .phishin && key.id == PHISH.id) ? tracks : [],
+            failed: failed
+        )
+    }
+}
+
 public protocol MusicSource {
     var backend: Backend { get }
 
@@ -192,6 +288,10 @@ public protocol MusicSource {
 
     /// `recordingId` nil takes the source's own default — the best tape, where there's a choice.
     func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail
+
+    /// `term` is at least 3 characters — both APIs return nothing below that. A backend with
+    /// nothing to offer returns empty hits rather than throwing.
+    func search(term: String) async throws -> SearchHits
 }
 
 /// Shared by the browse UI and (eventually) any background prefetch — one seam, matching the
@@ -200,6 +300,28 @@ public func sourceFor(_ backend: Backend) -> MusicSource {
     switch backend {
     case .phishin: return PhishInSource()
     case .relisten: return RelistenCatalogSource.shared
+    }
+}
+
+/// Fans out a search across every backend; one backend's failure doesn't cost the rest. Each
+/// child task builds its own source from `backend` rather than capturing a `MusicSource`
+/// existential across the concurrency boundary.
+public func searchAll(_ term: String) async -> SearchHits {
+    await withTaskGroup(of: SearchHits.self) { group in
+        for backend in Backend.allCases {
+            group.addTask {
+                do {
+                    return try await sourceFor(backend).search(term: term)
+                } catch {
+                    return SearchHits(failed: [backend])
+                }
+            }
+        }
+        var result = SearchHits()
+        for await hits in group {
+            result = result + hits
+        }
+        return result
     }
 }
 
@@ -228,6 +350,10 @@ public struct PhishInSource: MusicSource {
 
     public func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
         try await PhishInAPI.show(date).toShowDetail()
+    }
+
+    public func search(term: String) async throws -> SearchHits {
+        try await PhishInAPI.search(term).toSearchHits()
     }
 }
 

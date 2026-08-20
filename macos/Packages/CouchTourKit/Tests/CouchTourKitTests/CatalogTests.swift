@@ -1,8 +1,9 @@
 import XCTest
 @testable import CouchTourKit
 
-/// The phish.in half of the `MusicSource` seam. Mapping is kept in pure functions so it can be
-/// checked without a network call — port of CatalogTest.kt.
+/// The phish.in half of the `MusicSource` seam, plus `SearchHits`'s pure combinators —
+/// port of CatalogTest.kt. Mapping is kept in pure functions so it can be checked without
+/// a network call.
 final class CatalogTests: XCTestCase {
 
     private func track(
@@ -37,6 +38,9 @@ final class CatalogTests: XCTestCase {
             tracks: tracks ?? [track()]
         )
     }
+
+    private let dead = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
+    private let wsp = ArtistRef(backend: .relisten, id: "wsp", name: "Widespread Panic")
 
     // ---------------------------------------------------------------- backend
 
@@ -165,5 +169,52 @@ final class CatalogTests: XCTestCase {
     func testLooksLikeMatrixIsFalseWithNoMatchingText() {
         XCTAssertFalse(RecordingRef(id: "1", label: "x", taper: "Jim Wise", lineage: "DAT > FLAC").looksLikeMatrix)
         XCTAssertFalse(RecordingRef(id: "1", label: "x").looksLikeMatrix)
+    }
+
+    // ----------------------------------------------------------------- search
+
+    func testPhishInSearchResultsCarryTheirShowsAndTracksStraightThrough() throws {
+        let results = try JSONDecoder().decode(SearchResults.self, from: try fixtureData("search.json"))
+        let hits = results.toSearchHits()
+        XCTAssertEqual(results.shows.count, hits.shows.count)
+        XCTAssertEqual(results.tracks, hits.tracks)
+    }
+
+    func testPlusMergesEveryFieldAndUnionsTheFailedSet() {
+        let a = SearchHits(artists: [dead], failed: [.relisten])
+        let b = SearchHits(artists: [wsp])
+        let merged = a + b
+        XCTAssertEqual([dead, wsp], merged.artists)
+        XCTAssertEqual([.relisten], merged.failed)
+    }
+
+    func testArtistsPresentIsDedupedAcrossEveryHitType() {
+        let hits = SearchHits(
+            artists: [dead],
+            shows: [ShowSummary(artist: dead, date: "1977-05-08")],
+            slices: [SliceHit(kind: .song, artist: wsp, period: PeriodRef(id: "song:x", label: "Junior"))],
+            tracks: [Track(id: 1, title: "Tweezer")]
+        )
+        XCTAssertEqual([dead, wsp, PHISH], hits.artistsPresent)
+    }
+
+    func testFilteredToNarrowsEveryFieldToOneArtistDroppingPhishOnlyFieldsForOthers() {
+        let hits = SearchHits(
+            artists: [dead, wsp],
+            shows: [
+                ShowSummary(artist: dead, date: "1977-05-08"),
+                ShowSummary(artist: wsp, date: "2001-04-22"),
+            ],
+            tracks: [Track(id: 1, title: "Tweezer")]
+        )
+        let filtered = hits.filteredTo(dead)
+        XCTAssertEqual([dead], filtered.artists)
+        XCTAssertEqual(["1977-05-08"], filtered.shows.map { $0.date })
+        XCTAssertTrue(filtered.tracks.isEmpty)
+    }
+
+    func testFilteredToANilKeyReturnsEverythingUnchanged() {
+        let hits = SearchHits(artists: [dead, wsp])
+        XCTAssertEqual(hits, hits.filteredTo(nil))
     }
 }

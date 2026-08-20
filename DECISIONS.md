@@ -2033,3 +2033,89 @@ Unlike D167, the cost of that here is smaller: `looksLikeMatrix` and the blank-s
 pure model logic, fully proven by `swift test` independent of the UI. What's unverified live is
 the popover's rendering and the position-carry across a real source switch — flagged in the PR
 for a manual pass, same as the prior two entries.
+
+### D169 — desktop search: a sidebar section, porting Android's whole stack (#25, D5 walk-back)
+
+The fourth slice pulled from #25's batch (D166 did the small player fixes, D167 the
+player-surface group, D168 the show-detail browse group). This one adds the piece ROADMAP.md
+carried as an open question until now — search — settled yes and filed as the next slice.
+macOS had none of it: `MusicSource` declared only `artists()`/`periods()`/`shows()`/`show()`,
+and the desktop MVP's original scoping comment (`Catalog.swift`, D5) explicitly named search
+as out of scope alongside login/likes/playlists. Login/likes/playlists stay out; search is now
+in.
+
+**Port, not fresh design.** Android's whole stack (`Catalog.kt`'s `MusicSource.search`/
+`searchAll`/`SearchHits`, `Api.kt`'s phish.in search, `Relisten.kt`'s search DTOs and the
+`song:`/`venue:`-prefixed `PeriodRef` trick) transferred close to verbatim. The one deliberate
+omission: `SearchHits.playlists` isn't ported — the desktop MVP has no `Playlist` model or
+playlists screen at all (D5), so there's nothing for a playlist hit to land on.
+
+**Placement: a new sidebar section, confirmed with Mike over two other options** (a toolbar
+`.searchable` over the Artists browse pane, and a ⌘F palette sheet). Both lost for the same
+reason D167 rejected a Now Playing sidebar section: `RootView.swift` deliberately builds a
+fresh `NavigationStack` per section so Artists → Periods → Shows → Show drill-down doesn't
+leak. But that constraint cuts the opposite way for search than it did for Now Playing — a
+toolbar search field would fight the drill-down (what does typing mean three levels into
+1977?) and collide with the existing Now Playing toolbar button, and a sheet would need to
+dismiss itself before pushing onto whatever browse stack happens to be visible. A sidebar
+section is a destination, not a companion, so it gets its own stack the same way
+Artists/History/Sync already do.
+
+**A phish.in track hit opens its show, confirmed with Mike over auto-play-on-arrival.**
+`ShowDetailView` already shows the full setlist and the track is one click away; auto-play
+would need `ShowDetailView` to accept and act on an optional start-track id, one more moving
+part for what search's own hit list already makes reachable. A track with no `show_date` is
+dropped from the list entirely rather than pushing a `ShowSummary` that can't load.
+
+**Two encoding traps, the actual reason this needed its own request tests.**
+- phish.in's `/search/{term}` puts the term in the *path*, and `PhishInAPI.path(_:)`'s
+  `URL.appendPathComponent` treats `/` as a separator — a raw slash in the term would silently
+  become an extra path segment and 404. `PhishInAPI.search(_:)` bypasses `path(_:)` for this
+  one call and builds `percentEncodedPath` by hand, escaping `/` explicitly. The test asserting
+  this had to be written against `URLComponents.percentEncodedPath`, not `RequestTests`'
+  existing `pathSegments` helper — that helper splits the already percent-*decoded* `URL.path`,
+  so it would pass even if the bug were live.
+- Relisten's is the opposite shape on purpose (`?q=` query param, not a path segment) —
+  `RelistenAPI.path(_:)` returns a bare `URL` here, unlike `PhishInAPI`'s `URLComponents`, so
+  `search(_:)` builds its own `URLComponents` to attach the query item.
+
+**A second `navigationDestination(for: ShowSummary.self)` would have been silently wrong.**
+`ShowsView` (reached when a song/venue slice hit pushes it) already declares that destination
+for its own list. SwiftUI supports only one `navigationDestination` per data type per
+`NavigationStack`, no matter how deep the declaring view sits — a second declaration for the
+same type doesn't error, it silently drops one of them. `SearchView`'s own direct show links
+(the Shows section, track hits) go through a private `SearchDestination` wrapper with its own
+declaration instead of sharing `ShowSummary`'s.
+
+**`MockServer` gained host-scoped `enqueue`.** The fan-out test (`SearchFanOutTests`, port of
+`SearchFanOutTest.kt`) needs two backends racing concurrently, and the existing `MockServer` is
+one global `URLProtocol` with a single FIFO response queue — two concurrent requests would
+drain it in a nondeterministic order. `enqueue(_:forHost:)` (default `nil`, matching any
+request) lets a test pin a response to a specific mock host without touching any existing
+unscoped call.
+
+**`.searchFocused` needs macOS 15; this project's deployment target is 14** (`project.yml`).
+⌘F still switches to the Search section on any supported OS via `appModel.selection` — a
+`FocusOnRequest` view modifier gates the actual field-focusing behind
+`if #available(macOS 15, *)`, so 14 gets the section switch without the auto-focus rather than
+failing to build.
+
+**Fixtures copied verbatim, not trimmed fresh.** `check-fixtures.sh` requires every macOS
+fixture to byte-match an Android counterpart, and Android already had all four this needed
+(`search.json`, `relisten_search.json`, `relisten_song_shows.json`,
+`relisten_venue_shows.json`) — copied as-is rather than re-trimmed from a live response.
+
+**Testing.** `swift test` is 155/155, up from 131 (D168's count) — the model layer
+(`SearchHits`'s combinators, both backends' DTOs and mapping, the prefix dispatch, both
+encoding traps, the fan-out) is fully proven independent of the UI. `xcodebuild` succeeds;
+`xcodegen generate` was needed (`SearchView.swift` is a new source file). Live verification hit
+the same wall D166-D168 all documented: this machine's login keychain holds a real
+`sync.deviceToken` from a paired device, and `SyncSession.init` reads it unconditionally at
+launch — any `install.sh` rebuild gets a fresh ad-hoc signature, parking the main thread in
+`SecItemCopyMatching` behind a Keychain re-authorization prompt no agent should answer. Nothing
+UI-facing in this PR was clicked through live; verification here is `swift test` plus a full
+read of the diff. A manual pass is worth five minutes on a real device before calling this
+fully done: type a query and watch grouped hits appear, click a song hit and land on that
+song's shows, click a venue hit the same way, click a show hit and a track hit and land on the
+right show, confirm ⌘F both switches to Search and (on macOS 15+) focuses the field, and
+confirm switching sections away and back resets the query as expected.

@@ -2,8 +2,9 @@ import XCTest
 @testable import CouchTourKit
 
 /// Decodes real Relisten responses, trimmed, plus the pure mapping into the backend-neutral
-/// model — port of RelistenParsingTest.kt. See the Android repo's MULTI-ARTIST-PLAN.md
-/// "Verified against the live API" for where the facts pinned here came from.
+/// model — port of RelistenParsingTest.kt, plus search (D169). See the Android repo's
+/// MULTI-ARTIST-PLAN.md "Verified against the live API" for where the facts pinned here
+/// came from.
 final class RelistenParsingTests: XCTestCase {
 
     private let decoder = JSONDecoder()
@@ -178,5 +179,55 @@ final class RelistenParsingTests: XCTestCase {
         XCTAssertEqual("Jim Wise", ref.label)
         XCTAssertEqual("Jim Wise", ref.taper)
         XCTAssertEqual("DAT > FLAC", ref.lineage)
+    }
+
+    // ----------------------------------------------------------------- search
+
+    func testParsesEverySearchBucketAndDropsThePhishSlug() throws {
+        let results = try decoder.decode(RelistenSearchResults.self, from: try fixture("relisten_search.json"))
+        let hits = results.toSearchHits()
+
+        XCTAssertEqual(["Goose"], hits.artists.map { $0.name })
+        XCTAssertEqual(["1977-05-08"], hits.shows.map { $0.date })
+        XCTAssertEqual("Grateful Dead", hits.shows.first?.artist.name)
+        // 2 songs (grateful-dead, dark-star-orchestra) + 1 venue — the fixture's third song
+        // hit is Phish's, dropped.
+        XCTAssertEqual(3, hits.slices.count)
+        XCTAssertTrue(hits.slices.contains { $0.kind == .venue && $0.artist.name == "Grateful Dead" })
+    }
+
+    func testDropsThePhishSlugFromSongHitsSpecifically() throws {
+        let results = try decoder.decode(RelistenSearchResults.self, from: try fixture("relisten_search.json"))
+        let songHits = results.toSearchHits().slices.filter { $0.kind == .song }
+
+        XCTAssertEqual(2, songHits.count)
+        XCTAssertFalse(songHits.contains { $0.artist.id == "phish" })
+    }
+
+    func testSongAndVenueHitsCarryNamespacedPeriodIds() throws {
+        let hits = try decoder.decode(RelistenSearchResults.self, from: try fixture("relisten_search.json")).toSearchHits()
+
+        let songHit = hits.slices.first { $0.kind == .song }!
+        XCTAssertTrue(songHit.period.id.hasPrefix("song:"))
+
+        let venueHit = hits.slices.first { $0.kind == .venue }!
+        XCTAssertTrue(venueHit.period.id.hasPrefix("venue:"))
+    }
+
+    func testASongsShowsParseIntoShowSummaries() throws {
+        let detail = try decoder.decode(RelistenSliceWithShows.self, from: try fixture("relisten_song_shows.json"))
+        let summaries = detail.toShowSummaries(artist: deadArtist)
+
+        XCTAssertEqual(["1974-03-23", "1974-05-14", "1974-05-19"], summaries.map { $0.date })
+        XCTAssertEqual("Cow Palace", summaries.first?.venue)
+    }
+
+    func testAVenuesShowsParseTheSameWayWithTheVenuePopulatedUnlikeASearchHit() throws {
+        let detail = try decoder.decode(RelistenSliceWithShows.self, from: try fixture("relisten_venue_shows.json"))
+        let summaries = detail.toShowSummaries(artist: deadArtist)
+
+        XCTAssertEqual(3, summaries.count)
+        XCTAssertEqual("Barton Hall, Cornell University", summaries.first?.venue)
+        XCTAssertEqual("Ithaca, NY, USA", summaries.first?.location)
     }
 }

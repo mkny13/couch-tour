@@ -18,7 +18,11 @@ final class MockServer {
 
     private static var active: MockServer?
 
-    private var responses: [(code: Int, body: String, headers: [String: String])] = []
+    /// `host` nil matches any request — the default every existing caller uses, preserving
+    /// plain FIFO order. A host-scoped entry only satisfies a request to that host, which is
+    /// what makes two backends hitting one shared `Interceptor` concurrently (the search
+    /// fan-out) deterministic instead of racing over a single unscoped queue.
+    private var responses: [(host: String?, code: Int, body: String, headers: [String: String])] = []
     private(set) var requests: [URLRequest] = []
     private let lock = NSLock()
     /// Total requests ever received, unlike `requests.count` which shrinks as `takeRequest`
@@ -35,9 +39,9 @@ final class MockServer {
         MockServer.active = nil
     }
 
-    func enqueue(_ body: String, code: Int = 200, headers: [String: String] = [:]) {
+    func enqueue(_ body: String, code: Int = 200, headers: [String: String] = [:], forHost host: String? = nil) {
         lock.lock(); defer { lock.unlock() }
-        responses.append((code, body, headers))
+        responses.append((host, code, body, headers))
     }
 
     func takeRequest() -> URLRequest? {
@@ -50,7 +54,9 @@ final class MockServer {
         lock.lock()
         requests.append(protocolInstance.request)
         requestCount += 1
-        let next = responses.isEmpty ? nil : responses.removeFirst()
+        let requestHost = protocolInstance.request.url?.host
+        let next = responses.firstIndex(where: { $0.host == nil || $0.host == requestHost })
+            .map { responses.remove(at: $0) }
         lock.unlock()
 
         guard let next else {
