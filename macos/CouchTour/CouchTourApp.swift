@@ -19,5 +19,29 @@ struct CouchTourApp: App {
                 .environmentObject(appModel)
                 .environmentObject(player)
         }
+        .commands {
+            CommandMenu("Playback") {
+                Button(player.isPlaying ? "Pause" : "Play") {
+                    player.togglePlayPause()
+                }
+                .keyboardShortcut(.space, modifiers: [])
+
+                Divider()
+
+                // Command-modified rather than the bare arrow keys browse already uses for
+                // list navigation, so the two don't collide.
+                Button("Next Track") {
+                    player.skipToNext()
+                }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+                .disabled((player.currentIndex ?? -1) >= player.tracks.count - 1)
+
+                Button("Previous Track") {
+                    player.skipToPrevious()
+                }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled((player.currentIndex ?? 0) == 0)
+            }
+        }
     }
 }

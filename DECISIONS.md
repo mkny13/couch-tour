@@ -1823,3 +1823,56 @@ opting out, offer a picker to choose which past tour or era to track for "catchi
 Left for a follow-up rather than folded into this pass — it is a real UI addition (where does
 it live, how is "tour" enumerated for a picker), not a bug fix, and deserves its own design
 pass. Noted in ROADMAP.md.
+
+### D166 — three small desktop player fixes, pulled forward from #25's batch
+
+#25 ("Desktop UI improvements") is explicitly a batch to split from, not a single unit of
+work — ROADMAP.md's build order already named three items in it as small and worth pulling
+forward ahead of the rest: the scrubber seek-thrash fix, the `skipToNext` disable asymmetry,
+and menu-bar `Commands`. This does those three and leaves the rest of #25 (a real Now Playing
+view, artwork, volume control, a Settings scene, desktop search, history grouping, the tape
+switcher's own Source-picker rework) for later passes.
+
+- **Scrubber** (`MiniPlayerView.swift`): the `Slider`'s `value` binding called `player.seek`
+  on every intermediate value, so dragging issued a continuous stream of seeks at
+  `AVPlayer`. Now tracked with a local `@State private var dragPositionMs: Double?` and
+  `Slider`'s `onEditingChanged` — the displayed position follows the drag locally, and
+  `player.seek(toMs:)` fires exactly once, when the drag ends.
+- **`skipToNext` disable** (`MiniPlayerView.swift`): `skipToPrevious` was already disabled at
+  `currentIndex == 0`; `skipToNext` had no equivalent at the end of the queue. Added
+  `.disabled((player.currentIndex ?? -1) >= player.tracks.count - 1)`, the same bounds check
+  mirrored in the new menu commands below.
+- **Menu-bar `Commands`** (`CouchTourApp.swift`): a new "Playback" `CommandMenu` — Play/Pause
+  (bare Space, matching standard macOS media-app convention), Next Track and Previous Track
+  (Cmd+Right/Cmd+Left, modified rather than the bare arrow keys browse already uses for list
+  navigation, so the two don't collide). Confirmed live: the menu renders in the correct
+  standard position (between View and Window), and Next/Previous correctly start disabled
+  with no queue loaded.
+
+**Testing limits worth being honest about.** `macos/CouchTour` has no unit test target — this
+is UI code verified by building and running, same as `CLAUDE.md` asks for. I was able to
+build, install, and drive the app directly (`osascript`/`System Events`, window-scoped
+`screencapture` rather than a full-desktop grab — this machine had several personal windows
+open), and confirmed the Commands menu live end to end. I could not get a synthetic click via
+`System Events` to trigger `ShowDetailView.TrackRow`'s `.onTapGesture` and actually start
+playback — clicks that worked fine for `List` row *navigation* (artist → year → show) didn't
+register on this particular tap gesture, a pre-existing interaction that isn't part of this
+change. That blocked live verification of the scrubber drag behavior and the `skipToNext`
+disable state while a queue is actually loaded; both are covered by code review and the same
+bounds-check pattern already proven live in the Commands menu, but a real interactive pass —
+starting a show and dragging the scrubber, confirming the button disables on the last
+track — is worth five minutes on a real device before calling this done.
+
+Also: `macos/scripts/install.sh` picked the first `find` match under DerivedData rather than
+the newest, so with more than one stale `CouchTour-*` folder around (routine — `xcodegen
+generate` gives the project a fresh identity on every run, so old DerivedData folders pile up
+instead of being reused) it could silently install a build from days earlier. Found while
+verifying this change — the install script handed back a binary with none of these edits in
+it. Fixed to sort by mtime and take the newest.
+
+One live-testing wrinkle, unrelated to the fix itself and not code to "fix": a fresh ad-hoc
+signature (which a clean rebuild produces) needs the Keychain to re-authorize
+`SyncSession`'s stored token, which blocks app launch behind a password prompt neither an
+agent nor a script should be answering. It resolved itself by relaunching a build whose
+signature had already been trusted in an earlier session — noted here in case a similarly
+inexplicable hang shows up again.

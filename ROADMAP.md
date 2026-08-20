@@ -93,9 +93,11 @@ blocked on the rest of it landing soon:
    D161), #13 (on-this-date playlist), and #22 (next Couch Tour stop, D164). #43 (show the
    app version somewhere unobtrusive, D163) also shipped — parked here for scheduling
    convenience rather than being part of the cluster itself.
-4. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
-   seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` are each
-   small and worth pulling forward.
+4. **Desktop parity** — #25 (desktop UI improvements); not release-gated. The scrubber
+   seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` (D166) are
+   done — pulled forward as the three small items. The rest of #25's batch (a real Now
+   Playing view, artwork, volume control, a Settings scene, desktop search, history
+   grouping, and #25's own share of the Source-picker rework) is still open.
 5. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
    (Spotify Live) — each is a new surface rather than a feature on an existing one; #16 and
    #15 also carry ToS/API risk worth resolving before writing code, and #15's approach-
@@ -205,10 +207,11 @@ liked state).
   by side; and letting the user flag preferred (and avoided) tapers, which then influences
   source ordering or highlighting. (#24)
 - Desktop UI improvements — player surface (no full Now Playing view, no artwork, no volume
-  control, scrubber seeks on every drag tick instead of on release), window/macOS idioms (no
-  menu-bar `Commands` or keyboard shortcuts, no toolbar, no Settings scene), and browse (no
-  search, History not grouped by artist, venue/city lost on drill-in, tape switcher needs the
-  same Source-picker rework as #17). (#25)
+  control; the scrubber seek-thrash fix and the `skipToNext` disable asymmetry are done,
+  D166), window/macOS idioms (menu-bar `Commands` for Play/Pause/Next/Previous are done,
+  D166; still no toolbar, no Settings scene), and browse (no search, History not grouped by
+  artist, venue/city lost on drill-in, tape switcher needs the same Source-picker rework as
+  #17). (#25)
 - Security review before Play Store release — sync backend rate limiting and request
   validation, client secret storage verification, log/manifest/dependency audit. (#26)
 - Show the app version somewhere unobtrusive, on both clients — useful for comparing behavior
