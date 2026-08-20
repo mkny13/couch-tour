@@ -92,6 +92,8 @@ blocked on the rest of it landing soon:
    (playlists spanning both backends, on Room rather than #11's storage layer, D161), and #13
    (on-this-date playlist) are done.** #22 (next Couch Tour stop) is the one item left in the
    cluster.
+   - #43 (show the app version somewhere unobtrusive) is small and unblocked — fine to slot
+     into any free worktree rather than waiting on cluster order.
 4. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
    seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` are each
    small and worth pulling forward.
@@ -143,8 +145,11 @@ liked state).
   a hard budget (`RELISTEN_YEAR_BUDGET`, 12 year-fetches split across at most 3 favorited
   artists). Cached once a day in memory (`OnThisDate`), the same shape as
   `RelistenCatalogSource.cachedArtists`, not a new Room table. D162.
-- Favorite artists, akin to the Relisten app — favorited artists surface on the home screen
-  and pinned to the top of the browse-artists list. (#14)
+- ~~Favorite artists~~ — shipped (#14). A star toggle on the artist row/header, backed by a
+  `Favorites` `SharedPreferences` set of `ArtistRef.key`s; favorited artists pin to the front
+  of the browse-artists list right after Phish (whose position-1 slot is earned by its account
+  features, not by being liked, so favoriting never displaces it) and get their own "Favorites"
+  section on the Home screen.
 - Spotify Live Releases support. Ideally in-app playback; if that isn't feasible, at minimum
   track which Spotify Live tracks have been listened to, leaning on Last.fm for that if
   needed. (#15)
@@ -195,6 +200,12 @@ liked state).
   same Source-picker rework as #17). (#25)
 - Security review before Play Store release — sync backend rate limiting and request
   validation, client secret storage verification, log/manifest/dependency audit. (#26)
+- Show the app version somewhere unobtrusive, on both clients — useful for comparing behavior
+  across a beta build. Blocked on a real fix first: Android's `versionName`/`versionCode`
+  (`app/build.gradle.kts`) and macOS's `MARKETING_VERSION` (`macos/project.yml`) are both
+  hardcoded and never bumped, completely disconnected from the `v0.NN` tags
+  `build-debug-apk.yml`'s `release_tag` input actually cuts — so displaying either today would
+  show the same static string forever. (#43)
 
 ## Multi-artist follow-ups
 
