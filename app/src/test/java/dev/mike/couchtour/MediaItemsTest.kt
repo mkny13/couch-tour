@@ -100,4 +100,46 @@ class MediaItemsTest {
         assertEquals("art.jpg", viaRecording.mediaMetadata.artworkUri.toString())
         assertEquals("t · s", viaRecording.mediaMetadata.subtitle)
     }
+
+    // ------------------------------------------------------- local playlists (#12)
+
+    @Test
+    fun `a mixed local playlist scrobbles each track under its own artist, not the queue's`() {
+        // The trap this exists to catch (like the class doc's phish.in-only one, but for a
+        // queue that can hold both backends at once): every other queue shares one
+        // QueueInfo.artist for all its items, so a mixed playlist needs a real per-track
+        // override rather than accidentally scrobbling a Dead track as whichever artist
+        // happened to be first, or as the "Phish" default.
+        val resolved = listOf(
+            ResolvedLocalTrack(
+                id = "1", title = "Tweezer", url = "https://phish.in/a.mp3", waveformUrl = null,
+                showDate = "1997-11-17", venueName = "McNichols Arena", artUrl = null, artistName = "Phish",
+            ),
+            ResolvedLocalTrack(
+                id = "t1", title = "Scarlet Begonias", url = "https://archive.org/b.mp3", waveformUrl = null,
+                showDate = "1977-05-08", venueName = "Barton Hall", artUrl = null, artistName = "Grateful Dead",
+            ),
+        )
+
+        val items = localPlaylistTrackItems("p1", "Key Jams", resolved)
+
+        assertEquals(listOf("Phish", "Grateful Dead"), items.map { it.mediaMetadata.artist })
+    }
+
+    @Test
+    fun `a local playlist keys its queue by its own id`() {
+        val resolved = listOf(
+            ResolvedLocalTrack(
+                id = "1", title = "Tweezer", url = "https://phish.in/a.mp3", waveformUrl = null,
+                showDate = null, venueName = null, artUrl = null, artistName = "Phish",
+            )
+        )
+
+        val items = localPlaylistTrackItems("p1", "Key Jams", resolved)
+
+        assertEquals(
+            "local-playlist:p1",
+            items.first().mediaMetadata.extras?.getString(Keys.QUEUE_KEY),
+        )
+    }
 }

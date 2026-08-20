@@ -89,8 +89,8 @@ blocked on the rest of it landing soon:
    ten-screen repeated load/loading/error scaffold in `MainActivity.kt` into a shared `Loaded`
    composable, done ahead of phase 3 adding more screens).
 3. **Personal library cluster** — #14 (favorite artists, blocks #13 and #22) → #11 (likes for
-   Relisten tracks) → #12 (playlists spanning both backends — shares its storage layer with
-   #11) → #13 (on-this-date playlist) → #22 (next Couch Tour stop).
+   Relisten tracks) → #12 (playlists spanning both backends — turned out to need Room rather
+   than #11's storage layer, D161) → #13 (on-this-date playlist) → #22 (next Couch Tour stop).
 4. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
    seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` are each
    small and worth pulling forward.
@@ -121,8 +121,17 @@ liked state).
   `PlayableTrack`; the Now Playing screen still has no like button of any kind, phish.in or
   Relisten — that's the open `PlayerState` gap noted below, left as a follow-up rather than
   folded into this pass.
-- Playlists: create and save playlists for Relisten tracks, similar to phish.in's playlist
-  feature; playlists should be able to mix phish.in and Relisten tracks together. (#12)
+- ~~Playlists spanning both backends~~ — shipped (#12). Local-only and account-free, on Room
+  rather than the `SharedPreferences` shape #11 was expected to reuse — a playlist is ordered
+  and each entry needs enough context (backend, show date, and for Relisten an artist slug
+  and tape id) to be refetched at play time, since neither backend has a fetch-track-by-id
+  endpoint (D161). An "add to playlist" button sits next to the like heart on both backends'
+  track rows; a new "Local playlists" row on the Library screen browses, creates, and plays
+  them. Deliberately left out: importing an existing phish.in playlist (there's no write API
+  on phish.in's side to build against either way), excerpts (phish.in's own playlists support
+  clipped entries, D30), renaming a playlist after creation, manually reordering tracks (only
+  append/remove), and a browse root for local playlists in Android Auto (resuming one already
+  in "Continue listening" works; picking a fresh one from the car doesn't).
 - Home screen "on this date" playlist — a random selection of shows played by the user's
   favorited artists on the same month and day, across past years. (#13)
 - Favorite artists, akin to the Relisten app — favorited artists surface on the home screen

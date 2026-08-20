@@ -106,4 +106,29 @@ class QueueTest {
         assertEquals(QueueKind.PLAYLIST, parseQueueKey("playlist:relisten:x")!!.kind)
         assertEquals(QueueKind.RECORDING, parseQueueKey("relisten:a/b/c")!!.kind)
     }
+
+    // ------------------------------------------------------------ local playlists (#12)
+
+    @Test
+    fun `builds a local playlist key`() {
+        assertEquals("local-playlist:abc-123", localPlaylistQueueKey("abc-123"))
+    }
+
+    @Test
+    fun `round-trips a local playlist key`() {
+        val ref = parseQueueKey(localPlaylistQueueKey("abc-123"))
+        assertEquals(QueueRef(QueueKind.LOCAL_PLAYLIST, "abc-123"), ref)
+        assertEquals("local-playlist:abc-123", ref!!.key)
+    }
+
+    @Test
+    fun `rejects an empty local playlist key`() {
+        assertNull(parseQueueKey("local-playlist:"))
+    }
+
+    @Test
+    fun `a local playlist key does not get parsed as a phish-in playlist`() {
+        // A bare "playlist:" id routes to PhishInApi.playlist; a local one has no such slug.
+        assertEquals(QueueKind.LOCAL_PLAYLIST, parseQueueKey("local-playlist:abc-123")!!.kind)
+    }
 }

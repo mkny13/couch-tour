@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 data class PlayerState(
     val connected: Boolean = false,
@@ -40,6 +41,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
     val progressDao = PhishInDb.get(app).progressDao()
+    val localPlaylistDao = PhishInDb.get(app).localPlaylistDao()
 
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
@@ -127,6 +129,38 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         c.play()
     }
 
+    // ------------------------------------------------------- local playlists (#12, D161)
+
+    suspend fun createLocalPlaylist(name: String): String {
+        val id = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        localPlaylistDao.insertPlaylist(LocalPlaylistEntity(id, name, createdAt = now, updatedAt = now))
+        return id
+    }
+
+    fun addToLocalPlaylist(playlistId: String, track: LocalPlaylistTrackEntity) {
+        viewModelScope.launch {
+            localPlaylistDao.addTrack(track.copy(playlistId = playlistId), System.currentTimeMillis())
+        }
+    }
+
+    fun removeFromLocalPlaylist(rowId: Long, playlistId: String) {
+        viewModelScope.launch { localPlaylistDao.removeTrack(rowId, playlistId, System.currentTimeMillis()) }
+    }
+
+    fun deleteLocalPlaylist(id: String) {
+        viewModelScope.launch { localPlaylistDao.deletePlaylist(id) }
+    }
+
+    fun playLocalPlaylist(playlistId: String, startIndex: Int = 0, startPositionMs: Long = 0) {
+        viewModelScope.launch {
+            runCatching { localPlaylistItems(playlistId) }.onSuccess { start(it, startIndex, startPositionMs) }
+        }
+    }
+
+    private suspend fun localPlaylistItems(playlistId: String): List<MediaItem> =
+        localPlaylistQueueItems(localPlaylistDao, playlistId)
+
     /**
      * Resume a queue the user left earlier, re-fetching it from the API. Handles both
      * queue kinds; a finished queue restarts from the top, because its stored position is
@@ -157,6 +191,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         // must reopen the exact tape the position was recorded against.
                         playRecording(RelistenCatalogSource.show(artist, rec.date, rec.sourceId), index, position)
                     }
+                    QueueKind.LOCAL_PLAYLIST -> start(localPlaylistItems(ref.id), index, position)
                 }
             }
         }

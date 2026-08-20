@@ -34,7 +34,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
@@ -47,6 +50,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -238,6 +242,10 @@ fun App(
             }
             composable("mine/shows") { MyShowsScreen(nav) }
             composable("mine/tracks") { MyTracksScreen(vm, nav) }
+            composable("local-playlists") { LocalPlaylistsScreen(vm, nav) }
+            composable("local-playlist/{id}") { entry ->
+                LocalPlaylistScreen(entry.arguments?.getString("id").orEmpty(), vm, nav)
+            }
             composable("sync") { SyncScreen(vm, nav) }
             composable("scan") { ScanScreen(nav) }
         }
@@ -389,6 +397,13 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                     nav.navigate("playlists")
                 }
             }
+            item {
+                // Account-free (#12), so it sits outside the phish.in-account section above —
+                // and isn't titled "My playlists" too, which that section's row already is.
+                RowItem("Local playlists", "Mix tracks from any artist, saved on this device", null) {
+                    nav.navigate("local-playlists")
+                }
+            }
 
             item { SectionHeader("Sync", divided = true) }
             item {
@@ -520,8 +535,9 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                         }
                     }
                 }
+                val artUrl = s.albumCoverUrl ?: s.coverArtUrls?.medium
                 tracksGroupedBySet(playable) { index, track ->
-                    TrackRow(track, index + 1, date) { vm.playShow(s, index, 0) }
+                    TrackRow(track, index + 1, date, artUrl, vm) { vm.playShow(s, index, 0) }
                 }
             }
         }
@@ -686,7 +702,7 @@ fun RecordingScreen(
                     }
                 }
                 groupedBySet(detail.tracks, { it.setName }, { it.id }) { index, track ->
-                    RecordingTrackRow(track, index + 1, detail.summary.artist, date) { vm.playRecording(detail, index, 0) }
+                    RecordingTrackRow(track, index + 1, detail.summary.artist, date, detail.recording?.id, vm) { vm.playRecording(detail, index, 0) }
                 }
             }
         }
@@ -830,7 +846,15 @@ private fun SourceBadge(text: String, color: Color) {
 }
 
 @Composable
-private fun RecordingTrackRow(track: PlayableTrack, number: Int, artist: ArtistRef, date: String, onClick: () -> Unit) {
+private fun RecordingTrackRow(
+    track: PlayableTrack,
+    number: Int,
+    artist: ArtistRef,
+    date: String,
+    recordingId: String?,
+    vm: PlayerViewModel,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -842,6 +866,14 @@ private fun RecordingTrackRow(track: PlayableTrack, number: Int, artist: ArtistR
         // falls back to the show link, so no trackSlug to pass here.
         ShareButton(trackShareText(artist, date, track.title, trackSlug = null))
         LikeTrackButton(track.id)
+        AddToPlaylistButton(vm) {
+            LocalPlaylistTrackEntity(
+                playlistId = "", position = 0, backend = Backend.RELISTEN.id,
+                trackId = track.id, showDate = date, artistSlug = artist.id, recordingId = recordingId,
+                title = track.title, durationMs = track.durationMs, venueName = track.venueName,
+                artUrl = track.artUrl,
+            )
+        }
     }
 }
 
@@ -862,6 +894,81 @@ private fun LikeTrackButton(trackId: String) {
             modifier = Modifier.size(18.dp)
         )
     }
+}
+
+/**
+ * Add-to-playlist button for either backend's track row (#12) — [buildRef] is called with
+ * `playlistId`/`position` left as placeholders; [PlayerViewModel.addToLocalPlaylist] fills
+ * both in. A bottom sheet, matching [SourcePicker]'s reasoning: playlists here can run long
+ * enough (and "New playlist" needs its own row) that a [DropdownMenu] would cramp them.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddToPlaylistButton(vm: PlayerViewModel, buildRef: () -> LocalPlaylistTrackEntity) {
+    var open by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    IconButton(onClick = { open = true }) {
+        Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist", modifier = Modifier.size(18.dp))
+    }
+    if (open) {
+        val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
+        ModalBottomSheet(onDismissRequest = { open = false }) {
+            LazyColumn {
+                item {
+                    RowItem("New playlist", "", null) {
+                        open = false
+                        creating = true
+                    }
+                }
+                items(playlists, key = { it.id }) { playlist ->
+                    RowItem(
+                        title = playlist.name,
+                        subtitle = "${playlist.trackCount} ${plural(playlist.trackCount, "track")}",
+                        artUrl = null,
+                    ) {
+                        open = false
+                        vm.addToLocalPlaylist(playlist.id, buildRef())
+                    }
+                }
+            }
+        }
+    }
+    if (creating) {
+        NewPlaylistDialog(
+            onDismiss = { creating = false },
+            onCreate = { name ->
+                creating = false
+                scope.launch {
+                    val id = vm.createLocalPlaylist(name)
+                    vm.addToLocalPlaylist(id, buildRef())
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New playlist") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank(), onClick = { onCreate(name.trim()) }) { Text("Create") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -1328,6 +1435,126 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
     }
 }
 
+/**
+ * Local playlists spanning both backends (#12) — account-free, unlike phish.in's own
+ * [PlaylistsScreen]/[PlaylistScreen], which is why this is a separate screen pair rather than
+ * a third filter on those (D161).
+ */
+@Composable
+fun LocalPlaylistsScreen(vm: PlayerViewModel, nav: NavHostController) {
+    val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
+    var creating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Local playlists", nav)
+        Button(
+            onClick = { creating = true },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("New playlist")
+        }
+        if (playlists.isEmpty()) {
+            Text(
+                "No playlists yet. Add a track to one from its playlist button.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        } else {
+            LazyColumn {
+                items(playlists, key = { it.id }) { playlist ->
+                    RowItem(
+                        title = playlist.name,
+                        subtitle = "${playlist.trackCount} ${plural(playlist.trackCount, "track")}",
+                        artUrl = null,
+                        onClick = { nav.navigate("local-playlist/${playlist.id}") },
+                    )
+                }
+            }
+        }
+    }
+    if (creating) {
+        NewPlaylistDialog(
+            onDismiss = { creating = false },
+            onCreate = { name ->
+                creating = false
+                scope.launch {
+                    val id = vm.createLocalPlaylist(name)
+                    nav.navigate("local-playlist/$id")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController) {
+    val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
+    val playlist = playlists.firstOrNull { it.id == id }
+    val tracks by vm.localPlaylistDao.tracks(id).collectAsState(initial = emptyList())
+    val saved = loadOnce(id) { vm.progressFor(localPlaylistQueueKey(id)) }
+    val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
+
+    Column(Modifier.fillMaxSize()) {
+        Header(playlist?.name ?: "Playlist", nav)
+        if (playlist == null) {
+            Loading()
+        } else {
+            LazyColumn {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "${tracks.size} ${plural(tracks.size, "track")}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { vm.deleteLocalPlaylist(id); nav.popBackStack() }) {
+                            Icon(Icons.Default.Delete, "Delete playlist")
+                        }
+                    }
+                }
+                if (progress != null) {
+                    item {
+                        ResumeBanner(progress) {
+                            vm.playLocalPlaylist(id, progress.trackIndex, progress.positionMs)
+                        }
+                    }
+                }
+                if (tracks.isEmpty()) {
+                    item {
+                        Text(
+                            "No tracks yet.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                } else {
+                    itemsIndexed(tracks, key = { _, t -> t.rowId }) { i, t ->
+                        RowItem(
+                            title = t.title,
+                            subtitle = listOfNotNull(t.showDate, t.venueName).joinToString(" · "),
+                            artUrl = t.artUrl,
+                            trailing = fmt(t.durationMs),
+                            trailingContent = {
+                                IconButton(onClick = { vm.removeFromLocalPlaylist(t.rowId, id) }) {
+                                    Icon(Icons.Default.Close, "Remove from playlist")
+                                }
+                            },
+                            onClick = { vm.playLocalPlaylist(id, i, 0) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun MyShowsScreen(nav: NavHostController) {
     val data = loadOnce("my-shows") { PhishInApi.likedShows() }
@@ -1456,6 +1683,7 @@ internal fun openQueueKey(key: String, nav: NavHostController) {
             val rec = parseRecordingId(ref.id) ?: return
             nav.navigate("recording/${Backend.RELISTEN.id}/${rec.artistSlug}/${rec.date}?src=${rec.sourceId}")
         }
+        QueueKind.LOCAL_PLAYLIST -> nav.navigate("local-playlist/${ref.id}")
     }
 }
 
@@ -1466,7 +1694,7 @@ private fun openQueue(progress: Progress, nav: NavHostController) =
 @Composable
 private fun ResumeCard(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
     var menuOpen by remember { mutableStateOf(false) }
-    val isPlaylist = parseQueueKey(progress.queueKey)?.kind == QueueKind.PLAYLIST
+    val isPlaylist = parseQueueKey(progress.queueKey)?.kind in setOf(QueueKind.PLAYLIST, QueueKind.LOCAL_PLAYLIST)
 
     Column(Modifier.width(132.dp)) {
         Box {
@@ -1579,7 +1807,7 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
 
 
 @Composable
-private fun TrackRow(track: Track, number: Int, date: String, onClick: () -> Unit) {
+private fun TrackRow(track: Track, number: Int, date: String, artUrl: String?, vm: PlayerViewModel, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1590,6 +1818,15 @@ private fun TrackRow(track: Track, number: Int, date: String, onClick: () -> Uni
         Text(fmt(track.duration), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         ShareButton(trackShareText(PHISH, date, track.title, track.slug))
         LikeButton(Likable.Track, track.id, track.likedByUser, track.likesCount)
+        AddToPlaylistButton(vm) {
+            // track.showDate/showAlbumCoverUrl are null here — this Track came nested
+            // inside a Show fetch (Api.kt), so date/artUrl come from the caller instead.
+            LocalPlaylistTrackEntity(
+                playlistId = "", position = 0, backend = Backend.PHISHIN.id,
+                trackId = track.id.toString(), showDate = date, title = track.title,
+                durationMs = track.duration, artUrl = artUrl,
+            )
+        }
     }
 }
 
