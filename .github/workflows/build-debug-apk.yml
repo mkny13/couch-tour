@@ -75,12 +75,19 @@ jobs:
       - name: Assemble debug APK
         env:
           SIDE_INSTALL: ${{ inputs.side_install }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
+          args=()
           if [ "$SIDE_INSTALL" = "true" ]; then
-            ./gradlew assembleDebug -PsideInstall=true
-          else
-            ./gradlew assembleDebug
+            args+=(-PsideInstall=true)
           fi
+          # Threads the release tag into BuildConfig.VERSION_NAME (app/build.gradle.kts) so a
+          # build cut for e.g. v0.23 actually reports v0.23 in the app, not the static
+          # placeholder — see #43.
+          if [ -n "$RELEASE_TAG" ]; then
+            args+=(-PversionName="$RELEASE_TAG")
+          fi
+          ./gradlew assembleDebug "${args[@]}"
 
       - uses: actions/upload-artifact@v4
         with:
