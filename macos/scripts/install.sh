@@ -17,8 +17,17 @@ echo "Building Release..."
 xcodebuild -project "$macos_dir/CouchTour.xcodeproj" -scheme CouchTour \
     -configuration Release -destination 'platform=macOS' build
 
+# xcodegen gives CouchTour.xcodeproj a fresh identity on every `generate`, which makes Xcode
+# spin up a brand-new DerivedData folder rather than reusing the last one — so stale builds
+# from earlier sessions pile up alongside the current one. `find | head -1` picked whichever
+# happened to sort first, which is not necessarily the newest; sorting by mtime picks the
+# build xcodebuild just produced instead of a leftover from days ago.
 built_app=$(find "$HOME/Library/Developer/Xcode/DerivedData" \
-    -path "*/CouchTour-*/Build/Products/Release/$app_name" -maxdepth 5 2>/dev/null | head -1)
+    -path "*/CouchTour-*/Build/Products/Release/$app_name" -maxdepth 5 -print0 2>/dev/null \
+    | xargs -0 stat -f '%m %N' \
+    | sort -rn \
+    | head -1 \
+    | cut -d' ' -f2-)
 
 if [ -z "$built_app" ]; then
     echo "Couldn't find the built app under DerivedData." >&2
