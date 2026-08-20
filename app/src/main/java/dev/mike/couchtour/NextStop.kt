@@ -13,7 +13,7 @@ import kotlinx.coroutines.coroutineScope
  * most recent shows and read [ShowSummary.tourName] off of them. That makes this the same
  * shape of problem [OnThisDate] solves for anniversaries: fetch a bounded slice of each
  * favorited artist's catalog through the [MusicSource] seam, fan the artists out
- * concurrently, and cache the network half once a day (D162, D163).
+ * concurrently, and cache the network half once a day (D162, D164).
  *
  * The two latest periods are fetched per artist, not one — a tour that crosses New Year (say
  * the most recent show is in January, the rest of the run is the previous December) would
