@@ -9,6 +9,9 @@ final class AppModel: ObservableObject {
     let progressStore: ProgressStore?
     let progressStoreError: String?
     let syncSession = SyncSession()
+    /// Whether the Now Playing inspector is open. Lives here, not as local `@State` in
+    /// RootView, because CouchTourApp's View-menu toggle needs to reach it too.
+    @Published var showNowPlaying = false
 
     init() {
         do {

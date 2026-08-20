@@ -39,7 +39,8 @@ SwiftUI + AVFoundation (D94), not Electron or a browser client.
   play/pause/next/previous; mini player bar with scrubber. Verified live: the system Now
   Playing widget showed title/artist/album (album = the show, D106) alongside Spotify, and its
   own pause button paused the app and updated the mini player back — `MPRemoteCommandCenter`
-  confirmed round-tripping both directions. Artwork not wired up yet (D107).
+  confirmed round-tripping both directions. Artwork wasn't wired up yet at the time (D107),
+  closed by D167.
 - **M4 — progress/History wiring** (`ProgressRecorder.swift`, `Resume.swift`, D108-D112):
   playing a show writes to `ProgressStore` every 5s and on play/pause/track-change; quitting
   the app entirely and relaunching resumed the right track at the right second; playing two
@@ -62,8 +63,10 @@ currently queued up next for sync specifically; future work here will start a fr
 
 **What's next for desktop, unrelated to sync:**
 
-- Artwork in Now Playing (D107).
-- History grouped by artist, matching Android, once there's enough real history to want it.
+- History grouped by artist — not actually "matching Android" as this used to say: Android's
+  History screen is a flat list too (`MainActivity.kt`'s `HistoryScreen`), the DAO methods for
+  grouping (`Progress.artists()`, `Progress.historyFor()`) exist but are only exercised by
+  tests. Whichever platform does this first is designing it fresh, not porting.
 - Login, likes, playlists, search, and casting on desktop — out of scope for the MVP,
   unscheduled beyond that.
 - Auto-updates. There's no update mechanism today — the app is ad-hoc signed, not
@@ -94,10 +97,11 @@ blocked on the rest of it landing soon:
    app version somewhere unobtrusive, D163) also shipped — parked here for scheduling
    convenience rather than being part of the cluster itself.
 4. **Desktop parity** — #25 (desktop UI improvements); not release-gated. The scrubber
-   seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` (D166) are
-   done — pulled forward as the three small items. The rest of #25's batch (a real Now
-   Playing view, artwork, volume control, a Settings scene, desktop search, history
-   grouping, and #25's own share of the Source-picker rework) is still open.
+   seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` (D166), plus
+   the whole player-surface group — a Now Playing inspector, artwork in the app and the
+   system widget, and a volume control (D167) — are done. What's left of #25's batch: a
+   Settings scene, desktop search, history grouping, venue/city on drill-in, and #25's own
+   share of the Source-picker rework.
 5. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
    (Spotify Live) — each is a new surface rather than a feature on an existing one; #16 and
    #15 also carry ToS/API risk worth resolving before writing code, and #15's approach-
@@ -206,12 +210,15 @@ liked state).
   way to quickly compare snippets of the same track across all available tapers/sources side
   by side; and letting the user flag preferred (and avoided) tapers, which then influences
   source ordering or highlighting. (#24)
-- Desktop UI improvements — player surface (no full Now Playing view, no artwork, no volume
-  control; the scrubber seek-thrash fix and the `skipToNext` disable asymmetry are done,
-  D166), window/macOS idioms (menu-bar `Commands` for Play/Pause/Next/Previous are done,
-  D166; still no toolbar, no Settings scene), and browse (no search, History not grouped by
-  artist, venue/city lost on drill-in, tape switcher needs the same Source-picker rework as
-  #17). (#25)
+- Desktop UI improvements — player surface: shipped (D167), a Now Playing inspector panel
+  (artwork, full track queue, no duplicated transport — `MiniPlayerView` already covers that),
+  artwork in the mini player and the system Now Playing widget, and a persisted app-level
+  volume control. Window/macOS idioms: menu-bar `Commands` for Play/Pause/Next/Previous and
+  the inspector's toolbar button are done (D166, D167); still no Settings scene. Browse is
+  still open: no search, History not grouped by artist — and neither is Android's despite an
+  older note here claiming otherwise (see the Desktop section above), so this is a fresh
+  design, not a port — venue/city lost on drill-in, tape switcher needs the same Source-picker
+  rework as #17. (#25)
 - Security review before Play Store release — sync backend rate limiting and request
   validation, client secret storage verification, log/manifest/dependency audit. (#26)
 - Show the app version somewhere unobtrusive, on both clients — useful for comparing behavior

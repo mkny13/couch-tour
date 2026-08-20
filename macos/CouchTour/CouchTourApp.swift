@@ -20,6 +20,13 @@ struct CouchTourApp: App {
                 .environmentObject(player)
         }
         .commands {
+            CommandGroup(after: .sidebar) {
+                Button(appModel.showNowPlaying ? "Hide Now Playing" : "Show Now Playing") {
+                    appModel.showNowPlaying.toggle()
+                }
+                .keyboardShortcut("i", modifiers: [.command, .option])
+            }
+
             CommandMenu("Playback") {
                 Button(player.isPlaying ? "Pause" : "Play") {
                     player.togglePlayPause()

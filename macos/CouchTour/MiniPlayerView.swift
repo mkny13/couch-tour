@@ -8,6 +8,8 @@ struct MiniPlayerView: View {
 
     var body: some View {
         HStack(spacing: 16) {
+            ArtworkView(url: player.artURL)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(player.currentTrack?.title ?? "—")
                     .font(.headline)
@@ -43,10 +45,34 @@ struct MiniPlayerView: View {
             .disabled((player.currentIndex ?? -1) >= player.tracks.count - 1)
 
             scrubber
+
+            volumeControl
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+    }
+
+    private var volumeControl: some View {
+        HStack(spacing: 6) {
+            Button {
+                player.toggleMute()
+            } label: {
+                Image(systemName: volumeSymbol)
+            }
+
+            Slider(value: $player.volume, in: 0...1)
+                .frame(width: 72)
+        }
+    }
+
+    private var volumeSymbol: String {
+        switch player.volume {
+        case 0: return "speaker.slash.fill"
+        case ..<0.34: return "speaker.wave.1.fill"
+        case ..<0.67: return "speaker.wave.2.fill"
+        default: return "speaker.wave.3.fill"
+        }
     }
 
     /// Tracks the drag locally and only calls through to `player.seek` when the drag ends —
