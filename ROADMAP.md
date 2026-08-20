@@ -62,10 +62,6 @@ currently queued up next for sync specifically; future work here will start a fr
 
 **What's next for desktop, unrelated to sync:**
 
-- Search — decided worth building (the open question this used to be is settled), and it's
-  the next #25 slice. Android's whole stack is there to port from: `MusicSource.search`, both
-  backends' result models, and `song:`/`venue:`-prefixed `PeriodRef` ids that route hits back
-  through the existing `shows()` seam (`Catalog.kt`, `Relisten.kt`). macOS has none of it yet.
 - History grouped by artist — not actually "matching Android" as this used to say: Android's
   History screen is a flat list too (`MainActivity.kt`'s `HistoryScreen`), the DAO methods for
   grouping (`Progress.artists()`, `Progress.historyFor()`) exist but are only exercised by
@@ -101,10 +97,9 @@ blocked on the rest of it landing soon:
    convenience rather than being part of the cluster itself.
 4. **Desktop parity** — #25 (desktop UI improvements); not release-gated. The scrubber
    seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` (D166), the
-   whole player-surface group (D167), and the show-detail browse group — a real Source picker
-   and venue/city kept on drill-in (D168) — are done. What's left of #25's batch: a Settings
-   scene, desktop search (decided worth building — see the Desktop section above; this is
-   the next slice), and history grouping.
+   whole player-surface group (D167), the show-detail browse group — a real Source picker
+   and venue/city kept on drill-in (D168) — and search, its own sidebar section (D169), are
+   done. What's left of #25's batch: a Settings scene and history grouping.
 5. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
    (Spotify Live) — each is a new surface rather than a feature on an existing one; #16 and
    #15 also carry ToS/API risk worth resolving before writing code, and #15's approach-
@@ -221,8 +216,10 @@ liked state).
   the inspector's toolbar button are done (D166, D167); still no Settings scene. Browse: the
   tape switcher now gets the same Source-picker rework as #17 — a popover with the same
   badges, ratings, taper/lineage fields, and position-carry on switch — and venue/city is kept
-  on drill-in (both D168). Still open: search (decided worth building, filed as the next
-  slice — see the Desktop section above) and History not grouped by artist — and neither is
+  on drill-in (both D168). Search is shipped too — its own sidebar section, ported from
+  Android's whole stack (`MusicSource.search`, both backends' result models, the
+  `song:`/`venue:`-prefixed `PeriodRef` trick), a phish.in track hit opens its show rather
+  than auto-playing (D169). Still open: History not grouped by artist — and neither is
   Android's despite an older note here claiming otherwise, so that one's a fresh design, not a
   port. (#25)
 - Security review before Play Store release — sync backend rate limiting and request

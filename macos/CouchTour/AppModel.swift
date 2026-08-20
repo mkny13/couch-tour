@@ -12,6 +12,14 @@ final class AppModel: ObservableObject {
     /// Whether the Now Playing inspector is open. Lives here, not as local `@State` in
     /// RootView, because CouchTourApp's View-menu toggle needs to reach it too.
     @Published var showNowPlaying = false
+    /// The sidebar's current section. Lives here rather than as `@State` in RootView for the
+    /// same reason `showNowPlaying` does — CouchTourApp's ⌘F command switches to Search from
+    /// outside RootView.
+    @Published var selection: SidebarSection? = .artists
+    /// Set true to ask SearchView to focus its search field, then cleared by SearchView once
+    /// it does — a one-shot signal rather than persistent state, so it doesn't fight the
+    /// field's own focus once the user starts typing.
+    @Published var focusSearchField = false
 
     init() {
         do {

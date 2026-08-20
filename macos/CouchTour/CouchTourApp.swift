@@ -25,6 +25,14 @@ struct CouchTourApp: App {
                     appModel.showNowPlaying.toggle()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+
+                // Switches to the Search section and focuses its field in one step —
+                // AppModel is the only thing both this scene and SearchView can reach.
+                Button("Find") {
+                    appModel.selection = .search
+                    appModel.focusSearchField = true
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
 
             CommandMenu("Playback") {

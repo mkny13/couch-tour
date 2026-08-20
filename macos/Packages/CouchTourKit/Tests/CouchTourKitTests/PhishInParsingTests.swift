@@ -2,7 +2,8 @@ import XCTest
 @testable import CouchTourKit
 
 /// Decodes real phish.in responses, trimmed — port of the browse-relevant cases in
-/// ApiParsingTest.kt. Login/playlist/search parsing is out of scope for the desktop MVP.
+/// ApiParsingTest.kt, plus search (D169). Login/playlist parsing is out of scope for the
+/// desktop MVP (D5).
 final class PhishInParsingTests: XCTestCase {
 
     private let decoder = JSONDecoder()
@@ -99,5 +100,36 @@ final class PhishInParsingTests: XCTestCase {
     func testTreatsAPresentUrlWithMissingStatusAsUnplayable() throws {
         let mismatch = try decoder.decode(Track.self, from: Data(#"{"id":1,"title":"x","mp3_url":"https://phish.in/blob/a.mp3","audio_status":"missing"}"#.utf8))
         XCTAssertFalse(mismatch.playable)
+    }
+
+    // ----------------------------------------------------------------- search
+
+    func testParsesSearchResultsAcrossShowsAndTracks() throws {
+        let results = try decoder.decode(SearchResults.self, from: try fixture("search.json"))
+        XCTAssertNil(results.exactShow)
+        XCTAssertEqual(["2025-07-27", "1998-08-15"], results.shows.map { $0.date })
+        XCTAssertEqual(2, results.tracks.count)
+    }
+
+    func testSearchTracksCarryTheShowTheyCameFrom() throws {
+        let track = try decoder.decode(SearchResults.self, from: try fixture("search.json")).tracks.first!
+        // Without show_date a search hit can't be opened inside its show.
+        XCTAssertEqual("1993-07-22", track.showDate)
+        XCTAssertEqual("Stowe Performing Arts Center", track.venueName)
+    }
+
+    func testExactShowIsIncludedFirstWhenPresent() throws {
+        let withExact = try decoder.decode(
+            SearchResults.self,
+            from: Data(#"{"exact_show":{"date":"1997-11-17"},"other_shows":[{"date":"1997-11-22"}]}"#.utf8)
+        )
+        XCTAssertEqual(["1997-11-17", "1997-11-22"], withExact.shows.map { $0.date })
+    }
+
+    func testTreatsAnEmptySearchBodyAsNoHits() throws {
+        let empty = try decoder.decode(SearchResults.self, from: Data("{}".utf8))
+        XCTAssertTrue(empty.shows.isEmpty)
+        XCTAssertTrue(empty.tracks.isEmpty)
+        XCTAssertTrue(empty.toSearchHits().isEmpty)
     }
 }
