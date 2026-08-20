@@ -309,6 +309,14 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
 
         val favoritedArtists = artists?.getOrNull()?.filter { it.key in favoriteKeys }.orEmpty()
+        // A second, independent load rather than part of loadArtistsByBackend's: it is a
+        // multi-request walk of the favorited artists' catalogs (#13), far slower than the
+        // artist list, and the screen's first paint must not wait on it. Keyed on the date and
+        // the favorites, which is exactly what the answer depends on.
+        val today = remember { java.time.LocalDate.now().toString() }
+        val onThisDate = loadOnce(today to favoritedArtists.map { it.key }) {
+            OnThisDate.load(favoritedArtists, today)
+        }
 
         LazyColumn(Modifier.fillMaxSize()) {
             item { SurpriseMeButton(artists?.getOrNull().orEmpty(), nav) }
@@ -334,6 +342,27 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                         artUrl = null,
                         onClick = { nav.navigate("history") }
                     )
+                }
+            }
+
+            // Deliberately silent rather than scaffolded: no header while it loads, none if it
+            // fails, and none on a day nobody played. It is a discovery extra the user never
+            // asked for, so a spinner or an error where a row would be costs more than it's
+            // worth — unlike the sections below, whose absence would read as breakage.
+            loaded(onThisDate.value) { shows ->
+                if (shows.isNotEmpty()) {
+                    item { SectionHeader("On this date", divided = true) }
+                    item {
+                        LazyRow(
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(shows, key = { "${it.artist.key}-${it.date}" }) { show ->
+                                AnniversaryCard(show, nav)
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(8.dp)) }
                 }
             }
 
@@ -1689,6 +1718,39 @@ internal fun openQueueKey(key: String, nav: NavHostController) {
 
 private fun openQueue(progress: Progress, nav: NavHostController) =
     openQueueKey(progress.queueKey, nav)
+
+/**
+ * One card in the "On this date" row (#13). Same 132dp geometry as [ResumeCard] so the two
+ * rows read as siblings, but simpler — no resume button or long-press menu, since tapping is
+ * the only action: it opens the show, the same [Backend] dispatch [SurpriseMeButton] uses.
+ */
+@Composable
+private fun AnniversaryCard(show: ShowSummary, nav: NavHostController) {
+    Column(
+        Modifier
+            .width(132.dp)
+            .clickable {
+                when (show.artist.backend) {
+                    Backend.PHISHIN -> nav.navigate("show/${show.date}")
+                    Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                }
+            }
+    ) {
+        AsyncImage(
+            model = show.artUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .size(132.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(show.date, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(show.artist.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        show.where.takeIf { it.isNotEmpty() }?.let {
+            Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

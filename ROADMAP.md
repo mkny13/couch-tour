@@ -88,9 +88,10 @@ blocked on the rest of it landing soon:
    rated/popular — trending is still open, see the Feature ideas entry), #30 (extract the
    ten-screen repeated load/loading/error scaffold in `MainActivity.kt` into a shared `Loaded`
    composable, done ahead of phase 3 adding more screens).
-3. **Personal library cluster** — #14 (favorite artists, blocks #13 and #22) → #11 (likes for
-   Relisten tracks) → #12 (playlists spanning both backends — turned out to need Room rather
-   than #11's storage layer, D161) → #13 (on-this-date playlist) → #22 (next Couch Tour stop).
+3. **Personal library cluster — #14 (favorite artists), #11 (likes for Relisten tracks), #12
+   (playlists spanning both backends, on Room rather than #11's storage layer, D161), and #13
+   (on-this-date playlist) are done.** #22 (next Couch Tour stop) is the one item left in the
+   cluster.
 4. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
    seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` are each
    small and worth pulling forward.
@@ -132,8 +133,16 @@ liked state).
   clipped entries, D30), renaming a playlist after creation, manually reordering tracks (only
   append/remove), and a browse root for local playlists in Android Auto (resuming one already
   in "Continue listening" works; picking a fresh one from the car doesn't).
-- Home screen "on this date" playlist — a random selection of shows played by the user's
-  favorited artists on the same month and day, across past years. (#13)
+- ~~Home screen "on this date" playlist~~ — shipped (#13). A `LazyRow` of `AnniversaryCard`s
+  between "Continue listening" and "Favorites", rendered only when there's a match — no
+  header, spinner, or error text on a quiet day, since it's a discovery extra layered on top
+  of the screen rather than something asked for directly. The request cost is bounded per
+  backend rather than uniformly: phish.in's `showsForPeriod` batches its whole ~35-period
+  archive into a handful of `year_range=` requests (`phishInRanges`, capped under the API's
+  `per_page=1000`), while Relisten — no range endpoint, one request per year per artist — gets
+  a hard budget (`RELISTEN_YEAR_BUDGET`, 12 year-fetches split across at most 3 favorited
+  artists). Cached once a day in memory (`OnThisDate`), the same shape as
+  `RelistenCatalogSource.cachedArtists`, not a new Room table. D162.
 - Favorite artists, akin to the Relisten app — favorited artists surface on the home screen
   and pinned to the top of the browse-artists list. (#14)
 - Spotify Live Releases support. Ideally in-app playback; if that isn't feasible, at minimum
