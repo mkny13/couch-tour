@@ -71,6 +71,18 @@ class NextStopTest {
     }
 
     @Test
+    fun `currentTourShows treats both backends' Not Part of a Tour sentinel as no tour`() {
+        // Confirmed live against both APIs: neither leaves tourName blank for a standalone
+        // show, they both send this literal string. Without filtering it out, an inactive
+        // artist's whole untoured archive reads as one fake "tour" spanning years.
+        val shows = listOf(
+            ShowSummary(artist = PHISH, date = "2025-07-01", tourName = "Not Part of a Tour"),
+            ShowSummary(artist = PHISH, date = "1994-02-25", tourName = "Not Part of a Tour"),
+        )
+        assertTrue(currentTourShows(shows).isEmpty())
+    }
+
+    @Test
     fun `currentTourShows is empty for no shows`() {
         assertTrue(currentTourShows(emptyList()).isEmpty())
     }
