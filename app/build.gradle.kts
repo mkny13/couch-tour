@@ -30,7 +30,11 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        // A workflow_dispatch release build passes -PversionName=$TAG (see
+        // build-debug-apk.yml) so BuildConfig.VERSION_NAME reflects the actual release tag
+        // (e.g. "v0.23") rather than this static placeholder; local and plain CI push builds
+        // fall back to it.
+        versionName = project.findProperty("versionName") as? String ?: "1.0"
         manifestPlaceholders["appLabel"] = "Couch Tour"
         manifestPlaceholders["appIcon"] = "ic_launcher"
     }
@@ -93,6 +97,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests {
