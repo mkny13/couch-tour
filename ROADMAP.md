@@ -88,12 +88,11 @@ blocked on the rest of it landing soon:
    rated/popular — trending is still open, see the Feature ideas entry), #30 (extract the
    ten-screen repeated load/loading/error scaffold in `MainActivity.kt` into a shared `Loaded`
    composable, done ahead of phase 3 adding more screens).
-3. **Personal library cluster — #14 (favorite artists), #11 (likes for Relisten tracks), #12
-   (playlists spanning both backends, on Room rather than #11's storage layer, D161), and #13
-   (on-this-date playlist) are done.** #22 (next Couch Tour stop) is the one item left in the
-   cluster.
-   - #43 (show the app version somewhere unobtrusive) is small and unblocked — fine to slot
-     into any free worktree rather than waiting on cluster order.
+3. **Personal library cluster — done.** #14 (favorite artists), #11 (likes for Relisten
+   tracks), #12 (playlists spanning both backends, on Room rather than #11's storage layer,
+   D161), #13 (on-this-date playlist), and #22 (next Couch Tour stop, D164). #43 (show the
+   app version somewhere unobtrusive, D163) also shipped — parked here for scheduling
+   convenience rather than being part of the cluster itself.
 4. **Desktop parity** — #25 (desktop UI improvements); not release-gated, but the scrubber
    seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` are each
    small and worth pulling forward.
@@ -186,8 +185,12 @@ liked state).
   total. Android Auto's browse tree got phish.in's "Popular" node (mirrors the mobile UI, no
   seam changes needed) but not Relisten's Top rated toggle — Auto has no sort-toggle
   mechanism today, so a Relisten artist's shows list there stays date-ordered. (#21)
-- "Next Couch Tour stop" button — surfaces the oldest unplayed show from the current tours of
-  your favorited artists (depends on favorite artists, above). (#22)
+- ~~"Next Couch Tour stop"~~ — shipped (#22). Derives each favorited artist's current tour
+  from the tour name on its two most-recent periods' shows (covering a New Year run split
+  across two years), then surfaces the single oldest show across all of them with no
+  `finished` progress row. Cached daily like D162's "On this date", except the unplayed
+  filter itself runs live against `ProgressDao.finishedKeys()` rather than being part of
+  that cache, since it changes the moment a show finishes rather than once a day. D164.
 - Better source selection beyond the "switch tape" rework above: surface whatever signals
   help identify the best source for a show (ratings, review counts/text, taper reputation); a
   way to quickly compare snippets of the same track across all available tapers/sources side

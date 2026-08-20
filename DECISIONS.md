@@ -1741,3 +1741,61 @@ string forever.
   touching. Shown as a `.caption`/`.secondary`, centered `Section` at the bottom of the form.
   Building a whole Settings scene or an "About" panel just for this (both currently
   unscheduled — see ROADMAP.md and #25) was ruled out as more than the issue asked for.
+### D164 — the tour is derived from the latest show, not asked for; the unplayed half stays live, not cached
+
+"Next Couch Tour stop" (#22), the last item in the personal-library cluster, sitting on top of
+favorite artists (#14) and reusing `showsOnDate`'s shape as D162 flagged: dispatch on backend
+through `MusicSource`, bound the request count, cache once a day (`NextStop.kt`). It's a
+sibling of `OnThisDate.kt`, not an extension of it — the two problems (anniversary matching,
+tour derivation) share no step past the fan-out skeleton, so a shared helper would be an
+abstraction bought for two callers with nothing in common.
+
+Neither backend has a "current tour" concept. `PeriodRef`s are years, not tours, so the only
+way to find one is to fetch an artist's most recent shows and read `ShowSummary.tourName` off
+them — the current tour is whichever one the latest show belongs to. An artist whose latest
+show carries no tour name (older or single-show periods often don't) simply doesn't
+participate, the same opt-out `showsOnAnniversary` gives a malformed date.
+
+Two periods are fetched per artist, not one: a tour crossing New Year — latest show in
+January, the rest of the run the previous December — would otherwise expose only its tail,
+and since this picks the *oldest* show in the tour, a missing older half doesn't degrade the
+answer, it makes it wrong. `recentPeriods` sorts on `PeriodRef.label` rather than `id` — id is
+the year itself on phish.in but an opaque uuid on Relisten (`RelistenYear.toPeriodRef`), while
+label is a plain year string on both, including the synthetic `POPULAR_PERIOD_ID` ("Popular"),
+which drops out for not parsing as one.
+
+Unlike D162's cache, the "unplayed" half of the answer is deliberately *not* baked into the
+daily one: it depends on the `progress` table, which changes the instant a show finishes,
+while the catalog fetch only changes once a day. So `NextStop.load` caches `currentTours`'
+network result exactly like `OnThisDate.load` does, and `oldestUnplayed` runs fresh on every
+recomposition against `ProgressDao.finishedKeys()` — a `Flow`, so finishing a show updates the
+row without a screen reload. No migration: a new `@Query` doesn't touch the schema hash,
+`version` stays 8.
+
+Matching "have I played this?" across backends needed one small addition to `Queue.kt`:
+`recordingShowKey(artistSlug, date)`, a Relisten recording key with its tape id dropped. A
+favorited-artist catalog fetch never resolves to a specific tape, so the match has to be "any
+tape of that night", not the exact key `ProgressDao` stores against — `showId`/`playedShowIds`
+reparse a stored key back down to that identity rather than fuzzy-matching key prefixes.
+
+The request bound is per-backend like D162's Relisten cap, not shared: `MAX_TOUR_ARTISTS` (3)
+participate per backend, each costing 1 `periods()` + 2 `shows()` calls — worst case about
+twelve requests, cheaper than D162's nineteen since there's no year budget to split.
+
+Rendered as a `SectionHeader` + `RowItem` on Home, between "History" and "On this date" —
+not the button the issue's title names. `SurpriseMeButton` is a button because its answer is
+computed on tap and is meant to be a surprise; here the answer is already fetched, and hiding
+the tour/date/venue behind a tap throws away exactly the context that makes it worth tapping.
+Silent when there's nothing to show, same intent as D162's "absence reads as nothing" — but
+genuinely silent this time: it branches on the result directly rather than through `loaded()`,
+whose null branch emits a spinner.
+
+Tested at one layer: `NextStopTest.kt` covers period selection, tour derivation (including a
+New Year run's December half), the cross-backend played-show match, the oldest-unplayed pick
+with its tie-break, the fan-out's per-backend cap and failure isolation, and the cache key —
+all against a fake `MusicSource`, no network, following `OnThisDateTest.kt`'s pattern.
+
+Deliberately out of scope: a "tour" is inferred from `tourName` matching alone, with no
+recency cutoff — an artist whose last tour was years ago still yields a valid answer, which
+reads as a feature (there's always a next stop to catch up on) rather than a bug for this
+pass.

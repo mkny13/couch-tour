@@ -72,6 +72,11 @@ interface ProgressDao {
     @Query("SELECT DISTINCT artist FROM progress WHERE artist != '' AND deletedAt IS NULL ORDER BY artist")
     fun artists(): Flow<List<String>>
 
+    /** The queue keys played through to the end — one query rather than a lookup per
+     *  candidate show, for "which of these have I already heard?" (#22). */
+    @Query("SELECT queueKey FROM progress WHERE finished = 1 AND deletedAt IS NULL")
+    fun finishedKeys(): Flow<List<String>>
+
     @Query("SELECT * FROM progress WHERE artist = :artist AND deletedAt IS NULL ORDER BY updatedAt DESC")
     fun historyFor(artist: String): Flow<List<Progress>>
 

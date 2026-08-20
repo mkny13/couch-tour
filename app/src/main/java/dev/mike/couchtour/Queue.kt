@@ -41,6 +41,10 @@ fun localPlaylistQueueKey(id: String) = LOCAL_PLAYLIST_PREFIX + id
 fun recordingQueueKey(artistSlug: String, date: String, sourceId: String) =
     RECORDING_PREFIX + RecordingId(artistSlug, date, sourceId).id
 
+/** A recording key with its tape id dropped — the show it's a tape of. Every tape of the
+ *  same night shares this, which is what "have I played this show?" actually asks (#22). */
+fun recordingShowKey(artistSlug: String, date: String) = RECORDING_PREFIX + "$artistSlug/$date"
+
 /**
  * Splits a stored key back into its parts. Returns null for anything unrecognised rather
  * than guessing — an unknown key should be skipped, not played as the wrong thing.
