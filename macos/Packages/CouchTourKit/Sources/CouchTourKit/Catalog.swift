@@ -112,6 +112,15 @@ public struct RecordingRef: Hashable {
         self.taper = taper
         self.lineage = lineage
     }
+
+    /// Relisten has no structured "matrix" flag — only `isSoundboard`. Where a matrix mix
+    /// exists at all, it's folded into free text on `taper` or `lineage` (e.g. "SBD/AUD
+    /// Matrix"). This is a heuristic substring match on that text, not a guaranteed signal:
+    /// it can miss a matrix worded some other way, or flag something that mentions "matrix"
+    /// for an unrelated reason. Treat it as a hint in the UI, not a fact.
+    public var looksLikeMatrix: Bool {
+        [taper, lineage].compactMap { $0 }.contains { $0.range(of: "matrix", options: .caseInsensitive) != nil }
+    }
 }
 
 public struct PlayableTrack: Equatable {
