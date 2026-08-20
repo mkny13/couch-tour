@@ -317,6 +317,17 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         val onThisDate = loadOnce(today to favoritedArtists.map { it.key }) {
             OnThisDate.load(favoritedArtists, today)
         }
+        // The catalog half of #22's answer is cached daily like onThisDate's, but "unplayed"
+        // isn't: it depends on the progress table, which changes the moment a show finishes.
+        // So only currentTours' network result is behind loadOnce; oldestUnplayed runs fresh
+        // on every recomposition against a live finishedKeys read.
+        val nextStopShows = loadOnce(today to favoritedArtists.map { it.key }) {
+            NextStop.load(favoritedArtists, today)
+        }
+        val finishedKeys by vm.progressDao.finishedKeys().collectAsState(initial = emptyList())
+        val nextStop = remember(nextStopShows.value, finishedKeys) {
+            nextStopShows.value?.getOrNull()?.let { oldestUnplayed(it, playedShowIds(finishedKeys)) }
+        }
 
         LazyColumn(Modifier.fillMaxSize()) {
             item { SurpriseMeButton(artists?.getOrNull().orEmpty(), nav) }
@@ -341,6 +352,25 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                         subtitle = "$historyCount ${plural(historyCount, "show")} and playlists played",
                         artUrl = null,
                         onClick = { nav.navigate("history") }
+                    )
+                }
+            }
+
+            // Genuinely silent, not routed through loaded() — its null branch shows a spinner,
+            // which is wrong for a discovery extra with nothing to announce while it loads.
+            nextStop?.let { show ->
+                item { SectionHeader("Next Couch Tour stop", divided = true) }
+                item {
+                    RowItem(
+                        title = "${show.date} · ${show.artist.name}",
+                        subtitle = listOfNotNull(show.tourName, show.where.ifBlank { null }).joinToString(" — "),
+                        artUrl = show.artUrl,
+                        onClick = {
+                            when (show.artist.backend) {
+                                Backend.PHISHIN -> nav.navigate("show/${show.date}")
+                                Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                            }
+                        }
                     )
                 }
             }
