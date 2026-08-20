@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Combine
 import CouchTourKit
@@ -14,6 +15,8 @@ import MediaPlayer
 /// Progress writing lives here rather than in the UI, the same call Android's
 /// `PlaybackService` makes — the player itself is what knows when a track actually changed or
 /// the queue actually drained (D20), not whichever screen happened to trigger playback.
+private let volumeDefaultsKey = "playerVolume"
+
 @MainActor
 final class Player: NSObject, ObservableObject {
     @Published private(set) var show: ShowSummary?
@@ -23,6 +26,28 @@ final class Player: NSObject, ObservableObject {
     @Published private(set) var isPlaying = false
     /// Milliseconds into the current track.
     @Published private(set) var positionMs: Int64 = 0
+    @Published private(set) var artURL: String?
+
+    /// App-level volume (0...1), independent of system volume — persisted so it survives a
+    /// relaunch. `didSet` doesn't fire for the `init` assignment, so `init` also sets
+    /// `queuePlayer.volume` directly.
+    @Published var volume: Float = UserDefaults.standard.object(forKey: volumeDefaultsKey) as? Float ?? 1.0 {
+        didSet {
+            queuePlayer.volume = volume
+            UserDefaults.standard.set(volume, forKey: volumeDefaultsKey)
+        }
+    }
+    private var volumeBeforeMute: Float?
+
+    func toggleMute() {
+        if let volumeBeforeMute {
+            volume = volumeBeforeMute
+            self.volumeBeforeMute = nil
+        } else {
+            volumeBeforeMute = volume
+            volume = 0
+        }
+    }
 
     var currentTrack: PlayableTrack? {
         guard let currentIndex, tracks.indices.contains(currentIndex) else { return nil }
@@ -33,7 +58,10 @@ final class Player: NSObject, ObservableObject {
     private let recorder: ProgressRecorder
     private let progressStore: ProgressStore?
     private let syncSession: SyncSession?
-    private var artURL: String?
+    /// The `NSImage` currently cached for `artURL`, and the URL it belongs to — so a late
+    /// asynchronous load can be dropped if the show has changed by the time it finishes.
+    private var artworkImage: NSImage?
+    private var artworkLoadURL: String?
 
     /// Indexed identically to `tracks`, even though only a suffix of it is ever inserted into
     /// `queuePlayer` (playback starts mid-show when a track other than the first is tapped) —
@@ -53,6 +81,7 @@ final class Player: NSObject, ObservableObject {
         self.progressStore = progressStore
         self.syncSession = syncSession
         super.init()
+        queuePlayer.volume = volume
         configureRemoteCommands()
         observePlayer()
     }
@@ -65,7 +94,31 @@ final class Player: NSObject, ObservableObject {
         // Same fallback Android's recordingTrackItems uses: the show's own art, else the
         // first track's, since a Relisten show summary often carries no art of its own.
         artURL = detail.summary.artURL ?? detail.tracks.first?.artURL
+        loadArtwork(for: artURL)
         startQueue(tracks: detail.tracks, startIndex: startIndex, resumePositionMs: resumePositionMs)
+    }
+
+    /// Fetches and caches the `NSImage` for the system Now Playing widget (D107). Guards
+    /// against a stale load landing after the show has already changed again.
+    private func loadArtwork(for urlString: String?) {
+        // Cleared synchronously rather than left stale until the new fetch resolves — otherwise
+        // switching shows could briefly attach the previous show's art to the new track's
+        // Now Playing metadata.
+        artworkImage = nil
+        guard let urlString, let url = URL(string: urlString) else {
+            artworkLoadURL = nil
+            return
+        }
+        artworkLoadURL = urlString
+        Task { [weak self] in
+            guard let (data, _) = try? await URLSession.shared.data(from: url),
+                  let image = NSImage(data: data) else { return }
+            await MainActor.run {
+                guard let self, self.artworkLoadURL == urlString else { return }
+                self.artworkImage = image
+                self.updateNowPlayingInfo()
+            }
+        }
     }
 
     func togglePlayPause() {
@@ -229,6 +282,12 @@ final class Player: NSObject, ObservableObject {
         info[MPMediaItemPropertyPlaybackDuration] = Double(track.durationMs) / 1000
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        // Rebuilt from a stored image rather than fetched here — this method reconstructs the
+        // whole dictionary on every track change, and the async fetch in loadArtwork(for:) may
+        // not have completed yet when that happens.
+        if let artworkImage {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artworkImage.size) { _ in artworkImage }
+        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 

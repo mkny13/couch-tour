@@ -1,8 +1,10 @@
 import CouchTourKit
 import SwiftUI
 
-/// Flat, newest-first for now. Grouping by artist (matching Android's History screen) is
-/// left for later — real depth there is worth doing once there's real history to look at.
+/// Flat, newest-first for now. Android's History screen is flat too — grouping by artist was
+/// never actually shipped there, only the DAO groundwork (`Progress.artists()`/
+/// `historyFor()`) — so this would be a fresh design, not a port. Left for later — real depth
+/// there is worth doing once there's real history to look at.
 struct HistoryView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player

@@ -1876,3 +1876,89 @@ signature (which a clean rebuild produces) needs the Keychain to re-authorize
 agent nor a script should be answering. It resolved itself by relaunching a build whose
 signature had already been trusted in an earlier session — noted here in case a similarly
 inexplicable hang shows up again.
+
+### D167 — a Now Playing inspector, artwork everywhere, and a volume control (#25, player surface)
+
+The second slice pulled from #25's batch (D166 pulled the first three small items). This one
+takes the whole player-surface bullet group: a real Now Playing view, artwork in the app and
+the system widget, and a volume control. Browse (#17's Source-picker rework, search, history
+grouping, venue/city on drill-in) and a Settings scene are left for later slices — #25 is
+explicitly meant to be split, not done in one pass.
+
+**Placement: a trailing `.inspector` panel**, not a separate window or a fifth sidebar
+section. A window would need its own artwork/transport duplicated and is one more window to
+manage; a sidebar section was rejected because `RootView.swift` deliberately builds a fresh
+`NavigationStack` per section (Artists → Periods → Shows → Show state must not leak across
+sections), so visiting a "Now Playing" section would reset browse's drill-down every time —
+exactly the state loss the issue's "see the rest of the show while browsing elsewhere" is
+asking to avoid. The inspector needs a toolbar to toggle it, which also delivers #25's "no
+toolbar on the detail pane" item as a side effect.
+
+**No transport controls in the panel.** `MiniPlayerView` is always on screen directly below
+the inspector whenever a show is loaded (`RootView.swift`), so duplicating play/pause/skip/
+scrub a few points above it would be redundant chrome. The panel is artwork, identity, and the
+full track queue; `MiniPlayerView` stays the only transport.
+
+**Queue.** `NowPlayingInspector` reads `player.tracks` — the whole show's track list, which
+`Player` already holds independent of how much of it is actually loaded into `AVQueuePlayer`
+(only a suffix starting at the current index ever is). Grouped by set with the same
+first-appearance-order logic `ShowDetailView` already had; that logic moved out to
+`TrackGroups.swift` so both views share it rather than duplicating it. Tapping any row calls
+`player.seek(toTrack:)`, which rebuilds the queue from that index — the same mechanism
+`ShowDetailView`'s track rows already use.
+
+**Artwork.** `ArtworkView` wraps `AsyncImage` with a `music.note` placeholder — needed because
+Relisten show summaries carry no art at all, so the placeholder is the common case there, not
+an edge case. Used at 36pt in the mini player and 160pt in the inspector. The system Now
+Playing widget needed a separate path: `MPNowPlayingInfoCenter`'s `MPMediaItemArtwork` wants an
+`NSImage`, not a URL, and `updateNowPlayingInfo()` rebuilds its whole info dictionary on every
+track change — including before an async fetch can possibly have completed — so `Player` now
+fetches into a cached `NSImage` (`loadArtwork(for:)`, keyed against the URL that requested it so
+a stale load can't land after the show has already changed again) and includes it from that
+cache rather than fetching inline. This closes D107, which shipped Now Playing metadata
+without artwork specifically because this wasn't built yet.
+
+**Volume.** `Player.volume` (0...1) is app-level, not system volume — a `@Published` property
+with `didSet` writing through to `queuePlayer.volume` and `UserDefaults` so it survives a
+relaunch; `init` also sets `queuePlayer.volume` directly since `didSet` doesn't fire for an
+initializer assignment. `toggleMute()` stashes the pre-mute level rather than just zeroing it,
+so unmuting restores where it was. Lives in the mini player, not the inspector, so it's
+reachable without opening the panel.
+
+**One change outside the strict scope, flagged deliberately.** `ShowDetailView`'s `TrackRow`
+used `.contentShape(Rectangle()).onTapGesture`, which D166 found doesn't reliably respond to a
+synthetic click via `System Events` — the exact thing that blocked live verification of
+anything needing a loaded queue in that pass, and would have blocked this one too, since none
+of this PR's changes are observable without one. Switched to `Button(...).buttonStyle(.plain)`,
+mirrored in the new `QueueRow`. Three-line change, keyboard- and VoiceOver-accessible either
+way, and plausibly unblocks the automated pass — but stands on its own accessibility merit even
+if it turns out not to.
+
+**Testing limits, worth being just as honest about as D166 was.** The build succeeds
+(`xcodebuild`) and `swift test` stays green (124/124 — CouchTourKit itself is untouched by this
+pass; the 94/94 D166 cited has grown since). Live verification hit the exact hang D166 already
+documented and moved on from: `xcodegen generate` gives the project a fresh identity, so
+`install.sh`'s Release build carries a fresh ad-hoc signature, and this machine's login keychain
+holds a real `sync.deviceToken` from an actual paired device (the live sync verification from
+D116-D148) — `SyncSession.init` reads it unconditionally via `AppModel`, at launch, before any
+UI appears. `sample` confirmed the main thread parked in `SecItemCopyMatching`, and a
+`SecurityAgent` process was running — the OS asking to authorize the new signature against that
+real credential. Per D166 and CLAUDE.md, that prompt is never one to answer non-interactively;
+the process was killed instead, twice, without touching it. This worktree has no
+previously-trusted build of its own to fall back to (D166's was a different worktree, a
+different DerivedData path), so nothing in this PR was clicked through live — verification here
+is code review only: the diff was read start to finish, the build was confirmed clean, and two
+real issues were caught and fixed that way (stale artwork surviving a show switch until the new
+fetch resolved, and `.navigationTitle` not being guaranteed to render inside an `.inspector`
+panel that isn't itself a `NavigationStack` — both described above). A real interactive pass —
+toggling the inspector, playing a show, confirming artwork appears in both the panel and
+Control Center's Now Playing widget, dragging the volume slider and hearing it — is worth five
+minutes on a real device before calling this fully done, the same ask D166 closed with.
+
+**Also found and fixed while exploring this issue, unrelated to the change itself:** Android's
+History screen is not actually grouped by artist, contrary to `HistoryView.swift`'s comment and
+two lines in ROADMAP.md. `MainActivity.kt`'s `HistoryScreen` is a flat `LazyColumn` over
+`ProgressDao.history()`; the grouping DAO methods added for it (`Progress.artists()`,
+`Progress.historyFor()`) are real but referenced only by tests, never by any screen. Corrected
+in both places rather than left to mislead whichever slice eventually ports "History grouped by
+artist" to macOS.

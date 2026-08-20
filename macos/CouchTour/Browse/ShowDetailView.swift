@@ -24,7 +24,7 @@ struct ShowDetailView: View {
                                 tapeSwitcher(detail)
                             }
                         }
-                        ForEach(trackGroups(detail), id: \.setName) { group in
+                        ForEach(trackGroups(detail.tracks), id: \.setName) { group in
                             Section(group.setName.isEmpty ? "" : group.setName) {
                                 ForEach(group.tracks, id: \.id) { track in
                                     TrackRow(
@@ -45,24 +45,6 @@ struct ShowDetailView: View {
         }
         .navigationTitle(show.date)
         .task { await load() }
-    }
-
-    private struct TrackGroup {
-        let setName: String
-        let tracks: [PlayableTrack]
-    }
-
-    /// Preserves first-appearance order of set names, since sets already arrive in index
-    /// order from the catalog layer (Catalog.swift / RelistenAPI.swift) — grouping here must
-    /// not re-sort them.
-    private func trackGroups(_ detail: ShowDetail) -> [TrackGroup] {
-        var order: [String] = []
-        var buckets: [String: [PlayableTrack]] = [:]
-        for track in detail.tracks {
-            if buckets[track.setName] == nil { order.append(track.setName) }
-            buckets[track.setName, default: []].append(track)
-        }
-        return order.map { TrackGroup(setName: $0, tracks: buckets[$0] ?? []) }
     }
 
     @ViewBuilder
@@ -107,20 +89,25 @@ private struct TrackRow: View {
     let onTap: () -> Void
 
     var body: some View {
-        HStack {
-            if isPlaying {
-                Image(systemName: "speaker.wave.2.fill")
-                    .foregroundStyle(.tint)
+        // A Button rather than .onTapGesture: keyboard- and VoiceOver-activatable, and
+        // .onTapGesture wasn't reliably triggered by synthetic clicks during D166's live
+        // verification pass even though List row navigation elsewhere in the app was fine.
+        Button(action: onTap) {
+            HStack {
+                if isPlaying {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .foregroundStyle(.tint)
+                        .font(.caption)
+                }
+                Text(track.title)
+                    .fontWeight(isPlaying ? .semibold : .regular)
+                Spacer()
+                Text(fmt(track.durationMs))
                     .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            Text(track.title)
-                .fontWeight(isPlaying ? .semibold : .regular)
-            Spacer()
-            Text(fmt(track.durationMs))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onTap)
+        .buttonStyle(.plain)
     }
 }

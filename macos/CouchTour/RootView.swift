@@ -42,17 +42,36 @@ struct RootView: View {
                 // A fresh NavigationStack per section, rather than one stack switching
                 // content, so drill-down state (Artists → Periods → Shows → Show) doesn't
                 // leak across sidebar sections and resets when you switch away and back.
-                switch selection ?? .artists {
-                case .artists:
-                    NavigationStack { ArtistsView() }
-                case .continueListening:
-                    NavigationStack { ContinueListeningView() }
-                case .history:
-                    NavigationStack { HistoryView() }
-                case .sync:
-                    NavigationStack {
-                        SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
+                Group {
+                    switch selection ?? .artists {
+                    case .artists:
+                        NavigationStack { ArtistsView() }
+                    case .continueListening:
+                        NavigationStack { ContinueListeningView() }
+                    case .history:
+                        NavigationStack { HistoryView() }
+                    case .sync:
+                        NavigationStack {
+                            SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
+                        }
                     }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            appModel.showNowPlaying.toggle()
+                        } label: {
+                            Label("Now Playing", systemImage: "music.note.list")
+                        }
+                    }
+                }
+                // A trailing inspector rather than a fifth sidebar section or a separate
+                // window: it can show the queue for whatever's playing without disturbing
+                // browse's own NavigationStack (see the comment above), and stays in the
+                // same window as everything else.
+                .inspector(isPresented: $appModel.showNowPlaying) {
+                    NowPlayingInspector()
+                        .inspectorColumnWidth(min: 260, ideal: 300, max: 380)
                 }
             }
             if player.show != nil {
