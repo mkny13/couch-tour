@@ -191,6 +191,14 @@ liked state).
   `finished` progress row. Cached daily like D162's "On this date", except the unplayed
   filter itself runs live against `ProgressDao.finishedKeys()` rather than being part of
   that cache, since it changes the moment a show finishes rather than once a day. D164.
+- "Next Couch Tour stop" tour picker for defunct/non-touring artists (#22 follow-up). Today
+  an artist whose latest show isn't part of a named tour (both backends tag it "Not Part of a
+  Tour" rather than leaving it blank, D165) simply doesn't participate — correct, but for a
+  band like Grateful Dead that never tours again, that means never participating at all.
+  Mike's suggestion: let the user pick which past tour or era to track instead of a strict
+  opt-out. Needs its own design pass — where the picker lives (artist page? the Next Stop row
+  itself?) and how "tour" gets enumerated for one of these artists (`tourName` grouping, or
+  falling back to year) aren't decided yet.
 - Better source selection beyond the "switch tape" rework above: surface whatever signals
   help identify the best source for a show (ratings, review counts/text, taper reputation); a
   way to quickly compare snippets of the same track across all available tapers/sources side

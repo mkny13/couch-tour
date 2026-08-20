@@ -1799,3 +1799,27 @@ Deliberately out of scope: a "tour" is inferred from `tourName` matching alone, 
 recency cutoff — an artist whose last tour was years ago still yields a valid answer, which
 reads as a feature (there's always a next stop to catch up on) rather than a bug for this
 pass.
+
+### D165 — both backends' "Not Part of a Tour" is a sentinel, not a real tour name
+
+Found on a real device within minutes of D164 shipping: favoriting Grateful Dead surfaced
+"1994-02-25 · Grateful Dead — Not Part of a Tour" as the next stop, when the band hasn't
+toured since 1995. `currentTourShows` (`NextStop.kt`) took `ShowSummary.tourName` at face
+value, but confirmed live against both APIs, neither leaves the field blank or null for a
+standalone show — they both send the literal string `"Not Part of a Tour"`. Treated as a real
+tour name, every such show across an artist's two most recent fetched periods got lumped
+together as if they were one tour, so a defunct or lightly-touring artist's oldest untoured
+show would win the cross-artist pick every time and quietly crowd out artists that actually
+have a current tour.
+
+Fixed by giving the sentinel the same opt-out `currentTourShows` already gave a blank or null
+`tourName` (D164): if the most recent show is tagged "Not Part of a Tour", the artist simply
+doesn't participate, same as one with no current tour at all. Covered by a new
+`NextStopTest.kt` case built from the exact string both APIs return, confirmed by querying
+them directly rather than guessing at the shape.
+
+Mike suggested a richer fix in the same conversation: rather than an inactive artist silently
+opting out, offer a picker to choose which past tour or era to track for "catching up" on.
+Left for a follow-up rather than folded into this pass — it is a real UI addition (where does
+it live, how is "tour" enumerated for a picker), not a bug fix, and deserves its own design
+pass. Noted in ROADMAP.md.

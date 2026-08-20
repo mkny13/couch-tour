@@ -73,14 +73,26 @@ internal fun playedShowIds(keys: Collection<String>): Set<String> = keys.mapNotN
     }
 }
 
+/** Both backends use this exact string as [ShowSummary.tourName] for a show that isn't part
+ *  of a named tour (confirmed live against both APIs) rather than leaving the field blank —
+ *  a sentinel, not a real tour, so it gets the same opt-out treatment a blank name would. */
+private const val NOT_PART_OF_A_TOUR = "Not Part of a Tour"
+
 /**
  * The shows in [shows] that share the tour of the most recent one — empty if that show
  * carries no tour name, which is how an artist without a "current tour" opts out entirely
- * (older or single-show periods often have none).
+ * (older or single-show periods often have none, and a lot of them are explicitly tagged
+ * [NOT_PART_OF_A_TOUR] rather than left blank). Without this, an inactive artist's standalone
+ * shows would get lumped into one fake "tour" spanning however many years happen to be
+ * fetched, and its oldest entry would win the cross-artist pick every time — a defunct band
+ * with a deep, mostly-untoured archive would permanently crowd out artists that actually
+ * tour.
  */
 internal fun currentTourShows(shows: List<ShowSummary>): List<ShowSummary> {
     val latest = shows.maxByOrNull { it.date } ?: return emptyList()
-    val tour = latest.tourName?.takeIf { it.isNotBlank() } ?: return emptyList()
+    val tour = latest.tourName
+        ?.takeIf { it.isNotBlank() && it != NOT_PART_OF_A_TOUR }
+        ?: return emptyList()
     return shows.filter { it.tourName == tour }
 }
 
