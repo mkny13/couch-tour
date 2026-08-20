@@ -88,6 +88,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -442,6 +443,20 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                     subtitle = if (paired) "Paired — manage devices" else "Not paired",
                     artUrl = null,
                     onClick = { nav.navigate("sync") }
+                )
+            }
+
+            // Diagnostic detail, not a feature — small, muted, and at the literal bottom of
+            // the scrollable list so it never competes with the content above (#43).
+            item {
+                Text(
+                    "Couch Tour ${BuildConfig.VERSION_NAME}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp, bottom = 16.dp)
                 )
             }
         }

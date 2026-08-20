@@ -1714,3 +1714,30 @@ Out of scope for this pass, left for #22 (the next Couch Tour stop, a related "s
 to favorited artists" query): no shared helper yet between the two, but `showsOnDate`'s shape
 — dispatch on backend through `MusicSource`, bound the request count, cache once-a-day — is
 worth reusing if #22 needs the same thing.
+
+### D163 — app version is threaded from the release tag on Android, hand-bumped on macOS
+
+#43. Both `BuildConfig.VERSION_NAME` and `MARKETING_VERSION` were static placeholders,
+disconnected from the `release_tag` (e.g. `v0.23`) that `build-debug-apk.yml` already used to
+name the GitHub Release and its APK asset — displaying either would have shown the same
+string forever.
+
+- **Android**: `app/build.gradle.kts`'s `versionName` now reads `-PversionName`
+  (`project.findProperty("versionName") as? String ?: "1.0"`), and
+  `build-debug-apk.yml`'s "Assemble debug APK" step passes `-PversionName="$RELEASE_TAG"`
+  whenever `release_tag` is set, alongside (not instead of) `-PsideInstall=true` when both are
+  set — a beta side-install cut with a release tag gets both. Plain pushes and dispatches
+  without a tag keep the placeholder. `buildFeatures.buildConfig = true` had to be turned on
+  explicitly — AGP 8 disables `BuildConfig` generation by default. Surfaced as a small,
+  `onSurfaceVariant`-at-60%-alpha, centered caption (`"Couch Tour ${BuildConfig.VERSION_NAME}"`)
+  as the literal last item in `HomeScreen`'s `LazyColumn`, after the Sync section — the most
+  out-of-the-way spot without a dedicated Settings screen, which doesn't exist yet.
+- **macOS**: no release-tag pipeline exists yet (no macOS CI at all — see CLAUDE.md), so this
+  stays manual: `MARKETING_VERSION` in `macos/project.yml` gets bumped by hand alongside each
+  notable build, same as before, just now actually looked at. `SyncView` — the closest thing
+  to a settings screen today — reads it back at runtime via
+  `Bundle.main.infoDictionary?["CFBundleShortVersionString"]` rather than hardcoding a second
+  copy of the string in Swift, so a hand-bump to `project.yml` is the only place that needs
+  touching. Shown as a `.caption`/`.secondary`, centered `Section` at the bottom of the form.
+  Building a whole Settings scene or an "About" panel just for this (both currently
+  unscheduled — see ROADMAP.md and #25) was ruled out as more than the issue asked for.

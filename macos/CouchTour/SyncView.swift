@@ -105,6 +105,17 @@ struct SyncView: View {
                     }
                 }
             }
+
+            // Diagnostic detail, not a feature — small, muted, at the bottom of the closest
+            // thing to a settings screen this app has today (#43). MARKETING_VERSION in
+            // project.yml is bumped by hand alongside each notable build; there's no
+            // release-tag pipeline for macOS yet (no CI at all — see CLAUDE.md).
+            Section {
+                Text("Couch Tour \(appVersion)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
         }
         .formStyle(.grouped)
         .navigationTitle("Sync")
@@ -112,6 +123,10 @@ struct SyncView: View {
         .onChange(of: syncSession.paired) { _, paired in
             if paired { Task { await refreshDevices() } }
         }
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
     }
 
     private func startPairing() {
