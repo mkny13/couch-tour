@@ -155,4 +155,28 @@ final class RelistenParsingTests: XCTestCase {
         let tracks = try decoder.decode(RelistenShowWithSources.self, from: Data(raw.utf8)).toShowDetail(artist: artist).tracks
         XCTAssertEqual(["Kept"], tracks.map { $0.title })
     }
+
+    // -------------------------------------------------------------- source picker
+
+    func testABlankTaperFallsBackToTheSoundboardAudienceLabelRatherThanRenderingEmpty() {
+        let sbd = RelistenSource(uuid: "1", isSoundboard: true, taper: "")
+        XCTAssertEqual("Soundboard", sbd.toRecordingRef().label)
+        XCTAssertNil(sbd.toRecordingRef().taper)
+
+        let aud = RelistenSource(uuid: "2", isSoundboard: false, taper: "")
+        XCTAssertEqual("Audience", aud.toRecordingRef().label)
+    }
+
+    func testABlankLineageBecomesNilRatherThanABareLabel() {
+        let source = RelistenSource(uuid: "1", lineage: "")
+        XCTAssertNil(source.toRecordingRef().lineage)
+    }
+
+    func testARealTaperAndLineageAreKeptAsIs() {
+        let source = RelistenSource(uuid: "1", taper: "Jim Wise", lineage: "DAT > FLAC")
+        let ref = source.toRecordingRef()
+        XCTAssertEqual("Jim Wise", ref.label)
+        XCTAssertEqual("Jim Wise", ref.taper)
+        XCTAssertEqual("DAT > FLAC", ref.lineage)
+    }
 }

@@ -1962,3 +1962,74 @@ two lines in ROADMAP.md. `MainActivity.kt`'s `HistoryScreen` is a flat `LazyColu
 `Progress.historyFor()`) are real but referenced only by tests, never by any screen. Corrected
 in both places rather than left to mislead whichever slice eventually ports "History grouped by
 artist" to macOS.
+
+### D168 — the Source-picker rework lands on macOS, plus two inherited Relisten bugs (#25, browse)
+
+The third slice pulled from #25's batch (D166 did the small player fixes; D167 did the whole
+player-surface group). This one takes the show-detail items from #25's browse group: the tape
+switcher was still a bare `Picker` labeled "Tape" — #17's rework shipped on Android but never
+landed here — and `ShowDetailView` dropped the venue/city on drill-in. Search and history
+grouping stay out of this slice; search is its own stack macOS has none of (`MusicSource` has
+no `search` at all), confirmed as the next desktop slice rather than folded in here, and history
+grouping is a fresh design per D167's correction, not a port.
+
+**Two bugs found while porting, fixed in the same pass.** Confirming the port against Android's
+`RecordingRef`/`SourceRow` turned up two places macOS's `RelistenSource` mapping had drifted
+from fixes Android already made:
+
+- **Blank taper/lineage rendered empty.** Relisten sends `""` rather than omitting these on
+  many sources; `RelistenAPI.swift`'s `toRecordingRef()` did `taper ?? (isSoundboard ? ... :
+  ...)`, so a blank taper produced an empty row label and a bare "Lineage:" with nothing after
+  it. A blank string satisfies Swift's `??` the same way it satisfies Kotlin's `?:` — neither
+  language's nil-coalescing treats `""` as absent. Fixed with a small `Optional<String>.nonBlank`
+  helper, mirroring Android's `taper?.takeIf { it.isNotBlank() }` (`Relisten.kt:207-217`).
+- **`looksLikeMatrix` never ported.** Android's `RecordingRef` has the computed property since
+  #17 shipped; macOS's `RecordingRef` (`Catalog.swift`) had all seven of `RecordingRef`'s stored
+  fields but not the derived one. Added verbatim, including the doc comment's framing — a
+  substring match on free text, a hint for the UI, not a fact, since Relisten has no structured
+  matrix flag.
+
+Both are covered in `CouchTourKitTests` now: `CatalogTests` for `looksLikeMatrix` (taper match,
+lineage match, case-insensitivity, negative), `RelistenParsingTests` for the blank-taper and
+blank-lineage fallbacks, built directly against `RelistenSource`'s own init rather than a new
+JSON fixture — the same pattern `testFlattensSetsInIndexOrderAndDropsTracksWithNoMp3Url` already
+uses for a constructed edge case.
+
+**Picker: a `.popover`, not a sheet.** The macOS analogue of Android's `ModalBottomSheet`:
+anchored to the row that opened it, dismissed by clicking away, lighter than a modal sheet for
+what's fundamentally a picker. `SourceRow` carries what Android's does — label, an "SBD" badge,
+a "Matrix?" badge (the `?` stays, marking the heuristic), `★ rating · N reviews` when rated,
+`Taper:` suppressed when it would just repeat the label, `Lineage:` when present, current source
+checkmarked. No client-side sort — Relisten already returns sources ranked by
+`avg_rating_weighted` desc (D79), and the current source is pinned first the same way the old
+`Picker` built its list.
+
+**Gate fix.** The old gate opened whenever `hasMultipleSources && (!alternates.isEmpty ||
+recording != nil)` — the `recording != nil` arm rendered a one-item picker with nothing to pick
+on a single-source show. Aligned to Android's `hasMultipleSources && alternates.isNotEmpty()`.
+
+**Position carry across a source switch — the behavioral half of #17 macOS lacked entirely.**
+Before this, picking a different source swapped the displayed track list but left the player on
+the old source. `switchSource(to:)` captures the pre-switch queue key, reloads, and — only if
+that queue key is still what the player has loaded (i.e. this show's queue is what's actually
+playing, not just what's being browsed) — restarts on the new source at the same track index and
+position via `player.play(detail:startIndex:resumePositionMs:)`, which already took exactly
+these parameters. Index is clamped to the new source's track count and read fresh from the
+player right before the call (not snapshotted before the network fetch), since tapers split
+tracks differently — the same approximation Android's picker documents, not something to imply
+is exact.
+
+**`navigationSubtitle`.** `ShowDetailView` now sets `.navigationSubtitle(show.where_)` alongside
+`navigationTitle(show.date)`, restoring the venue/city `ShowsView`'s list row already shows.
+
+**Testing.** `swift test` is the real gate here and it's green — 131/131, up from 124 (D167's
+count), with both bug fixes covered by tests that failed against the pre-fix code. `xcodebuild`
+succeeds; no new source files, so no `xcodegen generate` was needed. Live verification hit the
+same environmental wall D166/D167 already documented and moved past — any code change produces a
+fresh ad-hoc signature via `install.sh`, and this machine's login keychain holds a real
+`sync.deviceToken` from an actual paired device that `SyncSession.init` reads unconditionally at
+launch, parking the main thread behind a Keychain re-authorization prompt no agent should answer.
+Unlike D167, the cost of that here is smaller: `looksLikeMatrix` and the blank-string fixes are
+pure model logic, fully proven by `swift test` independent of the UI. What's unverified live is
+the popover's rendering and the position-carry across a real source switch — flagged in the PR
+for a manual pass, same as the prior two entries.

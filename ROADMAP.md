@@ -14,7 +14,6 @@ but have no screen.
 - Should a show auto-advance into the next show, or stop at the encore?
 - Do you want the waveform images (`waveform_image_url`) in the player, or is a plain
   scrubber enough?
-- Is search worth adding on macOS, given you picked browse-by-year as the MVP's entry point?
 - Confirm on a real device that audio now audibly ducks for a notification sound (#23, D93) —
   the fix is a platform audio-focus behavior Robolectric can't exercise, so it's unverified
   beyond compiling and the existing unit suite passing.
@@ -63,12 +62,16 @@ currently queued up next for sync specifically; future work here will start a fr
 
 **What's next for desktop, unrelated to sync:**
 
+- Search — decided worth building (the open question this used to be is settled), and it's
+  the next #25 slice. Android's whole stack is there to port from: `MusicSource.search`, both
+  backends' result models, and `song:`/`venue:`-prefixed `PeriodRef` ids that route hits back
+  through the existing `shows()` seam (`Catalog.kt`, `Relisten.kt`). macOS has none of it yet.
 - History grouped by artist — not actually "matching Android" as this used to say: Android's
   History screen is a flat list too (`MainActivity.kt`'s `HistoryScreen`), the DAO methods for
   grouping (`Progress.artists()`, `Progress.historyFor()`) exist but are only exercised by
   tests. Whichever platform does this first is designing it fresh, not porting.
-- Login, likes, playlists, search, and casting on desktop — out of scope for the MVP,
-  unscheduled beyond that.
+- Login, likes, playlists, and casting on desktop — out of scope for the MVP, unscheduled
+  beyond that.
 - Auto-updates. There's no update mechanism today — the app is ad-hoc signed, not
   distributed, and a copy of the `.app` on another Mac has no way to learn a newer build
   exists. The standard fix is bundling [Sparkle](https://sparkle-project.org) with a hosted
@@ -97,11 +100,11 @@ blocked on the rest of it landing soon:
    app version somewhere unobtrusive, D163) also shipped — parked here for scheduling
    convenience rather than being part of the cluster itself.
 4. **Desktop parity** — #25 (desktop UI improvements); not release-gated. The scrubber
-   seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` (D166), plus
-   the whole player-surface group — a Now Playing inspector, artwork in the app and the
-   system widget, and a volume control (D167) — are done. What's left of #25's batch: a
-   Settings scene, desktop search, history grouping, venue/city on drill-in, and #25's own
-   share of the Source-picker rework.
+   seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands` (D166), the
+   whole player-surface group (D167), and the show-detail browse group — a real Source picker
+   and venue/city kept on drill-in (D168) — are done. What's left of #25's batch: a Settings
+   scene, desktop search (decided worth building — see the Desktop section above; this is
+   the next slice), and history grouping.
 5. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
    (Spotify Live) — each is a new surface rather than a feature on an existing one; #16 and
    #15 also carry ToS/API risk worth resolving before writing code, and #15's approach-
@@ -165,7 +168,8 @@ liked state).
   show taper, lineage, rating, and review count; SBD sources get a badge, and a lineage/taper
   substring match for "matrix" gets a second one (marked "?" since Relisten has no structured
   matrix flag). Switching sources mid-playback carries the position to the same track index
-  on the new source. Desktop (macOS) still has the old tape switcher — see #25.
+  on the new source. Desktop (macOS) now has the same rework (D168): a `.popover` in place of
+  the `ModalBottomSheet`, same badges and fields, same position-carry on switch.
 - Source/show-level volume leveling — not traditional per-track leveling, but matching
   average sound levels across quiet and loud recordings so different sources/shows play back
   at comparable volume. (#18)
@@ -214,11 +218,13 @@ liked state).
   (artwork, full track queue, no duplicated transport — `MiniPlayerView` already covers that),
   artwork in the mini player and the system Now Playing widget, and a persisted app-level
   volume control. Window/macOS idioms: menu-bar `Commands` for Play/Pause/Next/Previous and
-  the inspector's toolbar button are done (D166, D167); still no Settings scene. Browse is
-  still open: no search, History not grouped by artist — and neither is Android's despite an
-  older note here claiming otherwise (see the Desktop section above), so this is a fresh
-  design, not a port — venue/city lost on drill-in, tape switcher needs the same Source-picker
-  rework as #17. (#25)
+  the inspector's toolbar button are done (D166, D167); still no Settings scene. Browse: the
+  tape switcher now gets the same Source-picker rework as #17 — a popover with the same
+  badges, ratings, taper/lineage fields, and position-carry on switch — and venue/city is kept
+  on drill-in (both D168). Still open: search (decided worth building, filed as the next
+  slice — see the Desktop section above) and History not grouped by artist — and neither is
+  Android's despite an older note here claiming otherwise, so that one's a fresh design, not a
+  port. (#25)
 - Security review before Play Store release — sync backend rate limiting and request
   validation, client secret storage verification, log/manifest/dependency audit. (#26)
 - Show the app version somewhere unobtrusive, on both clients — useful for comparing behavior

@@ -147,4 +147,23 @@ final class CatalogTests: XCTestCase {
         let detail = ShowDetail(summary: ShowSummary(artist: artist, date: "2001-04-22"))
         XCTAssertNil(detail.queueKey)
     }
+
+    // -------------------------------------------------------------- source picker
+
+    func testLooksLikeMatrixMatchesInTaper() {
+        XCTAssertTrue(RecordingRef(id: "1", label: "x", taper: "SBD/AUD Matrix").looksLikeMatrix)
+    }
+
+    func testLooksLikeMatrixMatchesInLineage() {
+        XCTAssertTrue(RecordingRef(id: "1", label: "x", lineage: "DAT > Matrix > FLAC").looksLikeMatrix)
+    }
+
+    func testLooksLikeMatrixIsCaseInsensitive() {
+        XCTAssertTrue(RecordingRef(id: "1", label: "x", taper: "MATRIX mix").looksLikeMatrix)
+    }
+
+    func testLooksLikeMatrixIsFalseWithNoMatchingText() {
+        XCTAssertFalse(RecordingRef(id: "1", label: "x", taper: "Jim Wise", lineage: "DAT > FLAC").looksLikeMatrix)
+        XCTAssertFalse(RecordingRef(id: "1", label: "x").looksLikeMatrix)
+    }
 }

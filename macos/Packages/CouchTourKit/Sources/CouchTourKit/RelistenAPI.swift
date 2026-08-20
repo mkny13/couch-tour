@@ -311,16 +311,25 @@ extension RelistenShowSummary {
     }
 }
 
+/// Relisten sends `""` rather than omitting `taper`/`lineage` on many sources — without this,
+/// a blank taper renders an empty row label and a bare "Lineage:" with nothing after it.
+extension Optional where Wrapped == String {
+    fileprivate var nonBlank: String? {
+        guard let self, !self.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        return self
+    }
+}
+
 extension RelistenSource {
     public func toRecordingRef() -> RecordingRef {
         RecordingRef(
             id: uuid,
-            label: taper ?? (isSoundboard ? "Soundboard" : "Audience"),
+            label: taper.nonBlank ?? (isSoundboard ? "Soundboard" : "Audience"),
             isSoundboard: isSoundboard,
             rating: avgRatingWeighted,
             reviewCount: numReviews,
-            taper: taper,
-            lineage: lineage
+            taper: taper.nonBlank,
+            lineage: lineage.nonBlank
         )
     }
 }
