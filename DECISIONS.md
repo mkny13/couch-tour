@@ -1660,3 +1660,57 @@ genuinely mixed playlist resolve correctly, and a stale or unreachable reference
 not thrown), `MigrationTest.kt`'s new v7→v8 section (existing `progress` rows survive
 untouched; the migrated db accepts a real playlist write), and `MediaItemsTest.kt`'s new
 cases (a mixed playlist's `MediaItem`s carry each track's own artist, not the queue's).
+
+### D162 — the request bound is split by backend, and the daily answer is cached in memory not Room
+
+Home screen "on this date" playlist (#13), sitting on top of favorite artists (#14). Neither
+backend has a month/day-across-years query — phish.in's `/shows` only takes `year=` or
+`year_range=` (`PhishInApi.showsForPeriod`), Relisten's catalog is a per-year fetch
+(`RelistenApi.year`) — so finding matches means fetching shows a period at a time and
+filtering client-side on the date string. That makes this a cost problem more than a UI one,
+and the cost is lopsided between backends, which is why the two get different bounds instead
+of one shared cap:
+
+- **phish.in**: no year bound. The whole archive is under 2,000 shows with audio across ~35
+  periods; `phishInRanges` (`OnThisDate.kt`) greedily batches consecutive periods into
+  `year_range=` requests capped at 900 shows each — comfortably under the API's
+  `per_page=1000` — so covering every Phish year end to end costs about four requests. The
+  bound is self-sizing against each period's own `showsWithAudioCount` rather than a
+  hardcoded year list, so it keeps holding as the archive grows.
+- **Relisten**: `RELISTEN_YEAR_BUDGET` (12) year-fetches total, split evenly across at most
+  `MAX_RELISTEN_ARTISTS` (3) favorited artists, most recent years first. Relisten has no
+  range endpoint — one request per year per artist — so without a cap, favoriting a handful
+  of deep-archive artists would mean dozens of requests on every Home screen visit.
+  Favoriting twelve Relisten artists costs exactly what favoriting three does; the extras
+  simply don't participate.
+- Worst case is about nineteen requests. Run at most once a day: `OnThisDate` wraps
+  `showsOnDate` in a one-entry in-memory cache keyed on today's date plus the sorted
+  favorited-artist keys, the same shape as `RelistenCatalogSource.cachedArtists`'s in-memory
+  cache rather than a new Room table — the answer only changes once a day, and the `progress`
+  table has no business holding throwaway catalog data. Process death re-fetches, which is
+  the right trade for a once-a-day result.
+
+Wired into `HomeScreen` as a second, independent `loadOnce` (`MainActivity.kt`) keyed on the
+date and the favorited artists' keys, separate from `loadArtistsByBackend`'s — it must not
+block the screen's first paint on a multi-request fetch. The section (`SectionHeader("On this
+date", divided = true)` + a `LazyRow` of `AnniversaryCard`s, geometry matching `ResumeCard`)
+renders only inside `loaded()`'s success branch and only when non-empty: no header, spinner,
+or error text on a day with no matches, or before any artist is favorited — it's a discovery
+extra layered on top of the screen, not something the user asked for, so its absence should
+read as nothing rather than as breakage.
+
+`pickAnniversaryShows` reuses `pickRandomShow`'s injectable-`Random` idiom (D36) rather than
+inventing a second random-pick pattern for the "random selection" the issue asked for:
+shuffle the matches, take a bounded handful (`MAX_ANNIVERSARY_SHOWS`, 8), then sort
+date-descending so the row doesn't reshuffle on every recomposition.
+
+Everything lives in pure functions and one suspend orchestrator behind the existing
+`MusicSource` seam (`OnThisDate.kt`), the same split `Catalog.kt` already uses for
+`mergeArtists`/`pickRandomShow` — `OnThisDateTest.kt` covers the date matching, the range
+batching, the Relisten budget split, and the fan-out (including one artist's fetch failing
+without sinking the others) with a fake source and no network call.
+
+Out of scope for this pass, left for #22 (the next Couch Tour stop, a related "shows relevant
+to favorited artists" query): no shared helper yet between the two, but `showsOnDate`'s shape
+— dispatch on backend through `MusicSource`, bound the request count, cache once-a-day — is
+worth reusing if #22 needs the same thing.
