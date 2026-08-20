@@ -89,6 +89,20 @@ class MigrationTest {
     """.trimIndent()
     private val v6IdentityHash = "4d896ba9c2e33ae0f04a776ea8820b5f"
 
+    // From app/schemas/dev.mike.couchtour.PhishInDb/7.json — same progress table as v6, with
+    // deletedAt added.
+    private val v7CreateTable = """
+        CREATE TABLE IF NOT EXISTS `progress` (
+            `queueKey` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
+            `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
+            `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL,
+            `finished` INTEGER NOT NULL, `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL,
+            `deletedAt` INTEGER,
+            PRIMARY KEY(`queueKey`)
+        )
+    """.trimIndent()
+    private val v7IdentityHash = "8f6c5f6f3e350c0e2308865a07dac721"
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -218,6 +232,28 @@ class MigrationTest {
         db.close()
     }
 
+    private fun createV7DatabaseWithRows() {
+        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        db.execSQL(v7CreateTable)
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+        db.execSQL(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            arrayOf(v7IdentityHash),
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish',NULL)"""
+        )
+        db.version = 7
+        db.close()
+    }
+
     private fun openWithCurrentSchema(): PhishInDb =
         Room.databaseBuilder(context, PhishInDb::class.java, dbFile.name)
             .addMigrations(
@@ -227,6 +263,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_4_5,
                 PhishInDb.MIGRATION_5_6,
                 PhishInDb.MIGRATION_6_7,
+                PhishInDb.MIGRATION_7_8,
             )
             .allowMainThreadQueries()
             .build()
@@ -450,6 +487,50 @@ class MigrationTest {
 
             assertNull(dao.get("show:1997-02-13"))
             assertEquals(1, dao.history().first().size)
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v7 -> v8
+
+    @Test
+    fun `migrating from v7 keeps every progress row untouched`() = runBlocking {
+        // v8 (#12, D161) only adds new tables — progress isn't altered at all, unlike every
+        // migration before it.
+        createV7DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val dao = db.progressDao()
+            assertEquals(2, dao.history().first().size)
+            assertTrue(dao.get("show:1992-12-02")!!.finished)
+            assertNull(dao.get("show:1997-02-13")!!.deletedAt)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `a database migrated from v7 accepts local playlists`() = runBlocking {
+        createV7DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val dao = db.localPlaylistDao()
+            dao.insertPlaylist(LocalPlaylistEntity("p1", "Key Jams", createdAt = 1000, updatedAt = 1000))
+            dao.addTrack(
+                LocalPlaylistTrackEntity(
+                    playlistId = "p1", position = 0, backend = Backend.PHISHIN.id,
+                    trackId = "42", showDate = "1997-11-17", title = "Tweezer",
+                ),
+                now = 2000,
+            )
+
+            val playlist = dao.playlist("p1")!!
+            assertEquals(1, playlist.trackCount)
+            assertEquals(2000L, playlist.updatedAt)
+            assertEquals(listOf("Tweezer"), dao.tracksOnce("p1").map { it.title })
         } finally {
             db.close()
         }

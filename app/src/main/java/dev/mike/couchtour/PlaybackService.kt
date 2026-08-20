@@ -539,6 +539,7 @@ class PlaybackService : MediaLibraryService() {
                     recordingTrackItems(RelistenCatalogSource.show(artist, rec.date, rec.sourceId))
                 }
             }
+            QueueKind.LOCAL_PLAYLIST -> localPlaylistQueueItems(PhishInDb.get(applicationContext).localPlaylistDao(), ref.id)
         }
         if (progress == null || progress.finished || all.isEmpty()) return all
         return all.drop(progress.trackIndex.coerceIn(0, all.lastIndex))

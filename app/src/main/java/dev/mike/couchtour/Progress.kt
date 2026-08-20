@@ -104,12 +104,13 @@ interface ProgressDao {
 }
 
 @Database(
-    entities = [Progress::class],
-    version = 7,
+    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class],
+    version = 8,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
+    abstract fun localPlaylistDao(): LocalPlaylistDao
 
     companion object {
         /**
@@ -182,6 +183,31 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /** Adds local playlists (#12, D161) — new tables only, `progress` is untouched. */
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `local_playlists` (
+                        `id` TEXT NOT NULL, `name` TEXT NOT NULL,
+                        `trackCount` INTEGER NOT NULL DEFAULT 0,
+                        `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`))"""
+                )
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `local_playlist_tracks` (
+                        `rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `playlistId` TEXT NOT NULL, `position` INTEGER NOT NULL,
+                        `backend` TEXT NOT NULL, `trackId` TEXT NOT NULL, `showDate` TEXT NOT NULL,
+                        `artistSlug` TEXT, `recordingId` TEXT, `title` TEXT NOT NULL,
+                        `durationMs` INTEGER NOT NULL DEFAULT 0, `venueName` TEXT, `artUrl` TEXT,
+                        FOREIGN KEY(`playlistId`) REFERENCES `local_playlists`(`id`) ON DELETE CASCADE)"""
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId` ON `local_playlist_tracks` (`playlistId`)"
+                )
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -194,7 +220,7 @@ abstract class PhishInDb : RoomDatabase() {
                 "phishin.db"
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                MIGRATION_6_7,
+                MIGRATION_6_7, MIGRATION_7_8,
             )
                 .build().also { instance = it }
         }

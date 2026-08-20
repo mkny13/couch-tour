@@ -111,6 +111,10 @@ private fun coreMediaItem(
     venueName: String?,
     info: QueueInfo,
     clipping: MediaItem.ClippingConfiguration? = null,
+    // Every existing caller shares one artist across the whole queue (info.artist) — true
+    // for a show, a phish.in playlist, or a Relisten tape. A local playlist (#12) can mix
+    // backends within one queue, so it's the only caller that ever passes something else.
+    artist: String = info.artist,
 ): MediaItem {
     val extras = Bundle().apply {
         info.key?.let { putString(Keys.QUEUE_KEY, it) }
@@ -121,7 +125,7 @@ private fun coreMediaItem(
     }
     val meta = MediaMetadata.Builder()
         .setTitle(title)
-        .setArtist(info.artist)
+        .setArtist(artist)
         // The album is the show the track was played at, not the queue it arrived in.
         // External scrobblers (the Last.fm app reads our MediaSession directly) take
         // this field verbatim, and "some playlist · by someone · 99 tracks" is not an
@@ -167,4 +171,49 @@ internal fun recordingTrackItems(detail: ShowDetail): List<MediaItem> {
         artist = summary.artist.name,
     )
     return detail.tracks.map { recordingMediaItem(it, info) }
+}
+
+/**
+ * One [LocalPlaylistTrackEntity] resolved back into something playable — built by
+ * [PlayerViewModel]'s refetch (#12, D161), which is the only place that knows how to turn a
+ * stored reference back into a URL for either backend.
+ */
+internal data class ResolvedLocalTrack(
+    val id: String,
+    val title: String,
+    val url: String,
+    val waveformUrl: String?,
+    val showDate: String?,
+    val venueName: String?,
+    val artUrl: String?,
+    /** Per-track, unlike every other queue — see [coreMediaItem]'s `artist` param. */
+    val artistName: String,
+)
+
+/**
+ * The playable [MediaItem]s for a local playlist (#12) — the one caller that can interleave
+ * both backends in a single queue, so unlike [showTrackItems]/[playlistTrackItems]/
+ * [recordingTrackItems] it passes a per-track artist through to [coreMediaItem] rather than
+ * relying on [QueueInfo.artist].
+ */
+internal fun localPlaylistTrackItems(playlistId: String, name: String, resolved: List<ResolvedLocalTrack>): List<MediaItem> {
+    val info = QueueInfo(
+        localPlaylistQueueKey(playlistId),
+        name,
+        "${resolved.size} ${plural(resolved.size, "track")}",
+        resolved.firstOrNull()?.artUrl,
+    )
+    return resolved.map {
+        coreMediaItem(
+            id = it.id,
+            title = it.title,
+            url = it.url,
+            art = it.artUrl ?: info.art,
+            waveformUrl = it.waveformUrl,
+            showDate = it.showDate,
+            venueName = it.venueName,
+            info = info,
+            artist = it.artistName,
+        )
+    }
 }

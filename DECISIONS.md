@@ -1561,7 +1561,7 @@ correctly). Both browse surfaces were also driven live end-to-end on the `phishi
 emulator, not just unit-tested: Phish → Popular shows Big Cypress '99 (428 likes) first, and
 Grateful Dead → 1995 → Top rated re-sorts around a real 10.0.
 
-**D150 — Likes for Relisten tracks (#11) are local-only, following #14's favorites pattern
+**D160 — Likes for Relisten tracks (#11) are local-only, following #14's favorites pattern
 rather than phish.in's `LikeButton`.** phish.in's existing `LikeButton` (MainActivity.kt) is
 gated on a signed-in `Session.username` and calls `PhishInApi.like`/`.unlike` with a `Long`
 id against a server-side, public `likesCount` — none of that holds for Relisten, which has no
@@ -1587,3 +1587,76 @@ same as `Favorites`'s, since #12 (cross-backend playlists) is expected to share 
 layer per ROADMAP.md; #12 can build on it as-is rather than needing rework.
 Tested the same way as `Favorites` (`LikedTracksTest.kt`, Robolectric + `ApplicationProvider`):
 toggle on/off, and persistence across a fresh `init` on the same context.
+
+**D161 — Local playlists (#12) use Room, not `SharedPreferences`, reversing D160's own
+expectation; a stored track needs enough context to be refetched, which is more than a bare
+id.** D160 assumed #12 would reuse `LikedTracks`'/`Favorites`' `Set<String>` shape — reasonable
+before actually reading what a playlist needs to store. It doesn't hold: a playlist is
+*ordered*, holds *structured per-entry data*, and there can be several of them, which is
+relational data `SharedPreferences`-as-one-JSON-blob handles by rewriting the whole blob on
+every single-track mutation. `PhishInDb` already has exactly this shape of table (`Progress`)
+and an established migration pattern, so `local_playlists` (`LocalPlaylistEntity`: id, name,
+a denormalised `trackCount`, timestamps) and `local_playlist_tracks`
+(`LocalPlaylistTrackEntity`, one row per entry, `MIGRATION_7_8`, `local_playlist_tracks`
+`ON DELETE CASCADE`s its playlist) followed that instead (`LocalPlaylist.kt`).
+
+The harder problem `PlayableTrack.id` alone doesn't solve: neither backend has a fetch-track-
+by-id endpoint, so playing a stored track later means refetching the show it lives in and
+finding the track inside it — the same trick `PlayerViewModel.playTrack()`/`.resume()`
+already use for a single track. A `LocalPlaylistTrackEntity` row is that trick's inputs, made
+storable: `backend` + `trackId` + `showDate`, plus Relisten-only `artistSlug` (no
+fetch-by-slug-less lookup exists) and `recordingId` (a show can have several tapes with
+different track splits — null falls back to the default tape, same as `MusicSource.show`).
+The rest (`title`, `durationMs`, `venueName`, `artUrl`) is denormalised display data, so the
+playlist screen renders without a fetch per row, same tradeoff `Progress` already makes.
+
+Resolution happens at play time, not at add time: `resolveLocalPlaylistTracks`
+(`LocalPlaylist.kt`) groups a playlist's stored rows by distinct show/tape, fetches each once
+(not once per track), and looks the track up inside the result. A reference that no longer
+resolves — deleted show, track dropped from a tape — is skipped rather than failing the whole
+playlist, since there's no precedent anywhere else in the app for "a stored reference stopped
+resolving" and skip-not-crash matches how a missing recording id already degrades elsewhere
+(`RelistenShowWithSources.toShowDetail`'s fallback to the default tape). This mirrors
+resuming rather than caching a URL: phish.in URLs aren't guaranteed stable, and every other
+resumable queue in the app already refetches rather than trusting a stored one.
+
+A local playlist gets its own `QueueKind.LOCAL_PLAYLIST` / `"local-playlist:"` key prefix
+(`Queue.kt`) rather than reusing `QueueKind.PLAYLIST`'s `"playlist:"` — a local id routed
+through that kind would hit `PhishInApi.playlist(id)`, which has no such slug. Wired into
+`PlayerViewModel.resume()` and `PlaybackService`'s Auto "Continue listening" resume path
+(`resumeChildren`) the same way every other kind already is, sharing one
+`localPlaylistQueueItems(dao, id)` builder between phone and Auto (D73's contract: the two
+must produce identical queues for the same inputs).
+
+One real cross-backend wrinkle: every existing queue (`QueueInfo.artist`) publishes one
+artist for the whole queue to the MediaSession external scrobblers read (D50) — true for a
+show, a phish.in playlist, or a Relisten tape, but not for a playlist that mixes both. Rather
+than widen `QueueInfo` itself, `coreMediaItem` (MediaItems.kt) grew an `artist` param
+defaulting to `info.artist` — every existing caller is unaffected — and the new
+`localPlaylistTrackItems` is the one caller that passes a real per-track artist through
+(`ResolvedLocalTrack.artistName`). This also fixes `Progress.artist` for free: `saveNow()`
+(`PlaybackService.kt`) already reads the *currently playing item's* own artist metadata
+rather than a queue-wide value, so "Continue listening" groups a mixed playlist's history
+entries under whichever artist is actually playing, not a queue-wide guess.
+
+Deliberately out of scope for this pass, to keep it from ballooning into #12 plus half of
+phish.in's playlist feature: importing an existing phish.in playlist's tracks into a local
+one (there's no write API on phish.in's side to build against either way — playlists there
+are still browse-only, per ROADMAP.md's "Not in the app yet"); excerpts
+(`startsAtSecond`/`endsAtSecond`, phish.in's own playlists support this — D30 — but the issue
+never asked for parity); renaming a playlist after creation; and manually reordering tracks
+(adding always appends; removing is supported). None of these are precluded by the schema —
+`LocalPlaylistTrackEntity.position` already supports a real reorder, an excerpt pair of
+columns would slot in next to it — they're just not built. Also out of scope: browsing local
+playlists from Android Auto (resuming one that's already "Continue listening" works, wired
+above, but there's no new browse-tree root to pick one from scratch, unlike the phone's
+Library screen) — Auto's browse tree already has a documented follow-up to unify
+(ROADMAP.md #28), and a third root wasn't worth adding ahead of that.
+
+Tested at three layers: `LocalPlaylistDaoTest.kt` (Room, in-memory db — add/remove
+transactions, cascade delete, ordering), `LocalPlaylistResolveTest.kt` (`MockWebServer` per
+backend, matching `SearchFanOutTest`'s pattern — a phish.in-only, a Relisten-only, and a
+genuinely mixed playlist resolve correctly, and a stale or unreachable reference is skipped,
+not thrown), `MigrationTest.kt`'s new v7→v8 section (existing `progress` rows survive
+untouched; the migrated db accepts a real playlist write), and `MediaItemsTest.kt`'s new
+cases (a mixed playlist's `MediaItem`s carry each track's own artist, not the queue's).
