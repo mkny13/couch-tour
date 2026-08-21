@@ -13,6 +13,18 @@ echo "Quitting any running instance..."
 pkill -f "$app_name/Contents/MacOS/Couch Tour" 2>/dev/null || true
 sleep 1
 
+# CouchTour.xcodeproj is generated, not committed (D103) — regenerating it here every run is
+# what makes this script safe to run blindly after a `git pull`. Without this step, adding or
+# removing a .swift file (as #25's batch did repeatedly — SearchView.swift,
+# NowPlayingInspector.swift, ArtworkView.swift, TrackGroups.swift) leaves `xcodebuild` building
+# an out-of-date project that silently omits the new files, with no error to signal it.
+if ! command -v xcodegen &>/dev/null; then
+    echo "xcodegen not found. Install it with: brew install xcodegen" >&2
+    exit 1
+fi
+echo "Regenerating Xcode project..."
+(cd "$macos_dir" && xcodegen generate)
+
 echo "Building Release..."
 xcodebuild -project "$macos_dir/CouchTour.xcodeproj" -scheme CouchTour \
     -configuration Release -destination 'platform=macOS' build

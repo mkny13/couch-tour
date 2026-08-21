@@ -13,6 +13,16 @@ echo "Quitting any running instance..."
 pkill -f "$app_name/Contents/MacOS/Couch Tour Beta" 2>/dev/null || true
 sleep 1
 
+# See install.sh's matching comment: CouchTour.xcodeproj is generated, not committed (D103),
+# so this has to run on every install or a new/removed .swift file silently doesn't reach the
+# build.
+if ! command -v xcodegen &>/dev/null; then
+    echo "xcodegen not found. Install it with: brew install xcodegen" >&2
+    exit 1
+fi
+echo "Regenerating Xcode project..."
+(cd "$macos_dir" && xcodegen generate)
+
 echo "Building Release..."
 xcodebuild -project "$macos_dir/CouchTour.xcodeproj" -scheme CouchTourBeta \
     -configuration Release -destination 'platform=macOS' build
