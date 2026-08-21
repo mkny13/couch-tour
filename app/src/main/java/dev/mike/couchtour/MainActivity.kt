@@ -1276,9 +1276,23 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
+        val lastError by SyncSession.lastError.collectAsState()
+        // Unconditional, not inside `if (paired)`: an auto-unlink on a bad token flips paired
+        // to false in the same beat this message is set, so keeping it scoped to the paired
+        // block would erase the explanation at exactly the moment it's needed (D172).
+        lastError?.let {
+            Text(
+                it,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+
         if (paired) {
             RowItem("This device is paired", "Tap to unlink", null) {
                 SyncSession.unlink()
+                SyncSession.clearError()
                 pairingResult = null
             }
 

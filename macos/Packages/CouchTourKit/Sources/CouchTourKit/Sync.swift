@@ -329,6 +329,13 @@ public final class SyncSession: ObservableObject {
     @Published public private(set) var isSyncing = false
     /// `nil` means never synced.
     @Published public private(set) var lastSyncedAt: Int64?
+    /// The most recent sync failure, or nil if the last attempt succeeded (or none has run
+    /// yet). Every path that used to fail silently — the periodic timer, the debounced push,
+    /// an auto-unlink on a 401 — updates this, so a device that's stopped actually syncing says
+    /// so instead of just quietly not doing anything (D172's Continue Listening bug turned out
+    /// to be one symptom of exactly this: a device whose token had gone bad kept reporting
+    /// nothing was wrong).
+    @Published public private(set) var lastError: String?
 
     public init(store: SyncTokenStore = SyncTokenStore()) {
         self.store = store
@@ -377,6 +384,12 @@ public final class SyncSession: ObservableObject {
         lastSyncedAt = nil
     }
 
+    /// Clears a stale error message after a deliberate, unrelated state change — e.g. the user
+    /// tapping "unlink" themselves shouldn't leave an old "was revoked" message on screen.
+    public func clearError() {
+        lastError = nil
+    }
+
     /// Push-then-pull until the local backlog is drained. Pushes every local row touched since
     /// the last successful push (tombstones included — see `ProgressStore.changedSince`),
     /// applies whatever the server sends back, and advances both cursors only on success.
@@ -390,19 +403,37 @@ public final class SyncSession: ObservableObject {
         defer { isSyncing = false }
         do {
             while try await syncOnce(token: token, progressStore) {}
+            lastError = nil
         } catch let error as SyncException {
             if error.unauthorized {
                 // Revoked from another device (or the token is simply bad): stop trying
                 // until the user re-pairs, rather than retrying a request that can't succeed.
+                // This used to be silent — the device would just stop syncing forever with
+                // nothing on screen to explain why, which is exactly what happened live (D172).
                 unlink()
+                lastError = "This device was unlinked — its pairing was revoked or expired. " +
+                    "Re-pair to resume syncing."
             } else if error.gone {
                 // Cursor predates the tombstone retention floor: start over from scratch.
                 // since = 0 never 410s (D126), so this terminates in one extra round trip.
                 store.lastSeq = 0
                 try await sync(progressStore)
             } else {
+                lastError = error.message
                 throw error
             }
+        } catch is CancellationError {
+            // Not a real failure — a debounced push superseded by a newer one cancels the Task
+            // this runs in. Rethrown untouched so structured concurrency still sees it;
+            // recording it as a user-visible error would flash a false alarm on every rapid
+            // track change.
+            throw CancellationError()
+        } catch {
+            // Broader than SyncException on purpose: a plain network failure (no connectivity,
+            // DNS, timeout) never reached the catch above, so it used to escape this function
+            // with nothing recorded — AppModel.syncNow()'s `try?` swallowed it entirely.
+            lastError = error.localizedDescription
+            throw error
         }
     }
 
