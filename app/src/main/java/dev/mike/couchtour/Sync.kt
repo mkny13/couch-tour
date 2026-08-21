@@ -213,7 +213,20 @@ private const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
  */
 class SyncTokenStore(context: Context) {
 
+    /**
+     * True when the Keystore-backed prefs file couldn't be opened on the first try and had to
+     * be wiped and recreated — the only way to recover write access once the master key an
+     * existing file was encrypted under stops decrypting it (an OS/Keystore-level event, not
+     * something the app or the user did). [SyncSession.init] surfaces this via [SyncSession
+     * .lastError] rather than leaving it as a `Log.w` nobody sees: this is the same reset that
+     * silently unpaired a real device (D173's bug report) with nothing on screen explaining
+     * why the token was just gone.
+     */
+    var recoveredFromReset: Boolean = false
+        private set
+
     private val prefs: SharedPreferences? = open(context) ?: run {
+        recoveredFromReset = true
         context.deleteSharedPreferences(SYNC_PREFS)
         open(context)
     }
@@ -333,6 +346,10 @@ object SyncSession {
         store = SyncTokenStore(context.applicationContext)
         _paired.value = store.deviceToken != null
         _lastSyncedAt.value = store.lastSyncedAt
+        if (store.recoveredFromReset) {
+            _lastError.value = "This device's secure storage was reset by the system — if " +
+                "sync was paired, you'll need to pair it again."
+        }
     }
 
     /**

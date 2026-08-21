@@ -2316,15 +2316,66 @@ error is set, so scoping the message to the paired section would erase the expla
 one moment it's needed. Android's `SyncScreen` and macOS's `SyncView` both show it as a plain
 red-styled `Text` right below the intro copy.
 
-**Testing.** Android: `testDebugUnitTest` green (JAVA_HOME pointed at Android Studio's bundled
-JDK, per CLAUDE.md). macOS: `swift test` 163/163, up from 159 — four new cases
-(`testAnUnauthorizedResponseSetsAnExplanatoryError`, `testAServerErrorSetsLastErrorAndRethrows`,
-`testASuccessfulSyncClearsAPriorError`, `testClearErrorResetsLastError`) cover the new state
-directly against `MockServer`; `xcodebuild` succeeds. No Android-side equivalent unit tests were
-added for `lastError` specifically — `SyncSession` there is a singleton `object` wired to real
-`WorkManager`/`SharedPreferences`, which the existing test suite doesn't exercise at all (no
-prior tests of `SyncSession.sync` itself either), so this matches existing coverage rather than
-leaving a new gap. Not verified live — same Keychain-reauth wall as D172; the one thing worth
+**Testing.** Both platforms already had a `SyncSession`/`SyncTokenStore` test suite
+(`SyncSessionTest`/`SyncTokenStoreTest` on Android, `SyncSessionTests`/`SyncTokenStoreTests` on
+macOS, both against a real local mock server) — corrected here from an earlier draft of this
+entry that claimed Android had none. Four matching cases were added to each (an unauthorized
+response sets an error, a server error sets `lastError` and rethrows, a successful sync clears a
+prior error, `clearError()` resets it). Android: `testDebugUnitTest` green (JAVA_HOME pointed at
+Android Studio's bundled JDK, per CLAUDE.md). macOS: `swift test` 163/163, up from 159;
+`xcodebuild` succeeds. Not verified live — same Keychain-reauth wall as D172; the one thing worth
 confirming by hand is the scenario that motivated this: unlink a device from the *other* one's
 Devices list, then check that the now-unauthorized device's next sync attempt shows the
 "unlinked" message instead of just silently going back to "not paired."
+
+## Iteration 37 — the other way a device silently drops out of sync (D174)
+
+### D174 — `SyncTokenStore.recoveredFromReset` surfaces an Android Keystore reset via `lastError`, not just a `Log.w`
+
+Mike asked whether he'd have to re-pair on every future update, and whether that's avoidable.
+Answering that required actually finding out how his phone lost its token in the first place —
+D173 made *a* silent failure visible, but didn't explain *this* one, since a bad-token 401 and a
+locally-wiped token look identical from the server's side (both just present as "unpaired").
+
+**A normal update shouldn't do this.** `applicationId` and `versionCode` (static `1`, bumped
+only by suffix for the beta variant, D137) are stable across builds, and the debug signing key
+is restored from a repo secret specifically so every CI build signs identically (the comment on
+"Restore debug keystore" in `build-debug-apk.yml` documents the exact failure — "App not
+installed" — this already fixed once). A same-key, same-package APK installed over itself is an
+update, not a reinstall, and Android preserves app data across those. So routine releases are not
+the mechanism — but Android's Keystore-backed `EncryptedSharedPreferences` *can* independently go
+bad (an OS-level key-material invalidation, unrelated to anything this app does), and
+`SyncTokenStore`'s existing fallback for that — inherited from `TokenStore`'s established
+pattern, not new here — silently deletes and recreates the prefs file the moment that happens:
+
+```kotlin
+private val prefs: SharedPreferences? = open(context) ?: run {
+    context.deleteSharedPreferences(SYNC_PREFS)
+    open(context)
+}
+```
+
+That delete-and-recreate is the right recovery — the alternative is a permanently undecryptable
+file and a device stuck in memory-only mode forever, worse than losing one token — but until now
+it was invisible: a `Log.w("SyncTokenStore", "Encrypted prefs unavailable...")` nobody would
+ever see, then a silently empty store. This is very likely the actual mechanism behind "the
+phone shows nothing linked": not something tied to updating per se, but a Keystore hiccup that
+happened to get noticed after one.
+
+**Fix: `SyncTokenStore.recoveredFromReset` is `true` whenever this fallback fired**, and
+`SyncSession.init` checks it and sets `lastError` (D173's mechanism, for free) to an explanation
+distinct from the 401 message — this is a local storage event, not a revoked pairing. Doesn't
+prevent the underlying Keystore failure (that's outside this app's control) or guarantee it
+won't recur, but the next time it happens, Mike sees why on the very next launch instead of
+discovering it days or weeks later by noticing Continue Listening had quietly stopped merging.
+
+Deliberately Android-only — macOS stores the token in Keychain via `SystemKeychain`, not an
+encrypted-prefs file with this specific delete-and-recreate shape, and Keychain access failures
+there manifest as the interactive re-authorization prompt D147/D166-D172 already documented, not
+silent data loss.
+
+**Testing.** `testDebugUnitTest` green. No test added for the fallback path itself — `open()` is
+private and forcing a real `EncryptedSharedPreferences.create` failure isn't something
+Robolectric's Keystore shadow can easily simulate, and neither the pre-existing `SyncTokenStore`
+nor `TokenStore` tests exercise that branch either, so this doesn't leave a new gap relative to
+established coverage.
