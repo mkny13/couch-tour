@@ -58,5 +58,14 @@ struct CouchTourApp: App {
                 .disabled((player.currentIndex ?? 0) == 0)
             }
         }
+
+        // ⌘, opens this — declaring the scene is all it takes, no Commands entry needed.
+        // Sync used to be a sidebar section (RootView.swift); it's the only settings-like
+        // surface the app has, so it moved here rather than duplicating the form in both
+        // places (D171).
+        Settings {
+            SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
+                .frame(width: 450)
+        }
     }
 }

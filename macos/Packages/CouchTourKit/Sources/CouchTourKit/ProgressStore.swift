@@ -227,3 +227,17 @@ public final class ProgressStore {
         }
     }
 }
+
+/// The artists in `rows`, most-recently-played first, for `HistoryView`'s filter — deliberately
+/// not `ProgressStore.artists()`, which orders alphabetically, or `historyFor(artist:)`, which
+/// would be an N+1 against a list already in memory. `history()` is already `updatedAt` desc,
+/// so first appearance in `rows` already is last-played order; no second query, no sort. Blank
+/// artists are skipped, same as `artists()` — see `PlaybackProgress.artist`.
+public func historyArtists(_ rows: [PlaybackProgress]) -> [String] {
+    var seen = Set<String>()
+    var result: [String] = []
+    for row in rows where !row.artist.isEmpty {
+        if seen.insert(row.artist).inserted { result.append(row.artist) }
+    }
+    return result
+}
