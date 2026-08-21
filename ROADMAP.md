@@ -60,6 +60,15 @@ Sync's original three-item punch list (tightened latency, QR pairing, the tombst
 is now fully built and verified live — see D144, D147, and D148 respectively. Nothing is
 currently queued up next for sync specifically; future work here will start a fresh list.
 
+- **The Sync screen's device list doesn't live-refresh (D170).** Both `SyncView.swift` (macOS)
+  and `SyncScreen` (Android's `MainActivity.kt`) only fetch `devices()` on first appear and
+  when local pairing state itself changes (`.task` / `onChange(of: paired)`) — a device joining
+  the group from elsewhere while the screen is already open doesn't show up until it's
+  reopened. Noticed live setting up the macOS beta build's sync group (D170): a newly-joined
+  emulator was missing from an already-open Sync screen on another device until that screen was
+  revisited. Minor, but worth a manual refresh affordance or a poll if this screen gets more
+  use.
+
 **What's next for desktop, unrelated to sync:**
 
 - History grouped by artist — not actually "matching Android" as this used to say: Android's

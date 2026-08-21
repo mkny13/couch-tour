@@ -63,9 +63,14 @@ public final class ProgressStore {
     /// Default on-disk location: `~/Library/Application Support/dev.mike.couchtour/phishin.db`.
     /// Same filename as Android for the same reason Android kept it across its own rename — a
     /// future "import from your phone" step is then a file copy, not a translation.
-    public static func defaultURL() -> URL {
+    ///
+    /// `appSupportDirName` is overridable so the side-installed beta target (see project.yml)
+    /// can point at its own subdirectory instead of silently sharing the regular app's
+    /// listening history — the regular app must keep this default forever, matching its
+    /// already-shipped on-disk path (CLAUDE.md's "names that look wrong and are not").
+    public static func defaultURL(appSupportDirName: String = "dev.mike.couchtour") -> URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = appSupport.appendingPathComponent("dev.mike.couchtour", isDirectory: true)
+        let dir = appSupport.appendingPathComponent(appSupportDirName, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("phishin.db")
     }

@@ -2119,3 +2119,48 @@ fully done: type a query and watch grouped hits appear, click a song hit and lan
 song's shows, click a venue hit the same way, click a show hit and a track hit and land on the
 right show, confirm ⌘F both switches to Search and (on macOS 15+) focuses the field, and
 confirm switching sections away and back resets the query as expected.
+
+## Iteration 33 — a macOS beta build, and its icon mirrors Android's badge (D170)
+
+### D170 — `CouchTourBeta`: a second Xcode target, its own sandbox container, and an amber-pill icon like Android's
+
+Mirrors D137 (Android's `sideInstall`): a new `CouchTourBeta` target in `project.yml`, bundle
+id `dev.mike.couchtour.mac.beta`, display name "Couch Tour Beta" — installs alongside the
+regular app instead of replacing it (`macos/scripts/install-beta.sh`, parallel to
+`install.sh`, building the `CouchTourBeta` scheme into `Couch Tour Beta.app`).
+
+**Data isolation turned out to already be free, then got a belt-and-suspenders seam anyway.**
+macOS App Sandbox scopes an app's container by bundle id, so prod and beta land in separate
+`~/Library/Containers/<bundle-id>/` trees — confirmed empirically
+(`dev.mike.couchtour.mac` vs `...mac.beta`), no code required. Added the seam regardless:
+`ProgressStore.defaultURL(appSupportDirName:)` and `SystemKeychain(service:)` now take
+overridable parameters (defaults unchanged — the regular app's on-disk path and Keychain
+service are untouchable, same "names that look wrong and are not" reasoning CLAUDE.md gives
+Android's `phishin.db`), and `AppModel.swift` passes the beta-only values behind a
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS: BETA` flag set only on the new target. Sandbox isolation
+being real doesn't mean it's wise to be the only thing standing between a build config typo
+and silently corrupting the real listening history.
+
+**The icon now mirrors Android's badge, reversing D146's call.** D146 gave macOS a diagonal
+ribbon (`AppIcon-Beta.appiconset`) because "Android's inline pill wouldn't read as clearly" on
+a non-circle-masked mac icon. At Mike's request this iteration replaced it: an amber
+(`#FFB71B`) pill with black bold "BETA" text, composited onto the same base art
+(`icon_512x512@2x.png` as the 1024px master, ImageMagick, Lanczos-downsampled to all 10
+required sizes) in the same position Android's `ic_launcher_beta_foreground.png` uses —
+legible down to 128@2x (256px), same trade-off the ribbon always made at 16/32px.
+
+**Live-paired into a new group, separate from prod.** The existing sync pairing (D138-D143:
+Mike's real Pixel 9 Pro XL and his Mac Mini) was left untouched. A second, beta-only group now
+links this macOS build, Mike's phone's side-installed beta APK, and the `phishin_test`
+emulator — all three paired and a sync round-trip confirmed ("Last synced just now" on the
+emulator's Sync screen).
+
+**One live mistake, and what it confirmed about `unlink()`:** an accidental tap hit "Unlink
+this device" instead of "Add another device" on the macOS beta app mid-session. `unlink()`
+(`Sync.swift`) is local-only — `store.clear()`, no server call — so the server-side device row
+was untouched (not revoked), but the local Keychain token was gone for good, with no way to
+recover it. Rejoining needed a fresh invite code from a device still in the group (Mike's
+phone), the same as pairing for the first time — confirming by accident that a lost local
+token is unrecoverable by design (D127: the server never re-mints a token for an existing
+device id, or a leaked database row plus a guessed id would be enough to impersonate a
+device). The orphaned `Mac Mini` row was revoked from the phone's Devices list afterward.

@@ -46,3 +46,41 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+
+  # Side-installable beta, mirroring Android's sideInstall build (D137): a distinct bundle id
+  # and display name so it installs alongside the regular app instead of replacing it. The
+  # BETA compilation condition drives AppModel.swift to point ProgressStore and the sync
+  # Keychain at beta-only storage — without it, this target would silently read/write the
+  # prod app's listening history and device pairing, since both share the same Mac.
+  CouchTourBeta:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: CouchTour
+    dependencies:
+      - package: CouchTourKit
+        product: CouchTourKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.mike.couchtour.mac.beta
+        PRODUCT_NAME: "Couch Tour Beta"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon-Beta
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "BETA"
+    info:
+      path: Generated/CouchTourBeta/Info.plist
+      properties:
+        CFBundleDisplayName: "Couch Tour Beta"
+        LSApplicationCategoryType: public.app-category.music
+        NSHumanReadableCopyright: ""
+    entitlements:
+      path: Generated/CouchTourBeta/CouchTour.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true

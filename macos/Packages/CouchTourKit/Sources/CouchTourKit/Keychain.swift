@@ -18,9 +18,15 @@ public protocol KeychainStoring {
 /// an explicit per-device act, and per-device revocation would otherwise break the moment two
 /// devices shared one Keychain-synced identity.
 public struct SystemKeychain: KeychainStoring {
-    private let service = "dev.mike.couchtour.sync"
+    private let service: String
 
-    public init() {}
+    /// `service` is overridable so the side-installed beta target (see macos/project.yml) can
+    /// use its own Keychain service instead of silently sharing the regular app's sync device
+    /// token — the regular app must keep this default forever, matching its already-shipped
+    /// service name.
+    public init(service: String = "dev.mike.couchtour.sync") {
+        self.service = service
+    }
 
     public func set(_ value: String?, forKey key: String) {
         let query: [String: Any] = [

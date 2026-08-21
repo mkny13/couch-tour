@@ -8,7 +8,11 @@ import Foundation
 final class AppModel: ObservableObject {
     let progressStore: ProgressStore?
     let progressStoreError: String?
+    #if BETA
+    let syncSession = SyncSession(store: SyncTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.sync")))
+    #else
     let syncSession = SyncSession()
+    #endif
     /// Whether the Now Playing inspector is open. Lives here, not as local `@State` in
     /// RootView, because CouchTourApp's View-menu toggle needs to reach it too.
     @Published var showNowPlaying = false
@@ -23,7 +27,11 @@ final class AppModel: ObservableObject {
 
     init() {
         do {
+            #if BETA
+            progressStore = try ProgressStore(url: ProgressStore.defaultURL(appSupportDirName: "dev.mike.couchtour.beta"))
+            #else
             progressStore = try ProgressStore()
+            #endif
             progressStoreError = nil
         } catch {
             progressStore = nil
