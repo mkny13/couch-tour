@@ -13,6 +13,10 @@ final class AppModel: ObservableObject {
     #else
     let syncSession = SyncSession()
     #endif
+    /// `UserDefaults.standard` is already per-bundle-id, so the beta target's favorites don't
+    /// need the explicit namespacing Keychain services and the GRDB file do (Player.swift's
+    /// volume setting relies on the same fact).
+    let favorites = Favorites()
     /// Whether the Now Playing inspector is open. Lives here, not as local `@State` in
     /// RootView, because CouchTourApp's View-menu toggle needs to reach it too.
     @Published var showNowPlaying = false

@@ -18,6 +18,7 @@ struct CouchTourApp: App {
             RootView()
                 .environmentObject(appModel)
                 .environmentObject(player)
+                .environmentObject(appModel.favorites)
         }
         .commands {
             CommandGroup(after: .sidebar) {

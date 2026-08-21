@@ -217,4 +217,34 @@ final class CatalogTests: XCTestCase {
         let hits = SearchHits(artists: [dead, wsp])
         XCTAssertEqual(hits, hits.filteredTo(nil))
     }
+
+    // ---------------------------------------------------------------- mergeArtists (#56)
+
+    func testMergeArtistsPutsPhishFirstRegardlessOfShowCountOrFavoriteStatus() {
+        let popular = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead", showCount: 2500)
+        let merged = mergeArtists(relistenArtists: [popular], favorites: [popular.key])
+        XCTAssertEqual(PHISH, merged.first)
+    }
+
+    func testMergeArtistsPinsFavoritedArtistsRightAfterPhishSortedByShowCount() {
+        let a = ArtistRef(backend: .relisten, id: "a", name: "A", showCount: 10)
+        let b = ArtistRef(backend: .relisten, id: "b", name: "B", showCount: 50)
+        let unfavorited = ArtistRef(backend: .relisten, id: "c", name: "C", showCount: 1000)
+        let merged = mergeArtists(relistenArtists: [a, b, unfavorited], favorites: [a.key, b.key])
+        XCTAssertEqual([PHISH, b, a, unfavorited], merged)
+    }
+
+    func testMergeArtistsSortsUnfavoritedByShowCountDescending() {
+        let a = ArtistRef(backend: .relisten, id: "a", name: "A", showCount: 10)
+        let b = ArtistRef(backend: .relisten, id: "b", name: "B", showCount: 50)
+        let merged = mergeArtists(relistenArtists: [a, b], favorites: [])
+        XCTAssertEqual([PHISH, b, a], merged)
+    }
+
+    func testMergeArtistsDropsRelistensOwnDuplicatePhishEntry() {
+        let relistenPhish = ArtistRef(backend: .relisten, id: "phish", name: "Phish", showCount: 999)
+        let dead = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead", showCount: 10)
+        let merged = mergeArtists(relistenArtists: [relistenPhish, dead], favorites: [])
+        XCTAssertEqual([PHISH, dead], merged)
+    }
 }
