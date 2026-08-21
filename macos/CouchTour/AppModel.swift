@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
     /// need the explicit namespacing Keychain services and the GRDB file do (Player.swift's
     /// volume setting relies on the same fact).
     let favorites = Favorites()
+    let likedTracks = LikedTracks()
     #if BETA
     let phishInSession = PhishInSession(store: PhishInTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.phishin")))
     #else

@@ -277,6 +277,25 @@ private struct LoginRequest: Encodable {
     let password: String
 }
 
+// -------------------------------------------------------------------- likes (#58)
+
+/// Matches the API's `likable_type` values.
+public enum Likable: String, Encodable {
+    case show = "Show"
+    case track = "Track"
+    case playlist = "Playlist"
+}
+
+private struct LikeRequest: Encodable {
+    let likableType: String
+    let likableId: Int64
+
+    enum CodingKeys: String, CodingKey {
+        case likableType = "likable_type"
+        case likableId = "likable_id"
+    }
+}
+
 public struct APIException: Error {
     public let message: String
     public let code: Int
@@ -337,6 +356,12 @@ public enum PhishInAPI {
         return try await send(request)
     }
 
+    private static func delete(_ url: URL) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        return try await send(request)
+    }
+
     private static func path(_ segments: String...) -> URLComponents {
         var url = baseURL
         for segment in segments { url.appendPathComponent(segment) }
@@ -386,5 +411,21 @@ public enum PhishInAPI {
         let url = path("auth", "login").url!
         let data = try await post(url, body: LoginRequest(email: email, password: password))
         return try decoder.decode(LoginResponse.self, from: data)
+    }
+
+    /// Requires auth; unauthenticated the API rejects the request rather than silently
+    /// no-op'ing, same as Android's `like`/`unlike`.
+    public static func like(_ type: Likable, _ id: Int64) async throws {
+        let url = path("likes").url!
+        _ = try await post(url, body: LikeRequest(likableType: type.rawValue, likableId: id))
+    }
+
+    public static func unlike(_ type: Likable, _ id: Int64) async throws {
+        var components = path("likes")
+        components.queryItems = [
+            URLQueryItem(name: "likable_type", value: type.rawValue),
+            URLQueryItem(name: "likable_id", value: String(id)),
+        ]
+        _ = try await delete(components.url!)
     }
 }

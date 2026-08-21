@@ -19,6 +19,8 @@ struct CouchTourApp: App {
                 .environmentObject(appModel)
                 .environmentObject(player)
                 .environmentObject(appModel.favorites)
+                .environmentObject(appModel.likedTracks)
+                .environmentObject(appModel.phishInSession)
         }
         .commands {
             CommandGroup(after: .sidebar) {
