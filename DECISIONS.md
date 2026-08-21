@@ -2379,3 +2379,40 @@ private and forcing a real `EncryptedSharedPreferences.create` failure isn't som
 Robolectric's Keystore shadow can easily simulate, and neither the pre-existing `SyncTokenStore`
 nor `TokenStore` tests exercise that branch either, so this doesn't leave a new gap relative to
 established coverage.
+
+## Iteration 38 — a 30+ second Android resume traced to one un-parallelized fetch (D175)
+
+### D175 — `resolveLocalPlaylistTracks` fetches distinct shows/tapes concurrently, not one at a time
+
+Mike reported resuming playback on Android taking 30+ seconds even on good wifi, much slower
+than phish.in itself or any other media app. Tracing the resume path (`PlayerViewModel.resume`
+→ `playShow`/`playPlaylist`/`playRecording` → `start()` → Media3) showed the ordinary
+single-show/playlist/recording resume does exactly one API call before `ExoPlayer.prepare()`,
+and a direct timing check against phish.in's own API put a single `show()` fetch under 200ms —
+neither explains a 30-second stall on its own.
+
+The actual mechanism was `resolveLocalPlaylistTracks` (`LocalPlaylist.kt`), the function that
+rebuilds a local playlist's (D161, #12) queue by refetching every distinct show/tape its tracks
+belong to, since neither backend has a fetch-by-id endpoint. It used Kotlin's stdlib
+`Iterable<K>.associateWith { suspendingSelector }` — which is a `for` loop that awaits each
+call before starting the next, not a fan-out. A "favorites across years" playlist spanning N
+distinct shows paid N *sequential* HTTP round trips — at roughly half a second apiece including
+TLS and JSON parsing, 30–60 distinct shows reproduces a 30+ second stall purely from
+serialization, independent of bandwidth. This is exactly the kind of playlist the "good wifi,
+still 30+ seconds" report describes, and it's also why the comparison to phish.in itself and to
+other media apps felt so stark — neither has an equivalent cross-show mixtape feature to be slow
+at.
+
+**Fix:** both fan-outs (the phish.in per-date fetch and the Relisten per-show-per-tape fetch)
+now use `coroutineScope { refs.map { async { ... } }.awaitAll() }` instead of `associateWith`,
+so all distinct shows/tapes resolve in parallel and the wall-clock cost is one round trip, not N.
+The two backends still run as two sequential *stages* (Relisten needs its artist list resolved
+before it can look up shows), but within each stage every distinct show/tape fetches
+concurrently.
+
+**Testing.** Added `` `a playlist spanning several shows resolves each show correctly when
+fetched concurrently` `` to `LocalPlaylistResolveTest.kt`, using a custom `MockWebServer`
+`Dispatcher` that routes by request path rather than enqueue order — proving each show still
+resolves to its own track regardless of what order the now-concurrent requests actually arrive
+in, which a plain FIFO `enqueue()` sequence couldn't have verified once the fetches stopped
+being sequential. `testDebugUnitTest` green, 327 tests.

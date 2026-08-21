@@ -9,6 +9,9 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Transaction
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -135,11 +138,17 @@ internal suspend fun localPlaylistQueueItems(dao: LocalPlaylistDao, playlistId: 
  * pattern (fetch the show, find the track inside it), batched to one fetch per distinct show
  * or tape rather than one per track. A reference that no longer resolves — a deleted show, a
  * track dropped from a tape — is skipped rather than failing the whole playlist.
+ *
+ * The per-show/per-tape fetches run concurrently (`async` + `awaitAll`), not one at a time —
+ * a playlist spanning N distinct shows used to pay N sequential round trips before playback
+ * could start, which is where a 30+ second resume on a "favorites across years" mixtape came
+ * from (issue: slow Android playback resume).
  */
-internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEntity>): List<ResolvedLocalTrack> {
+internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEntity>): List<ResolvedLocalTrack> = coroutineScope {
     val phishShows = refs.filter { it.backend == Backend.PHISHIN.id }
         .map { it.showDate }.distinct()
-        .associateWith { date -> runCatching { PhishInApi.show(date) }.getOrNull() }
+        .map { date -> async { date to runCatching { PhishInApi.show(date) }.getOrNull() } }
+        .awaitAll().toMap()
 
     val relistenRefs = refs.filter { it.backend == Backend.RELISTEN.id }
     val relistenArtists = if (relistenRefs.isEmpty()) emptyList()
@@ -147,12 +156,16 @@ internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEnt
     val relistenShows = relistenRefs
         .mapNotNull { ref -> ref.artistSlug?.let { Triple(it, ref.showDate, ref.recordingId) } }
         .distinct()
-        .associateWith { (slug, date, recordingId) ->
-            val artist = relistenArtists.firstOrNull { it.id == slug } ?: return@associateWith null
-            runCatching { RelistenCatalogSource.show(artist, date, recordingId) }.getOrNull()
+        .map { key ->
+            async {
+                val (slug, date, recordingId) = key
+                val artist = relistenArtists.firstOrNull { it.id == slug }
+                key to artist?.let { runCatching { RelistenCatalogSource.show(it, date, recordingId) }.getOrNull() }
+            }
         }
+        .awaitAll().toMap()
 
-    return refs.mapNotNull { ref ->
+    refs.mapNotNull { ref ->
         when (ref.backend) {
             Backend.PHISHIN.id -> {
                 val show = phishShows[ref.showDate] ?: return@mapNotNull null

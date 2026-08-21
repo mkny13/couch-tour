@@ -2,8 +2,10 @@ package dev.mike.couchtour
 
 import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -148,5 +150,34 @@ class LocalPlaylistResolveTest {
         val resolved = resolveLocalPlaylistTracks(listOf(phishRef("1997-11-17", "42", "Tweezer")))
 
         assertTrue(resolved.isEmpty())
+    }
+
+    /**
+     * A playlist spanning several distinct shows used to fetch them one at a time
+     * ([resolveLocalPlaylistTracks] previously used `associateWith`, whose suspending
+     * selector awaits each call before starting the next) — the root cause of a 30+ second
+     * resume on a multi-show mixtape. Routing responses by request path (rather than
+     * enqueue order) proves each show still resolves to its own track regardless of what
+     * order the now-concurrent requests actually arrive in.
+     */
+    @Test
+    fun `a playlist spanning several shows resolves each show correctly when fetched concurrently`() = runBlocking {
+        val dates = listOf("1997-11-17", "1997-11-22", "1998-11-14")
+        phishInServer.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val date = dates.first { request.path.orEmpty().endsWith(it) }
+                return MockResponse().setBody(
+                    """{"date":"$date","venue_name":"Venue $date","tracks":[
+                        {"id":1,"title":"Track $date","mp3_url":"http://x/$date.mp3","audio_status":"complete"}
+                    ]}"""
+                )
+            }
+        }
+
+        val refs = dates.map { phishRef(it, "1", "Track $it") }
+        val resolved = resolveLocalPlaylistTracks(refs)
+
+        assertEquals(dates.map { "Track $it" }, resolved.map { it.title })
+        assertEquals(dates.map { "http://x/$it.mp3" }, resolved.map { it.url })
     }
 }
