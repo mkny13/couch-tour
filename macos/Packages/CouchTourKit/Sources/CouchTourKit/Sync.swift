@@ -422,12 +422,12 @@ public final class SyncSession: ObservableObject {
                 lastError = error.message
                 throw error
             }
-        } catch is CancellationError {
+        } catch let error as CancellationError {
             // Not a real failure — a debounced push superseded by a newer one cancels the Task
             // this runs in. Rethrown untouched so structured concurrency still sees it;
             // recording it as a user-visible error would flash a false alarm on every rapid
             // track change.
-            throw CancellationError()
+            throw error
         } catch {
             // Broader than SyncException on purpose: a plain network failure (no connectivity,
             // DNS, timeout) never reached the catch above, so it used to escape this function
