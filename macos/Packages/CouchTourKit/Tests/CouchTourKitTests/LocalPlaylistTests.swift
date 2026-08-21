@@ -123,8 +123,10 @@ final class ResolveLocalPlaylistTracksTests: XCTestCase {
     }
 
     func testAShowThatFailsToFetchDropsJustItsOwnRowsNotTheWholePlaylist() async throws {
-        server.enqueue("", code: 500, forHost: "mock.test")
-        server.enqueue(try fixtureString("show.json"), forHost: "mock.test")
+        // Path-routed, not FIFO — the two dates' fetches now run concurrently (D175), so
+        // whichever happens to reach MockServer first must still get its own response.
+        server.enqueue("", code: 500, forPathContaining: "1990-01-01")
+        server.enqueue(try fixtureString("show.json"), forPathContaining: "1997-11-17")
         let rows = [
             LocalPlaylistTrack(playlistId: "p", position: 0, backend: "phishin", trackId: "missing", showDate: "1990-01-01", title: "x", durationMs: 0),
             LocalPlaylistTrack(playlistId: "p", position: 1, backend: "phishin", trackId: "8435", showDate: "1997-11-17", title: "x", durationMs: 0),
@@ -148,8 +150,10 @@ final class ResolveLocalPlaylistTracksTests: XCTestCase {
     }
 
     func testPreservesStoredOrderAcrossMultipleShows() async throws {
-        server.enqueue(try fixtureString("relisten_show.json"))
-        server.enqueue(try fixtureString("show.json"))
+        // Path-routed, not FIFO — both backends' fetches now run concurrently (D175) and
+        // share one mock host, so enqueue order no longer matches request order.
+        server.enqueue(try fixtureString("relisten_show.json"), forPathContaining: "1977-05-08")
+        server.enqueue(try fixtureString("show.json"), forPathContaining: "1997-11-17")
         let rows = [
             LocalPlaylistTrack(
                 playlistId: "p", position: 0, backend: "relisten", trackId: "160c100c-75a9-6568-7ef1-12aecdabcafe",
@@ -161,5 +165,24 @@ final class ResolveLocalPlaylistTracksTests: XCTestCase {
         let resolved = await resolveLocalPlaylistTracks(rows)
 
         XCTAssertEqual(["Minglewood Blues", "Tweezer"], resolved.map(\.title))
+    }
+
+    /// D175: distinct shows now fetch concurrently, not one at a time, so responses can land
+    /// in a different order than the requests that triggered them — this pins each still
+    /// resolves to its own correct show regardless. Path-routed rather than FIFO-enqueued
+    /// (`forPathContaining`, added alongside this fix) is what actually proves that: a plain
+    /// enqueue sequence would pass even if the two shows' tracks got swapped, as long as
+    /// requests happened to arrive in enqueue order.
+    func testEachShowResolvesToItsOwnTracksRegardlessOfConcurrentResponseOrder() async throws {
+        server.enqueue(try fixtureString("show.json"), forPathContaining: "1997-11-17")
+        server.enqueue(#"{"date":"1997-11-22","tracks":[{"id":1,"title":"Character Zero","mp3_url":"https://x/a.mp3","audio_status":"complete"}]}"#, forPathContaining: "1997-11-22")
+        let rows = [
+            LocalPlaylistTrack(playlistId: "p", position: 0, backend: "phishin", trackId: "8435", showDate: "1997-11-17", title: "x", durationMs: 0),
+            LocalPlaylistTrack(playlistId: "p", position: 1, backend: "phishin", trackId: "1", showDate: "1997-11-22", title: "x", durationMs: 0),
+        ]
+
+        let resolved = await resolveLocalPlaylistTracks(rows)
+
+        XCTAssertEqual(["Tweezer", "Character Zero"], resolved.map(\.title))
     }
 }

@@ -18,11 +18,13 @@ final class MockServer {
 
     private static var active: MockServer?
 
-    /// `host` nil matches any request — the default every existing caller uses, preserving
-    /// plain FIFO order. A host-scoped entry only satisfies a request to that host, which is
-    /// what makes two backends hitting one shared `Interceptor` concurrently (the search
-    /// fan-out) deterministic instead of racing over a single unscoped queue.
-    private var responses: [(host: String?, code: Int, body: String, headers: [String: String])] = []
+    /// `host`/`pathContaining` nil matches any request — the default every existing caller
+    /// uses, preserving plain FIFO order. A scoped entry only satisfies a request matching it,
+    /// which is what makes several requests hitting one shared `Interceptor` concurrently (the
+    /// search fan-out across backends, `resolveLocalPlaylistTracks`'s fan-out across distinct
+    /// shows) deterministic instead of racing over a single unscoped FIFO queue — mirroring
+    /// the Kotlin tests' path-routing `MockWebServer` `Dispatcher` (D175) for the same reason.
+    private var responses: [(host: String?, pathContaining: String?, code: Int, body: String, headers: [String: String])] = []
     private(set) var requests: [URLRequest] = []
     private let lock = NSLock()
     /// Total requests ever received, unlike `requests.count` which shrinks as `takeRequest`
@@ -39,9 +41,12 @@ final class MockServer {
         MockServer.active = nil
     }
 
-    func enqueue(_ body: String, code: Int = 200, headers: [String: String] = [:], forHost host: String? = nil) {
+    func enqueue(
+        _ body: String, code: Int = 200, headers: [String: String] = [:],
+        forHost host: String? = nil, forPathContaining pathContaining: String? = nil
+    ) {
         lock.lock(); defer { lock.unlock() }
-        responses.append((host, code, body, headers))
+        responses.append((host, pathContaining, code, body, headers))
     }
 
     func takeRequest() -> URLRequest? {
@@ -55,8 +60,11 @@ final class MockServer {
         requests.append(protocolInstance.request)
         requestCount += 1
         let requestHost = protocolInstance.request.url?.host
-        let next = responses.firstIndex(where: { $0.host == nil || $0.host == requestHost })
-            .map { responses.remove(at: $0) }
+        let requestPath = protocolInstance.request.url?.path ?? ""
+        let next = responses.firstIndex(where: {
+            ($0.host == nil || $0.host == requestHost)
+                && ($0.pathContaining == nil || requestPath.contains($0.pathContaining!))
+        }).map { responses.remove(at: $0) }
         lock.unlock()
 
         guard let next else {
