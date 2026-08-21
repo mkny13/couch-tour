@@ -14,6 +14,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -396,6 +397,58 @@ class SyncSessionTest {
         // The 410 plus its retry: two requests beyond whatever claim() already made.
         assertEquals(2, server.requestCount - requestsBeforeSync)
         assertTrue(SyncSession.paired.value)
+    }
+
+    // D173: every path that used to fail a sync silently now records why on `lastError`, since
+    // a device that's stopped actually syncing used to have nothing on screen saying so.
+
+    @Test
+    fun `an unauthorized response sets an explanatory error`() = runBlocking {
+        claim()
+        enqueue("""{"error":"unauthorized"}""", code = 401)
+
+        SyncSession.sync(db.progressDao())
+
+        assertNotNull(SyncSession.lastError.value)
+    }
+
+    @Test
+    fun `a server error sets lastError and rethrows`() = runBlocking {
+        claim()
+        enqueue("""{"error":"internal error"}""", code = 500)
+
+        try {
+            SyncSession.sync(db.progressDao())
+            fail("expected the 500 to rethrow")
+        } catch (e: SyncException) {
+            // expected
+        }
+        assertNotNull(SyncSession.lastError.value)
+    }
+
+    @Test
+    fun `a successful sync clears a prior error`() = runBlocking {
+        claim()
+        enqueue("""{"error":"internal error"}""", code = 500)
+        runCatching { SyncSession.sync(db.progressDao()) }
+        assertNotNull(SyncSession.lastError.value)
+
+        enqueue("""{"seq":1,"changes":[]}""")
+        SyncSession.sync(db.progressDao())
+
+        assertNull(SyncSession.lastError.value)
+    }
+
+    @Test
+    fun `clearError resets lastError`() = runBlocking {
+        claim()
+        enqueue("""{"error":"internal error"}""", code = 500)
+        runCatching { SyncSession.sync(db.progressDao()) }
+        assertNotNull(SyncSession.lastError.value)
+
+        SyncSession.clearError()
+
+        assertNull(SyncSession.lastError.value)
     }
 
     @Test
