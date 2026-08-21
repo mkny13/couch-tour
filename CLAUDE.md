@@ -29,6 +29,27 @@ risky without touching his daily-driver install. Pair it with `prerelease: true`
 become the GitHub "Latest" release. `release_tag`/`release_notes` create the release itself;
 omit `release_tag` to just build and upload the APK as a workflow artifact.
 
+**Promoting a beta to production is Mike's call, never automatic.** Every batch cuts a beta
+(above) — that beta build, installed on Mike's actual devices, *is* the manual testing step;
+nothing else exercises the app end to end before a real user does. Cut all the betas a batch
+needs, but don't also cut a matching non-beta release "to be safe" — that defeats the point of
+having a separate beta channel to test in first. Only promote when Mike explicitly confirms a
+beta (or a run of them) is good, and when he does:
+
+```
+gh workflow run build-debug-apk.yml --ref <the confirmed beta's tag, e.g. v0.31> \
+  -f release_tag=<next tag, e.g. v0.32> -f release_notes="..." \
+  -f prerelease=false -f side_install=false
+```
+
+`--ref` matters — it must point at the *confirmed* beta's own tag, not just "current main."
+Later betas may have shipped (and be mid-testing, or already found broken) since the one Mike
+actually confirmed; promoting "whatever's on main right now" instead of the exact confirmed
+commit would ship code he never tested. `prerelease=false` and `side_install=false` (both are
+the workflow's defaults, but pass them explicitly here so the intent reads clearly next to the
+`--ref`) is what makes this a real release: builds the regular `dev.mike.couchtour` package
+and marks it the GitHub "Latest" release, updating Mike's daily-driver install in place.
+
 ## Building (macOS)
 
 Everything under `macos/Packages/CouchTourKit` is a plain SwiftPM package — API clients, the
@@ -158,11 +179,14 @@ autonomous by default, not a proposal he approves each time:
   limit, told to stop), commit and push whatever's done rather than leaving it uncommitted in
   the worktree — an open PR (even a rough one) is far more likely to get picked up than a diff
   nobody knows to look for.
-- **Cut a release at the end of each batch of work**, not just when asked: `workflow_dispatch`
+- **Cut a beta release at the end of each batch of work**, not just when asked: `workflow_dispatch`
   on `build-debug-apk.yml` with `side_install: true` and `prerelease: true` (see "Cutting a
   beta release" above), tag bumped by one (`v0.NN`), release notes summarizing what merged.
   This is how Mike gets a build onto his own devices to test — treat it as part of finishing
-  the batch, not a separate ask.
+  the batch, not a separate ask. **Stop at the beta.** Promoting one to production (see
+  "Promoting a beta to production" above) needs Mike to have actually tested it — that's the
+  entire point of a separate beta channel — so it only happens when he explicitly confirms one,
+  never automatically at the end of a batch alongside the beta.
 - **Multiple worktrees can run in parallel without active coordination.** Don't have one
   agent's prompt tell it to "coordinate" with another running elsewhere — that spends tokens
   re-deriving context for no real benefit. Instead, when handing out a batch for a second
