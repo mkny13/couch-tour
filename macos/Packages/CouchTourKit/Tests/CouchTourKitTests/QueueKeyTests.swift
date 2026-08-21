@@ -91,4 +91,23 @@ final class QueueKeyTests: XCTestCase {
         XCTAssertEqual(QueueKind.playlist, parseQueueKey("playlist:relisten:x")!.kind)
         XCTAssertEqual(QueueKind.recording, parseQueueKey("relisten:a/b/c")!.kind)
     }
+
+    // ------------------------------------------------------------- local playlists (#59)
+
+    func testBuildsALocalPlaylistKey() {
+        XCTAssertEqual("local-playlist:abc-123", localPlaylistQueueKey("abc-123"))
+    }
+
+    func testRoundTripsALocalPlaylistKey() {
+        let ref = parseQueueKey(localPlaylistQueueKey("abc-123"))
+        XCTAssertEqual(QueueRef(kind: .localPlaylist, id: "abc-123"), ref)
+        XCTAssertEqual("local-playlist:abc-123", ref!.key)
+    }
+
+    func testALocalPlaylistKeyDoesNotCollideWithAServerPlaylistKey() {
+        // "local-playlist:" doesn't start with "playlist:", so a local id can never
+        // round-trip through PhishInAPI.playlist(id) — see Catalog.swift's QueueKind doc.
+        XCTAssertEqual(QueueKind.localPlaylist, parseQueueKey("local-playlist:x")!.kind)
+        XCTAssertNil(parseQueueKey("local-playlist:"))
+    }
 }

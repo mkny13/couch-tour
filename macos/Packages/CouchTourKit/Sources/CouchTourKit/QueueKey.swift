@@ -6,6 +6,10 @@ public enum QueueKind: Equatable {
     case show
     case playlist
     case recording
+    /// A device-local playlist (#59) — namespaced separately from `.playlist` (a phish.in
+    /// server playlist slug) specifically so a local id never round-trips through
+    /// `PhishInApi.playlist(id)`, matching Android's `Queue.kt` (D161 in DECISIONS.md).
+    case localPlaylist
 }
 
 /// Playback progress is stored under a namespaced key so every kind of queue can share one
@@ -27,6 +31,7 @@ public struct QueueRef: Equatable {
         case .show: return showQueueKey(id)
         case .playlist: return playlistQueueKey(id)
         case .recording: return recordingPrefix + id
+        case .localPlaylist: return localPlaylistQueueKey(id)
         }
     }
 }
@@ -54,6 +59,8 @@ public func showQueueKey(_ date: String) -> String { "show:\(date)" }
 
 public func playlistQueueKey(_ slug: String) -> String { "playlist:\(slug)" }
 
+public func localPlaylistQueueKey(_ id: String) -> String { localPlaylistPrefix + id }
+
 public func recordingQueueKey(_ artistSlug: String, _ date: String, _ sourceId: String) -> String {
     recordingPrefix + RecordingId(artistSlug: artistSlug, date: date, sourceId: sourceId).id
 }
@@ -61,6 +68,10 @@ public func recordingQueueKey(_ artistSlug: String, _ date: String, _ sourceId: 
 /// Splits a stored key back into its parts. Returns nil for anything unrecognised rather than
 /// guessing — an unknown key should be skipped, not played as the wrong thing.
 public func parseQueueKey(_ raw: String) -> QueueRef? {
+    if raw.hasPrefix(localPlaylistPrefix) {
+        let rest = String(raw.dropFirst(localPlaylistPrefix.count))
+        return rest.isEmpty ? nil : QueueRef(kind: .localPlaylist, id: rest)
+    }
     if raw.hasPrefix(playlistPrefix) {
         let rest = String(raw.dropFirst(playlistPrefix.count))
         return rest.isEmpty ? nil : QueueRef(kind: .playlist, id: rest)
@@ -91,3 +102,4 @@ public func parseRecordingId(_ raw: String) -> RecordingId? {
 private let showPrefix = "show:"
 private let playlistPrefix = "playlist:"
 private let recordingPrefix = "relisten:"
+private let localPlaylistPrefix = "local-playlist:"

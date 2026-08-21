@@ -96,7 +96,7 @@ struct HistoryView: View {
 
     private func tapResume(_ row: PlaybackProgress) async {
         do {
-            try await resume(row, player: player)
+            try await resume(row, player: player, localPlaylistStore: appModel.localPlaylistStore)
         } catch {
             resumeError = "Couldn't resume \(row.title): \(error.localizedDescription)"
         }

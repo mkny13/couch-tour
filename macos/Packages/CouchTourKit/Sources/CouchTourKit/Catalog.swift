@@ -171,12 +171,19 @@ public struct ShowDetail: Equatable {
     public let recording: RecordingRef?
     public let alternates: [RecordingRef]
     public let tracks: [PlayableTrack]
+    /// Set only for a local playlist queue (#59), which spans arbitrary shows so the derived
+    /// key below doesn't apply — the caller passes `localPlaylistQueueKey(id)` in directly.
+    private let explicitQueueKey: String?
 
-    public init(summary: ShowSummary, recording: RecordingRef? = nil, alternates: [RecordingRef] = [], tracks: [PlayableTrack] = []) {
+    public init(
+        summary: ShowSummary, recording: RecordingRef? = nil, alternates: [RecordingRef] = [],
+        tracks: [PlayableTrack] = [], queueKey: String? = nil
+    ) {
         self.summary = summary
         self.recording = recording
         self.alternates = alternates
         self.tracks = tracks
+        self.explicitQueueKey = queueKey
     }
 
     /// Where this queue's progress is stored, or nil if it isn't resumable.
@@ -187,6 +194,7 @@ public struct ShowDetail: Equatable {
     /// nothing beats recording a position that parses back to nothing, the same call shuffle
     /// makes (D42).
     public var queueKey: String? {
+        if let explicitQueueKey { return explicitQueueKey }
         switch summary.artist.backend {
         case .phishin:
             return showQueueKey(summary.date)

@@ -12,3 +12,9 @@ func fixtureData(_ name: String, file: StaticString = #filePath, line: UInt = #l
     }
     return try Data(contentsOf: url)
 }
+
+/// `fixtureData` as a UTF-8 string, for tests that hand a fixture straight to `MockServer`,
+/// which enqueues response bodies as strings rather than `Data`.
+func fixtureString(_ name: String, file: StaticString = #filePath, line: UInt = #line) throws -> String {
+    String(decoding: try fixtureData(name, file: file, line: line), as: UTF8.self)
+}
