@@ -74,6 +74,10 @@ struct HistoryView: View {
         .navigationTitle("History")
         .task { await load() }
         .onChange(of: player.queueKey) { _, _ in Task { await load() } }
+        // Same staleness fix as ContinueListeningView: a background sync writes fresh rows but
+        // this view has no reactive DB observation (unlike Android's Room Flow), so it needs an
+        // explicit nudge to re-query once a sync round trip actually finishes.
+        .onChange(of: appModel.syncSession.lastSyncedAt) { _, _ in Task { await load() } }
         .alert("Couldn't resume", isPresented: Binding(
             get: { resumeError != nil },
             set: { if !$0 { resumeError = nil } }

@@ -2227,3 +2227,40 @@ pairing/devices/sync-now/the version string all rendering at a sensible window s
 gone from the sidebar and nothing else there shifted; History's artist picker appears only with
 more than one artist, orders most-recently-played first, narrows the list on selection, and
 "All artists" restores everything including any blank-artist row.
+
+## Iteration 35 — Continue Listening going stale on macOS after a background sync (D172)
+
+### D172 — `ContinueListeningView`/`HistoryView` reload on `syncSession.lastSyncedAt`, not just on queue change
+
+Reported by Mike as "sync is not actually working — phone and desktop show as synced but
+continue listening entries don't match." The sync protocol itself (push/pull, last-write-wins,
+D119-D149) was fine; the bug was downstream, on macOS only.
+
+**Root cause: the two SwiftUI views never re-queried after a sync pull.** Android's
+`ProgressDao.inProgress()` returns a Room `Flow`, which re-emits automatically on any write to
+the `progress` table — including the writes `SyncSession.syncOnce` makes via `progressDao.put()`
+when applying pulled rows. `ContinueListeningView`/`HistoryView` have no such mechanism: they
+load `rows` once via `.task` on appear, and again `.onChange(of: player.queueKey)` when local
+playback moves to a new queue. `AppModel.syncNow()` — fired on launch, on
+`didBecomeActiveNotification`, and every 15 minutes (`RootView.swift`) — writes straight to
+`ProgressStore` through `SyncSession.sync`, but nothing told either view to look again. A sync
+could complete correctly, `lastSyncedAt` would update, and the on-disk row for a show played on
+the other device would be exactly right — while the visible list kept showing whatever was
+loaded before that sync ran, sometimes since app launch.
+
+**Fix: both views also reload `.onChange(of: appModel.syncSession.lastSyncedAt)`.**
+`SyncSession.lastSyncedAt` is already `@Published` and already updated only on a successful sync
+round trip, so this is the cheapest correct signal — no new plumbing, no GRDB
+`ValueObservation`/`DatabasePublisher` needed for what's otherwise a two-line fix. A real
+`ValueObservation` would be the more "correct" reactive-DB approach (and would also catch local
+writes this same gap misses, e.g. a resume from `ShowDetail`'s saved-progress banner not
+updating an already-open Continue Listening list), but that's a bigger change than this bug
+needs; left for later if staleness shows up somewhere `syncSession.lastSyncedAt` doesn't cover.
+
+**Testing.** `swift test`: 159/159, unchanged — this bug was never reachable from
+`CouchTourKit`'s own tests, since `ProgressStore`/`SyncSession` are both correct; it lived
+entirely in the app-target views, which the package tests don't touch. `xcodebuild` succeeds.
+Not verified live against a real paired device — same Keychain-reauth wall D166-D171 hit; a
+manual check is worth doing: play something on the phone, let the Mac's next sync tick (or
+foreground it) go by without touching playback locally, and confirm Continue Listening picks up
+the new row without switching sidebar sections.

@@ -40,6 +40,11 @@ struct ContinueListeningView: View {
         // A crude but sufficient refresh trigger for the MVP: reload whenever playback moves
         // to a new queue, so starting or advancing a show updates this list if it's on screen.
         .onChange(of: player.queueKey) { _, _ in Task { await load() } }
+        // Without this, a background sync (launch/foreground/15-minute timer, AppModel.syncNow)
+        // writes fresh rows via ProgressStore.put() but this view — unlike Android's reactive
+        // Room Flow — never re-queries, so it can sit showing a stale "Continue Listening" list
+        // even though the two devices' databases actually agree.
+        .onChange(of: appModel.syncSession.lastSyncedAt) { _, _ in Task { await load() } }
         .alert("Couldn't resume", isPresented: Binding(
             get: { resumeError != nil },
             set: { if !$0 { resumeError = nil } }
