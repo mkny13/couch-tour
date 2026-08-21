@@ -39,6 +39,10 @@ no Xcode project to build or test:
 cd macos/Packages/CouchTourKit && swift test
 ```
 
+This also runs in CI (`.github/workflows/macos-tests.yml`, `macos-14` runner) on any PR
+touching `macos/Packages/CouchTourKit/**` — the app target (`macos/CouchTour`) isn't covered,
+since building/installing it needs local ad-hoc signing; that stays a manual check.
+
 **If `swift build`/`swift test` fails with a `PackageDescription.Package.__allocating_init`
 linker error, Xcode itself isn't installed** — Command Line Tools alone can't compile *any*
 SwiftPM manifest (confirmed with an empty, unrelated package during this repo's own macOS
@@ -142,6 +146,18 @@ autonomous by default, not a proposal he approves each time:
   issue, touches only what it should, has real tests, doesn't contradict something documented
   elsewhere (this file, DECISIONS.md). Only hold a PR for Mike when something in the diff looks
   genuinely risky or ambiguous, not merely "could be nicer."
+- **Clean up your own worktree and branch immediately after your PR merges** — `git worktree
+  remove` on the worktree you were using (if any) and delete the branch, both locally and on
+  the remote (`gh pr merge --delete-branch` handles the remote side in one step). This is what
+  actually keeps `.claude/worktrees/` and the branch list usable; skipping it is exactly how 4
+  stale worktrees and 20+ merged-but-undeleted branches piled up before a 2026-08-20 cleanup
+  pass caught them. A worktree directory's name is only ever accurate at the moment it's
+  created — the same folder gets reused for unrelated later branches (its name then means
+  nothing), so don't rely on it to identify what's inside; `git -C <path> branch --show-current`
+  is the source of truth. If you're mid-task and about to run out of room to finish (context
+  limit, told to stop), commit and push whatever's done rather than leaving it uncommitted in
+  the worktree — an open PR (even a rough one) is far more likely to get picked up than a diff
+  nobody knows to look for.
 - **Cut a release at the end of each batch of work**, not just when asked: `workflow_dispatch`
   on `build-debug-apk.yml` with `side_install: true` and `prerelease: true` (see "Cutting a
   beta release" above), tag bumped by one (`v0.NN`), release notes summarizing what merged.

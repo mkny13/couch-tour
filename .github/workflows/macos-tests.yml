@@ -1,0 +1,23 @@
+name: macOS unit tests
+
+# Runs CouchTourKit's plain SwiftPM test suite — no Xcode project needed, see CLAUDE.md's
+# "Building (macOS)" section — on a GitHub-hosted macOS runner, so a change to the API clients,
+# catalog model, queue-key grammar, or progress storage can't silently break the desktop client.
+# The full app target (macos/CouchTour) still needs local ad-hoc signing to build/install and
+# isn't covered here; that stays a manual check (CLAUDE.md, macos/scripts/install.sh).
+on:
+  pull_request:
+    paths:
+      - "macos/Packages/CouchTourKit/**"
+      - ".github/workflows/macos-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  macos-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run CouchTourKit tests
+        working-directory: macos/Packages/CouchTourKit
+        run: swift test

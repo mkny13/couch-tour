@@ -7,6 +7,18 @@ name: Build debug APK
 on:
   push:
     branches: [main]
+    # Docs-only or macOS-only merges (ROADMAP.md, DECISIONS.md, macos/**) don't touch anything
+    # this build depends on — filtering keeps those merges from burning ~80s on a pointless
+    # APK build every time.
+    paths:
+      - "app/**"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/build-debug-apk.yml"
   workflow_dispatch:
     inputs:
       release_tag:
