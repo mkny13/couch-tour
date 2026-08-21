@@ -40,6 +40,11 @@ public struct ArtistRef: Hashable, Sendable {
         self.hasSets = hasSets
         self.hasMultipleSources = hasMultipleSources
     }
+
+    /// Stable cross-backend identity for anything that needs to store a reference to an
+    /// artist rather than the whole struct — favoriting, eventually sync. Port of
+    /// `Catalog.kt`'s `ArtistRef.key`.
+    public var key: String { "\(backend.rawValue):\(id)" }
 }
 
 /// A browsable slice of an artist's catalog. On phish.in this is a period and may be a range
@@ -329,6 +334,26 @@ public func searchAll(_ term: String) async -> SearchHits {
 
 /// phish.in is a single-artist archive, so its artist is a constant rather than a fetch.
 public let PHISH = ArtistRef(backend: .phishin, id: "phish", name: "Phish")
+
+/// Orders the merged artist list: Phish always first — it is the only artist with an
+/// account, likes, and playlists behind it, so favoriting never displaces it — then
+/// favorited artists by show count descending, then everyone else by show count descending.
+/// Relisten separately archives Phish too, under its own taper-community show count, so its
+/// copy is dropped rather than shown as a second, confusing "Phish". Port of `Catalog.kt`'s
+/// `mergeArtists` (Android's #14/#56).
+public func mergeArtists(relistenArtists: [ArtistRef], favorites: Set<String>) -> [ArtistRef] {
+    let rest = relistenArtists.filter { $0.name.caseInsensitiveCompare(PHISH.name) != .orderedSame }
+    let (favorited, unfavorited) = rest.reduce(into: ([ArtistRef](), [ArtistRef]())) { acc, artist in
+        if favorites.contains(artist.key) {
+            acc.0.append(artist)
+        } else {
+            acc.1.append(artist)
+        }
+    }
+    return [PHISH]
+        + favorited.sorted { $0.showCount > $1.showCount }
+        + unfavorited.sorted { $0.showCount > $1.showCount }
+}
 
 /// Adapts `PhishInAPI` to the seam. Deliberately thin: it reuses the client untouched,
 /// including the period/year-range branch and the audio filtering, so nothing about the Phish
