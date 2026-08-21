@@ -247,4 +247,13 @@ final class CatalogTests: XCTestCase {
         let merged = mergeArtists(relistenArtists: [relistenPhish, dead], favorites: [])
         XCTAssertEqual([PHISH, dead], merged)
     }
+
+    // ---------------------------------------------------------------- likes (#58)
+
+    func testToPlayableTrackCarriesPhishInsLikeStateThrough() {
+        let liked = Track(id: 1, title: "Tweezer", likesCount: 12, likedByUser: true)
+        let playable = liked.toPlayableTrack(showArt: nil)
+        XCTAssertEqual(12, playable.likesCount)
+        XCTAssertTrue(playable.likedByUser)
+    }
 }

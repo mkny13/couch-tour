@@ -142,10 +142,15 @@ public struct PlayableTrack: Equatable {
     public let showDate: String?
     public let venueName: String?
     public let artURL: String?
+    /// phish.in only (#58) — 0/false for Relisten, which has no server-side like concept;
+    /// Relisten likes are tracked locally by id instead, see `LikedTracks`.
+    public let likesCount: Int
+    public let likedByUser: Bool
 
     public init(
         id: String, title: String, setName: String = "", durationMs: Int64 = 0, url: String,
-        waveformURL: String? = nil, showDate: String? = nil, venueName: String? = nil, artURL: String? = nil
+        waveformURL: String? = nil, showDate: String? = nil, venueName: String? = nil, artURL: String? = nil,
+        likesCount: Int = 0, likedByUser: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -156,6 +161,8 @@ public struct PlayableTrack: Equatable {
         self.showDate = showDate
         self.venueName = venueName
         self.artURL = artURL
+        self.likesCount = likesCount
+        self.likedByUser = likedByUser
     }
 }
 
@@ -423,7 +430,9 @@ extension Track {
             waveformURL: waveformImageUrl,
             showDate: showDate,
             venueName: venueName,
-            artURL: showAlbumCoverUrl ?? showArt
+            artURL: showAlbumCoverUrl ?? showArt,
+            likesCount: likesCount,
+            likedByUser: likedByUser
         )
     }
 }

@@ -112,9 +112,11 @@ Two independent halves; land together or separately depending on how #57 goes.
 - `PhishInAPI.swift` gains `Likable` (show/track/playlist), `like`/`unlike` (POST/DELETE
   `/likes`), and decodes `likesCount`/`likedByUser` on the `Show`/`Track`/`Playlist` structs
   that don't carry them yet (check `PhishInAPI.swift:72-73,133-134` — some may already).
-- A like button on phish.in track rows and the show header, signed-out state showing the
-  public count but inert to taps (matches `LikeButton`'s `Session.username` gate,
-  `MainActivity.kt:1948-1990`), optimistic toggle with rollback on failure.
+- A like button on phish.in track rows, signed-out state showing the public count but inert
+  to taps (matches `LikeButton`'s `Session.username` gate, `MainActivity.kt:1948-1990`),
+  optimistic toggle with rollback on failure. Scoped to tracks, matching the issue title and
+  the Android #11 precedent it's explicitly porting — not the show/playlist header, which
+  would need `ShowSummary` to carry a phish.in numeric show id it doesn't have yet.
 - Explicitly **not** on Now Playing (#63, out of scope here).
 
 Test plan: `LikedTracks` gets the same toggle/persist test as `Favorites`. phish.in half gets

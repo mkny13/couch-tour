@@ -29,6 +29,7 @@ struct ShowDetailView: View {
                                 ForEach(group.tracks, id: \.id) { track in
                                     TrackRow(
                                         track: track,
+                                        backend: show.artist.backend,
                                         // Keyed on queueKey, not just the show: two tapes of
                                         // the same date share a ShowSummary but not a queue.
                                         isPlaying: player.queueKey == detail.queueKey && player.currentTrack?.id == track.id
@@ -216,29 +217,36 @@ private struct SourceRow: View {
 
 private struct TrackRow: View {
     let track: PlayableTrack
+    let backend: Backend
     let isPlaying: Bool
     let onTap: () -> Void
 
     var body: some View {
-        // A Button rather than .onTapGesture: keyboard- and VoiceOver-activatable, and
-        // .onTapGesture wasn't reliably triggered by synthetic clicks during D166's live
-        // verification pass even though List row navigation elsewhere in the app was fine.
-        Button(action: onTap) {
-            HStack {
-                if isPlaying {
-                    Image(systemName: "speaker.wave.2.fill")
-                        .foregroundStyle(.tint)
+        HStack {
+            // A Button rather than .onTapGesture: keyboard- and VoiceOver-activatable, and
+            // .onTapGesture wasn't reliably triggered by synthetic clicks during D166's live
+            // verification pass even though List row navigation elsewhere in the app was fine.
+            Button(action: onTap) {
+                HStack {
+                    if isPlaying {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .foregroundStyle(.tint)
+                            .font(.caption)
+                    }
+                    Text(track.title)
+                        .fontWeight(isPlaying ? .semibold : .regular)
+                    Spacer()
+                    Text(fmt(track.durationMs))
                         .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                Text(track.title)
-                    .fontWeight(isPlaying ? .semibold : .regular)
-                Spacer()
-                Text(fmt(track.durationMs))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            TrackLikeButton(
+                backend: backend, trackID: track.id, likesCount: track.likesCount, likedByUser: track.likedByUser
+            )
         }
-        .buttonStyle(.plain)
     }
 }
