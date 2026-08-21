@@ -2264,3 +2264,67 @@ Not verified live against a real paired device — same Keychain-reauth wall D16
 manual check is worth doing: play something on the phone, let the Mac's next sync tick (or
 foreground it) go by without touching playback locally, and confirm Continue Listening picks up
 the new row without switching sidebar sections.
+
+## Iteration 36 — a failing sync used to say nothing about it (D173)
+
+### D173 — `SyncSession.lastError` on both platforms; every previously-silent failure path now sets it
+
+D172 fixed the UI staleness Mike reported, but the underlying report — "sync is not actually
+working" — turned out to be a second, real bug once he checked: the phone's Settings showed
+"nothing linked" while the Mac still listed the phone as a paired device. The phone's local
+token had gone bad (most likely an app reinstall/data clear, or a prior 401 that
+auto-`unlink()`ed it) and `sync()` is a documented no-op when unpaired — `guard let token = ...
+else { return }` / `val token = store.deviceToken ?: return`. It had been silently doing
+nothing on every launch, foreground, 15-minute timer, and debounced push, with zero indication
+anywhere. Re-pairing the phone was the actual fix; this decision is about making the *next*
+version of this failure visible instead of silent.
+
+**Every sync failure path used to swallow its error.** `AppModel.syncNow()` is `Task { try?
+await syncSession.sync(progressStore) }`; Android's periodic worker, debounced push, and "Sync
+now" button all wrap `SyncSession.sync(...)` in `runCatching`/`try`/`Result.retry()` with
+nothing surfaced to the UI. An auto-unlink on a 401 is even quieter — `unlink()` runs and
+`paired` flips to false with no explanation at all for why. None of these paths were bugs
+exactly (background sync failing shouldn't crash anything, and `Result.retry()` is the right
+WorkManager behavior), but stacked together they meant a device could stop syncing entirely and
+never say so — exactly what happened here.
+
+**Fix: `SyncSession` (both platforms) gets a `lastError: String?`/`StateFlow<String?>`,** set
+inside `sync()`/`sync(_:)` itself rather than by each caller, so every existing call site — the
+periodic job, the debounce, the manual button, an auto-unlink — gets it for free with no changes
+to their own error handling:
+- A full round trip succeeding clears it.
+- The `unauthorized` branch now also sets an explanatory message before calling `unlink()`, so
+  the moment a device gets kicked back to "not paired," it says why instead of just changing
+  state silently.
+- The `gone` branch is unchanged (D126's transparent full-resync retry isn't a user-facing
+  failure).
+- A catch-all beyond `SyncException` was added on both platforms, because a plain network
+  failure (no connectivity, DNS, timeout) was never a `SyncException` and was escaping `sync()`
+  entirely uncaught before this — on macOS in particular, `AppModel.syncNow()`'s `try?` meant
+  this class of failure left literally no trace anywhere.
+- `CancellationException`/`CancellationError` is explicitly re-thrown untouched before the
+  catch-all runs, on both platforms — a debounced push superseding an in-flight one cancels the
+  coroutine/Task it's running in, and that's routine, not a failure; recording it as
+  `lastError` would flash a false "sync failed" banner on every rapid track change.
+- `clearError()` lets a deliberate, unrelated state change (the user tapping "unlink"
+  themselves) drop a stale message rather than leaving an old "was revoked" explanation on
+  screen after an intentional action.
+
+**UI: both Settings/Sync screens show `lastError` unconditionally, not nested inside "if
+paired."** The auto-unlink case is exactly why — `paired` flips to false in the same beat the
+error is set, so scoping the message to the paired section would erase the explanation at the
+one moment it's needed. Android's `SyncScreen` and macOS's `SyncView` both show it as a plain
+red-styled `Text` right below the intro copy.
+
+**Testing.** Android: `testDebugUnitTest` green (JAVA_HOME pointed at Android Studio's bundled
+JDK, per CLAUDE.md). macOS: `swift test` 163/163, up from 159 — four new cases
+(`testAnUnauthorizedResponseSetsAnExplanatoryError`, `testAServerErrorSetsLastErrorAndRethrows`,
+`testASuccessfulSyncClearsAPriorError`, `testClearErrorResetsLastError`) cover the new state
+directly against `MockServer`; `xcodebuild` succeeds. No Android-side equivalent unit tests were
+added for `lastError` specifically — `SyncSession` there is a singleton `object` wired to real
+`WorkManager`/`SharedPreferences`, which the existing test suite doesn't exercise at all (no
+prior tests of `SyncSession.sync` itself either), so this matches existing coverage rather than
+leaving a new gap. Not verified live — same Keychain-reauth wall as D172; the one thing worth
+confirming by hand is the scenario that motivated this: unlink a device from the *other* one's
+Devices list, then check that the now-unauthorized device's next sync attempt shows the
+"unlinked" message instead of just silently going back to "not paired."

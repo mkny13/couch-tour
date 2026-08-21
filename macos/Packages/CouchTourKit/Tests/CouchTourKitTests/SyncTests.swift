@@ -367,6 +367,54 @@ final class SyncSessionTests: XCTestCase {
         XCTAssertTrue(session.paired)
     }
 
+    // D172: every path that used to fail a sync silently now records why on `lastError`,
+    // since a device that's stopped actually syncing used to have nothing on screen saying so.
+
+    func testAnUnauthorizedResponseSetsAnExplanatoryError() async throws {
+        try await claim()
+        server.enqueue(#"{"error":"unauthorized"}"#, code: 401)
+
+        try await session.sync(store)
+
+        XCTAssertNotNil(session.lastError)
+    }
+
+    func testAServerErrorSetsLastErrorAndRethrows() async throws {
+        try await claim()
+        server.enqueue(#"{"error":"internal error"}"#, code: 500)
+
+        do {
+            try await session.sync(store)
+            XCTFail("expected the 500 to rethrow")
+        } catch {
+            // expected
+        }
+        XCTAssertNotNil(session.lastError)
+    }
+
+    func testASuccessfulSyncClearsAPriorError() async throws {
+        try await claim()
+        server.enqueue(#"{"error":"internal error"}"#, code: 500)
+        try? await session.sync(store)
+        XCTAssertNotNil(session.lastError)
+
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+        try await session.sync(store)
+
+        XCTAssertNil(session.lastError)
+    }
+
+    func testClearErrorResetsLastError() async throws {
+        try await claim()
+        server.enqueue(#"{"error":"internal error"}"#, code: 500)
+        try? await session.sync(store)
+        XCTAssertNotNil(session.lastError)
+
+        session.clearError()
+
+        XCTAssertNil(session.lastError)
+    }
+
     func testRequestDebouncedPushCoalescesABurstOfCallsIntoASinglePush() async throws {
         try await claim()
         let requestsBeforeDebounce = server.requestCount

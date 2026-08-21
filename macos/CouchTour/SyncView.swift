@@ -26,10 +26,21 @@ struct SyncView: View {
                 .foregroundStyle(.secondary)
             }
 
+            // Unconditional, not inside `if syncSession.paired`: an auto-unlink on a bad token
+            // flips `paired` to false in the same beat this message is set, so scoping it to
+            // the paired section would erase the explanation at exactly the moment it's
+            // needed (D172).
+            if let lastError = syncSession.lastError {
+                Section {
+                    Text(lastError).foregroundStyle(.red)
+                }
+            }
+
             if syncSession.paired {
                 Section {
                     Button("Unlink this device") {
                         syncSession.unlink()
+                        syncSession.clearError()
                         pairingResult = nil
                     }
                 }

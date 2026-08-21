@@ -13,6 +13,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -311,6 +312,23 @@ object SyncSession {
     private val _lastSyncedAt = MutableStateFlow(0L)
     val lastSyncedAt: StateFlow<Long> = _lastSyncedAt.asStateFlow()
 
+    /**
+     * The most recent sync failure, or null if the last attempt succeeded (or none has run
+     * yet). Every path that used to fail silently — the periodic worker, the debounced push,
+     * an auto-unlink on a 401 — updates this, so a device that's stopped actually syncing says
+     * so instead of just quietly not doing anything (D172's Continue Listening bug turned out
+     * to be one symptom of exactly this: a device whose token had gone bad kept reporting
+     * nothing was wrong).
+     */
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
+    /** Clears a stale error message after a deliberate, unrelated state change — e.g. the user
+     *  tapping "unlink" themselves shouldn't leave an old "was revoked" message on screen. */
+    fun clearError() {
+        _lastError.value = null
+    }
+
     fun init(context: Context) {
         store = SyncTokenStore(context.applicationContext)
         _paired.value = store.deviceToken != null
@@ -379,16 +397,38 @@ object SyncSession {
         try {
             @Suppress("ControlFlowWithEmptyBody")
             while (syncOnce(token, progressDao)) { }
+            _lastError.value = null
         } catch (e: SyncException) {
             when {
                 // Revoked from another device (or the token is simply bad): stop trying
                 // until the user re-pairs, rather than retrying a request that can't succeed.
-                e.unauthorized -> unlink()
+                // This used to be silent — the device would just stop syncing forever with
+                // nothing on screen to explain why, which is exactly what happened live (D172).
+                e.unauthorized -> {
+                    unlink()
+                    _lastError.value = "This device was unlinked — its pairing was revoked " +
+                        "or expired. Re-pair to resume syncing."
+                }
                 // Cursor predates the tombstone retention floor: start over from scratch.
                 // since = 0 never 410s (D126), so this terminates in one extra round trip.
                 e.gone -> { store.lastSeq = 0; sync(progressDao) }
-                else -> throw e
+                else -> {
+                    _lastError.value = e.message ?: "Sync failed"
+                    throw e
+                }
             }
+        } catch (e: CancellationException) {
+            // Not a real failure — a debounced push superseded by a newer one cancels the
+            // coroutine this runs in. Rethrown untouched so structured concurrency still sees
+            // it; recording it as a user-visible error would flash a false alarm on every
+            // rapid track change.
+            throw e
+        } catch (e: Exception) {
+            // Broader than SyncException on purpose: a plain network failure (no connectivity,
+            // DNS, timeout) never reached the catch above, so it used to escape this function
+            // with nothing recorded — the periodic worker retried, but silently, forever.
+            _lastError.value = e.message ?: "Sync failed"
+            throw e
         } finally {
             _syncing.value = false
         }
