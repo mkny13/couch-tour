@@ -28,6 +28,9 @@ alongside the regular app instead of updating over it — the way to let Mike tr
 risky without touching his daily-driver install. Pair it with `prerelease: true` so it doesn't
 become the GitHub "Latest" release. `release_tag`/`release_notes` create the release itself;
 omit `release_tag` to just build and upload the APK as a workflow artifact.
+[scripts/cut-beta.sh](scripts/cut-beta.sh) wraps this: it fetches tags, bumps the latest `vX.Y`
+by one, dispatches with the right flags, and prints the run URL — `scripts/cut-beta.sh "notes
+summarizing what merged"`, or `-t vX.Y` to pin the tag explicitly.
 
 **Promoting a beta to production is Mike's call, never automatic.** Every batch cuts a beta
 (above) — that beta build, installed on Mike's actual devices, *is* the manual testing step;
@@ -41,6 +44,10 @@ gh workflow run build-debug-apk.yml --ref <the confirmed beta's tag, e.g. v0.31>
   -f release_tag=<next tag, e.g. v0.32> -f release_notes="..." \
   -f prerelease=false -f side_install=false
 ```
+
+Or [scripts/promote-beta.sh](scripts/promote-beta.sh) `<confirmed-beta-tag> <next-tag>
+"notes"`, which wraps the same call — it exists purely to save typing the flags correctly, not
+to change when this runs; it still only gets invoked once Mike has explicitly confirmed a tag.
 
 `--ref` matters — it must point at the *confirmed* beta's own tag, not just "current main."
 Later betas may have shipped (and be mid-testing, or already found broken) since the one Mike
@@ -166,7 +173,9 @@ autonomous by default, not a proposal he approves each time:
   actual changes, not just the description) turns up nothing that looks wrong — matches the
   issue, touches only what it should, has real tests, doesn't contradict something documented
   elsewhere (this file, DECISIONS.md). Only hold a PR for Mike when something in the diff looks
-  genuinely risky or ambiguous, not merely "could be nicer."
+  genuinely risky or ambiguous, not merely "could be nicer." [scripts/ci-wait.sh](scripts/ci-wait.sh)
+  `<pr-number>` replaces the manual poll-then-diagnose loop — it blocks until checks finish and,
+  on a failure, pulls the failing job's log tail in the same call.
 - **Clean up your own worktree and branch immediately after your PR merges** — `git worktree
   remove` on the worktree you were using (if any) and delete the branch, both locally and on
   the remote (`gh pr merge --delete-branch` handles the remote side in one step). This is what
