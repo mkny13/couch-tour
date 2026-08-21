@@ -119,9 +119,9 @@ Casting from desktop is tracked separately, alongside the other new-surface work
 ## Suggested build order
 
 Filed as GitHub issues #9-28 (Android/general), #25 (desktop UI), #26 (security review), #49
-(filler-track skip toggle), and #56-69 (post-MVP backlog). Phases 1-6 covered the path to the
-Play Store release and are done except where noted; phase 7 is the fresh, unordered backlog
-opened up by being past MVP:
+(filler-track skip toggle), and #56-69 plus #83 (post-MVP backlog). Phases 1-6 covered the path
+to the Play Store release and are done except where noted; phase 7 is the fresh, unordered
+backlog opened up by being past MVP:
 
 1. **Release gates — done.** #26 (security review of `sync/` and both clients' credential
    storage). #23 (notification-sound ducking) is fixed (D93) and closed, pending the
@@ -157,9 +157,9 @@ opened up by being past MVP:
    catalog cache beyond the single `@Volatile`-cached artist list, #62 Relisten show artwork,
    #63 a Now Playing like button for Relisten tracks); two follow-ups to already-shipped
    features (#68 a tour picker for defunct/non-touring artists' Next Stop, #69 playlist
-   rename/reorder); and a freshly filed feature, #49, a persistent toggle to skip filler
-   tracks (intro/outro/banter/tuning) on both platforms. No priority order yet — pick up as
-   they get triaged.
+   rename/reorder); and two freshly filed features: #49, a persistent toggle to skip filler
+   tracks (intro/outro/banter/tuning) on both platforms, and #83, listened-status indicators for
+   tracks and shows. No priority order yet — pick up as they get triaged.
 
 ## Feature ideas
 
@@ -272,6 +272,9 @@ opened up by being past MVP:
   neither backend exposes a structured segment-type field, so detection will likely be
   title-keyword matching rather than an API flag. Needs to bypass skipped tracks during
   playback/auto-advance on both platforms, not just hide them from a track list.
+- Listened-status indicators for tracks and shows (#83) — visually mark tracks once playback
+  passes a completion threshold (issue suggests >90%), and mark shows as listened once the last
+  non-filler track is complete.
 
 ## Multi-artist follow-ups
 
