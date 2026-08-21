@@ -6,8 +6,10 @@ name: Unit tests
 # here instead. Same reasoning as build-debug-apk.yml, which says so for the APK build.
 on:
   pull_request:
-  push:
-    branches: [main]
+  # No push:[main] trigger — merges go through a PR (CLAUDE.md's autonomous merge policy), and
+  # a squash-merged commit is the same diff the pull_request run already tested, so a second
+  # run here would just be ~50-90s of redundant CI time on every merge. workflow_dispatch below
+  # still covers the rare direct-to-main push if it ever needs a manual re-check.
   workflow_dispatch:
 
 jobs:
