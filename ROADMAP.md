@@ -12,9 +12,11 @@ Offline downloads (#65) and a sleep timer (#66) — genuinely new scope, never f
 pass. Search covers shows, tracks, playlists, songs, and venues; tags are returned by the API
 but have no browse screen yet (#67).
 
-Login, likes, playlists, and favorite artists all exist on Android (#11, #12, #14 — all
-shipped) but not on desktop — see **Desktop (macOS) → personal library and account parity**
-below.
+Login, likes, and favorite artists now exist on both platforms — Android (#11 likes, #14
+favorite artists) and desktop (#56 favorite artists, #57 login, #58 likes — all shipped).
+Local playlists exist on Android (#12); the desktop port (#59) has its code merged (#80,
+#81) but the issue itself is still being wrapped up — see **Desktop (macOS) → personal
+library and account parity** below.
 
 ## Open questions
 
@@ -95,12 +97,13 @@ gaps** above for the two small issues found since.
 
 The whole personal-library/account cluster that shipped on Android — login, likes, playlists,
 favorite artists — was explicitly out of scope for the desktop MVP and stayed unscheduled
-after it. Now filed as issues, unordered:
+after it. Filed as issues; three of four now shipped:
 
-- Favorite artists on desktop (#56)
-- phish.in account login on desktop (#57)
-- Likes for phish.in and Relisten tracks on desktop (#58)
-- Local playlists on desktop, spanning both backends (#59)
+- ~~Favorite artists on desktop~~ — shipped (#56).
+- ~~phish.in account login on desktop~~ — shipped (#57).
+- ~~Likes for phish.in and Relisten tracks on desktop~~ — shipped (#58).
+- Local playlists on desktop, spanning both backends (#59) — code merged (#80, #81); issue
+  still open pending wrap-up.
 
 Casting from desktop is tracked separately, alongside the other new-surface work — see
 **New platforms/backends** below (#10).
@@ -115,10 +118,10 @@ Casting from desktop is tracked separately, alongside the other new-surface work
 
 ## Suggested build order
 
-Filed as GitHub issues #9-28 (Android/general), #25 (desktop UI), #26 (security review), and
-#56-69 (post-MVP backlog filed in this pass). Phases 1-6 covered the path to the Play Store
-release and are done except where noted; phase 7 is the fresh, unordered backlog opened up by
-being past MVP:
+Filed as GitHub issues #9-28 (Android/general), #25 (desktop UI), #26 (security review), #49
+(filler-track skip toggle), and #56-69 (post-MVP backlog). Phases 1-6 covered the path to the
+Play Store release and are done except where noted; phase 7 is the fresh, unordered backlog
+opened up by being past MVP:
 
 1. **Release gates — done.** #26 (security review of `sync/` and both clients' credential
    storage). #23 (notification-sound ducking) is fixed (D93) and closed, pending the
@@ -147,13 +150,16 @@ being past MVP:
    picker) is done on both platforms (Android in #37, desktop folded into #25 via #51). What's
    left: #24 (comparison, ratings, preferred tapers — explicitly builds on #17) → #18
    (source/show volume leveling, independent but adjacent).
-7. **Post-MVP backlog — freshly filed, unordered.** Desktop personal-library/account parity
-   (#56-59) and auto-updates (#60); general not-yet-built features (#65 offline downloads, #66
-   sleep timer, #67 browse by tag); implementation debt (#61 a real catalog cache beyond the
-   single `@Volatile`-cached artist list, #62 Relisten show artwork, #63 a Now Playing like
-   button for Relisten tracks); and two follow-ups to already-shipped features (#68 a tour
-   picker for defunct/non-touring artists' Next Stop, #69 playlist rename/reorder). No priority
-   order yet — pick up as they get triaged.
+7. **Post-MVP backlog — unordered, in progress.** Desktop personal-library/account parity is
+   mostly done — #56, #57, #58 shipped; #59 (local playlists) has its code merged, wrapping up
+   — and auto-updates (#60) hasn't started. Still open: general not-yet-built features (#65
+   offline downloads, #66 sleep timer, #67 browse by tag); implementation debt (#61 a real
+   catalog cache beyond the single `@Volatile`-cached artist list, #62 Relisten show artwork,
+   #63 a Now Playing like button for Relisten tracks); two follow-ups to already-shipped
+   features (#68 a tour picker for defunct/non-touring artists' Next Stop, #69 playlist
+   rename/reorder); and a freshly filed feature, #49, a persistent toggle to skip filler
+   tracks (intro/outro/banter/tuning) on both platforms. No priority order yet — pick up as
+   they get triaged.
 
 ## Feature ideas
 
@@ -261,6 +267,11 @@ being past MVP:
 - Sleep timer (#66) — stop playback after a set duration or at the end of the current track.
 - Browse/filter by tag (#67) — both backends' search already returns tags; no screen browses
   by them yet.
+- Persistent toggle to skip filler tracks (#49) — intro, outro, banter, tuning, crowd noise,
+  and similar non-music segments some shows break out as their own tracks. Off by default;
+  neither backend exposes a structured segment-type field, so detection will likely be
+  title-keyword matching rather than an API flag. Needs to bypass skipped tracks during
+  playback/auto-advance on both platforms, not just hide them from a track list.
 
 ## Multi-artist follow-ups
 
