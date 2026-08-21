@@ -304,6 +304,7 @@ object RelistenApi {
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .eventListenerFactory { TimingEventListener("RelistenApi") }
         .build()
 
     private val json = Json { ignoreUnknownKeys = true }

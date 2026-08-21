@@ -2416,3 +2416,44 @@ fetched concurrently` `` to `LocalPlaylistResolveTest.kt`, using a custom `MockW
 resolves to its own track regardless of what order the now-concurrent requests actually arrive
 in, which a plain FIFO `enqueue()` sequence couldn't have verified once the fetches stopped
 being sequential. `testDebugUnitTest` green, 327 tests.
+
+## Iteration 39 — D175 didn't explain Mike's actual case, so instrument before guessing again (D176)
+
+### D176 — Timing/connection-reuse logging on `PhishInApi`/`RelistenApi`, not a speculative fix
+
+D175 fixed a real bug, but Mike clarified his 30+ second resume wasn't a local (mixtape)
+playlist — it was resuming a recent, ordinary play. Re-tracing that path found nothing
+provably broken: `PlayerViewModel.resume()` makes exactly one `PhishInApi.show()`/`playlist()`
+call for `QueueKind.SHOW`/`PLAYLIST` (two sequential calls for `RECORDING`, needing the artist
+list before the tape), `MediaItems.kt`'s `showTrackItems`/`playlistTrackItems`/
+`recordingTrackItems` are pure in-memory mappers with no per-track fetches, `PlaybackService`
+does nothing blocking in `onCreate`, and a direct `curl` against phish.in's `/shows/{date}`
+endpoint returned under 200ms every time.
+
+**The one candidate that fits "30+ seconds, good wifi" and isn't ruled out:** both
+`PhishInApi` and `RelistenApi` (`Api.kt`, `Relisten.kt`) hold a process-lifetime `OkHttpClient`
+with a 30s read timeout, OkHttp's default connection pool, and no ping/health-check. If the
+process sits backgrounded a while (screen off, radio doze, a router/carrier NAT re-mapping an
+idle socket) — exactly the moment before someone taps "resume a recent play" — the pooled
+keep-alive connection can go silently dead. The next request writes fine but never gets a
+response, and nothing notices until the 30s read timeout fires; the retried request then
+succeeds in the same ~100-200ms `curl` already showed. That upper bound landing right at
+"30+ seconds" is what makes this the leading theory over anything else checked.
+
+Rather than tune timeouts against a guess, add just enough logging to confirm or kill it on
+Mike's own device next time it happens: `ApiTiming.kt`'s `TimingEventListener` (attached to
+both clients via `eventListenerFactory`) logs each call's connection-acquired timing and
+whether the connection was reused or freshly opened, plus elapsed time on completion/failure —
+the reused-without-a-fresh-connect signal is the direct proof of a stale pooled socket.
+`PlayerViewModel.resume()` also now logs its own elapsed time and, for the first time, logs
+failures instead of silently swallowing them via `runCatching` — and `start()` logs when a tap
+arrives before `MediaController` has finished connecting (a separate, real gap found during
+this pass: that tap is currently dropped with no feedback and no retry).
+
+**Testing.** The `TimingEventListener`'s `Log.d`/`Log.w` calls run inside `ApiRequestTest`,
+`RelistenRequestTest`, and `SearchFanOutTest` — none of which use Robolectric, so they hit the
+unmocked `android.util.Log` stub, which throws rather than logging. Wrapped only those calls in
+`runCatching` (real device logging is unaffected; `Log` never throws there) rather than adding
+Robolectric to tests that were deliberately kept lightweight. No new tests — this is
+diagnostic-only and changes no resume behavior. `testDebugUnitTest` green, 327 tests
+(unchanged).
