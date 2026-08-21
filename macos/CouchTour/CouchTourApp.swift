@@ -63,10 +63,16 @@ struct CouchTourApp: App {
         // ⌘, opens this — declaring the scene is all it takes, no Commands entry needed.
         // Sync used to be a sidebar section (RootView.swift); it's the only settings-like
         // surface the app has, so it moved here rather than duplicating the form in both
-        // places (D171).
+        // places (D171). Account (#57) joined it as a second tab rather than a third sidebar
+        // section or its own window, same reasoning.
         Settings {
-            SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
-                .frame(width: 450)
+            TabView {
+                AccountView(session: appModel.phishInSession)
+                    .tabItem { Label("Account", systemImage: "person.circle") }
+                SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
+                    .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+            }
+            .frame(width: 450)
         }
     }
 }

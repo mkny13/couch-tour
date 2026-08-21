@@ -1,7 +1,7 @@
 import Foundation
 
-// Port of Api.kt, browse path only (D5: no login on the desktop MVP; likes/playlists/search
-// stay out of scope per the plan). DTOs and the request layer only — the mapping into the
+// Port of Api.kt. Login landed in #57; likes/playlists/search-account-gating are still out
+// of scope (tracked as #58/#59). DTOs and the request layer only — the mapping into the
 // backend-neutral model lives in Catalog.swift, matching the Kotlin file split.
 
 public struct CoverArt: Codable, Equatable {
@@ -258,6 +258,25 @@ private struct ShowsPage: Decodable {
     }
 }
 
+// -------------------------------------------------------------------- auth (#57)
+
+public struct LoginResponse: Decodable, Equatable {
+    public let jwt: String
+    public let username: String
+    public let email: String
+
+    public init(jwt: String, username: String, email: String) {
+        self.jwt = jwt
+        self.username = username
+        self.email = email
+    }
+}
+
+private struct LoginRequest: Encodable {
+    let email: String
+    let password: String
+}
+
 public struct APIException: Error {
     public let message: String
     public let code: Int
@@ -270,23 +289,52 @@ public struct APIException: Error {
     public var unauthorized: Bool { code == 401 }
 }
 
-/// Plain reads only in the desktop MVP (no auth/login, D5). Matches `PhishInApi`'s shape: an
-/// overridable `baseURL` for tests, no third-party HTTP framework.
+/// Matches `PhishInApi`'s shape: an overridable `baseURL` for tests, no third-party HTTP
+/// framework.
 public enum PhishInAPI {
     private static let defaultBase = URL(string: "https://phish.in/api/v2")!
 
     /// Overridden by tests to point at a local mock server.
     public static var baseURL: URL = defaultBase
 
-    private static let decoder: JSONDecoder = JSONDecoder()
+    /// Set by `PhishInSession` once a login (or a restored one) is active. Attached as
+    /// `X-Auth-Token` on every request — deliberately not `Authorization: Bearer`, which the
+    /// API also accepts but treats identically to a wrong/expired token: both produce an
+    /// indistinguishable 401, the same footgun `Api.kt`'s own comment warns about.
+    public static var authToken: String?
 
-    private static func get(_ url: URL) async throws -> Data {
-        var request = URLRequest(url: url)
+    /// Fired when a request that carried `authToken` comes back 401. Gated on the request
+    /// having actually carried a token so a bad-password 401 from `login` itself — which never
+    /// attaches one — surfaces as a login error instead of silently logging out. Async and
+    /// awaited so `PhishInSession.logout()` (MainActor-isolated) has finished before this
+    /// request's caller sees the resulting error, rather than racing a detached `Task`.
+    public static var onUnauthorized: (() async -> Void)?
+
+    private static let decoder: JSONDecoder = JSONDecoder()
+    private static let encoder: JSONEncoder = JSONEncoder()
+
+    private static func send(_ request: URLRequest) async throws -> Data {
+        var request = request
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let carriedToken = authToken
+        if let carriedToken { request.setValue(carriedToken, forHTTPHeaderField: "X-Auth-Token") }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIException("No HTTP response") }
+        if http.statusCode == 401 && carriedToken != nil { await onUnauthorized?() }
         guard (200...299).contains(http.statusCode) else { throw APIException("HTTP \(http.statusCode)", code: http.statusCode) }
         return data
+    }
+
+    private static func get(_ url: URL) async throws -> Data {
+        try await send(URLRequest(url: url))
+    }
+
+    private static func post<Body: Encodable>(_ url: URL, body: Body) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoder.encode(body)
+        return try await send(request)
     }
 
     private static func path(_ segments: String...) -> URLComponents {
@@ -332,5 +380,11 @@ public enum PhishInAPI {
         components.percentEncodedPath += "/search/" + encodedTerm
         components.queryItems = [URLQueryItem(name: "audio_status", value: "complete_or_partial")]
         return try decoder.decode(SearchResults.self, from: try await get(components.url!))
+    }
+
+    public static func login(email: String, password: String) async throws -> LoginResponse {
+        let url = path("auth", "login").url!
+        let data = try await post(url, body: LoginRequest(email: email, password: password))
+        return try decoder.decode(LoginResponse.self, from: data)
     }
 }
