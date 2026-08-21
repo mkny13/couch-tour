@@ -795,6 +795,7 @@ private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: Str
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
+                Text(summary.artist.name, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 Text(summary.venue.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 Text(summary.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 Text("${detail.tracks.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
@@ -1718,6 +1719,7 @@ private fun ShowHeader(show: Show, trackCount: Int) {
         )
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
+            Text(PHISH.name, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             Text(show.venueName.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
             Text(show.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             Text("$trackCount tracks · ${fmt(show.duration)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
