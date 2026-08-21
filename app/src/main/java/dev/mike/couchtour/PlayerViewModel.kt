@@ -2,6 +2,7 @@ package dev.mike.couchtour
 
 import android.app.Application
 import android.content.ComponentName
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -122,7 +123,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun start(items: List<MediaItem>, startIndex: Int, startPositionMs: Long) {
-        val c = controller ?: return
+        val c = controller ?: run {
+            Log.w("PlayerViewModel", "start() called before MediaController connected; dropping the tap")
+            return
+        }
         if (items.isEmpty()) return
         c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), startPositionMs)
         c.prepare()
@@ -170,6 +174,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val ref = parseQueueKey(progress.queueKey) ?: return
         val index = if (progress.finished) 0 else progress.trackIndex
         val position = if (progress.finished) 0L else progress.positionMs
+        val startNanos = System.nanoTime()
         viewModelScope.launch {
             runCatching {
                 when (ref.kind) {
@@ -193,6 +198,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     QueueKind.LOCAL_PLAYLIST -> start(localPlaylistItems(ref.id), index, position)
                 }
+            }.onSuccess {
+                Log.d("PlayerViewModel", "resume(${ref.kind}) ready after ${(System.nanoTime() - startNanos) / 1_000_000}ms")
+            }.onFailure { e ->
+                Log.w("PlayerViewModel", "resume(${ref.kind}) failed after ${(System.nanoTime() - startNanos) / 1_000_000}ms: ${e.javaClass.simpleName}: ${e.message}")
             }
         }
     }
