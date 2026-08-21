@@ -30,6 +30,8 @@ struct ShowDetailView: View {
                                     TrackRow(
                                         track: track,
                                         backend: show.artist.backend,
+                                        artistSlug: show.artist.backend == .relisten ? show.artist.id : nil,
+                                        recordingId: detail.recording?.id,
                                         // Keyed on queueKey, not just the show: two tapes of
                                         // the same date share a ShowSummary but not a queue.
                                         isPlaying: player.queueKey == detail.queueKey && player.currentTrack?.id == track.id
@@ -218,6 +220,8 @@ private struct SourceRow: View {
 private struct TrackRow: View {
     let track: PlayableTrack
     let backend: Backend
+    let artistSlug: String?
+    let recordingId: String?
     let isPlaying: Bool
     let onTap: () -> Void
 
@@ -247,6 +251,13 @@ private struct TrackRow: View {
             TrackLikeButton(
                 backend: backend, trackID: track.id, likesCount: track.likesCount, likedByUser: track.likedByUser
             )
+            AddToPlaylistButton {
+                LocalPlaylistTrack(
+                    playlistId: "", backend: backend.rawValue, trackId: track.id,
+                    showDate: track.showDate ?? "", artistSlug: artistSlug, recordingId: recordingId,
+                    title: track.title, durationMs: track.durationMs, venueName: track.venueName, artUrl: track.artURL
+                )
+            }
         }
     }
 }

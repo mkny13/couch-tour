@@ -8,6 +8,9 @@ import Foundation
 final class AppModel: ObservableObject {
     let progressStore: ProgressStore?
     let progressStoreError: String?
+    /// nil under the same condition `progressStore` is — local playlists share its
+    /// `phishin.db` connection (#59), so there's nothing to open independently.
+    let localPlaylistStore: LocalPlaylistStore?
     #if BETA
     let syncSession = SyncSession(store: SyncTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.sync")))
     #else
@@ -47,6 +50,7 @@ final class AppModel: ObservableObject {
             progressStore = nil
             progressStoreError = "Couldn't open the listening history database: \(error)"
         }
+        localPlaylistStore = progressStore.flatMap { try? LocalPlaylistStore(sharing: $0) }
     }
 
     /// One push-then-pull cycle. Fire-and-forget: `sync` is a no-op if unpaired, and any

@@ -1,0 +1,165 @@
+import XCTest
+import GRDB
+@testable import CouchTourKit
+
+/// Port of Android's LocalPlaylistDaoTest.kt: CRUD against an in-memory `LocalPlaylistStore`
+/// sharing a `ProgressStore`'s connection, plus `resolveLocalPlaylistTracks`'s fetch-grouping
+/// and skip-what-doesn't-resolve behavior against a `MockServer`.
+final class LocalPlaylistStoreTests: XCTestCase {
+    private var progressStore: ProgressStore!
+    private var store: LocalPlaylistStore!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        progressStore = try ProgressStore.inMemory()
+        store = try LocalPlaylistStore(sharing: progressStore)
+    }
+
+    private func row(playlistId: String, trackId: String, showDate: String = "1997-11-17") -> LocalPlaylistTrack {
+        LocalPlaylistTrack(
+            playlistId: playlistId, backend: "phishin", trackId: trackId, showDate: showDate,
+            title: "Track \(trackId)", durationMs: 1_000
+        )
+    }
+
+    func testCreatePlaylistPersistsWithZeroTracks() throws {
+        let playlist = try store.createPlaylist(name: "Road Trip", now: 1_000)
+        XCTAssertEqual("Road Trip", playlist.name)
+        XCTAssertEqual(0, playlist.trackCount)
+        XCTAssertEqual([playlist], try store.playlists())
+    }
+
+    func testAddTrackAppendsAtTheEndAndBumpsCountAndUpdatedAt() throws {
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "1"), toPlaylist: playlist.id, now: 2_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "2"), toPlaylist: playlist.id, now: 3_000)
+
+        let rows = try store.tracks(playlistId: playlist.id)
+        XCTAssertEqual(["1", "2"], rows.map(\.trackId))
+        XCTAssertEqual([0, 1], rows.map(\.position))
+        XCTAssertEqual(2, try store.playlist(id: playlist.id)!.trackCount)
+        XCTAssertEqual(3_000, try store.playlist(id: playlist.id)!.updatedAt)
+    }
+
+    func testRemoveTrackDropsItAndDecrementsCount() throws {
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "1"), toPlaylist: playlist.id, now: 2_000)
+        let rowId = try store.tracks(playlistId: playlist.id).first!.rowId!
+
+        try store.removeTrack(rowId: rowId, fromPlaylist: playlist.id, now: 3_000)
+
+        XCTAssertTrue(try store.tracks(playlistId: playlist.id).isEmpty)
+        XCTAssertEqual(0, try store.playlist(id: playlist.id)!.trackCount)
+    }
+
+    func testDeletingAPlaylistCascadesItsTracks() throws {
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "1"), toPlaylist: playlist.id, now: 2_000)
+
+        try store.deletePlaylist(id: playlist.id)
+
+        XCTAssertNil(try store.playlist(id: playlist.id))
+        XCTAssertTrue(try store.tracks(playlistId: playlist.id).isEmpty)
+    }
+
+    func testPlaylistsOrderByMostRecentlyUpdatedFirst() throws {
+        let a = try store.createPlaylist(name: "A", now: 1_000)
+        let b = try store.createPlaylist(name: "B", now: 2_000)
+        XCTAssertEqual([b.id, a.id], try store.playlists().map(\.id))
+    }
+
+    func testASecondStoreSharingTheSameProgressStoreSeesTheSameData() throws {
+        // The whole reason for `sharing:` — one connection, one migrator run, both stores
+        // agree on what's there.
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        let second = try LocalPlaylistStore(sharing: progressStore)
+        XCTAssertEqual([playlist], try second.playlists())
+    }
+}
+
+final class ResolveLocalPlaylistTracksTests: XCTestCase {
+    private var server: MockServer!
+
+    override func setUp() {
+        super.setUp()
+        server = MockServer()
+        server.start()
+        PhishInAPI.baseURL = URL(string: "https://mock.test/api/v2")!
+        RelistenAPI.baseURL = URL(string: "https://mock.test/api")!
+    }
+
+    override func tearDown() {
+        server.shutdown()
+        PhishInAPI.baseURL = URL(string: "https://phish.in/api/v2")!
+        RelistenAPI.baseURL = URL(string: "https://api.relisten.net/api")!
+        super.tearDown()
+    }
+
+    func testResolvesPhishInTracksFetchingTheShowOnce() async throws {
+        server.enqueue(try fixtureString("show.json"))
+        let rows = [
+            LocalPlaylistTrack(playlistId: "p", position: 0, backend: "phishin", trackId: "8435", showDate: "1997-11-17", title: "x", durationMs: 0),
+            LocalPlaylistTrack(playlistId: "p", position: 1, backend: "phishin", trackId: "8436", showDate: "1997-11-17", title: "x", durationMs: 0),
+        ]
+
+        let resolved = await resolveLocalPlaylistTracks(rows)
+
+        XCTAssertEqual(["Tweezer", "Reba"], resolved.map(\.title))
+        XCTAssertEqual(1, server.requestCount)
+    }
+
+    func testResolvesRelistenTracksUsingTheArtistSlugAndRecordingId() async throws {
+        server.enqueue(try fixtureString("relisten_show.json"))
+        let rows = [
+            LocalPlaylistTrack(
+                playlistId: "p", position: 0, backend: "relisten", trackId: "160c100c-75a9-6568-7ef1-12aecdabcafe",
+                showDate: "1977-05-08", artistSlug: "grateful-dead", title: "x", durationMs: 0
+            )
+        ]
+
+        let resolved = await resolveLocalPlaylistTracks(rows)
+
+        XCTAssertEqual(["Minglewood Blues"], resolved.map(\.title))
+    }
+
+    func testAShowThatFailsToFetchDropsJustItsOwnRowsNotTheWholePlaylist() async throws {
+        server.enqueue("", code: 500, forHost: "mock.test")
+        server.enqueue(try fixtureString("show.json"), forHost: "mock.test")
+        let rows = [
+            LocalPlaylistTrack(playlistId: "p", position: 0, backend: "phishin", trackId: "missing", showDate: "1990-01-01", title: "x", durationMs: 0),
+            LocalPlaylistTrack(playlistId: "p", position: 1, backend: "phishin", trackId: "8435", showDate: "1997-11-17", title: "x", durationMs: 0),
+        ]
+
+        let resolved = await resolveLocalPlaylistTracks(rows)
+
+        XCTAssertEqual(["Tweezer"], resolved.map(\.title))
+    }
+
+    func testATrackIdThatIsNoLongerInTheFetchedShowIsSkipped() async throws {
+        server.enqueue(try fixtureString("show.json"))
+        let rows = [
+            LocalPlaylistTrack(playlistId: "p", position: 0, backend: "phishin", trackId: "8435", showDate: "1997-11-17", title: "x", durationMs: 0),
+            LocalPlaylistTrack(playlistId: "p", position: 1, backend: "phishin", trackId: "999999", showDate: "1997-11-17", title: "x", durationMs: 0),
+        ]
+
+        let resolved = await resolveLocalPlaylistTracks(rows)
+
+        XCTAssertEqual(["Tweezer"], resolved.map(\.title))
+    }
+
+    func testPreservesStoredOrderAcrossMultipleShows() async throws {
+        server.enqueue(try fixtureString("relisten_show.json"))
+        server.enqueue(try fixtureString("show.json"))
+        let rows = [
+            LocalPlaylistTrack(
+                playlistId: "p", position: 0, backend: "relisten", trackId: "160c100c-75a9-6568-7ef1-12aecdabcafe",
+                showDate: "1977-05-08", artistSlug: "grateful-dead", title: "x", durationMs: 0
+            ),
+            LocalPlaylistTrack(playlistId: "p", position: 1, backend: "phishin", trackId: "8435", showDate: "1997-11-17", title: "x", durationMs: 0),
+        ]
+
+        let resolved = await resolveLocalPlaylistTracks(rows)
+
+        XCTAssertEqual(["Minglewood Blues", "Tweezer"], resolved.map(\.title))
+    }
+}

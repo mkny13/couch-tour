@@ -6,6 +6,9 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case artists = "Artists"
     case search = "Search"
     case history = "History"
+    /// Account-free, spans both backends (#59) — its own top-level section rather than
+    /// nested under Artists, the same peer-level placement Account/Sync got in Settings.
+    case playlists = "Playlists"
 
     var id: String { rawValue }
 
@@ -15,6 +18,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .artists: return "music.mic"
         case .search: return "magnifyingglass"
         case .history: return "clock.arrow.circlepath"
+        case .playlists: return "music.note.list"
         }
     }
 }
@@ -54,6 +58,8 @@ struct RootView: View {
                         NavigationStack { ContinueListeningView() }
                     case .history:
                         NavigationStack { HistoryView() }
+                    case .playlists:
+                        NavigationStack { LocalPlaylistsView() }
                     }
                 }
                 .toolbar {

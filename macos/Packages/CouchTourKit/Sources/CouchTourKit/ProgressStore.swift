@@ -58,7 +58,10 @@ public struct PlaybackProgress: Codable, Equatable, FetchableRecord, Persistable
 /// GRDB wrapper around the `progress` table. Query shapes mirror Android's `ProgressDao`
 /// one-for-one so the two clients' notions of "history" and "continue listening" never diverge.
 public final class ProgressStore {
-    private let dbQueue: DatabaseQueue
+    /// Internal, not private: `LocalPlaylistStore` (#59) shares this one connection rather
+    /// than opening a second `DatabaseQueue` to the same `phishin.db` file, which GRDB
+    /// recommends against within a single process.
+    let dbQueue: DatabaseQueue
 
     /// Default on-disk location: `~/Library/Application Support/dev.mike.couchtour/phishin.db`.
     /// Same filename as Android for the same reason Android kept it across its own rename — a
