@@ -210,19 +210,29 @@ public func resolveLocalPlaylistTracks(_ rows: [LocalPlaylistTrack]) async -> [P
         if seen.insert(k).inserted { order.append(k) }
     }
 
+    // Concurrent, not a sequential for-loop: N distinct shows/tapes used to pay N sequential
+    // HTTP round trips before playback could start, reproducing Android's 30+ second resume
+    // stall on a wide mixtape playlist (D175 — the bug was found and fixed there first).
     var detailsByKey: [GroupKey: ShowDetail] = [:]
-    for k in order {
-        guard let backend = Backend.from(k.backend) else { continue }
-        let artist: ArtistRef
-        switch backend {
-        case .phishin:
-            artist = PHISH
-        case .relisten:
-            guard let slug = k.artistSlug else { continue }
-            artist = ArtistRef(backend: .relisten, id: slug, name: "")
+    await withTaskGroup(of: (GroupKey, ShowDetail?).self) { group in
+        for k in order {
+            group.addTask {
+                guard let backend = Backend.from(k.backend) else { return (k, nil) }
+                let artist: ArtistRef
+                switch backend {
+                case .phishin:
+                    artist = PHISH
+                case .relisten:
+                    guard let slug = k.artistSlug else { return (k, nil) }
+                    artist = ArtistRef(backend: .relisten, id: slug, name: "")
+                }
+                let detail = try? await sourceFor(backend).show(artist: artist, date: k.showDate, recordingId: k.recordingId)
+                return (k, detail)
+            }
         }
-        guard let detail = try? await sourceFor(backend).show(artist: artist, date: k.showDate, recordingId: k.recordingId) else { continue }
-        detailsByKey[k] = detail
+        for await (k, detail) in group {
+            if let detail { detailsByKey[k] = detail }
+        }
     }
 
     return rows.compactMap { row in
