@@ -262,4 +262,39 @@ final class ProgressStoreTests: XCTestCase {
 
         XCTAssertEqual(["Phish"], try store.artists())
     }
+
+    // ------------------------------------------------------------ historyArtists
+
+    func testHistoryArtistsOrdersByLastPlayedNotAlphabetically() throws {
+        // Deliberately the opposite of artists()'s alphabetical order — Grateful Dead would
+        // sort first alphabetically but played least recently here.
+        try store.put(progress(key: "show:1997-02-13", updatedAt: 100, artist: "Grateful Dead"))
+        try store.put(progress(key: "show:1998-11-02", updatedAt: 200, artist: "Phish"))
+        try store.put(progress(key: "show:1999-06-01", updatedAt: 300, artist: "Widespread Panic"))
+
+        XCTAssertEqual(
+            ["Widespread Panic", "Phish", "Grateful Dead"],
+            historyArtists(try store.history())
+        )
+    }
+
+    func testHistoryArtistsDedupesAtTheArtistsMostRecentAppearance() throws {
+        try store.put(progress(key: "show:1972-08-27", updatedAt: 100, artist: "Grateful Dead"))
+        try store.put(progress(key: "show:1997-02-13", updatedAt: 200, artist: "Phish"))
+        try store.put(progress(key: "show:1977-05-08", updatedAt: 300, artist: "Grateful Dead"))
+
+        XCTAssertEqual(["Grateful Dead", "Phish"], historyArtists(try store.history()))
+    }
+
+    func testHistoryArtistsSkipsBlankArtistsButTheRowStaysInHistory() throws {
+        try store.put(progress(key: "show:1997-02-13", artist: ""))
+        try store.put(progress(key: "show:1998-11-02", artist: "Phish"))
+
+        XCTAssertEqual(["Phish"], historyArtists(try store.history()))
+        XCTAssertEqual(2, try store.history().count)
+    }
+
+    func testHistoryArtistsOfAnEmptyHistoryIsEmpty() throws {
+        XCTAssertEqual([], historyArtists(try store.history()))
+    }
 }

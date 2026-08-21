@@ -6,7 +6,6 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case artists = "Artists"
     case search = "Search"
     case history = "History"
-    case sync = "Sync"
 
     var id: String { rawValue }
 
@@ -16,7 +15,6 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .artists: return "music.mic"
         case .search: return "magnifyingglass"
         case .history: return "clock.arrow.circlepath"
-        case .sync: return "arrow.triangle.2.circlepath"
         }
     }
 }
@@ -56,10 +54,6 @@ struct RootView: View {
                         NavigationStack { ContinueListeningView() }
                     case .history:
                         NavigationStack { HistoryView() }
-                    case .sync:
-                        NavigationStack {
-                            SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
-                        }
                     }
                 }
                 .toolbar {

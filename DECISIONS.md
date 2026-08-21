@@ -2164,3 +2164,66 @@ phone), the same as pairing for the first time — confirming by accident that a
 token is unrecoverable by design (D127: the server never re-mints a token for an existing
 device id, or a leaked database row plus a guessed id would be enough to impersonate a
 device). The orphaned `Mac Mini` row was revoked from the phone's Devices list afterward.
+
+## Iteration 34 — closing out #25: a Settings scene and History filtered by artist (D171)
+
+### D171 — Sync moves into a real Settings scene; History gets a last-played-ordered artist filter
+
+The last two items in #25's batch, both confirmed with Mike before building. This closes #25 —
+every UI gap the issue collected (player surface D166-D167, browse D168, search D169, the beta
+build D170 was a separate track) is now done.
+
+**Settings: Sync moves in, the sidebar section goes away.** `CouchTourApp.swift` declares a
+`Settings` scene holding the same `SyncView` the sidebar used to show — that's the whole change
+macOS needs for ⌘, to work; no `Commands` entry required. Sync is the only settings-like surface
+this app has (the one other persisted preference, volume, already lives in the mini player,
+where it belongs), so nothing was invented to fill out a General tab — the alternative Mike
+turned down. Two things a `Settings` scene gets wrong by default if you don't watch for them:
+it does **not** inherit the environment a `WindowGroup` sets up, so a view built assuming
+`@EnvironmentObject` access would crash on open rather than fail to compile (`SyncView` already
+took `syncSession` and `sync` as plain parameters, so this was a check, not a fix); and
+`.navigationTitle` isn't guaranteed to render outside a `NavigationStack` — `SyncView`'s
+`.navigationTitle("Sync")` came out for the same reason D167 dropped one from `.inspector`. A
+bare `Form` in a Settings window also sizes badly without a `.frame(width:)`.
+
+**History stays flat and newest-first; it gains a filter, not sections or a drill-down.**
+Mike's call, and the reasoning holds up: History mostly answers "what did I just play", and
+both grouping alternatives cost an extra click or a mode switch to get back to that. The filter
+is the same shape `SearchView`'s own artist picker already uses — a menu-style `Picker`, shown
+only when there's more than one artist, selection falling back to "everything" (not literally
+reset) once the artist it names is no longer present, the identical accident-of-key-reuse
+behavior `SearchView.resultsList` documents.
+
+**`ProgressStore.artists()`/`historyFor(artist:)` stayed unused on purpose, despite looking
+purpose-built for this.** Both exist and are tested — Android-parity groundwork, same as
+`Progress.artists()`/`historyFor()` on the Kotlin side, referenced only by tests there too. But
+`artists()` orders alphabetically (`ORDER BY artist`), the opposite of what Mike asked for, and
+`historyFor(artist:)` would be an unnecessary second query against a list `HistoryView` already
+holds in memory. `history()` is already `updatedAt` descending, so a fresh free function,
+`historyArtists(_:)` in `ProgressStore.swift`, gets last-played order for free — first
+appearance in an already-sorted list is last-played order, no second query, no sort. Neither
+existing method was touched or deleted; CLAUDE.md's guidance against removing pre-existing code
+that isn't in the way applies here even though it now looks stranger to leave unused than it did
+before this landed.
+
+**No shared filter component between `SearchView` and `HistoryView`.** Search filters
+`ArtistRef` keyed on backend+id; History filters plain artist strings pulled straight off
+`PlaybackProgress`. Two small, differently-typed filters, not one abstraction pretending
+they're the same thing — the speculative generality CLAUDE.md's simplicity section warns off.
+
+**Testing.** `swift test` is 159/159, up from 155 (D169's count) — `historyArtists`'s ordering,
+dedup-at-most-recent, blank-artist skip (with the row still surviving `history()` itself), and
+empty-history cases are all covered independent of the UI; the Settings scene is pure wiring
+with nothing to unit-test, covered by the build instead. `xcodebuild` succeeds on both
+`CouchTour` and `CouchTourBeta` (they share these source files); no new source files, so no
+`xcodegen generate` was needed. Live verification hit the same wall D166-D170 all documented:
+this machine's login keychain holds a real `sync.deviceToken` from a paired device, and
+`SyncSession.init` reads it unconditionally at launch — any `install.sh` rebuild gets a fresh
+ad-hoc signature, parking the main thread in `SecItemCopyMatching` behind a Keychain
+re-authorization prompt no agent should answer. Nothing UI-facing in this PR was clicked
+through live; verification here is `swift test` plus a full read of the diff. A manual pass is
+worth a few minutes on a real device before calling this fully done: ⌘, opens Settings with
+pairing/devices/sync-now/the version string all rendering at a sensible window size; Sync is
+gone from the sidebar and nothing else there shifted; History's artist picker appears only with
+more than one artist, orders most-recently-played first, narrows the list on selection, and
+"All artists" restores everything including any blank-artist row.

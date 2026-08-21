@@ -106,10 +106,11 @@ struct SyncView: View {
                 }
             }
 
-            // Diagnostic detail, not a feature — small, muted, at the bottom of the closest
-            // thing to a settings screen this app has today (#43). MARKETING_VERSION in
-            // project.yml is bumped by hand alongside each notable build; there's no
-            // release-tag pipeline for macOS yet (no CI at all — see CLAUDE.md).
+            // Diagnostic detail, not a feature — small, muted, at the bottom of the Settings
+            // window (D171; this lived at the bottom of the sidebar's Sync section before
+            // that, #43). MARKETING_VERSION in project.yml is bumped by hand alongside each
+            // notable build; there's no release-tag pipeline for macOS yet (no CI at all —
+            // see CLAUDE.md).
             Section {
                 Text("Couch Tour \(appVersion)")
                     .font(.caption)
@@ -118,7 +119,10 @@ struct SyncView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Sync")
+        // No .navigationTitle here (D171): this now lives in a Settings scene, not a
+        // NavigationStack — the Settings window titles itself, and navigationTitle isn't
+        // guaranteed to render outside a NavigationStack (D167 hit the same thing with
+        // .inspector).
         .task { if syncSession.paired { await refreshDevices() } }
         .onChange(of: syncSession.paired) { _, paired in
             if paired { Task { await refreshDevices() } }
