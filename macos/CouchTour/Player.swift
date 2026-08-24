@@ -75,6 +75,8 @@ final class Player: NSObject, ObservableObject {
     private var currentItemObservation: NSKeyValueObservation?
     private var rateObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
+    /// Bare-Space play/pause. Not a SwiftUI `keyboardShortcut` — see `SpacePlaybackHotkey`.
+    private var spaceKeyMonitor: Any?
 
     init(progressStore: ProgressStore?, syncSession: SyncSession?) {
         recorder = ProgressRecorder(store: progressStore)
@@ -83,7 +85,14 @@ final class Player: NSObject, ObservableObject {
         super.init()
         queuePlayer.volume = volume
         configureRemoteCommands()
+        configureSpaceKeyMonitor()
         observePlayer()
+    }
+
+    deinit {
+        if let spaceKeyMonitor {
+            NSEvent.removeMonitor(spaceKeyMonitor)
+        }
     }
 
     /// Starts a queue-key-bearing show or recording. `resumePositionMs`, when non-zero, is
@@ -235,6 +244,18 @@ final class Player: NSObject, ObservableObject {
     }
 
     // MARK: - Now Playing / media keys
+
+    private func configureSpaceKeyMonitor() {
+        spaceKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard SpacePlaybackHotkey.shouldHandle(event, firstResponder: NSApp.keyWindow?.firstResponder)
+            else { return event }
+            // Held Space would otherwise toggle on every repeat tick.
+            if !event.isARepeat {
+                Task { @MainActor in self?.togglePlayPause() }
+            }
+            return nil
+        }
+    }
 
     private func configureRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()

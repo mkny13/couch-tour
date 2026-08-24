@@ -74,7 +74,9 @@ SwiftUI + AVFoundation (D94), not Electron or a browser client.
   resuming its own tape correctly, never the other's.
 - **M5 — desktop UI parity, done (#25).** Player surface (D167): a Now Playing inspector
   panel, artwork in the mini player and the system widget, a persisted app-level volume
-  control. Window/macOS idioms: menu-bar `Commands` for transport (D166), a real `Settings`
+  control. Window/macOS idioms: menu-bar `Commands` for transport (D166; Space play/pause
+  actually delivered via an `NSEvent` monitor rather than a SwiftUI `keyboardShortcut`, D177
+  / #84), a real `Settings`
   scene (⌘,) holding Sync (D171). Browse: the tape switcher reworked into a Source picker
   matching Android's #17 (D168), search as its own sidebar section (D169), and History's
   last-played-ordered artist filter (D171).

@@ -42,7 +42,10 @@ struct CouchTourApp: App {
                 Button(player.isPlaying ? "Pause" : "Play") {
                     player.togglePlayPause()
                 }
-                .keyboardShortcut(.space, modifiers: [])
+                // Space is handled by Player's local NSEvent monitor (D177), not a
+                // Command keyboardShortcut — SwiftUI never delivers bare Space to a
+                // menu action when a List has focus, which is almost always. Keeping a
+                // .keyboardShortcut(.space) here would also steal the key from Search.
 
                 Divider()
 
