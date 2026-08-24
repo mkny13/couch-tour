@@ -2457,3 +2457,27 @@ unmocked `android.util.Log` stub, which throws rather than logging. Wrapped only
 Robolectric to tests that were deliberately kept lightweight. No new tests — this is
 diagnostic-only and changes no resume behavior. `testDebugUnitTest` green, 327 tests
 (unchanged).
+
+## Iteration 40 — Space play/pause never fired (#84, D177)
+
+### D177 — bare Space is an `NSEvent` monitor, not a SwiftUI `keyboardShortcut`
+
+D166 wired Play/Pause to `.keyboardShortcut(.space, modifiers: [])` on the Playback
+`CommandMenu`, matching Music/Podcasts. That shortcut never actually arrived at the action
+once a `List` had focus — which is the app's usual state (sidebar, artists, shows, history).
+SwiftUI delivers Command-modified shortcuts fine (⌘→ / ⌘← still work); it does not deliver
+bare Space, because AppKit treats that key as "activate the focused control." Mike filed it
+as a high-priority bug (#84).
+
+Fix is a local `NSEvent` keyDown monitor on `Player` (`SpacePlaybackHotkey.swift`): swallow
+bare Space and call `togglePlayPause()`, except when the first-responder chain is an
+`NSTextView`/`NSTextField` (Search, Settings, playlist naming) or an AppKit modal is up
+(those still need Space for the default button). Held-Space repeats are swallowed without
+toggling, so holding the key doesn't stutter. The menu item stays, without a
+`.keyboardShortcut(.space)` — leaving that in place would steal Space from Search even after
+the monitor declined to handle it.
+
+**Testing.** `macos/CouchTour` still has no unit test target; this is the same UI-code
+constraint D166 documented. Policy is a small pure helper (`isBareSpace` /
+`isEditingText` / `shouldHandle`) so a later app-target test can pin it without spinning up
+`AVQueuePlayer`. Verified by compiling the app target.
