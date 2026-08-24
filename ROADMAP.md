@@ -153,15 +153,13 @@ opened up by being past MVP:
    left: #24 (comparison, ratings, preferred tapers — explicitly builds on #17) → #18
    (source/show volume leveling, independent but adjacent).
 7. **Post-MVP backlog — unordered, in progress.** Desktop personal-library/account parity is
-   mostly done — #56, #57, #58 shipped; #59 (local playlists) has its code merged, wrapping up
-   — and auto-updates (#60) hasn't started. Still open: general not-yet-built features (#65
-   offline downloads, #66 sleep timer, #67 browse by tag); implementation debt (#61 a real
-   catalog cache beyond the single `@Volatile`-cached artist list, #62 Relisten show artwork,
-   #63 a Now Playing like button for Relisten tracks); two follow-ups to already-shipped
-   features (#68 a tour picker for defunct/non-touring artists' Next Stop, #69 playlist
-   rename/reorder); and a freshly filed feature, #49, a persistent toggle to skip filler
-   tracks (intro/outro/banter/tuning) on both platforms. No priority order yet — pick up as
-   they get triaged.
+   mostly done — #56, #57, #58 shipped; #59 (local playlists) has its code merged, wrapping up;
+   #49 (skip filler tracks toggle) shipped — and auto-updates (#60) hasn't started. Still open:
+   general not-yet-built features (#65 offline downloads, #66 sleep timer, #67 browse by tag);
+   implementation debt (#61 a real catalog cache beyond the single `@Volatile`-cached artist list,
+   #62 Relisten show artwork, #63 a Now Playing like button for Relisten tracks); two follow-ups
+   to already-shipped features (#68 a tour picker for defunct/non-touring artists' Next Stop,
+   #69 playlist rename/reorder). No priority order yet — pick up as they get triaged.
 
 ## Feature ideas
 
@@ -269,11 +267,12 @@ opened up by being past MVP:
 - Sleep timer (#66) — stop playback after a set duration or at the end of the current track.
 - Browse/filter by tag (#67) — both backends' search already returns tags; no screen browses
   by them yet.
-- Persistent toggle to skip filler tracks (#49) — intro, outro, banter, tuning, crowd noise,
-  and similar non-music segments some shows break out as their own tracks. Off by default;
-  neither backend exposes a structured segment-type field, so detection will likely be
-  title-keyword matching rather than an API flag. Needs to bypass skipped tracks during
-  playback/auto-advance on both platforms, not just hide them from a track list.
+- ~~Persistent toggle to skip filler tracks~~ — shipped (#49, D178). Intro, outro, banter,
+  tuning, crowd noise, and announcements are identified via keyword/compound title heuristics
+  (`isFillerTrack`) and bypassed during playback queue construction and auto-advance on both
+  Android and macOS when enabled. Off by default, configured via Home screen Playback section
+  (Android) and Settings Playback tab / menu item (macOS). Non-filler songs (e.g. "Drums",
+  "Space", "Divided Sky") are preserved, and explicit user taps on a filler track still play it.
 
 ## Multi-artist follow-ups
 

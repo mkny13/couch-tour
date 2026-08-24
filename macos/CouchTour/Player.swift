@@ -58,6 +58,7 @@ final class Player: NSObject, ObservableObject {
     private let recorder: ProgressRecorder
     private let progressStore: ProgressStore?
     private let syncSession: SyncSession?
+    private let playbackSettings: PlaybackSettings?
     /// The `NSImage` currently cached for `artURL`, and the URL it belongs to — so a late
     /// asynchronous load can be dropped if the show has changed by the time it finishes.
     private var artworkImage: NSImage?
@@ -78,10 +79,11 @@ final class Player: NSObject, ObservableObject {
     /// Bare-Space play/pause. Not a SwiftUI `keyboardShortcut` — see `SpacePlaybackHotkey`.
     private var spaceKeyMonitor: Any?
 
-    init(progressStore: ProgressStore?, syncSession: SyncSession?) {
+    init(progressStore: ProgressStore?, syncSession: SyncSession?, playbackSettings: PlaybackSettings? = nil) {
         recorder = ProgressRecorder(store: progressStore)
         self.progressStore = progressStore
         self.syncSession = syncSession
+        self.playbackSettings = playbackSettings
         super.init()
         queuePlayer.volume = volume
         configureRemoteCommands()
@@ -162,13 +164,18 @@ final class Player: NSObject, ObservableObject {
 
     private func startQueue(tracks: [PlayableTrack], startIndex: Int, resumePositionMs: Int64 = 0) {
         guard tracks.indices.contains(startIndex) else { return }
-        self.tracks = tracks
+        let filtered = filterPlaybackTracks(
+            tracks: tracks,
+            startIndex: startIndex,
+            skipFiller: playbackSettings?.skipFiller ?? false
+        )
+        self.tracks = filtered.tracks
         queuePlayer.removeAllItems()
-        items = tracks.map { AVPlayerItem(url: URL(string: $0.url) ?? URL(fileURLWithPath: "/dev/null")) }
-        for item in items[startIndex...] {
+        items = filtered.tracks.map { AVPlayerItem(url: URL(string: $0.url) ?? URL(fileURLWithPath: "/dev/null")) }
+        for item in items[filtered.startIndex...] {
             queuePlayer.insert(item, after: nil)
         }
-        currentIndex = startIndex
+        currentIndex = filtered.startIndex
         positionMs = 0
         pendingResumeMs = resumePositionMs > 0 ? resumePositionMs : nil
         observeCurrentItemReadyForResume()

@@ -21,6 +21,7 @@ final class AppModel: ObservableObject {
     /// volume setting relies on the same fact).
     let favorites = Favorites()
     let likedTracks = LikedTracks()
+    let playbackSettings = PlaybackSettings()
     #if BETA
     let phishInSession = PhishInSession(store: PhishInTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.phishin")))
     #else

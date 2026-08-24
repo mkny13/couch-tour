@@ -2481,3 +2481,37 @@ the monitor declined to handle it.
 constraint D166 documented. Policy is a small pure helper (`isBareSpace` /
 `isEditingText` / `shouldHandle`) so a later app-target test can pin it without spinning up
 `AVQueuePlayer`. Verified by compiling the app target.
+
+## Iteration 41 — Persistent toggle to skip filler tracks (#49, D178)
+
+### D178 — Filler track detection and playback queue filtering on Android and macOS
+
+Neither phish.in nor Relisten exposes a structured segment-type flag, so filler tracks (intro,
+outro, tuning, stage banter, chatter, crowd noise, announcements, encore break) are identified via
+keyword and compound title heuristics (`isFillerTrack(title)` in Kotlin and Swift CouchTourKit).
+Real music tracks — including Grateful Dead's "Drums" and "Space", Phish's "Divided Sky", "The
+Curtain With", "Tweezer Reprise", etc. — are preserved.
+
+**Queue filtering behavior:**
+- Off by default (`skipFiller = false`).
+- Stored persistently via `SharedPreferences` on Android (`PlaybackSettings.kt`) and `UserDefaults`
+  on macOS (`PlaybackSettings.swift`).
+- When enabled, filler tracks are omitted during playback queue construction (`MediaItems.kt` /
+  `PlayerViewModel.kt` on Android, `Player.swift` / `filterPlaybackTracks` on macOS).
+- If starting playback from index 0 and track 0 is filler (e.g. an "Intro" or "Tuning" track),
+  playback automatically advances to the first non-filler track.
+- If the user explicitly taps a filler track from the show track list, that track is retained at the
+  start index so it plays immediately, while subsequent filler tracks in the queue are skipped.
+- Browse UI and setlists continue to display all tracks normally.
+
+**UI Controls:**
+- Android: Toggle switch under a new "Playback" section on `HomeScreen`.
+- macOS: Toggle switch under a new "Playback" tab in `Settings` (⌘,), and under the `Playback`
+  menu bar menu.
+
+**Testing:**
+- Swift (`CouchTourKitTests`): `FillerTrackTests.swift` testing keyword heuristics and playback
+  filtering; 210/210 tests passing.
+- macOS app target (`xcodebuild`): Debug and Beta schemes built and verified.
+- Android (`FillerTracksTest.kt`): unit tests for title heuristics, queue filtering, and
+  preference persistence; 332/332 tests passing.

@@ -10,7 +10,11 @@ struct CouchTourApp: App {
         // first and handed in rather than each @StateObject initializing independently.
         let model = AppModel()
         _appModel = StateObject(wrappedValue: model)
-        _player = StateObject(wrappedValue: Player(progressStore: model.progressStore, syncSession: model.syncSession))
+        _player = StateObject(wrappedValue: Player(
+            progressStore: model.progressStore,
+            syncSession: model.syncSession,
+            playbackSettings: model.playbackSettings
+        ))
     }
 
     var body: some Scene {
@@ -20,6 +24,7 @@ struct CouchTourApp: App {
                 .environmentObject(player)
                 .environmentObject(appModel.favorites)
                 .environmentObject(appModel.likedTracks)
+                .environmentObject(appModel.playbackSettings)
                 .environmentObject(appModel.phishInSession)
         }
         .commands {
@@ -62,6 +67,13 @@ struct CouchTourApp: App {
                 }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
                 .disabled((player.currentIndex ?? 0) == 0)
+
+                Divider()
+
+                Toggle("Skip Filler Tracks", isOn: Binding(
+                    get: { appModel.playbackSettings.skipFiller },
+                    set: { appModel.playbackSettings.skipFiller = $0 }
+                ))
             }
         }
 
@@ -69,9 +81,11 @@ struct CouchTourApp: App {
         // Sync used to be a sidebar section (RootView.swift); it's the only settings-like
         // surface the app has, so it moved here rather than duplicating the form in both
         // places (D171). Account (#57) joined it as a second tab rather than a third sidebar
-        // section or its own window, same reasoning.
+        // section or its own window, same reasoning. Playback settings (#49) forms the third tab.
         Settings {
             TabView {
+                PlaybackSettingsView(settings: appModel.playbackSettings)
+                    .tabItem { Label("Playback", systemImage: "play.circle") }
                 AccountView(session: appModel.phishInSession)
                     .tabItem { Label("Account", systemImage: "person.circle") }
                 SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
