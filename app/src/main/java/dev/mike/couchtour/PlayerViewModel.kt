@@ -188,6 +188,22 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { localPlaylistDao.removeTrack(rowId, playlistId, System.currentTimeMillis()) }
     }
 
+    fun renameLocalPlaylist(id: String, name: String) {
+        viewModelScope.launch { localPlaylistDao.renamePlaylist(id, name, System.currentTimeMillis()) }
+    }
+
+    fun reorderLocalPlaylistTracks(playlistId: String, orderedRowIds: List<Long>) {
+        viewModelScope.launch { localPlaylistDao.reorderTracks(playlistId, orderedRowIds, System.currentTimeMillis()) }
+    }
+
+    fun moveLocalPlaylistTrack(playlistId: String, tracks: List<LocalPlaylistTrackEntity>, fromIndex: Int, toIndex: Int) {
+        if (fromIndex !in tracks.indices || toIndex !in tracks.indices || fromIndex == toIndex) return
+        val mutable = tracks.toMutableList()
+        val item = mutable.removeAt(fromIndex)
+        mutable.add(toIndex, item)
+        reorderLocalPlaylistTracks(playlistId, mutable.map { it.rowId })
+    }
+
     fun deleteLocalPlaylist(id: String) {
         viewModelScope.launch { localPlaylistDao.deletePlaylist(id) }
     }

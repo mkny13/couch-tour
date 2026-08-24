@@ -105,6 +105,12 @@ interface LocalPlaylistDao {
     @Query("DELETE FROM local_playlists WHERE id = :id")
     suspend fun deletePlaylist(id: String)
 
+    @Query("UPDATE local_playlists SET name = :name, updatedAt = :now WHERE id = :id")
+    suspend fun renamePlaylist(id: String, name: String, now: Long)
+
+    @Query("UPDATE local_playlist_tracks SET position = :position WHERE rowId = :rowId AND playlistId = :playlistId")
+    suspend fun updateTrackPosition(rowId: Long, playlistId: String, position: Int)
+
     /** Appends [track] to the end of its playlist and bumps [LocalPlaylistEntity.trackCount]/`updatedAt`. */
     @Transaction
     suspend fun addTrack(track: LocalPlaylistTrackEntity, now: Long) {
@@ -118,6 +124,18 @@ interface LocalPlaylistDao {
     suspend fun removeTrack(rowId: Long, playlistId: String, now: Long) {
         deleteTrackRow(rowId)
         decrementTrackCount(playlistId, now)
+    }
+
+    @Query("UPDATE local_playlists SET updatedAt = :now WHERE id = :id")
+    suspend fun touchPlaylist(id: String, now: Long)
+
+    /** Updates positions for [orderedRowIds] sequentially and bumps playlist `updatedAt`. */
+    @Transaction
+    suspend fun reorderTracks(playlistId: String, orderedRowIds: List<Long>, now: Long) {
+        orderedRowIds.forEachIndexed { index, rowId ->
+            updateTrackPosition(rowId, playlistId, index)
+        }
+        touchPlaylist(playlistId, now)
     }
 }
 

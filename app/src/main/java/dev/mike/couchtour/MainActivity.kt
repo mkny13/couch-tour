@@ -38,9 +38,12 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -1075,6 +1078,30 @@ private fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit)
 }
 
 @Composable
+private fun RenamePlaylistDialog(currentName: String, onDismiss: () -> Unit, onRename: (String) -> Unit) {
+    var name by rememberSaveable(currentName) { mutableStateOf(currentName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename playlist") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank() && name.trim() != currentName, onClick = { onRename(name.trim()) }) {
+                Text("Rename")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
 private fun SearchResultsList(
     results: SearchHits?,
     vm: PlayerViewModel,
@@ -1623,6 +1650,7 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
     val tracks by vm.localPlaylistDao.tracks(id).collectAsState(initial = emptyList())
     val saved = loadOnce(id) { vm.progressFor(localPlaylistQueueKey(id)) }
     val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
+    var renaming by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         Header(playlist?.name ?: "Playlist", nav)
@@ -1632,7 +1660,7 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
             LazyColumn {
                 item {
                     Row(
-                        Modifier.fillMaxWidth().padding(16.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -1641,6 +1669,9 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
                             fontSize = 13.sp,
                             modifier = Modifier.weight(1f),
                         )
+                        IconButton(onClick = { renaming = true }) {
+                            Icon(Icons.Default.Edit, "Rename playlist")
+                        }
                         IconButton(onClick = { vm.deleteLocalPlaylist(id); nav.popBackStack() }) {
                             Icon(Icons.Default.Delete, "Delete playlist")
                         }
@@ -1669,8 +1700,30 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
                             artUrl = t.artUrl,
                             trailing = fmt(t.durationMs),
                             trailingContent = {
-                                IconButton(onClick = { vm.removeFromLocalPlaylist(t.rowId, id) }) {
-                                    Icon(Icons.Default.Close, "Remove from playlist")
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        enabled = i > 0,
+                                        onClick = { vm.moveLocalPlaylistTrack(id, tracks, i, i - 1) },
+                                    ) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowUp,
+                                            "Move up",
+                                            tint = if (i > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                        )
+                                    }
+                                    IconButton(
+                                        enabled = i < tracks.lastIndex,
+                                        onClick = { vm.moveLocalPlaylistTrack(id, tracks, i, i + 1) },
+                                    ) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            "Move down",
+                                            tint = if (i < tracks.lastIndex) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                        )
+                                    }
+                                    IconButton(onClick = { vm.removeFromLocalPlaylist(t.rowId, id) }) {
+                                        Icon(Icons.Default.Close, "Remove from playlist")
+                                    }
                                 }
                             },
                             onClick = { vm.playLocalPlaylist(id, i, 0) },
@@ -1679,6 +1732,16 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
                 }
             }
         }
+    }
+    if (renaming && playlist != null) {
+        RenamePlaylistDialog(
+            currentName = playlist.name,
+            onDismiss = { renaming = false },
+            onRename = { newName ->
+                renaming = false
+                vm.renameLocalPlaylist(id, newName)
+            },
+        )
     }
 }
 

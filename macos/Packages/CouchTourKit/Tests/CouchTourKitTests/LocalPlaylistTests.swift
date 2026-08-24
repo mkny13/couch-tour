@@ -75,6 +75,35 @@ final class LocalPlaylistStoreTests: XCTestCase {
         let second = try LocalPlaylistStore(sharing: progressStore)
         XCTAssertEqual([playlist], try second.playlists())
     }
+
+    func testRenamePlaylistUpdatesNameAndUpdatedAt() throws {
+        let playlist = try store.createPlaylist(name: "Old Name", now: 1_000)
+        try store.renamePlaylist(id: playlist.id, name: "New Name", now: 5_000)
+
+        let updated = try store.playlist(id: playlist.id)!
+        XCTAssertEqual("New Name", updated.name)
+        XCTAssertEqual(5_000, updated.updatedAt)
+    }
+
+    func testReorderTracksUpdatesPositionsAndUpdatedAt() throws {
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "1"), toPlaylist: playlist.id, now: 2_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "2"), toPlaylist: playlist.id, now: 3_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "3"), toPlaylist: playlist.id, now: 4_000)
+
+        let initial = try store.tracks(playlistId: playlist.id)
+        let id1 = initial.first { $0.trackId == "1" }!.rowId!
+        let id2 = initial.first { $0.trackId == "2" }!.rowId!
+        let id3 = initial.first { $0.trackId == "3" }!.rowId!
+
+        // Reorder to: 3, 1, 2
+        try store.reorderTracks(playlistId: playlist.id, orderedRowIds: [id3, id1, id2], now: 6_000)
+
+        let reordered = try store.tracks(playlistId: playlist.id)
+        XCTAssertEqual(["3", "1", "2"], reordered.map(\.trackId))
+        XCTAssertEqual([0, 1, 2], reordered.map(\.position))
+        XCTAssertEqual(6_000, try store.playlist(id: playlist.id)!.updatedAt)
+    }
 }
 
 final class ResolveLocalPlaylistTracksTests: XCTestCase {

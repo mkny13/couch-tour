@@ -156,9 +156,16 @@ public final class LocalPlaylistStore {
         try dbQueue.write { db in _ = try LocalPlaylist.deleteOne(db, key: id) }
     }
 
-    /// Appends at the end. Android's `addTrack`/`removeTrack` are the only mutations — no
-    /// manual reorder (#69 is a follow-up), so "end" is always the right position for a new
-    /// entry.
+    public func renamePlaylist(id: String, name: String, now: Int64) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE local_playlists SET name = ?, updatedAt = ? WHERE id = ?",
+                arguments: [name, now, id]
+            )
+        }
+    }
+
+    /// Appends at the end.
     public func addTrack(_ track: LocalPlaylistTrack, toPlaylist playlistId: String, now: Int64) throws {
         try dbQueue.write { db in
             let maxPosition = try Int.fetchOne(
@@ -180,6 +187,22 @@ public final class LocalPlaylistStore {
             _ = try LocalPlaylistTrack.deleteOne(db, key: rowId)
             try db.execute(
                 sql: "UPDATE local_playlists SET trackCount = MAX(trackCount - 1, 0), updatedAt = ? WHERE id = ?",
+                arguments: [now, playlistId]
+            )
+        }
+    }
+
+    /// Reorders the playlist's tracks to match `orderedRowIds` and updates `updatedAt`.
+    public func reorderTracks(playlistId: String, orderedRowIds: [Int64], now: Int64) throws {
+        try dbQueue.write { db in
+            for (index, rowId) in orderedRowIds.enumerated() {
+                try db.execute(
+                    sql: "UPDATE local_playlist_tracks SET position = ? WHERE rowId = ? AND playlistId = ?",
+                    arguments: [index, rowId, playlistId]
+                )
+            }
+            try db.execute(
+                sql: "UPDATE local_playlists SET updatedAt = ? WHERE id = ?",
                 arguments: [now, playlistId]
             )
         }

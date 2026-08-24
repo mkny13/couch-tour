@@ -2607,3 +2607,26 @@ Per Issue #63, liking a track previously required being on a track-row list scre
 - macOS Swift package tests (`swift test`): 210/210 tests passing.
 - macOS app build (`xcodebuild`): Build succeeded.
 
+## Iteration 47 — Local playlist editing: rename & manual reorder (#69, D184)
+
+### D184 — Local playlist management (rename and track reordering)
+
+Follow-up to #12 and #59: Local playlists originally shipped with append and remove only.
+
+**Android:**
+- `LocalPlaylist.kt`: Added `renamePlaylist`, `updateTrackPosition`, and `reorderTracks` to `LocalPlaylistDao`. `reorderTracks` updates track `position` indices sequentially in a single `@Transaction` and updates `updatedAt`.
+- `PlayerViewModel.kt`: Added `renameLocalPlaylist`, `reorderLocalPlaylistTracks`, and `moveLocalPlaylistTrack`.
+- `MainActivity.kt`: Added `RenamePlaylistDialog`, a rename button in `LocalPlaylistScreen`'s header, and Move Up (`Icons.Default.KeyboardArrowUp`) / Move Down (`Icons.Default.KeyboardArrowDown`) buttons on each playlist track row.
+- `LocalPlaylistDaoTest.kt`: Unit tests for `renamePlaylist` and `reorderTracks`.
+
+**macOS:**
+- `LocalPlaylist.swift`: Added `renamePlaylist(id:name:now:)` and `reorderTracks(playlistId:orderedRowIds:now:)` to `LocalPlaylistStore`.
+- `LocalPlaylistTests.swift`: Unit tests for `renamePlaylist` and `reorderTracks`.
+- `LocalPlaylistView.swift`: Added Rename button in toolbar (`RenamePlaylistSheet`), drag-and-drop `.onMove` reordering, Move Up/Down buttons, and row context menus.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 338/338 tests passing.
+- macOS Swift package tests (`swift test`): 212/212 tests passing.
+- macOS app target build (`xcodebuild`): Build succeeded.
+
+

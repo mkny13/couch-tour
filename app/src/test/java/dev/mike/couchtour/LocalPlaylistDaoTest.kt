@@ -87,4 +87,36 @@ class LocalPlaylistDaoTest {
 
         assertEquals(listOf("New", "Old"), dao.playlists().first().map { it.name })
     }
+
+    @Test
+    fun `renamePlaylist updates name and updatedAt`() = runBlocking {
+        dao.insertPlaylist(LocalPlaylistEntity("p1", "Old Name", createdAt = 100, updatedAt = 100))
+
+        dao.renamePlaylist("p1", "New Name", now = 500)
+
+        val updated = dao.playlist("p1")!!
+        assertEquals("New Name", updated.name)
+        assertEquals(500L, updated.updatedAt)
+    }
+
+    @Test
+    fun `reorderTracks updates track positions sequentially and touches updatedAt`() = runBlocking {
+        dao.insertPlaylist(LocalPlaylistEntity("p1", "Key Jams", createdAt = 0, updatedAt = 0))
+        dao.addTrack(track("p1", 0, Backend.PHISHIN, "1", "Track A"), now = 100)
+        dao.addTrack(track("p1", 0, Backend.PHISHIN, "2", "Track B"), now = 200)
+        dao.addTrack(track("p1", 0, Backend.PHISHIN, "3", "Track C"), now = 300)
+
+        val initial = dao.tracksOnce("p1")
+        val rowA = initial.first { it.title == "Track A" }.rowId
+        val rowB = initial.first { it.title == "Track B" }.rowId
+        val rowC = initial.first { it.title == "Track C" }.rowId
+
+        // Reorder to: Track C, Track A, Track B
+        dao.reorderTracks("p1", listOf(rowC, rowA, rowB), now = 600)
+
+        val reordered = dao.tracksOnce("p1")
+        assertEquals(listOf("Track C", "Track A", "Track B"), reordered.map { it.title })
+        assertEquals(listOf(0, 1, 2), reordered.map { it.position })
+        assertEquals(600L, dao.playlist("p1")!!.updatedAt)
+    }
 }
