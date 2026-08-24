@@ -2538,3 +2538,72 @@ is unchanged — that key never goes through Now Playing.
 Couch Tour Beta; confirming the media key pauses Couch Tour while Spotify is open in the
 background is the live check.
 
+## Iteration 43 — Build version visibility on main UI and Settings (D181)
+
+### D181 — Surfacing build version on macOS and Android main UI and Settings
+
+Previously, build version information was only visible after scrolling to the bottom of the Home screen on Android or under the Sync tab in Settings on macOS.
+
+**1. Main UI Visibility:**
+- **Android**: `HomeScreen`'s top title header now displays `BuildConfig.VERSION_NAME` alongside the app title ("Couch Tour").
+- **macOS**: `RootView`'s sidebar displays `Bundle.main.appVersionString` (e.g. "Couch Tour 0.1" / "Couch Tour Beta 0.1") in a `.safeAreaInset(edge: .bottom)` footer.
+
+**2. Settings Visibility:**
+- **Android**: `SyncScreen` (and the existing `HomeScreen` settings section) includes the centered version footer.
+- **macOS**: All tabs in the `Settings` window (`PlaybackSettingsView`, `AccountView`, `SyncView`) consistently include the version footer at the bottom.
+
+**Testing:**
+- Swift unit tests (`swift test`): 210/210 passing.
+- macOS Xcode targets (`CouchTour` and `CouchTourBeta`): debug builds succeeded.
+- Android unit tests (`./gradlew testDebugUnitTest`): 332/332 passing.
+
+## Iteration 44 — Visual indicators for listened tracks and completed shows (D182)
+
+### D182 — Tracking listened tracks and completed shows
+
+Per Issue #83:
+- **Track Listened State**: A track is considered "listened to" when playback reaches $\ge 90\%$ of total duration. Track IDs are persisted in `SharedPreferences` via `ListenedTracks.kt` and surfaced across the app as a subtle checkmark (`Icons.Default.Check`) next to the track number or title in `TrackRow`, `RecordingTrackRow`, search track results, local playlists, and liked tracks.
+- **Show Completion**: A show is marked `finished = true` in `Progress` when ExoPlayer reaches `STATE_ENDED` or when the last non-filler track in the queue finishes ($\ge 90\%$). Completed shows display a completed checkmark / "DONE" badge across show lists, headers, search results, liked shows, and anniversary cards.
+
+**Testing:**
+- Android unit tests (`ListenedTracksTest.kt`, `ProgressDaoTest.kt`, `MigrationTest.kt`, full suite): 334/334 passing.
+- macOS unit tests (`swift test`): 210/210 passing.
+
+## Iteration 45 — Desktop personal-library and account parity (#56–#59, D180)
+
+Closing out the personal-library and account parity cluster on macOS ([DESKTOP-PARITY-PLAN.md](DESKTOP-PARITY-PLAN.md)):
+
+### D180 — Cross-backend local playlists on macOS with concurrent track resolution (#59)
+
+- **#59 Local playlists**: Adds `local_playlists` and `local_playlist_tracks` GRDB tables to `phishin.db` via `LocalPlaylistStore(sharing:)`.
+- **Queue Key**: Adds `.localPlaylist` (`"local-playlist:<uuid>"`) `QueueKind`, maintaining byte-identical parity with Android.
+- **Resolution**: `resolveLocalPlaylistTracks` groups stored track references by distinct show/tape and resolves distinct shows concurrently (D175 parity), skipping unresolvable references cleanly.
+- **UI**: Added a "Playlists" sidebar section, playlist detail view (play-from-here, remove, delete), and "Add to Playlist" popover on track rows.
+
+**Testing:**
+- `swift test`: 210/210 passing.
+- `xcodebuild`: Both `CouchTour` and `CouchTourBeta` debug schemes succeeded.
+
+## Iteration 46 — Like button on the Now Playing surface (#63, D183)
+
+### D183 — Track likes surfaced directly on Now Playing and MiniPlayer
+
+Per Issue #63, liking a track previously required being on a track-row list screen that directly held a `Track` or `PlayableTrack`. `PlayerState` on Android carried no track ID, backend discriminator, or like metadata.
+
+**Android:**
+- `MediaItems.kt`: `coreMediaItem` attaches `track_id`, `backend`, `liked`, and `likes_count` into `MediaMetadata.extras` bundles across `mediaItem`, `recordingMediaItem`, and `localPlaylistTrackItems`.
+- `PlaybackService.kt`: `Keys` includes `BACKEND`, `TRACK_ID`, `LIKED`, `LIKES_COUNT`, and exposes them in `Keys.ALL` for Cast / session propagation.
+- `PlayerViewModel.kt`: `PlayerState` includes `trackId: String?`, `backend: String?`, `likedByUser: Boolean`, `likesCount: Int`, read from current media item metadata in `refresh()`.
+- `MainActivity.kt`: `LikeButton` (phish.in account-gated with count) and `LikeTrackButton` (Relisten local like) exposed internally and embedded in `MiniPlayer`.
+- `NowPlaying.kt`: `NowPlayingScreen` displays `LikeButton` or `LikeTrackButton` inline with track/show title metadata.
+
+**macOS:**
+- `NowPlayingInspector.swift`: Displays `TrackLikeButton` for active `player.currentTrack` in the inspector header.
+- `MiniPlayerView.swift`: Displays `TrackLikeButton` directly in the persistent transport bar alongside track/show titles.
+- As requested, `macos/CouchTour/Player.swift` was left untouched.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 336/336 tests passing (including new like metadata extras tests in `MediaItemsTest.kt`).
+- macOS Swift package tests (`swift test`): 210/210 tests passing.
+- macOS app build (`xcodebuild`): Build succeeded.
+

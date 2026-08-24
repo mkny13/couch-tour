@@ -33,6 +33,10 @@ data class PlayerState(
     /** Index into the current queue — what the source picker reads to carry a mid-track
      *  position across a source switch (#17). */
     val trackIndex: Int = 0,
+    val trackId: String? = null,
+    val backend: String? = null,
+    val likedByUser: Boolean = false,
+    val likesCount: Int = 0,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -60,9 +64,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     /** Called on a UI tick so the scrubber advances between player events. */
     fun refresh() {
         val c = controller ?: return
-        val meta = c.currentMediaItem?.mediaMetadata
+        val item = c.currentMediaItem
+        val meta = item?.mediaMetadata
         val queue = (meta?.subtitle ?: meta?.albumTitle)?.toString().orEmpty()
         val show = meta?.albumTitle?.toString().orEmpty()
+        val extras = meta?.extras
         _state.value = PlayerState(
             connected = true,
             hasQueue = c.mediaItemCount > 0,
@@ -74,12 +80,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             // catches both. In a playlist the two are unrelated, so both lines survive.
             showTitle = if (queue.startsWith(show)) "" else show,
             queueTitle = queue,
-            queueKey = meta?.extras?.getString(Keys.QUEUE_KEY),
+            queueKey = extras?.getString(Keys.QUEUE_KEY),
             artUrl = meta?.artworkUri?.toString(),
-            waveformUrl = meta?.extras?.getString(Keys.WAVEFORM),
+            waveformUrl = extras?.getString(Keys.WAVEFORM),
             positionMs = c.currentPosition.coerceAtLeast(0),
             durationMs = c.duration.coerceAtLeast(0),
             trackIndex = c.currentMediaItemIndex,
+            trackId = extras?.getString(Keys.TRACK_ID) ?: item?.mediaId,
+            backend = extras?.getString(Keys.BACKEND),
+            likedByUser = extras?.getBoolean(Keys.LIKED, false) ?: false,
+            likesCount = extras?.getInt(Keys.LIKES_COUNT, 0) ?: 0,
         )
     }
 

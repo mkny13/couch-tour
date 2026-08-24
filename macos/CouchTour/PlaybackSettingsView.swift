@@ -13,6 +13,12 @@ struct PlaybackSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                Text(Bundle.main.appVersionString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
         }
         .formStyle(.grouped)
     }

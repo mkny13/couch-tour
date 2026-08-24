@@ -122,20 +122,35 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
 
             Spacer(Modifier.height(28.dp))
 
-            Column(Modifier.padding(horizontal = 24.dp)) {
-                Text(
-                    state.trackTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (state.showTitle.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        state.showTitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        state.trackTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                    if (state.showTitle.isNotEmpty()) {
+                        Text(
+                            state.showTitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
+                    LikeTrackButton(state.trackId!!)
+                } else if (state.trackId != null && state.trackId?.toLongOrNull() != null) {
+                    LikeButton(
+                        Likable.Track,
+                        state.trackId!!.toLong(),
+                        state.likedByUser,
+                        state.likesCount,
                     )
                 }
             }

@@ -123,7 +123,7 @@ struct SyncView: View {
             // notable build; there's no release-tag pipeline for macOS yet (no CI at all —
             // see CLAUDE.md).
             Section {
-                Text("Couch Tour \(appVersion)")
+                Text(Bundle.main.appVersionString)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -138,10 +138,6 @@ struct SyncView: View {
         .onChange(of: syncSession.paired) { _, paired in
             if paired { Task { await refreshDevices() } }
         }
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
     }
 
     private func startPairing() {

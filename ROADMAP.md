@@ -1,296 +1,162 @@
-# Roadmap
+# Couch Tour — Product Roadmap
 
-Not-yet-built features and open questions — as opposed to [DECISIONS.md](DECISIONS.md),
-which is a log of choices already made. Both clients' MVPs are done and live (Android's full
-feature set, desktop's browse/play/resume/history), and sync between them is shipped and
-verified — everything below is post-MVP backlog, chunked by area rather than by
-what's-left-before-launch.
+This document outlines the product vision, recently completed milestones, prioritized feature backlog, and open design questions for **Couch Tour** across Android, macOS, and the Cloudflare sync backend.
 
-## Not in the app yet
+Historical implementation details and architectural choices are logged separately in [DECISIONS.md](DECISIONS.md).
 
-Offline downloads (#65) and a sleep timer (#66) — genuinely new scope, never filed until this
-pass. Search covers shows, tracks, playlists, songs, and venues; tags are returned by the API
-but have no browse screen yet (#67).
+---
 
-Login, likes, and favorite artists now exist on both platforms — Android (#11 likes, #14
-favorite artists) and desktop (#56 favorite artists, #57 login, #58 likes — all shipped).
-Local playlists exist on Android (#12); the desktop port (#59) has its code merged (#80,
-#81) but the issue itself is still being wrapped up — see **Desktop (macOS) → personal
-library and account parity** below.
+## Current Status Overview
 
-## Open questions
+- **Android Client**: Full-featured native app (Jetpack Compose, Media3, Room, Android Auto) supporting the complete phish.in and Relisten catalog (~200+ artists), personal library (likes, local playlists, favorites, on-this-date discovery, next tour stop), filler-track skipping, playback history, and listened/completion indicators.
+- **macOS Client**: Native SwiftUI + AVFoundation app matching Android's core browse, playback, source switching, search, inspector, settings, filler-track skipping, and full personal library parity (login, likes, favorites, cross-backend local playlists).
+- **Sync Backend**: Cloudflare Worker + D1 live in production (`https://couch-tour-sync.mkastellec.workers.dev`), syncing playback progress, history, and resume positions across paired devices with QR pairing, token rotation, and 180-day tombstone cleanup.
 
-- Should a show auto-advance into the next show, or stop at the encore?
-- Do you want the waveform images (`waveform_image_url`) in the player, or is a plain
-  scrubber enough?
-- Confirm on a real device that audio now audibly ducks for a notification sound (#23, D93) —
-  the fix is a platform audio-focus behavior Robolectric can't exercise, so it's unverified
-  beyond compiling and the existing unit suite passing.
-- Confirm on a real device that the share sheet actually opens for a show and a track (#19,
-  D155-D156) — the Intent's shape (`ACTION_CHOOSER` wrapping a `text/plain` `ACTION_SEND`)
-  and the URL/text it carries are covered by tests, but launching the real chooser and a
-  recipient app actually opening the link isn't something Robolectric exercises.
+---
 
-## Known gaps
+## Completed Milestones
 
-Small, non-blocking things noticed live rather than filed up front:
+### 1. Multi-Artist Catalog & Core Playback (Shipped)
+- **Multi-Artist Support via Relisten**: Full access to ~200+ artists alongside phish.in with backend-neutral catalog abstractions ([MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md), D74–D82).
+- **Source / Tape Picker**: Reworked tape switching into an etree-style Source sheet/popover with SBD/Matrix heuristics, ratings, taper notes, and lineage on Android (#17, #37) and macOS (#25, D168).
+- **Filler Track Skipping**: Configurable persistent toggle on Android and macOS to bypass tuning, intro/outro banter, crowd chatter, and announcements during playback (#49, D178).
+- **Listened Track & Show Completion Indicators**: Visual checkmarks for tracks listened to $\ge 90\%$ and completed show badges (#83, D182).
+- **Android Auto Support**: Full MediaLibraryService browse hierarchy for phish.in and Relisten with car Continue Listening support (#5, P8, D73).
 
-- **Sync screen's device list doesn't live-refresh (#64, D170).** Both `SyncView.swift`
-  (macOS) and `SyncScreen` (Android's `MainActivity.kt`) only fetch `devices()` on first
-  appear and when local pairing state itself changes (`.task` / `onChange(of: paired)`) — a
-  device joining the group from elsewhere while the screen is already open doesn't show up
-  until it's reopened. Noticed live setting up the macOS beta build's sync group. Worth a
-  manual refresh affordance or a poll if this screen gets more use.
-- **macOS Continue Listening/History went stale after a background sync, fixed (D172).** Both
-  views loaded once on appear and again on local queue change, but never re-queried after a
-  background `AppModel.syncNow()` pulled fresh rows from another device — unlike Android's
-  reactive Room `Flow`. Fixed by also reloading on `appModel.syncSession.lastSyncedAt`. Not yet
-  confirmed live against a real paired device (same Keychain-reauth wall D166-D171 hit) — worth
-  a manual check: play something on the phone, let the Mac's next sync tick go by untouched,
-  confirm Continue Listening picks up the new row.
+### 2. Personal Library & Account Parity (Shipped)
+- **Favorite Artists**: Star toggle and pinned favorites section on Android (#14, #38) and macOS (#56, #75).
+- **phish.in Account Integration**: Login, session management, and server-side likes on Android and macOS (#57, #77).
+- **Relisten Track Likes**: Fast, account-free local likes for Relisten tracks on Android (#11, #40) and macOS (#58, #78).
+- **Cross-Backend Local Playlists**: Local mixtape playlists mixing phish.in and Relisten tracks with parallelized track resolution on Android (#12, #41, D161, D175) and macOS (#59, #80, #81, D175).
 
-## Desktop (macOS)
+### 3. Discovery & Browse Enhancements (Shipped)
+- **Home Screen "On This Date"**: Anniversary shows across favorited artists with backend-bounded request batching and caching (#13, #42, D162).
+- **"Next Couch Tour Stop"**: Automatic discovery of unplayed shows on active tours for favorited artists (#22, #46, D164, D165).
+- **Browse by Top Rated / Popular**: phish.in "Popular" synthetic period sorted by server likes; Relisten period-level `avg_rating` sort filter (#21, #33, D158–D159).
+- **"Surprise Me" Random Show**: Full merged catalog random show selector (#20, #32, D157).
+- **Universal Search**: Multi-artist search across artists, shows, songs, and venues on Android and macOS (#25, D169).
+- **Social Sharing**: Share sheets for shows and tracks resolving to canonical phish.in and relisten.net web URLs (#19, #31, D155–D156).
 
-**The MVP shipped: browse, play, resume, and history, both backends, verified live end to
-end** — not just built, actually clicked through and listened to. Form factor was native
-SwiftUI + AVFoundation (D94), not Electron or a browser client.
+### 4. Cross-Platform Sync & Reliability (Shipped)
+- **End-to-End Progress Sync**: Real-time progress, history, and resume sync with last-write-wins conflict resolution (D116–D143).
+- **Sync Usability & QR Pairing**: QR code pairing generator and scanner, low-latency debounced pushes, and automated tombstone purge (D144, D147, D148).
+- **Sync Resilience & Diagnostics**: UI error surfacing (`lastError`), Android Keystore reset recovery, macOS background sync reactive refresh, and connection-reuse timing instrumentation (D172, D173, D174, D176).
+- **Security Audit**: Rate limiting, parameterized D1 queries, and secure credential storage verified (#26, D150–D154).
 
-- **M1 — `CouchTourKit`** (`macos/Packages/CouchTourKit`): API clients, catalog model,
-  queue-key grammar, progress storage. `swift test` is 159/159 green.
-- **M2 — app shell and browse** (`macos/CouchTour`, project generated by XcodeGen — D103):
-  sidebar (Continue Listening / Artists / History) → Artists → Periods → Shows → Show, both
-  backends, tape switcher — clicked through live against both real APIs, including switching
-  Cornell '77 tapes and watching the track list reload with different track boundaries.
-- **M3 — playback + Now Playing** (`Player.swift`, D105-D107): tap a track to play from there;
-  play/pause/next/previous; mini player bar with scrubber. Verified live: the system Now
-  Playing widget showed title/artist/album (album = the show, D106) alongside Spotify, and its
-  own pause button paused the app and updated the mini player back — `MPRemoteCommandCenter`
-  confirmed round-tripping both directions. Artwork wasn't wired up yet at the time (D107),
-  closed by D167.
-- **M4 — progress/History wiring** (`ProgressRecorder.swift`, `Resume.swift`, D108-D112):
-  playing a show writes to `ProgressStore` every 5s and on play/pause/track-change; quitting
-  the app entirely and relaunching resumed the right track at the right second; playing two
-  different tapes of the same Grateful Dead date produced two independent History rows, each
-  resuming its own tape correctly, never the other's.
-- **M5 — desktop UI parity, done (#25).** Player surface (D167): a Now Playing inspector
-  panel, artwork in the mini player and the system widget, a persisted app-level volume
-  control. Window/macOS idioms: menu-bar `Commands` for transport (D166; Space play/pause
-  actually delivered via an `NSEvent` monitor rather than a SwiftUI `keyboardShortcut`, D177
-  / #84), a real `Settings`
-  scene (⌘,) holding Sync (D171). Browse: the tape switcher reworked into a Source picker
-  matching Android's #17 (D168), search as its own sidebar section (D169), and History's
-  last-played-ordered artist filter (D171).
+### 5. Desktop (macOS) UI & Native Experience (Shipped)
+- **Player Surface & Inspector**: Trailing Now Playing inspector panel, track queue, high-res artwork caching, and persistent app volume control (#25, D167).
+- **Menu Bar & Keyboard Transport**: Native menu commands and bare Space hotkey monitor for global play/pause (#25, D166, #84, D177).
+- **Settings Scene & History Filters**: Dedicated Settings window (⌘,) and artist-filtered listening history (#25, D171).
+- **Unobtrusive App Version**: Build version indicators displayed in headers and settings across both clients (#43, D163, D181).
 
-**Sync of playback history and resume with mobile shipped and is verified working live**
-(D116-D143): pairing, push/pull with last-write-wins conflict resolution, token rotation and
-instant revocation, wired into both clients with a background sync cadence — the live backend
-is `https://couch-tour-sync.mkastellec.workers.dev` (`sync/`). D140-D143 were a second pass
-after the first live pairing attempt found sync silently failing every push (a null-field
-encoding mismatch, D140) and crashing Android on relaunch (D141) — both fixed, and a real
-emulator round trip (pair → play → force-quit → relaunch → confirm the row reached the server
-→ confirm a second device pulled it down) now backs the "verified live" claim, not just unit
-tests.
+---
 
-Sync's original three-item punch list (tightened latency, QR pairing, the tombstone purge job)
-is now fully built and verified live — see D144, D147, and D148 respectively. See **Known
-gaps** above for the two small issues found since.
+## Prioritized Product Roadmap
 
-### Personal library and account parity
+```mermaid
+flowchart LR
+    subgraph NearTerm ["Phase 1: Near-Term Polish & Parity"]
+        direction TB
+        N1["#69 Playlist Rename & Reorder"]
+        N2["#63 Now Playing Like Button"]
+        N3["#60 macOS Auto-Updates (Sparkle)"]
+        N4["#66 Sleep Timer"]
+        N5["#67 Browse & Filter by Tag"]
+        N6["#64 Sync Device List Live Refresh"]
+        N7["#28 Unified Android Auto Browse"]
+    end
 
-The whole personal-library/account cluster that shipped on Android — login, likes, playlists,
-favorite artists — was explicitly out of scope for the desktop MVP and stayed unscheduled
-after it. Filed as issues; three of four now shipped:
+    subgraph MediumTerm ["Phase 2: Discovery & Advanced Playback"]
+        direction TB
+        M1["#65 Offline Downloads"]
+        M2["#18 Volume Leveling Across Sources"]
+        M3["#27 FLAC Streaming Support"]
+        M4["#68 Next Stop Era/Tour Picker"]
+        M5["#21 Trending / Momentum Sort"]
+        M6["#61 Multi-Level Catalog Cache"]
+        M7["#62 Relisten Show Artwork"]
+        M8["#10 Desktop Cast Support"]
+    end
 
-- ~~Favorite artists on desktop~~ — shipped (#56).
-- ~~phish.in account login on desktop~~ — shipped (#57).
-- ~~Likes for phish.in and Relisten tracks on desktop~~ — shipped (#58).
-- Local playlists on desktop, spanning both backends (#59) — code merged (#80, #81); issue
-  still open pending wrap-up.
+    subgraph LongTerm ["Phase 3: New Surfaces & Ecosystem"]
+        direction TB
+        L1["#24 Taper Intelligence & Source Comparison"]
+        L2["#9 Google TV App"]
+        L3["#15 Spotify Live Releases"]
+        L4["#16 YouTube Audio/Video Support"]
+    end
 
-Casting from desktop is tracked separately, alongside the other new-surface work — see
-**New platforms/backends** below (#10).
+    NearTerm --> MediumTerm --> LongTerm
+```
 
-### Distribution
+---
 
-- **Auto-updates (#60).** There's no update mechanism today — the app is ad-hoc signed, not
-  distributed, and a copy of the `.app` on another Mac has no way to learn a newer build
-  exists. The standard fix is bundling [Sparkle](https://sparkle-project.org) with a hosted
-  appcast feed, which needs signing keys and somewhere to host the feed/builds — real setup,
-  not yet started.
+### Phase 1: Near-Term Polish & High-Impact Parity
 
-## Suggested build order
+Focus on closing remaining interaction gaps and high-leverage quality-of-life enhancements.
 
-Filed as GitHub issues #9-28 (Android/general), #25 (desktop UI), #26 (security review), #49
-(filler-track skip toggle), and #56-69 (post-MVP backlog). Phases 1-6 covered the path to the
-Play Store release and are done except where noted; phase 7 is the fresh, unordered backlog
-opened up by being past MVP:
+| Issue | Feature | Description | Platforms |
+|---|---|---|---|
+| **#69** | **Playlist Management (Rename & Reorder)** | Allow renaming local playlists and dragging/moving tracks to reorder within a playlist (currently append and remove only). | Android, macOS |
+| **#63** | **Now Playing Like Button** | Add heart/like action directly onto the Now Playing player surface for phish.in and Relisten (requires plumbing track ID into `PlayerState`). | Android, macOS |
+| **#60** | **macOS Auto-Updates** | Integrate [Sparkle](https://sparkle-project.org) framework with a hosted appcast feed and signing keys for seamless desktop app updates. | macOS |
+| **#66** | **Sleep Timer** | Allow setting a timer to pause playback after a specified duration (15m, 30m, 45m, 1h) or at the end of the current track. | Android, macOS |
+| **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS |
+| **#64** | **Sync Screen Live Refresh** | Auto-refresh or poll the paired devices list while the Sync screen is open when a new device joins the sync group. | Android, macOS |
+| **#28** | **Unified Android Auto Browse Tree** | Merge Android Auto's separate "Artists" and "Years" browse roots into a single unified artist catalog matching the mobile app. | Android (Auto) |
 
-1. **Release gates — done.** #26 (security review of `sync/` and both clients' credential
-   storage). #23 (notification-sound ducking) is fixed (D93) and closed, pending the
-   real-device confirmation noted under Open questions above.
-2. **Quick wins — done.** #19 (share a show/track), #20 ("surprise me"), #21 (browse by top
-   rated/popular — trending is still open, see the Feature ideas entry), #30 (extract the
-   ten-screen repeated load/loading/error scaffold in `MainActivity.kt` into a shared `Loaded`
-   composable, done ahead of phase 3 adding more screens).
-3. **Personal library cluster — done.** #14 (favorite artists), #11 (likes for Relisten
-   tracks), #12 (playlists spanning both backends, on Room rather than #11's storage layer,
-   D161), #13 (on-this-date playlist), and #22 (next Couch Tour stop, D164). #43 (show the
-   app version somewhere unobtrusive, D163) also shipped — parked here for scheduling
-   convenience rather than being part of the cluster itself.
-4. **Desktop parity — done.** #25 (desktop UI improvements); wasn't release-gated. The
-   scrubber seek-thrash fix, the `skipToNext` disable asymmetry, and menu-bar `Commands`
-   (D166), the whole player-surface group (D167), the show-detail browse group — a real
-   Source picker and venue/city kept on drill-in (D168) — search, its own sidebar section
-   (D169), a Settings scene holding Sync, and History's last-played-ordered artist filter
-   (both D171), close out the issue.
-5. **New platforms/backends** — #10 (cast from desktop), #9 (Google TV), #16 (YouTube), #15
-   (Spotify Live) — each is a new surface rather than a feature on an existing one; #16 and
-   #15 also carry ToS/API risk worth resolving before writing code, and #15's approach-
-   Relisten's-operators prerequisite (see Multi-artist follow-ups below) applies to this whole
-   phase before a store release.
-6. **Source/tape cluster (lowest priority)** — #17 (rework "switch tape" into a Source
-   picker) is done on both platforms (Android in #37, desktop folded into #25 via #51). What's
-   left: #24 (comparison, ratings, preferred tapers — explicitly builds on #17) → #18
-   (source/show volume leveling, independent but adjacent).
-7. **Post-MVP backlog — unordered, in progress.** Desktop personal-library/account parity is
-   mostly done — #56, #57, #58 shipped; #59 (local playlists) has its code merged, wrapping up;
-   #49 (skip filler tracks toggle) shipped — and auto-updates (#60) hasn't started. Still open:
-   general not-yet-built features (#65 offline downloads, #66 sleep timer, #67 browse by tag);
-   implementation debt (#61 a real catalog cache beyond the single `@Volatile`-cached artist list,
-   #62 Relisten show artwork, #63 a Now Playing like button for Relisten tracks); two follow-ups
-   to already-shipped features (#68 a tour picker for defunct/non-touring artists' Next Stop,
-   #69 playlist rename/reorder). No priority order yet — pick up as they get triaged.
+---
 
-## Feature ideas
+### Phase 2: Audio Fidelity, Discovery & Media Power Features
 
-- Google TV app. (#9)
-- Cast from desktop. (#10)
-- ~~Likes for Relisten tracks~~ — shipped (#11). Local-only, mirroring #14's favorites
-  pattern rather than phish.in's account-gated `LikeButton`: no account, no server round-trip,
-  no public count, just a `LikedTracks` `SharedPreferences` set of `PlayableTrack.id`s (the
-  Relisten track `uuid`), with a heart toggle on `RecordingTrackRow` (where phish.in's own
-  `LikeButton` already lives, e.g. `TrackRow`). Scoped to track rows that already hold a
-  `PlayableTrack`; the Now Playing screen still has no like button of any kind, phish.in or
-  Relisten — filed separately as #63. Desktop equivalent filed as #58.
-- ~~Playlists spanning both backends~~ — shipped (#12). Local-only and account-free, on Room
-  rather than the `SharedPreferences` shape #11 was expected to reuse — a playlist is ordered
-  and each entry needs enough context (backend, show date, and for Relisten an artist slug
-  and tape id) to be refetched at play time, since neither backend has a fetch-track-by-id
-  endpoint (D161). An "add to playlist" button sits next to the like heart on both backends'
-  track rows; a new "Local playlists" row on the Library screen browses, creates, and plays
-  them. Deliberately left out: importing an existing phish.in playlist (there's no write API
-  on phish.in's side to build against either way), excerpts (phish.in's own playlists support
-  clipped entries, D30), renaming a playlist after creation, manually reordering tracks (only
-  append/remove — filed as a follow-up, #69), and a browse root for local playlists in Android
-  Auto (resuming one already in "Continue listening" works; picking a fresh one from the car
-  doesn't). Desktop equivalent filed as #59.
-- ~~Home screen "on this date" playlist~~ — shipped (#13). A `LazyRow` of `AnniversaryCard`s
-  between "Continue listening" and "Favorites", rendered only when there's a match — no
-  header, spinner, or error text on a quiet day, since it's a discovery extra layered on top
-  of the screen rather than something asked for directly. The request cost is bounded per
-  backend rather than uniformly: phish.in's `showsForPeriod` batches its whole ~35-period
-  archive into a handful of `year_range=` requests (`phishInRanges`, capped under the API's
-  `per_page=1000`), while Relisten — no range endpoint, one request per year per artist — gets
-  a hard budget (`RELISTEN_YEAR_BUDGET`, 12 year-fetches split across at most 3 favorited
-  artists). Cached once a day in memory (`OnThisDate`), the same shape as
-  `RelistenCatalogSource.cachedArtists`, not a new Room table. D162.
-- ~~Favorite artists~~ — shipped (#14). A star toggle on the artist row/header, backed by a
-  `Favorites` `SharedPreferences` set of `ArtistRef.key`s; favorited artists pin to the front
-  of the browse-artists list right after Phish (whose position-1 slot is earned by its account
-  features, not by being liked, so favoriting never displaces it) and get their own "Favorites"
-  section on the Home screen. Desktop equivalent filed as #56.
-- Spotify Live Releases support. Ideally in-app playback; if that isn't feasible, at minimum
-  track which Spotify Live tracks have been listened to, leaning on Last.fm for that if
-  needed. (#15)
-- YouTube video support — playable as video or audio-only, ideally with a toggle between the
-  two. (#16)
-- ~~"Switch tape" rework~~ — shipped on both platforms (#17). Relabeled to "Source" (etree
-  terminology); a `ModalBottomSheet` replaced the single-line `DropdownMenu` so each row can
-  show taper, lineage, rating, and review count; SBD sources get a badge, and a lineage/taper
-  substring match for "matrix" gets a second one (marked "?" since Relisten has no structured
-  matrix flag). Switching sources mid-playback carries the position to the same track index
-  on the new source. Desktop (macOS) got the same rework (D168): a `.popover` in place of
-  the `ModalBottomSheet`, same badges and fields, same position-carry on switch.
-- Source/show-level volume leveling — not traditional per-track leveling, but matching
-  average sound levels across quiet and loud recordings so different sources/shows play back
-  at comparable volume. (#18)
-- ~~Share a show or track~~ — shipped (#19, D155-D156). phish.in links to the real `/<date>`
-  and `/<date>/<slug>` pages (confirmed live); Relisten has no per-track page, so track shares
-  fall back to the show's `/<artist-slug>/<date>` link with the track's title kept in the
-  shared text. Lives on the track row next to the like button, not on Now Playing (that
-  screen doesn't carry a track id). The chooser `Intent` is covered by tests; actually
-  launching it and opening the link on a device is still unverified — see Open questions.
-- ~~"Surprise me" / random show button~~ — shipped (#20, D157). Global across the full merged
-  artist catalog rather than scoped to whichever artist you're browsing (Phish isn't
-  weighted any higher than the rest), lives at the top of the Home screen, picks a random
-  artist → period → show with no caching or weighting.
-- ~~Browse shows by top rated (and popular/trending)~~ — shipped for phish.in (a "Popular"
-  browse entry, sorted server-side by likes) and, bounded, for Relisten (a Date/Top rated
-  toggle on an already-loaded period's shows, using `avg_rating` — confirmed live to be on
-  the years-list endpoint already, not source-detail-only as assumed when this was filed).
-  Trending is still open: the same live check found Relisten's show entries also carry a
-  `popularity` object (`momentum_score`, `trend_ratio`, and `hot_score` per 48h/7d/30d
-  window) that would support a real recency-weighted sort, but picking the right window and
-  wiring a third sort mode was left for a follow-up rather than folded into this pass.
-  phish.in has no analogous recency-weighted signal — `likes_count` is a raw, unweighted
-  total. Android Auto's browse tree got phish.in's "Popular" node (mirrors the mobile UI, no
-  seam changes needed) but not Relisten's Top rated toggle — Auto has no sort-toggle
-  mechanism today, so a Relisten artist's shows list there stays date-ordered. (#21)
-- ~~"Next Couch Tour stop"~~ — shipped (#22). Derives each favorited artist's current tour
-  from the tour name on its two most-recent periods' shows (covering a New Year run split
-  across two years), then surfaces the single oldest show across all of them with no
-  `finished` progress row. Cached daily like D162's "On this date", except the unplayed
-  filter itself runs live against `ProgressDao.finishedKeys()` rather than being part of
-  that cache, since it changes the moment a show finishes rather than once a day. D164.
-- "Next Couch Tour stop" tour picker for defunct/non-touring artists (#68, follow-up to #22).
-  Today an artist whose latest show isn't part of a named tour (both backends tag it "Not Part
-  of a Tour" rather than leaving it blank, D165) simply doesn't participate — correct, but for
-  a band like Grateful Dead that never tours again, that means never participating at all.
-  Mike's suggestion: let the user pick which past tour or era to track instead of a strict
-  opt-out. Needs its own design pass — where the picker lives (artist page? the Next Stop row
-  itself?) and how "tour" gets enumerated for one of these artists (`tourName` grouping, or
-  falling back to year) aren't decided yet.
-- Better source selection beyond the "switch tape" rework above: surface whatever signals
-  help identify the best source for a show (ratings, review counts/text, taper reputation); a
-  way to quickly compare snippets of the same track across all available tapers/sources side
-  by side; and letting the user flag preferred (and avoided) tapers, which then influences
-  source ordering or highlighting. (#24)
-- ~~Desktop UI improvements~~ — shipped (#25). See M5 under Desktop (macOS) above for the
-  summary; personal-library/account parity that #25 explicitly didn't cover is filed as
-  #56-59.
-- ~~Security review before Play Store release~~ — shipped (#26). Sync backend rate limiting
-  and request validation, client secret storage verification, log/manifest/dependency audit.
-- ~~Show the app version somewhere unobtrusive, on both clients~~ — shipped (#43, D163).
-  Threaded from the `v0.NN` release tag rather than the previously-hardcoded, never-bumped
-  `versionName`/`versionCode` (Android) and `MARKETING_VERSION` (macOS).
-- Offline downloads (#65) — download a show or track for offline playback.
-- Sleep timer (#66) — stop playback after a set duration or at the end of the current track.
-- Browse/filter by tag (#67) — both backends' search already returns tags; no screen browses
-  by them yet.
-- ~~Persistent toggle to skip filler tracks~~ — shipped (#49, D178). Intro, outro, banter,
-  tuning, crowd noise, and announcements are identified via keyword/compound title heuristics
-  (`isFillerTrack`) and bypassed during playback queue construction and auto-advance on both
-  Android and macOS when enabled. Off by default, configured via Home screen Playback section
-  (Android) and Settings Playback tab / menu item (macOS). Non-filler songs (e.g. "Drums",
-  "Space", "Divided Sky") are preserved, and explicit user taps on a filler track still play it.
+Focus on advanced audio streaming, caching infrastructure, and richer catalog exploration.
 
-## Multi-artist follow-ups
+| Issue | Feature | Description | Platforms |
+|---|---|---|---|
+| **#65** | **Offline Downloads** | Download individual tracks or complete shows for local offline playback with storage management. | Android, macOS |
+| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. | Android, macOS |
+| **#27** | **FLAC Streaming Support** | Support lossless FLAC streaming from Relisten/archive.org (`flac_url`), with progressive MP3 fallback for Google Cast compatibility. | Android, macOS |
+| **#85** | **Post-Show Next Tour Stop Prompt** | When a show ends at the encore, stop playback automatically and surface an interactive prompt/banner to play the next consecutive show on the tour/run. | Android, macOS |
+| **#68** | **"Next Stop" Tour Picker for Defunct Artists** | For non-touring bands (e.g. Grateful Dead), allow the user to select a past tour or year to track on "Next Couch Tour Stop". | Android, macOS |
+| **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS |
+| **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS |
+| **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS |
+| **#10** | **Desktop Cast Support** | Add Google Cast / AirPlay sender integration into the macOS client. | macOS |
 
-Detailed in [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) (O3–O5):
+---
 
-- FLAC support — Relisten serves `flac_url`; the app is MP3-only today because Cast's MIME
-  type is hardcoded and the stock receiver expects progressive MP3. (#27)
-- A real catalog cache, beyond the single `@Volatile`-cached artist list. (#61)
-- Approach Relisten's operators about the API use, the same courtesy phish.in's maintainer
-  extended, before a store release. (Mike's action item, not engineering work — no issue
-  filed.)
-- Unify Android Auto's separate "Artists" and "Years" browse roots
-  (`PlaybackService.kt`'s `yearChildren`/`tourChildren`) with the phone's single merged
-  artist list (D89) — the car still browses Phish and Relisten as two trees. (#28)
-- Relisten shows have no artwork (`RelistenShowSummary.toShowSummary` sets no `artUrl`), so
-  every non-Phish show falls back to a plain `primaryContainer` background in the player
-  (D92) and a placeholder icon everywhere else. (#62)
-- The Now Playing screen (D92) has no like button for either backend — `LikeButton` and
-  `LikedTracks` (#11, shipped) both need a track id and liked state that `PlayerState` doesn't
-  carry today; likes only work today from the track-row screens that already hold a `Track` or
-  `PlayableTrack` directly. (#63)
+### Phase 3: New Surfaces & Extended Integrations
+
+Longer-range exploration of new media surfaces and third-party streaming ecosystems.
+
+| Issue | Feature | Description | Platforms |
+|---|---|---|---|
+| **#24** | **Advanced Source Selection & Taper Intelligence** | Side-by-side snippet comparisons across tapers, taper reputation scoring, and user-preferred / avoided taper filters. | Android, macOS |
+| **#86** | **Waveform Scrubber Visualization** | Render phish.in's `waveform_image_url` behind the player scrubber (nice-to-have visual enhancement). | Android, macOS |
+| **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. | Android TV |
+| **#15** | **Spotify Live Releases Support** | In-app playback or listening history integration for officially released live albums on Spotify. | Cross-platform |
+| **#16** | **YouTube Concert Video / Audio** | Stream concert video from YouTube with a dedicated toggle for audio-only background playback. | Cross-platform |
+
+---
+
+## Product Principles & Resolved Decisions
+
+- **Show End Behavior**: Playback stops at the end of the show/encore rather than silently auto-advancing into the next show. An actionable prompt/banner is presented to start the next show on the tour/run.
+- **Waveform Scrubber**: `waveform_image_url` rendering is categorized as a nice-to-have visual enhancement (Phase 3) while keeping the plain scrubber lightweight and uniform across backends in the interim.
+
+---
+
+## Open Operational & External Items
+
+1. **Relisten Operator Outreach**:
+   - Coordinate formal courtesy outreach to Relisten operators regarding API usage and attribution guidelines prior to a public Google Play Store launch.
+
+---
+
+## Real-Device Verification Checklist
+
+Items that compile and pass unit test suites, but require physical on-device verification:
+
+- [ ] **Notification Audio Ducking (#23, D93)**: Confirm on physical Android hardware that audio smoothly ducks when system notifications sound.
+- [ ] **Native Android Share Sheet (#19, D155–D156)**: Confirm `ACTION_CHOOSER` launches cleanly and shared URLs resolve in third-party target apps.
+- [ ] **macOS Reactive Background Sync (D172)**: Verify that playing a track on a phone updates the macOS Continue Listening view in the background without user interaction.

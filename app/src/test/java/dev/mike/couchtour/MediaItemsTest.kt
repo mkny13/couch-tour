@@ -142,4 +142,32 @@ class MediaItemsTest {
             items.first().mediaMetadata.extras?.getString(Keys.QUEUE_KEY),
         )
     }
+
+    // ------------------------------------------------------- like metadata (#63)
+
+    @Test
+    fun `a phish-in media item carries track ID, backend, and liked metadata in extras`() {
+        val info = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "McNichols Arena", art = null)
+        val track = Track(id = 42, title = "Ghost", mp3Url = "https://phish.in/a.mp3", likedByUser = true, likesCount = 15)
+
+        val item = mediaItem(track, info)
+        val extras = item.mediaMetadata.extras
+
+        assertEquals("42", item.mediaId)
+        assertEquals("42", extras?.getString(Keys.TRACK_ID))
+        assertEquals(Backend.PHISHIN.id, extras?.getString(Keys.BACKEND))
+        assertEquals(true, extras?.getBoolean(Keys.LIKED))
+        assertEquals(15, extras?.getInt(Keys.LIKES_COUNT))
+    }
+
+    @Test
+    fun `a relisten media item carries track ID and relisten backend in extras`() {
+        val items = recordingTrackItems(detail())
+        val item = items.first()
+        val extras = item.mediaMetadata.extras
+
+        assertEquals("t1", item.mediaId)
+        assertEquals("t1", extras?.getString(Keys.TRACK_ID))
+        assertEquals(Backend.RELISTEN.id, extras?.getString(Keys.BACKEND))
+    }
 }

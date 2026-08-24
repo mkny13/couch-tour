@@ -81,6 +81,9 @@ internal fun mediaItem(track: Track, info: QueueInfo, entry: PlaylistEntry? = nu
         venueName = track.venueName,
         info = info,
         clipping = clipping,
+        backend = Backend.PHISHIN.id,
+        likedByUser = track.likedByUser,
+        likesCount = track.likesCount,
     )
 }
 
@@ -94,6 +97,7 @@ internal fun recordingMediaItem(track: PlayableTrack, info: QueueInfo): MediaIte
     showDate = track.showDate,
     venueName = track.venueName,
     info = info,
+    backend = Backend.RELISTEN.id,
 )
 
 /**
@@ -115,6 +119,9 @@ private fun coreMediaItem(
     // for a show, a phish.in playlist, or a Relisten tape. A local playlist (#12) can mix
     // backends within one queue, so it's the only caller that ever passes something else.
     artist: String = info.artist,
+    backend: String? = null,
+    likedByUser: Boolean = false,
+    likesCount: Int = 0,
 ): MediaItem {
     val extras = Bundle().apply {
         info.key?.let { putString(Keys.QUEUE_KEY, it) }
@@ -122,6 +129,10 @@ private fun coreMediaItem(
         putString(Keys.QUEUE_SUBTITLE, info.subtitle)
         putString(Keys.QUEUE_ART, info.art)
         putString(Keys.WAVEFORM, waveformUrl)
+        putString(Keys.TRACK_ID, id)
+        backend?.let { putString(Keys.BACKEND, it) }
+        putBoolean(Keys.LIKED, likedByUser)
+        putInt(Keys.LIKES_COUNT, likesCount)
     }
     val meta = MediaMetadata.Builder()
         .setTitle(title)
@@ -188,6 +199,9 @@ internal data class ResolvedLocalTrack(
     val artUrl: String?,
     /** Per-track, unlike every other queue — see [coreMediaItem]'s `artist` param. */
     val artistName: String,
+    val backend: String = Backend.PHISHIN.id,
+    val likedByUser: Boolean = false,
+    val likesCount: Int = 0,
 )
 
 /**
@@ -214,6 +228,9 @@ internal fun localPlaylistTrackItems(playlistId: String, name: String, resolved:
             venueName = it.venueName,
             info = info,
             artist = it.artistName,
+            backend = it.backend,
+            likedByUser = it.likedByUser,
+            likesCount = it.likesCount,
         )
     }
 }

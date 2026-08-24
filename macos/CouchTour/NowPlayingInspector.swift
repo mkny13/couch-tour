@@ -48,6 +48,15 @@ struct NowPlayingInspector: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    if let track = player.currentTrack {
+                        TrackLikeButton(
+                            backend: show.artist.backend,
+                            trackID: track.id,
+                            likesCount: track.likesCount,
+                            likedByUser: track.likedByUser
+                        )
+                        .padding(.top, 4)
+                    }
                 }
                 .multilineTextAlignment(.center)
             }

@@ -38,9 +38,13 @@ object Keys {
     const val QUEUE_SUBTITLE = "queue_subtitle"
     const val QUEUE_ART = "queue_art"
     const val WAVEFORM = "waveform"
+    const val BACKEND = "backend"
+    const val TRACK_ID = "track_id"
+    const val LIKED = "liked"
+    const val LIKES_COUNT = "likes_count"
 
     /** Cast has to be told what to carry across the wire; nothing else enumerates these. */
-    val ALL = listOf(QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM)
+    val ALL = listOf(QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID, LIKED, LIKES_COUNT)
 }
 
 /**

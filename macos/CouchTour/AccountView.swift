@@ -40,6 +40,12 @@ struct AccountView: View {
                         .disabled(busy || email.isEmpty || password.isEmpty)
                 }
             }
+            Section {
+                Text(Bundle.main.appVersionString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
         }
         .formStyle(.grouped)
     }

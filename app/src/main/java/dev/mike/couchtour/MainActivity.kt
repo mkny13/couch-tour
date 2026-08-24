@@ -277,11 +277,21 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "Couch Tour",
-                style = MaterialTheme.typography.titleLarge,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
-            )
+            ) {
+                Text(
+                    "Couch Tour",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    BuildConfig.VERSION_NAME,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                )
+            }
             // Always visible regardless of scroll position — the Sync row further down the
             // list sits below the full artist list (up to ~200 rows) and was effectively
             // undiscoverable there.
@@ -976,7 +986,7 @@ private fun RecordingTrackRow(
  * count — just a local like.
  */
 @Composable
-private fun LikeTrackButton(trackId: String) {
+internal fun LikeTrackButton(trackId: String) {
     val likedIds by LikedTracks.ids.collectAsState()
     val liked = trackId in likedIds
     IconButton(onClick = { LikedTracks.toggle(trackId) }) {
@@ -1447,6 +1457,16 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
         }
+
+        Text(
+            "Couch Tour ${BuildConfig.VERSION_NAME}",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp, bottom = 16.dp)
+        )
     }
 }
 
@@ -1977,7 +1997,7 @@ private fun TrackRow(track: Track, number: Int, date: String, artUrl: String?, v
  * the count, since that's public, but tapping is inert.
  */
 @Composable
-private fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initialCount: Int) {
+internal fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initialCount: Int) {
     val signedIn by Session.username.collectAsState()
     var liked by remember(id) { mutableStateOf(initiallyLiked) }
     var count by remember(id) { mutableIntStateOf(initialCount) }
@@ -2094,6 +2114,16 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+            if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
+                LikeTrackButton(state.trackId)
+            } else if (state.trackId != null && state.trackId.toLongOrNull() != null) {
+                LikeButton(
+                    Likable.Track,
+                    state.trackId.toLong(),
+                    state.likedByUser,
+                    state.likesCount,
+                )
             }
             IconButton(onClick = { vm.togglePlayPause() }, modifier = Modifier.size(44.dp)) {
                 Icon(

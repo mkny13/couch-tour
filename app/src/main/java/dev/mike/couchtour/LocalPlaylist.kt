@@ -182,6 +182,9 @@ internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEnt
                     venueName = show.venueName,
                     artUrl = show.albumCoverUrl ?: show.coverArtUrls?.medium,
                     artistName = "Phish",
+                    backend = Backend.PHISHIN.id,
+                    likedByUser = track.likedByUser,
+                    likesCount = track.likesCount,
                 )
             }
             Backend.RELISTEN.id -> {
@@ -197,6 +200,7 @@ internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEnt
                     venueName = track.venueName,
                     artUrl = track.artUrl,
                     artistName = detail.summary.artist.name,
+                    backend = Backend.RELISTEN.id,
                 )
             }
             else -> null

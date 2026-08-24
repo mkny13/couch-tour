@@ -42,6 +42,12 @@ struct RootView: View {
                 List(SidebarSection.allCases, selection: $appModel.selection) { section in
                     Label(section.rawValue, systemImage: section.systemImage).tag(section)
                 }
+                .safeAreaInset(edge: .bottom) {
+                    Text(Bundle.main.appVersionString)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                }
                 .navigationTitle("Couch Tour")
                 .listStyle(.sidebar)
             } detail: {

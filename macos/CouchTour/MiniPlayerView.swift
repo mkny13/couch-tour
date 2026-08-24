@@ -23,6 +23,15 @@ struct MiniPlayerView: View {
             }
             .frame(minWidth: 160, alignment: .leading)
 
+            if let track = player.currentTrack, let show = player.show {
+                TrackLikeButton(
+                    backend: show.artist.backend,
+                    trackID: track.id,
+                    likesCount: track.likesCount,
+                    likedByUser: track.likedByUser
+                )
+            }
+
             Button {
                 player.skipToPrevious()
             } label: {
