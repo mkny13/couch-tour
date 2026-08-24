@@ -181,6 +181,9 @@ final class Player: NSObject, ObservableObject {
         observeCurrentItemReadyForResume()
         queuePlayer.play()
         updateNowPlayingInfo()
+        // Force .playing before the rate KVO fires — media keys stay with Spotify
+        // if we claim the Now Playing slot while still .paused (D179).
+        claimNowPlaying(playing: true)
         saveProgress(force: true)
     }
 
@@ -194,6 +197,9 @@ final class Player: NSObject, ObservableObject {
             Task { @MainActor in
                 self?.isPlaying = (change.newValue ?? 0) > 0
                 self?.updateNowPlayingElapsedTime()
+                // Re-claim on every transition to playing — Spotify will have taken
+                // the session if anything played there while we were paused.
+                if (change.newValue ?? 0) > 0 { self?.claimNowPlaying(playing: true) }
                 self?.saveProgress(force: true)
             }
         }
@@ -216,6 +222,7 @@ final class Player: NSObject, ObservableObject {
             currentIndex = nil
             isPlaying = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            MPNowPlayingInfoCenter.default().playbackState = .stopped
             return
         }
         currentIndex = index
@@ -264,6 +271,30 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
+    /// Publish `playbackState` on the shared Now Playing center. macOS does not
+    /// infer this from AVPlayer (iOS does), and the keyboard play/pause key follows
+    /// whichever app last set `.playing` — leaving it unset is why Spotify kept
+    /// the key while we were the ones making sound (D179).
+    private func claimNowPlaying(playing: Bool? = nil) {
+        let center = MPNowPlayingInfoCenter.default()
+        if let playing {
+            center.playbackState = playing ? .playing : .paused
+        } else {
+            applyPlaybackState()
+        }
+    }
+
+    private func applyPlaybackState() {
+        let center = MPNowPlayingInfoCenter.default()
+        if currentTrack == nil {
+            center.playbackState = .stopped
+        } else if queuePlayer.rate > 0 {
+            center.playbackState = .playing
+        } else {
+            center.playbackState = .paused
+        }
+    }
+
     private func configureRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
 
@@ -301,6 +332,7 @@ final class Player: NSObject, ObservableObject {
     private func updateNowPlayingInfo() {
         guard let track = currentTrack, let show else {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            MPNowPlayingInfoCenter.default().playbackState = .stopped
             return
         }
         var info: [String: Any] = [:]
@@ -317,6 +349,7 @@ final class Player: NSObject, ObservableObject {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artworkImage.size) { _ in artworkImage }
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        applyPlaybackState()
     }
 
     /// The lightweight per-tick update — only the elapsed-time key changes while a track
@@ -326,6 +359,7 @@ final class Player: NSObject, ObservableObject {
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        applyPlaybackState()
     }
 
     /// "1997-11-17 · McNichols Arena", falling back to the show summary when a track carries

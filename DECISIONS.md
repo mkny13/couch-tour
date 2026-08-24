@@ -2515,3 +2515,26 @@ Curtain With", "Tweezer Reprise", etc. — are preserved.
 - macOS app target (`xcodebuild`): Debug and Beta schemes built and verified.
 - Android (`FillerTracksTest.kt`): unit tests for title heuristics, queue filtering, and
   preference persistence; 332/332 tests passing.
+
+## Iteration 42 — hardware play/pause still went to Spotify (D179)
+
+### D179 — macOS media keys follow `playbackState`, not whoever is making sound
+
+D107 registered `MPRemoteCommandCenter.shared()` and published `nowPlayingInfo`, and the
+Control Center widget's pause button did pause Couch Tour when that widget was showing us.
+The keyboard play/pause key (F8 / the dedicated media key) is a different path: macOS
+routes it to whichever app last set `MPNowPlayingInfoCenter.playbackState = .playing`.
+Spotify sets that even while paused in the background. We never set `playbackState` at
+all — on macOS the system does not infer it from `AVPlayer` the way iOS does — so the
+key kept going to Spotify while Couch Tour was the thing actually playing. (`MPNowPlayingSession`
+looks like the right API for this and is what iOS 16+ uses; it is unavailable on macOS.)
+
+Fix (`Player.swift`): set `playbackState` to `.playing` / `.paused` / `.stopped` next to
+the existing metadata, and re-assert `.playing` whenever we start or resume so we take
+the slot back if Spotify held it. Remote commands stay on `.shared()`. Space (#84 / D177)
+is unchanged — that key never goes through Now Playing.
+
+**Testing.** Same app-target constraint as D166/D177. Verified by compiling and installing
+Couch Tour Beta; confirming the media key pauses Couch Tour while Spotify is open in the
+background is the live check.
+
