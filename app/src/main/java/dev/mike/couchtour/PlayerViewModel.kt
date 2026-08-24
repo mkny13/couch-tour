@@ -86,16 +86,42 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ play
 
     fun playShow(show: Show, startIndex: Int = 0, startPositionMs: Long = 0) {
-        start(showTrackItems(show), startIndex, startPositionMs)
+        val playable = show.tracks.filter { it.playable }
+        val filtered = filterPlaybackTracks(playable, startIndex, PlaybackSettings.skipFiller.value) { it.title }
+        val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
+        val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
+        val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art)
+        start(filtered.items.map { mediaItem(it, info) }, filtered.startIndex, startPositionMs)
     }
 
     fun playPlaylist(playlist: Playlist, startIndex: Int = 0, startPositionMs: Long = 0) {
-        start(playlistTrackItems(playlist), startIndex, startPositionMs)
+        val playable = playlist.entries.filter { it.track.playable }
+        val filtered = filterPlaybackTracks(playable, startIndex, PlaybackSettings.skipFiller.value) { it.track.title }
+        val subtitle = listOfNotNull(
+            playlist.username?.let { "by $it" },
+            "${playable.size} tracks",
+        ).joinToString(" · ")
+        val info = QueueInfo(
+            playlistQueueKey(playlist.slug),
+            playlist.name,
+            subtitle,
+            playable.firstOrNull()?.track?.showAlbumCoverUrl,
+        )
+        start(filtered.items.map { mediaItem(it.track, info, it) }, filtered.startIndex, startPositionMs)
     }
 
     /** Play one tape of a Relisten show. [detail] already picked the recording (P3). */
     fun playRecording(detail: ShowDetail, startIndex: Int = 0, startPositionMs: Long = 0) {
-        start(recordingTrackItems(detail), startIndex, startPositionMs)
+        val filtered = filterPlaybackTracks(detail.tracks, startIndex, PlaybackSettings.skipFiller.value) { it.title }
+        val summary = detail.summary
+        val info = QueueInfo(
+            key = detail.queueKey,
+            title = summary.date,
+            subtitle = summary.where,
+            art = summary.artUrl ?: detail.tracks.firstOrNull()?.artUrl,
+            artist = summary.artist.name,
+        )
+        start(filtered.items.map { recordingMediaItem(it, info) }, filtered.startIndex, startPositionMs)
     }
 
     /**
@@ -158,7 +184,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun playLocalPlaylist(playlistId: String, startIndex: Int = 0, startPositionMs: Long = 0) {
         viewModelScope.launch {
-            runCatching { localPlaylistItems(playlistId) }.onSuccess { start(it, startIndex, startPositionMs) }
+            runCatching {
+                val resolved = resolveLocalPlaylistTracks(localPlaylistDao.tracksOnce(playlistId))
+                val filtered = filterPlaybackTracks(resolved, startIndex, PlaybackSettings.skipFiller.value) { it.title }
+                val name = localPlaylistDao.playlist(playlistId)?.name.orEmpty()
+                localPlaylistTrackItems(playlistId, name, filtered.items) to filtered.startIndex
+            }.onSuccess { (items, index) -> start(items, index, startPositionMs) }
         }
     }
 

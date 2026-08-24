@@ -65,6 +65,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -463,6 +464,23 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 RowItem("Local playlists", "Mix tracks from any artist, saved on this device", null) {
                     nav.navigate("local-playlists")
                 }
+            }
+
+            item { SectionHeader("Playback", divided = true) }
+            item {
+                val skipFiller by PlaybackSettings.skipFiller.collectAsState()
+                RowItem(
+                    title = "Skip filler tracks",
+                    subtitle = "Skip intros, tuning, and banter during playback",
+                    artUrl = null,
+                    trailingContent = {
+                        Switch(
+                            checked = skipFiller,
+                            onCheckedChange = { PlaybackSettings.setSkipFiller(it) },
+                        )
+                    },
+                    onClick = { PlaybackSettings.toggle() },
+                )
             }
 
             item { SectionHeader("Sync", divided = true) }
