@@ -2244,10 +2244,18 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
                 )
             }
             IconButton(onClick = { vm.togglePlayPause() }, modifier = Modifier.size(44.dp)) {
-                Icon(
-                    if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    if (state.isPlaying) "Pause" else "Play",
-                )
+                if (state.isBuffering) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    Icon(
+                        if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (state.isPlaying) "Pause" else "Play",
+                    )
+                }
             }
         }
     }

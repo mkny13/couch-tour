@@ -20,6 +20,7 @@ data class PlayerState(
     val connected: Boolean = false,
     val hasQueue: Boolean = false,
     val isPlaying: Boolean = false,
+    val isBuffering: Boolean = false,
     val trackTitle: String = "",
     val artistName: String = "",
     val artistId: String = "",
@@ -122,10 +123,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             artistId = "phish"
         }
 
+        val isBuffering = c.playbackState == Player.STATE_BUFFERING || (c.playWhenReady && !c.isPlaying && c.playbackState != Player.STATE_ENDED && c.mediaItemCount > 0)
+
         _state.value = PlayerState(
             connected = true,
             hasQueue = c.mediaItemCount > 0,
             isPlaying = c.isPlaying,
+            isBuffering = isBuffering,
             trackTitle = meta?.title?.toString().orEmpty(),
             artistName = artistName,
             artistId = artistId,

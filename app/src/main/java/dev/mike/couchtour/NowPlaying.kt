@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -40,7 +41,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,15 +51,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
-import coil.imageLoader
-import coil.request.ImageRequest
 
 /**
  * The full-screen player, reached by tapping the compact bar or the media notification
@@ -71,36 +67,50 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
     val state by vm.state.collectAsState()
     val castDevice by Casting.deviceName.collectAsState()
     var menuOpen by remember { mutableStateOf(false) }
-    val tint = rememberArtGradientColor(state.artUrl) ?: MaterialTheme.colorScheme.primaryContainer
+
+    val backgroundGradient = Brush.verticalGradient(
+        listOf(
+            Color(0xFF14171E),
+            Color(0xFF0D0E13),
+            Color(0xFF07080B),
+        )
+    )
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(listOf(tint, MaterialTheme.colorScheme.surface))
-            )
+            .background(backgroundGradient)
     ) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = { nav.popBackStack() }) {
-                    Icon(Icons.Default.KeyboardArrowDown, "Close")
+                    Icon(Icons.Default.KeyboardArrowDown, "Close", tint = Color.White)
                 }
                 Text(
                     if (castDevice != null) "Casting to $castDevice" else state.showTitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 6.dp),
                 )
                 FeedbackButton(nav)
                 CastButton()
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, "More")
+                        Icon(Icons.Default.MoreVert, "More", tint = Color.White)
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         val key = state.queueKey
@@ -125,19 +135,19 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(8.dp))
 
             ArtworkBox(
                 artUrl = state.artUrl,
                 contentDescription = state.trackTitle,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .fillMaxWidth(0.78f)
+                    .fillMaxWidth(0.82f)
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(16.dp)),
             )
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.weight(1f))
 
             val onGoToShow = {
                 val key = state.queueKey
@@ -161,33 +171,40 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
 
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        state.trackTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        state.trackTitle.ifEmpty { "Not Playing" },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(onClick = onGoToShow),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onGoToShow)
+                            .padding(vertical = 2.dp, horizontal = 2.dp),
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(top = 4.dp),
                     ) {
                         if (state.showDate.isNotEmpty()) {
                             Text(
                                 state.showDate,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
                                     .clickable(onClick = onGoToShow)
-                                    .weight(1f, fill = false),
+                                    .padding(vertical = 2.dp, horizontal = 4.dp),
                             )
                             Spacer(Modifier.width(8.dp))
                         }
@@ -196,31 +213,36 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     if (state.artistName.isNotEmpty() || state.venueName.isNotEmpty()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 2.dp),
+                            modifier = Modifier.padding(top = 4.dp),
                         ) {
                             if (state.artistName.isNotEmpty()) {
                                 Text(
                                     state.artistName,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
-                                    modifier = Modifier.clickable(onClick = onGoToArtist),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable(onClick = onGoToArtist)
+                                        .padding(vertical = 2.dp, horizontal = 4.dp),
                                 )
                             }
                             if (state.venueName.isNotEmpty()) {
                                 if (state.artistName.isNotEmpty()) {
                                     Text(
                                         " · ",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     )
                                 }
                                 Text(
                                     state.venueName,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(vertical = 2.dp),
                                 )
                             }
                         }
@@ -238,64 +260,74 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(18.dp))
 
-            if (state.durationMs > 0) {
-                WaveformScrubber(
-                    waveformUrl = state.waveformUrl,
-                    positionMs = state.positionMs,
-                    durationMs = state.durationMs,
-                    playedColor = MaterialTheme.colorScheme.primary,
-                    unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                    onSeek = { vm.seekTo(it) },
-                    modifier = Modifier.padding(horizontal = 24.dp)
+            WaveformScrubber(
+                waveformUrl = state.waveformUrl,
+                positionMs = state.positionMs,
+                durationMs = state.durationMs,
+                playedColor = MaterialTheme.colorScheme.primary,
+                unplayedColor = Color(0xFF282C37),
+                onSeek = { vm.seekTo(it) },
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    fmt(state.positionMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        fmt(state.positionMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        fmt(state.durationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    if (state.durationMs > 0) fmt(state.durationMs) else "--:--",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             Spacer(Modifier.height(12.dp))
 
             Row(
-                Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = { vm.previous() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipPrevious, "Previous", Modifier.size(24.dp))
+                    Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(28.dp))
                 }
                 Spacer(Modifier.width(28.dp))
                 Box(
                     Modifier
-                        .size(56.dp)
+                        .size(64.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable { vm.togglePlayPause() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        if (state.isPlaying) "Pause" else "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(30.dp),
-                    )
+                    if (state.isBuffering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 3.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Icon(
+                            if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            if (state.isPlaying) "Pause" else "Play",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(34.dp),
+                        )
+                    }
                 }
                 Spacer(Modifier.width(28.dp))
                 IconButton(onClick = { vm.next() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipNext, "Next", Modifier.size(24.dp))
+                    Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(28.dp))
                 }
             }
         }
@@ -320,34 +352,6 @@ fun ArtworkBox(artUrl: String?, contentDescription: String?, modifier: Modifier 
             )
         }
     }
-}
-
-/**
- * The dark-vibrant swatch from the current artwork, for the player's background gradient.
- * Null while loading, for a null [artUrl], or if extraction fails — the caller falls back to
- * `primaryContainer`, which is also what every Relisten show gets (no `artUrl` today).
- */
-@Composable
-private fun rememberArtGradientColor(artUrl: String?): Color? {
-    val context = LocalContext.current
-    var color by remember(artUrl) { mutableStateOf<Color?>(null) }
-    LaunchedEffect(artUrl) {
-        color = null
-        color = artUrl?.let { url ->
-            runCatching {
-                // allowHardware(false): hardware bitmaps can't be read back by Palette, the
-                // same constraint Waveform.kt documents for its own Canvas readback.
-                val request = ImageRequest.Builder(context).data(url).allowHardware(false).build()
-                val bitmap = (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
-                bitmap?.let { bmp ->
-                    val palette = Palette.from(bmp).generate()
-                    val swatch = palette.darkVibrantSwatch ?: palette.darkMutedSwatch ?: palette.dominantSwatch
-                    swatch?.let { Color(it.rgb) }
-                }
-            }.getOrNull()
-        }
-    }
-    return color
 }
 
 @Composable
