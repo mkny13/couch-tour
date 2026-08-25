@@ -89,6 +89,7 @@ data class RecordingRef(
     val id: String,
     val label: String,
     val isSoundboard: Boolean = false,
+    val hasFlac: Boolean = false,
     val rating: Double = 0.0,
     val reviewCount: Int = 0,
     val taper: String? = null,
@@ -117,6 +118,7 @@ data class PlayableTrack(
     val showDate: String? = null,
     val venueName: String? = null,
     val artUrl: String? = null,
+    val flacUrl: String? = null,
 )
 
 data class ShowDetail(

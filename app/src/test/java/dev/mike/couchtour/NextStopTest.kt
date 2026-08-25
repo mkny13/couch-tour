@@ -263,4 +263,62 @@ class NextStopTest {
         assertEquals(emptyList<ShowSummary>(), result)
         NextStop.cached = null
     }
+
+    // ------------------------------------------------------------------ post-show tour stop (#85)
+
+    @Test
+    fun `resolveNextConsecutiveShow picks the next chronological show in the same tour`() {
+        val candidateShows = listOf(
+            ShowSummary(artist = PHISH, date = "1997-11-16", tourName = "1997 Fall Tour"),
+            ShowSummary(artist = PHISH, date = "1997-11-17", tourName = "1997 Fall Tour"),
+            ShowSummary(artist = PHISH, date = "1997-11-19", tourName = "1997 Fall Tour"),
+            ShowSummary(artist = PHISH, date = "1997-11-21", tourName = "1997 Fall Tour"),
+            ShowSummary(artist = PHISH, date = "1997-12-30", tourName = "1997 NYE Run"),
+        )
+
+        val next = resolveNextConsecutiveShow("1997-11-17", "1997 Fall Tour", candidateShows)
+        assertEquals("1997-11-19", next?.date)
+        assertEquals("1997 Fall Tour", next?.tourName)
+    }
+
+    @Test
+    fun `resolveNextConsecutiveShow falls back to next chronological show if tour has ended or null`() {
+        val candidateShows = listOf(
+            ShowSummary(artist = PHISH, date = "1997-11-17", tourName = "1997 Fall Tour"),
+            ShowSummary(artist = PHISH, date = "1997-12-30", tourName = "1997 NYE Run"),
+            ShowSummary(artist = PHISH, date = "1997-12-31", tourName = "1997 NYE Run"),
+        )
+
+        val next = resolveNextConsecutiveShow("1997-11-17", "1997 Fall Tour", candidateShows)
+        assertEquals("1997-12-30", next?.date)
+    }
+
+    @Test
+    fun `resolveNextConsecutiveShow returns null when there are no future shows`() {
+        val candidateShows = listOf(
+            ShowSummary(artist = PHISH, date = "1997-11-17", tourName = "1997 Fall Tour"),
+        )
+
+        val next = resolveNextConsecutiveShow("1997-11-17", "1997 Fall Tour", candidateShows)
+        assertNull(next)
+    }
+
+    @Test
+    fun `findNextTourStop resolves the next show via music source`() = runBlocking {
+        val source = FakeSource(
+            Backend.PHISHIN,
+            periodsByArtist = mapOf(
+                "phish" to listOf(PeriodRef("1997", "1997")),
+            ),
+            showsByPeriod = mapOf(
+                "1997" to listOf(
+                    ShowSummary(artist = PHISH, date = "1997-11-17", tourName = "1997 Fall Tour"),
+                    ShowSummary(artist = PHISH, date = "1997-11-19", tourName = "1997 Fall Tour"),
+                )
+            ),
+        )
+
+        val next = findNextTourStop(PHISH, "1997-11-17", "1997 Fall Tour") { source }
+        assertEquals("1997-11-19", next?.date)
+    }
 }

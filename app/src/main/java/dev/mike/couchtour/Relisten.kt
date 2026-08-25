@@ -92,6 +92,7 @@ data class RelistenSourceTrack(
     /** Seconds — see the file-level doc. Converted to ms in [toPlayableTrack]. */
     val duration: Long = 0,
     @SerialName("mp3_url") val mp3Url: String? = null,
+    @SerialName("flac_url") val flacUrl: String? = null,
 )
 
 @Serializable
@@ -204,17 +205,21 @@ internal fun RelistenShowSummary.toShowSummary(artist: ArtistRef) = ShowSummary(
     rating = avgRating,
 )
 
-internal fun RelistenSource.toRecordingRef() = RecordingRef(
-    id = uuid,
-    // Relisten sends "" rather than omitting the field on plenty of sources — blank, not
-    // just null, has to fall through to the SBD/AUD label or every one of them shows empty.
-    label = taper?.takeIf { it.isNotBlank() } ?: if (isSoundboard) "Soundboard" else "Audience",
-    isSoundboard = isSoundboard,
-    rating = avgRatingWeighted,
-    reviewCount = numReviews,
-    taper = taper?.takeIf { it.isNotBlank() },
-    lineage = lineage?.takeIf { it.isNotBlank() },
-)
+internal fun RelistenSource.toRecordingRef(): RecordingRef {
+    val hasFlac = sets.any { set -> set.tracks.any { !it.flacUrl.isNullOrBlank() } }
+    return RecordingRef(
+        id = uuid,
+        // Relisten sends "" rather than omitting the field on plenty of sources — blank, not
+        // just null, has to fall through to the SBD/AUD label or every one of them shows empty.
+        label = taper?.takeIf { it.isNotBlank() } ?: if (isSoundboard) "Soundboard" else "Audience",
+        isSoundboard = isSoundboard,
+        hasFlac = hasFlac,
+        rating = avgRatingWeighted,
+        reviewCount = numReviews,
+        taper = taper?.takeIf { it.isNotBlank() },
+        lineage = lineage?.takeIf { it.isNotBlank() },
+    )
+}
 
 internal fun RelistenSourceTrack.toPlayableTrack(artist: ArtistRef, showDate: String, venueName: String?, setName: String) =
     PlayableTrack(
@@ -227,6 +232,7 @@ internal fun RelistenSourceTrack.toPlayableTrack(artist: ArtistRef, showDate: St
         url = mp3Url.orEmpty(),
         showDate = showDate,
         venueName = venueName,
+        flacUrl = flacUrl,
     )
 
 /**

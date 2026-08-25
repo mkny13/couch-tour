@@ -170,4 +170,26 @@ class MediaItemsTest {
         assertEquals("t1", extras?.getString(Keys.TRACK_ID))
         assertEquals(Backend.RELISTEN.id, extras?.getString(Keys.BACKEND))
     }
+
+    // ------------------------------------------------------- FLAC streaming (#27)
+
+    @Test
+    fun `a relisten track with flac_url sets FLAC mime type and preserves mp3 fallback in extras`() {
+        val flacTrack = PlayableTrack(
+            id = "t-flac",
+            title = "Scarlet Begonias",
+            durationMs = 400_000,
+            url = "https://archive.org/scarlet.mp3",
+            flacUrl = "https://archive.org/scarlet.flac",
+            showDate = "1977-05-08",
+            venueName = "Barton Hall",
+        )
+        val info = QueueInfo(key = "k", title = "t", subtitle = "s", art = null, artist = "Grateful Dead")
+        val item = recordingMediaItem(flacTrack, info)
+
+        assertEquals("https://archive.org/scarlet.flac", item.localConfiguration?.uri.toString())
+        assertEquals(androidx.media3.common.MimeTypes.AUDIO_FLAC, item.localConfiguration?.mimeType)
+        assertEquals("https://archive.org/scarlet.flac", item.mediaMetadata.extras?.getString(Keys.FLAC_URL))
+        assertEquals("https://archive.org/scarlet.mp3", item.mediaMetadata.extras?.getString(Keys.MP3_URL))
+    }
 }

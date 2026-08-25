@@ -94,4 +94,33 @@ class CastTest {
         assertEquals("1997-11-17 · McNichols Arena · Denver, CO", meta.subtitle)
         assertNotNull(meta.artworkUri)
     }
+
+    // ------------------------------------------------------- FLAC Cast fallback (#27)
+
+    @Test
+    fun `a FLAC media item falls back to mp3 URL for Cast and restores FLAC when returning`() {
+        val flacTrack = PlayableTrack(
+            id = "t-flac",
+            title = "Scarlet Begonias",
+            durationMs = 400_000,
+            url = "https://archive.org/scarlet.mp3",
+            flacUrl = "https://archive.org/scarlet.flac",
+            showDate = "1977-05-08",
+            venueName = "Barton Hall",
+        )
+        val flacInfo = QueueInfo(key = "k", title = "t", subtitle = "s", art = null, artist = "Grateful Dead")
+        val localMediaItem = recordingMediaItem(flacTrack, flacInfo)
+
+        val converter = CastItemConverter()
+        val castQueueItem = converter.toMediaQueueItem(localMediaItem)
+        val castInfo = castQueueItem.media
+
+        assertNotNull(castInfo)
+        assertEquals(MimeTypes.AUDIO_MPEG, castInfo?.contentType)
+        assertEquals("https://archive.org/scarlet.mp3", castInfo?.contentUrl)
+
+        val restoredMediaItem = converter.toMediaItem(castQueueItem)
+        assertEquals("https://archive.org/scarlet.flac", restoredMediaItem.localConfiguration?.uri.toString())
+        assertEquals(MimeTypes.AUDIO_FLAC, restoredMediaItem.localConfiguration?.mimeType)
+    }
 }

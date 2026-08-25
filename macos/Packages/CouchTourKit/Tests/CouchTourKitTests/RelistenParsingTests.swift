@@ -77,6 +77,22 @@ final class RelistenParsingTests: XCTestCase {
         XCTAssertTrue(detail.recording!.isSoundboard)
     }
 
+    func testParsesFlacUrlOnSourceTracksAndSetsHasFlacOnRecordingRef() throws {
+        let show = try decoder.decode(RelistenShowWithSources.self, from: try fixture("relisten_show.json"))
+        let matrixId = "3b27ea5a-5450-9d56-17f8-ee2bf2d18723"
+        let detail = show.toShowDetail(artist: deadArtist, recordingId: matrixId)
+
+        XCTAssertTrue(detail.recording?.hasFlac == true)
+        XCTAssertEqual(
+            "https://archive.org/download/gd1977-05-08.111493.mtx.seamons.sbeok.flac16/gd77-05-08d1t01.flac",
+            detail.tracks.first?.flacUrl
+        )
+
+        let soundboardId = "0a1e8672-06ef-5fe6-5717-02061dcaf53e"
+        let sbdDetail = show.toShowDetail(artist: deadArtist, recordingId: soundboardId)
+        XCTAssertFalse(sbdDetail.recording?.hasFlac == true)
+    }
+
     func testAnUnknownRecordingIdFallsBackToTheDefault() throws {
         let show = try decoder.decode(RelistenShowWithSources.self, from: try fixture("relisten_show.json"))
         let detail = show.toShowDetail(artist: deadArtist, recordingId: "not-a-real-uuid")

@@ -105,15 +105,17 @@ public struct RecordingRef: Hashable {
     public let id: String
     public let label: String
     public let isSoundboard: Bool
+    public let hasFlac: Bool
     public let rating: Double
     public let reviewCount: Int
     public let taper: String?
     public let lineage: String?
 
-    public init(id: String, label: String, isSoundboard: Bool = false, rating: Double = 0, reviewCount: Int = 0, taper: String? = nil, lineage: String? = nil) {
+    public init(id: String, label: String, isSoundboard: Bool = false, hasFlac: Bool = false, rating: Double = 0, reviewCount: Int = 0, taper: String? = nil, lineage: String? = nil) {
         self.id = id
         self.label = label
         self.isSoundboard = isSoundboard
+        self.hasFlac = hasFlac
         self.rating = rating
         self.reviewCount = reviewCount
         self.taper = taper
@@ -142,6 +144,7 @@ public struct PlayableTrack: Equatable {
     public let showDate: String?
     public let venueName: String?
     public let artURL: String?
+    public let flacUrl: String?
     /// phish.in only (#58) — 0/false for Relisten, which has no server-side like concept;
     /// Relisten likes are tracked locally by id instead, see `LikedTracks`.
     public let likesCount: Int
@@ -150,7 +153,7 @@ public struct PlayableTrack: Equatable {
     public init(
         id: String, title: String, setName: String = "", durationMs: Int64 = 0, url: String,
         waveformURL: String? = nil, showDate: String? = nil, venueName: String? = nil, artURL: String? = nil,
-        likesCount: Int = 0, likedByUser: Bool = false
+        flacUrl: String? = nil, likesCount: Int = 0, likedByUser: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -161,6 +164,7 @@ public struct PlayableTrack: Equatable {
         self.showDate = showDate
         self.venueName = venueName
         self.artURL = artURL
+        self.flacUrl = flacUrl
         self.likesCount = likesCount
         self.likedByUser = likedByUser
     }

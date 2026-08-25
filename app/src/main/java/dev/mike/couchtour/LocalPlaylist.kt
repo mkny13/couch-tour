@@ -219,6 +219,7 @@ internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEnt
                     artUrl = track.artUrl,
                     artistName = detail.summary.artist.name,
                     backend = Backend.RELISTEN.id,
+                    flacUrl = track.flacUrl,
                 )
             }
             else -> null

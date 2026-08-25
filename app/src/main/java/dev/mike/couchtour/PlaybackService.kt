@@ -42,9 +42,11 @@ object Keys {
     const val TRACK_ID = "track_id"
     const val LIKED = "liked"
     const val LIKES_COUNT = "likes_count"
+    const val FLAC_URL = "flac_url"
+    const val MP3_URL = "mp3_url"
 
     /** Cast has to be told what to carry across the wire; nothing else enumerates these. */
-    val ALL = listOf(QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID, LIKED, LIKES_COUNT)
+    val ALL = listOf(QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID, LIKED, LIKES_COUNT, FLAC_URL, MP3_URL)
 }
 
 /**

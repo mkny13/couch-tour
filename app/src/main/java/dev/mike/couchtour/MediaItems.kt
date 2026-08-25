@@ -98,6 +98,7 @@ internal fun recordingMediaItem(track: PlayableTrack, info: QueueInfo): MediaIte
     venueName = track.venueName,
     info = info,
     backend = Backend.RELISTEN.id,
+    flacUrl = track.flacUrl,
 )
 
 /**
@@ -122,6 +123,7 @@ private fun coreMediaItem(
     backend: String? = null,
     likedByUser: Boolean = false,
     likesCount: Int = 0,
+    flacUrl: String? = null,
 ): MediaItem {
     val extras = Bundle().apply {
         info.key?.let { putString(Keys.QUEUE_KEY, it) }
@@ -133,6 +135,8 @@ private fun coreMediaItem(
         backend?.let { putString(Keys.BACKEND, it) }
         putBoolean(Keys.LIKED, likedByUser)
         putInt(Keys.LIKES_COUNT, likesCount)
+        flacUrl?.let { putString(Keys.FLAC_URL, it) }
+        if (url.isNotBlank()) putString(Keys.MP3_URL, url)
     }
     val meta = MediaMetadata.Builder()
         .setTitle(title)
@@ -151,13 +155,17 @@ private fun coreMediaItem(
         .setExtras(extras)
         .build()
 
+    val hasFlac = !flacUrl.isNullOrBlank()
+    val playbackUri = if (hasFlac) flacUrl!! else url
+    val mimeType = if (hasFlac) MimeTypes.AUDIO_FLAC else MimeTypes.AUDIO_MPEG
+
     return MediaItem.Builder()
         .setMediaId(id)
-        .setUri(url)
+        .setUri(playbackUri)
         // ExoPlayer sniffs the container and never needs this. Cast does: a queue item
         // with no content type is rejected outright by the media item converter, so
-        // casting would throw on the first track without it. Relisten is MP3-only too (O3).
-        .setMimeType(MimeTypes.AUDIO_MPEG)
+        // casting would throw on the first track without it.
+        .setMimeType(mimeType)
         .setMediaMetadata(meta)
         .apply { clipping?.let { setClippingConfiguration(it) } }
         .build()
@@ -202,6 +210,7 @@ internal data class ResolvedLocalTrack(
     val backend: String = Backend.PHISHIN.id,
     val likedByUser: Boolean = false,
     val likesCount: Int = 0,
+    val flacUrl: String? = null,
 )
 
 /**
@@ -231,6 +240,7 @@ internal fun localPlaylistTrackItems(playlistId: String, name: String, resolved:
             backend = it.backend,
             likedByUser = it.likedByUser,
             likesCount = it.likesCount,
+            flacUrl = it.flacUrl,
         )
     }
 }

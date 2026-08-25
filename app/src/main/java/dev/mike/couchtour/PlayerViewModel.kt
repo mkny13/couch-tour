@@ -37,6 +37,8 @@ data class PlayerState(
     val backend: String? = null,
     val likedByUser: Boolean = false,
     val likesCount: Int = 0,
+    val audioFormat: String = "MP3",
+    val isFlac: Boolean = false,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -44,6 +46,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private var controller: MediaController? = null
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
+
+    private val _postShowPrompt = MutableStateFlow<ShowSummary?>(null)
+    val postShowPrompt: StateFlow<ShowSummary?> = _postShowPrompt.asStateFlow()
+
+    private var activeShowSummary: ShowSummary? = null
+    private var lastResolvedEndedShowDate: String? = null
 
     val progressDao = PhishInDb.get(app).progressDao()
     val localPlaylistDao = PhishInDb.get(app).localPlaylistDao()
@@ -69,6 +77,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val queue = (meta?.subtitle ?: meta?.albumTitle)?.toString().orEmpty()
         val show = meta?.albumTitle?.toString().orEmpty()
         val extras = meta?.extras
+        val flacUrl = extras?.getString(Keys.FLAC_URL)
+        val isFlac = !flacUrl.isNullOrBlank()
+        val audioFormat = if (isFlac) "FLAC" else "MP3"
         _state.value = PlayerState(
             connected = true,
             hasQueue = c.mediaItemCount > 0,
@@ -90,12 +101,51 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             backend = extras?.getString(Keys.BACKEND),
             likedByUser = extras?.getBoolean(Keys.LIKED, false) ?: false,
             likesCount = extras?.getInt(Keys.LIKES_COUNT, 0) ?: 0,
+            audioFormat = audioFormat,
+            isFlac = isFlac,
         )
+
+        // When playback reaches the end of the show (after encore), prompt for next tour stop (#85)
+        if (c.playbackState == Player.STATE_ENDED) {
+            val active = activeShowSummary
+            if (active != null && lastResolvedEndedShowDate != active.date) {
+                lastResolvedEndedShowDate = active.date
+                viewModelScope.launch {
+                    val nextStop = findNextTourStop(active.artist, active.date, active.tourName)
+                    if (nextStop != null) {
+                        _postShowPrompt.value = nextStop
+                    }
+                }
+            }
+        }
+    }
+
+    fun dismissPostShowPrompt() {
+        _postShowPrompt.value = null
+    }
+
+    fun playNextTourStop(summary: ShowSummary) {
+        dismissPostShowPrompt()
+        viewModelScope.launch {
+            when (summary.artist.backend) {
+                Backend.PHISHIN -> {
+                    val show = PhishInApi.show(summary.date)
+                    if (show != null) playShow(show)
+                }
+                Backend.RELISTEN -> {
+                    val detail = runCatching { RelistenApi.show(summary.artist.id, summary.date).toShowDetail(summary.artist) }.getOrNull()
+                    if (detail != null) playRecording(detail)
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------------ play
 
     fun playShow(show: Show, startIndex: Int = 0, startPositionMs: Long = 0) {
+        activeShowSummary = ShowSummary(artist = PHISH, date = show.date, venue = show.venueName, location = show.location, tourName = null)
+        _postShowPrompt.value = null
+        lastResolvedEndedShowDate = null
         val playable = show.tracks.filter { it.playable }
         val filtered = filterPlaybackTracks(playable, startIndex, PlaybackSettings.skipFiller.value) { it.title }
         val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
@@ -105,6 +155,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playPlaylist(playlist: Playlist, startIndex: Int = 0, startPositionMs: Long = 0) {
+        activeShowSummary = null
+        _postShowPrompt.value = null
+        lastResolvedEndedShowDate = null
         val playable = playlist.entries.filter { it.track.playable }
         val filtered = filterPlaybackTracks(playable, startIndex, PlaybackSettings.skipFiller.value) { it.track.title }
         val subtitle = listOfNotNull(
@@ -122,6 +175,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Play one tape of a Relisten show. [detail] already picked the recording (P3). */
     fun playRecording(detail: ShowDetail, startIndex: Int = 0, startPositionMs: Long = 0) {
+        activeShowSummary = detail.summary
+        _postShowPrompt.value = null
+        lastResolvedEndedShowDate = null
         val filtered = filterPlaybackTracks(detail.tracks, startIndex, PlaybackSettings.skipFiller.value) { it.title }
         val summary = detail.summary
         val info = QueueInfo(
@@ -142,6 +198,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
      * saved index would land on a different track than the one you left.
      */
     fun shuffle(tracks: List<Track>, title: String) {
+        activeShowSummary = null
+        _postShowPrompt.value = null
+        lastResolvedEndedShowDate = null
         val playable = tracks.filter { it.playable }.shuffled()
         val info = QueueInfo(null, title, "${playable.size} tracks, shuffled", null)
         start(playable.map { mediaItem(it, info) }, 0, 0)

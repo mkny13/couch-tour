@@ -850,8 +850,9 @@ private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: Str
 }
 
 private fun recordingLabel(rec: RecordingRef): String {
+    val quality = if (rec.hasFlac) "FLAC · " else ""
     val rating = if (rec.rating > 0) " · %.1f".format(rec.rating) else ""
-    return rec.label + rating
+    return "$quality${rec.label}$rating"
 }
 
 /**
@@ -905,7 +906,7 @@ private fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Uni
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -916,6 +917,11 @@ private fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Uni
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            if (source.hasFlac) {
+                SourceBadge("FLAC", MaterialTheme.colorScheme.secondary)
+            } else {
+                SourceBadge("MP3", MaterialTheme.colorScheme.outline)
+            }
             if (source.isSoundboard) SourceBadge("SBD", MaterialTheme.colorScheme.primary)
             // Heuristic, not a real field — see RecordingRef.looksLikeMatrix. Labelled with
             // a "?" so it reads as a guess rather than a confirmed fact.
@@ -2154,6 +2160,7 @@ private fun FavoriteButton(artist: ArtistRef) {
 
 @Composable
 private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
+    val postShowPrompt by vm.postShowPrompt.collectAsState()
     Column(
         Modifier
             .background(
@@ -2162,6 +2169,13 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
             )
             .navigationBarsPadding()
     ) {
+        postShowPrompt?.let { prompt ->
+            PostShowTourPromptBanner(
+                prompt = prompt,
+                onPlay = { vm.playNextTourStop(prompt) },
+                onDismiss = { vm.dismissPostShowPrompt() },
+            )
+        }
         if (state.durationMs > 0) {
             val fraction = (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
             Box(
@@ -2198,14 +2212,19 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (state.showTitle.isNotEmpty()) {
-                    Text(
-                        state.showTitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (state.showTitle.isNotEmpty()) {
+                        Text(
+                            state.showTitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    AudioQualityBadge(state.audioFormat, state.isFlac)
                 }
             }
             if (state.backend == Backend.RELISTEN.id && state.trackId != null) {

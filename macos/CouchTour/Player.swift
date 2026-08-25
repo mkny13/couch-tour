@@ -27,6 +27,7 @@ final class Player: NSObject, ObservableObject {
     /// Milliseconds into the current track.
     @Published private(set) var positionMs: Int64 = 0
     @Published private(set) var artURL: String?
+    @Published private(set) var postShowPrompt: ShowSummary?
 
     /// App-level volume (0...1), independent of system volume — persisted so it survives a
     /// relaunch. `didSet` doesn't fire for the `init` assignment, so `init` also sets
@@ -170,8 +171,12 @@ final class Player: NSObject, ObservableObject {
             skipFiller: playbackSettings?.skipFiller ?? false
         )
         self.tracks = filtered.tracks
+        postShowPrompt = nil
         queuePlayer.removeAllItems()
-        items = filtered.tracks.map { AVPlayerItem(url: URL(string: $0.url) ?? URL(fileURLWithPath: "/dev/null")) }
+        items = filtered.tracks.map { track in
+            let playURL = (track.flacUrl?.isEmpty == false) ? track.flacUrl! : track.url
+            return AVPlayerItem(url: URL(string: playURL) ?? URL(fileURLWithPath: "/dev/null"))
+        }
         for item in items[filtered.startIndex...] {
             queuePlayer.insert(item, after: nil)
         }
@@ -223,12 +228,36 @@ final class Player: NSObject, ObservableObject {
             isPlaying = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             MPNowPlayingInfoCenter.default().playbackState = .stopped
+            if let finishedShow = self.show {
+                Task { @MainActor [weak self] in
+                    let nextStop = await findNextTourStop(
+                        artist: finishedShow.artist,
+                        currentDate: finishedShow.date,
+                        tourName: finishedShow.tourName
+                    )
+                    if let self, self.currentIndex == nil {
+                        self.postShowPrompt = nextStop
+                    }
+                }
+            }
             return
         }
         currentIndex = index
         positionMs = 0
         updateNowPlayingInfo()
         saveProgress(force: true)
+    }
+
+    func dismissPostShowPrompt() {
+        postShowPrompt = nil
+    }
+
+    func playNextTourStop(_ show: ShowSummary) {
+        dismissPostShowPrompt()
+        Task { @MainActor in
+            guard let detail = try? await sourceFor(show.artist.backend).show(artist: show.artist, date: show.date, recordingId: nil) else { return }
+            self.play(detail: detail)
+        }
     }
 
     /// Applies `pendingResumeMs` the moment the just-started item is actually ready — seeking

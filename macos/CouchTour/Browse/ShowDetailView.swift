@@ -67,7 +67,16 @@ struct ShowDetailView: View {
             showSourcePicker = true
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(detail.recording?.label ?? "Source")
+                HStack(spacing: 6) {
+                    Text(detail.recording?.label ?? "Source")
+                    if let rec = detail.recording {
+                        if rec.hasFlac {
+                            sourceBadge("FLAC", color: .green)
+                        } else {
+                            sourceBadge("MP3", color: .secondary)
+                        }
+                    }
+                }
                 Text("\(sources.count) \(plural(sources.count, "source"))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -166,13 +175,18 @@ private struct SourceRow: View {
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .lineLimit(1)
+                    if source.hasFlac {
+                        sourceBadge("FLAC", color: .green)
+                    } else {
+                        sourceBadge("MP3", color: .secondary)
+                    }
                     if source.isSoundboard {
-                        badge("SBD", color: .accentColor)
+                        sourceBadge("SBD", color: .accentColor)
                     }
                     // The "?" is deliberate — looksLikeMatrix is a text heuristic, not a
                     // guaranteed signal (Relisten has no structured matrix flag).
                     if source.looksLikeMatrix {
-                        badge("Matrix?", color: .purple)
+                        sourceBadge("Matrix?", color: .purple)
                     }
                 }
                 if source.rating > 0 {
@@ -205,16 +219,16 @@ private struct SourceRow: View {
         }
         return parts.joined(separator: " · ")
     }
+}
 
-    private func badge(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.caption2)
-            .fontWeight(.bold)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-            .foregroundStyle(color)
-    }
+private func sourceBadge(_ text: String, color: Color) -> some View {
+    Text(text)
+        .font(.caption2)
+        .fontWeight(.bold)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+        .foregroundStyle(color)
 }
 
 private struct TrackRow: View {

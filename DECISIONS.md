@@ -2661,6 +2661,47 @@ Per Issue #28 and [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md), Android Auto pre
 - macOS Swift package tests (`swift test`): 212/212 tests passing.
 - macOS app target build (`xcodebuild`): Build succeeded.
 
+## Iteration 50 — FLAC Streaming & Post-Show Tour Stop Prompt (#27, #85, D187-D188)
 
+### D187 — FLAC streaming support with Cast MP3 fallback (#27)
 
+Per Issue #27, Relisten / archive.org sources often provide lossless FLAC streams via `flac_url`.
 
+- **Lossless Stream Resolution:**
+  - `RelistenSourceTrack` parses `flac_url` (nullable) alongside `mp3_url` in both Kotlin (`Relisten.kt`) and Swift (`RelistenAPI.swift`), propagating it through `PlayableTrack` (`Catalog.kt`, `Catalog.swift`).
+  - Local playback on Android (`MediaItems.kt`) configures ExoPlayer `MediaItem` with `flacUrl` and `MimeTypes.AUDIO_FLAC` when present, retaining `mp3_url` in extras.
+  - Local and AirPlay playback on macOS (`Player.swift`) passes `flacUrl` to `AVPlayerItem` for AVFoundation streaming.
+- **Intelligent Cast Fallback:**
+  - Google Cast hardware/receivers may fail on raw FLAC audio streams. In `Cast.kt` (`CastItemConverter`), media items with `flac_url` are transparently rewritten to stream `mp3_url` (`MimeTypes.AUDIO_MPEG`) to the receiver, preserving the lossless FLAC URL in `customData` so it can be restored when playback returns to local.
+
+### D188 — Post-show next tour stop prompt (#85)
+
+Per Issue #85 and the resolved decision in `ROADMAP.md` that playback must stop at the end of a show's encore rather than automatically rolling into an unrequested show, users now receive an interactive prompt to continue to the next consecutive stop on tour.
+
+- **Tour Stop Resolution:**
+  - Pure function `resolveNextConsecutiveShow(currentDate:tourName:candidateShows:)` determines the next chronological show in the same tour (or falls back to the next chronological show overall if the tour has completed or is untoured).
+  - Suspend/async helper `findNextTourStop(artist:currentDate:tourName:)` fetches surrounding period shows and resolves the next stop (`NextStop.kt`, `NextStop.swift`).
+- **Player & Surface Integration:**
+  - Android (`PlayerViewModel.kt`): Observes queue completion (`Player.STATE_ENDED`) and resolves the next tour stop into `postShowPrompt: StateFlow<ShowSummary?>`. Rendered as an interactive card in `NowPlayingScreen` (`NowPlaying.kt`) and `MiniPlayer` (`MainActivity.kt`) with "Play" and "Dismiss" actions.
+  - macOS (`Player.swift`): On queue draining in `currentItemDidChange()`, queries `findNextTourStop` and updates `@Published var postShowPrompt: ShowSummary?`. Rendered as an interactive banner in `NowPlayingInspector.swift` and `MiniPlayerView.swift`.
+
+### D189 — Audio quality indicators in Now Playing surfaces & Source Selector quality badges (#27 follow-up)
+
+Following up on FLAC streaming support (#27), users need clarity on whether lossless FLAC or progressive MP3 audio is currently playing, as well as the best available audio quality tier for each recording/source in multi-source tape pickers.
+
+- **Data Models:**
+  - `RecordingRef` on both Android (`Catalog.kt`) and macOS (`Catalog.swift`) carries `hasFlac: Boolean`/`Bool = false`.
+  - `RelistenSource.toRecordingRef()` (`Relisten.kt`, `RelistenAPI.swift`) inspects track metadata across source sets (`sets.any { ... flacUrl.isNotBlank() }`) to populate `hasFlac`.
+  - `PlayerState` on Android (`PlayerViewModel.kt`) provides `audioFormat` (`"FLAC"` vs `"MP3"`) and `isFlac: Boolean`.
+- **UI Surfaces:**
+  - **Now Playing & MiniPlayer**:
+    - Android (`NowPlaying.kt`, `MainActivity.kt`): `AudioQualityBadge` renders format badge ("FLAC" in secondary container, "MP3" in surface variant) in `NowPlayingScreen` and `MiniPlayer`.
+    - macOS (`NowPlayingInspector.swift`, `MiniPlayerView.swift`): Renders green "FLAC" badge or secondary "MP3" badge in the inspector and mini player bar.
+  - **Source / Tape Selectors**:
+    - Android (`MainActivity.kt`): `SourceRow` inside `SourcePicker` bottom sheet and `recordingLabel` display a "FLAC" or "MP3" badge alongside "SBD" / "Matrix?".
+    - macOS (`ShowDetailView.swift`): `sourceRow` and `SourceRow` inside `SourcePicker` popover display "FLAC" or "MP3" badge next to source labels.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 344/344 tests passing.
+- macOS Swift package tests (`swift test`): 216/216 tests passing.
+- macOS app target build (`xcodebuild`): Build succeeded (`CouchTour`).

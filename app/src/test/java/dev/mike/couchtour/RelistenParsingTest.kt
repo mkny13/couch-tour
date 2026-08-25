@@ -103,6 +103,23 @@ class RelistenParsingTest {
     }
 
     @Test
+    fun `parses flac_url on source tracks and sets hasFlac on RecordingRef`() {
+        val show = json.decodeFromString<RelistenShowWithSources>(fixture("relisten_show.json"))
+        val matrixId = "3b27ea5a-5450-9d56-17f8-ee2bf2d18723"
+        val detail = show.toShowDetail(deadArtist, recordingId = matrixId)
+
+        assertTrue(detail.recording!!.hasFlac)
+        assertEquals(
+            "https://archive.org/download/gd1977-05-08.111493.mtx.seamons.sbeok.flac16/gd77-05-08d1t01.flac",
+            detail.tracks.first().flacUrl
+        )
+
+        val soundboardId = "0a1e8672-06ef-5fe6-5717-02061dcaf53e"
+        val sbdDetail = show.toShowDetail(deadArtist, recordingId = soundboardId)
+        org.junit.Assert.assertFalse(sbdDetail.recording!!.hasFlac)
+    }
+
+    @Test
     fun `an unknown recording id falls back to the default rather than an empty show`() {
         val show = json.decodeFromString<RelistenShowWithSources>(fixture("relisten_show.json"))
         val detail = show.toShowDetail(deadArtist, recordingId = "not-a-real-uuid")

@@ -161,20 +161,23 @@ public struct RelistenSourceTrack: Codable, Equatable {
     /// Seconds — see the file-level doc. Converted to ms in `toPlayableTrack`.
     public let duration: Int64
     public let mp3Url: String?
+    public let flacUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case uuid, title
         case trackPosition = "track_position"
         case duration
         case mp3Url = "mp3_url"
+        case flacUrl = "flac_url"
     }
 
-    public init(uuid: String, title: String, trackPosition: Int = 0, duration: Int64 = 0, mp3Url: String? = nil) {
+    public init(uuid: String, title: String, trackPosition: Int = 0, duration: Int64 = 0, mp3Url: String? = nil, flacUrl: String? = nil) {
         self.uuid = uuid
         self.title = title
         self.trackPosition = trackPosition
         self.duration = duration
         self.mp3Url = mp3Url
+        self.flacUrl = flacUrl
     }
 
     public init(from decoder: Decoder) throws {
@@ -184,6 +187,7 @@ public struct RelistenSourceTrack: Codable, Equatable {
         trackPosition = try c.decodeIfPresent(Int.self, forKey: .trackPosition) ?? 0
         duration = try c.decodeIfPresent(Int64.self, forKey: .duration) ?? 0
         mp3Url = try c.decodeIfPresent(String.self, forKey: .mp3Url)
+        flacUrl = try c.decodeIfPresent(String.self, forKey: .flacUrl)
     }
 }
 
@@ -477,10 +481,14 @@ extension Optional where Wrapped == String {
 
 extension RelistenSource {
     public func toRecordingRef() -> RecordingRef {
-        RecordingRef(
+        let hasFlac = sets.contains { set in
+            set.tracks.contains { $0.flacUrl.nonBlank != nil }
+        }
+        return RecordingRef(
             id: uuid,
             label: taper.nonBlank ?? (isSoundboard ? "Soundboard" : "Audience"),
             isSoundboard: isSoundboard,
+            hasFlac: hasFlac,
             rating: avgRatingWeighted,
             reviewCount: numReviews,
             taper: taper.nonBlank,
@@ -500,7 +508,8 @@ extension RelistenSourceTrack {
             durationMs: duration * 1000,
             url: mp3Url ?? "",
             showDate: showDate,
-            venueName: venueName
+            venueName: venueName,
+            flacUrl: flacUrl
         )
     }
 }

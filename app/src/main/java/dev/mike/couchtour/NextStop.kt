@@ -155,3 +155,42 @@ object NextStop {
         return shows
     }
 }
+
+/**
+ * Resolves the next consecutive show on tour after [currentDate] (#85).
+ *
+ * If [tourName] is present and not [NOT_PART_OF_A_TOUR], it looks for the next chronological
+ * show within that same tour. If no subsequent show exists in that tour or [tourName] is null/empty,
+ * it falls back to the next chronological show overall in [candidateShows].
+ */
+internal fun resolveNextConsecutiveShow(
+    currentDate: String,
+    tourName: String?,
+    candidateShows: List<ShowSummary>,
+): ShowSummary? {
+    val futureShows = candidateShows.filter { it.date > currentDate }
+    if (!tourName.isNullOrBlank() && tourName != NOT_PART_OF_A_TOUR) {
+        val nextInTour = futureShows.filter { it.tourName == tourName }.minByOrNull { it.date }
+        if (nextInTour != null) return nextInTour
+    }
+    return futureShows.minByOrNull { it.date }
+}
+
+/**
+ * Fetches the artist's shows surrounding [currentDate] and resolves the next consecutive show on tour (#85).
+ */
+suspend fun findNextTourStop(
+    artist: ArtistRef,
+    currentDate: String,
+    tourName: String? = null,
+    source: (Backend) -> MusicSource = ::sourceFor,
+): ShowSummary? = runCatching {
+    val src = source(artist.backend)
+    val periods = src.periods(artist)
+    val yearStr = currentDate.take(4)
+    val period = periods.firstOrNull { it.label == yearStr || it.label.contains(yearStr) || it.id == yearStr }
+        ?: periods.firstOrNull() ?: return null
+    val shows = src.shows(artist, period)
+    resolveNextConsecutiveShow(currentDate, tourName, shows)
+}.getOrNull()
+

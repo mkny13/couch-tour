@@ -7,59 +7,81 @@ struct MiniPlayerView: View {
     @State private var dragPositionMs: Double?
 
     var body: some View {
-        HStack(spacing: 16) {
-            ArtworkView(url: player.artURL)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(player.currentTrack?.title ?? "—")
-                    .font(.headline)
-                    .lineLimit(1)
-                if let show = player.show {
-                    Text("\(show.artist.name) · \(show.date)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .frame(minWidth: 160, alignment: .leading)
-
-            if let track = player.currentTrack, let show = player.show {
-                TrackLikeButton(
-                    backend: show.artist.backend,
-                    trackID: track.id,
-                    likesCount: track.likesCount,
-                    likedByUser: track.likedByUser
+        VStack(spacing: 0) {
+            if let prompt = player.postShowPrompt {
+                NextTourStopPromptBanner(
+                    prompt: prompt,
+                    onPlay: { player.playNextTourStop(prompt) },
+                    onDismiss: { player.dismissPostShowPrompt() }
                 )
+                .padding(.bottom, 4)
             }
 
-            Button {
-                player.skipToPrevious()
-            } label: {
-                Image(systemName: "backward.fill")
+            HStack(spacing: 16) {
+                ArtworkView(url: player.artURL)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(player.currentTrack?.title ?? "—")
+                        .font(.headline)
+                        .lineLimit(1)
+                    if let show = player.show {
+                        HStack(spacing: 4) {
+                            Text("\(show.artist.name) · \(show.date)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            if let track = player.currentTrack {
+                                Text(track.flacUrl?.isEmpty == false ? "FLAC" : "MP3")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .padding(.horizontal, 3)
+                                    .padding(.vertical, 1)
+                                    .background((track.flacUrl?.isEmpty == false ? Color.green : Color.secondary).opacity(0.18))
+                                    .foregroundStyle(track.flacUrl?.isEmpty == false ? Color.green : Color.secondary)
+                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                            }
+                        }
+                    }
+                }
+                .frame(minWidth: 160, alignment: .leading)
+
+                if let track = player.currentTrack, let show = player.show {
+                    TrackLikeButton(
+                        backend: show.artist.backend,
+                        trackID: track.id,
+                        likesCount: track.likesCount,
+                        likedByUser: track.likedByUser
+                    )
+                }
+
+                Button {
+                    player.skipToPrevious()
+                } label: {
+                    Image(systemName: "backward.fill")
+                }
+                .disabled((player.currentIndex ?? 0) == 0)
+
+                Button {
+                    player.togglePlayPause()
+                } label: {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title2)
+                }
+
+                Button {
+                    player.skipToNext()
+                } label: {
+                    Image(systemName: "forward.fill")
+                }
+                .disabled((player.currentIndex ?? -1) >= player.tracks.count - 1)
+
+                scrubber
+
+                volumeControl
             }
-            .disabled((player.currentIndex ?? 0) == 0)
-
-            Button {
-                player.togglePlayPause()
-            } label: {
-                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title2)
-            }
-
-            Button {
-                player.skipToNext()
-            } label: {
-                Image(systemName: "forward.fill")
-            }
-            .disabled((player.currentIndex ?? -1) >= player.tracks.count - 1)
-
-            scrubber
-
-            volumeControl
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
         }
-        .buttonStyle(.borderless)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     private var volumeControl: some View {

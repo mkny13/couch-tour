@@ -19,6 +19,14 @@ struct NowPlayingInspector: View {
                 .padding()
             Divider()
 
+            if let prompt = player.postShowPrompt {
+                NextTourStopPromptBanner(
+                    prompt: prompt,
+                    onPlay: { player.playNextTourStop(prompt) },
+                    onDismiss: { player.dismissPostShowPrompt() }
+                )
+            }
+
             if let show = player.show {
                 content(show: show)
             } else {
@@ -40,9 +48,14 @@ struct NowPlayingInspector: View {
                     Text(player.currentTrack?.title ?? "—")
                         .font(.headline)
                         .multilineTextAlignment(.center)
-                    Text("\(show.artist.name) · \(show.date)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text("\(show.artist.name) · \(show.date)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        if let track = player.currentTrack {
+                            qualityBadge(track.flacUrl?.isEmpty == false ? "FLAC" : "MP3", color: track.flacUrl?.isEmpty == false ? .green : .secondary)
+                        }
+                    }
                     if !show.where_.isEmpty {
                         Text(show.where_)
                             .font(.caption)
@@ -118,4 +131,48 @@ private struct QueueRow: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+struct NextTourStopPromptBanner: View {
+    let prompt: ShowSummary
+    let onPlay: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("NEXT TOUR STOP")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.tint)
+                Text("\(prompt.date) · \(prompt.where_.isEmpty ? prompt.artist.name : prompt.where_)")
+                    .font(.caption)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button("Play", action: onPlay)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(8)
+        .background(Color.accentColor.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal)
+        .padding(.top, 6)
+    }
+}
+
+private func qualityBadge(_ text: String, color: Color) -> some View {
+    Text(text)
+        .font(.system(size: 10, weight: .bold))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
+        .background(color.opacity(0.18))
+        .foregroundStyle(color)
+        .clipShape(RoundedRectangle(cornerRadius: 3))
 }

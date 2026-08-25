@@ -162,13 +162,18 @@ class CastItemConverter : MediaItemConverter {
             meta.artworkUri?.let { addImage(WebImage(it)) }
         }
 
-        val url = local.uri.toString()
+        val extras = meta.extras
+        val rawUrl = local.uri.toString()
+        val mp3Fallback = extras?.getString(Keys.MP3_URL)
+        val isFlac = local.mimeType == MimeTypes.AUDIO_FLAC || rawUrl.endsWith(".flac", ignoreCase = true)
+        val castUrl = if (isFlac && !mp3Fallback.isNullOrBlank()) mp3Fallback else rawUrl
+
         // Same shape as media3's own converter: the track id identifies the queue item,
         // the URL is what gets fetched.
-        val info = MediaInfo.Builder(mediaItem.mediaId.takeIf { it != MediaItem.DEFAULT_MEDIA_ID } ?: url)
+        val info = MediaInfo.Builder(mediaItem.mediaId.takeIf { it != MediaItem.DEFAULT_MEDIA_ID } ?: castUrl)
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-            .setContentType(local.mimeType ?: MimeTypes.AUDIO_MPEG)
-            .setContentUrl(url)
+            .setContentType(MimeTypes.AUDIO_MPEG)
+            .setContentUrl(castUrl)
             .setMetadata(castMeta)
             .setCustomData(castCustomData(mediaItem))
             .build()
@@ -192,12 +197,14 @@ class CastItemConverter : MediaItemConverter {
             .setExtras(castExtras(custom))
             .build()
 
+        val flacUrl = custom.optionalString(Keys.FLAC_URL)
+        val uri = flacUrl ?: custom.optionalString(KEY_URI) ?: info.contentUrl ?: info.contentId
+        val mimeType = if (flacUrl != null) MimeTypes.AUDIO_FLAC else (info.contentType ?: MimeTypes.AUDIO_MPEG)
+
         return MediaItem.Builder()
             .setMediaId(custom.optionalString(KEY_MEDIA_ID) ?: MediaItem.DEFAULT_MEDIA_ID)
-            // Our own copy of the URL first: contentId is only the URL for an item that
-            // had no media id to begin with.
-            .setUri(custom.optionalString(KEY_URI) ?: info.contentUrl ?: info.contentId)
-            .setMimeType(info.contentType ?: MimeTypes.AUDIO_MPEG)
+            .setUri(uri)
+            .setMimeType(mimeType)
             .setMediaMetadata(meta)
             .build()
     }
