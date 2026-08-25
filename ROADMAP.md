@@ -49,36 +49,34 @@ Historical implementation details and architectural choices are logged separatel
 - **Settings Scene & History Filters**: Dedicated Settings window (⌘,) and artist-filtered listening history (#25, D171).
 - **Unobtrusive App Version**: Build version indicators displayed in headers and settings across both clients (#43, D163, D181).
 
+### 6. Polish, Library & Usability Parity (Shipped — Phase 1)
+- **Local Playlist Editing (Rename & Reorder)**: Rename local playlists and manually reorder tracks via Drag-and-Drop `.onMove` and Move Up/Down controls on Android and macOS (#69, D184).
+- **Now Playing Track Likes**: Heart/like action surfaced directly on Now Playing and persistent MiniPlayer for phish.in and Relisten across Android and macOS (#63, D183).
+- **Live Sync Device List Refresh**: 5-second periodic polling and on-demand refresh buttons on Android and macOS Sync screens (#64, D185).
+- **Unified Android Auto Catalog**: Android Auto browse tree unified to the merged artist catalog (Phish, favorites, Relisten bands) (#28, D186).
+- **Native Feedback Launcher**: Direct in-app GitHub issue submission with pre-populated device/environment metadata (#87, D180).
+
 ---
 
 ## Prioritized Product Roadmap
 
 ```mermaid
 flowchart LR
-    subgraph NearTerm ["Phase 1: Near-Term Polish & Parity"]
-        direction TB
-        N1["#69 Playlist Rename & Reorder"]
-        N2["#63 Now Playing Like Button"]
-        N3["#60 macOS Auto-Updates (Sparkle)"]
-        N4["#66 Sleep Timer"]
-        N5["#67 Browse & Filter by Tag"]
-        N6["#64 Sync Device List Live Refresh"]
-        N7["#28 Unified Android Auto Browse"]
-    end
-
-    subgraph MediumTerm ["Phase 2: Discovery & Advanced Playback"]
+    subgraph NearTerm ["Phase 2: Discovery, Audio Fidelity & Media Power"]
         direction TB
         M1["#65 Offline Downloads"]
         M2["#18 Volume Leveling Across Sources"]
         M3["#27 FLAC Streaming Support"]
         M4["#68 Next Stop Era/Tour Picker"]
-        M5["#21 Trending / Momentum Sort"]
-        M6["#61 Multi-Level Catalog Cache"]
-        M7["#62 Relisten Show Artwork"]
-        M8["#10 Desktop Cast Support"]
+        M5["#67 Browse & Filter by Tag"]
+        M6["#21 Trending / Momentum Sort"]
+        M7["#61 Multi-Level Catalog Cache"]
+        M8["#62 Relisten Show Artwork"]
+        M9["#60 macOS Auto-Updates (Sparkle)"]
+        M10["#10 Desktop Cast Support"]
     end
 
-    subgraph LongTerm ["Phase 3: New Surfaces & Ecosystem"]
+    subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]
         direction TB
         L1["#24 Taper Intelligence & Source Comparison"]
         L2["#9 Google TV App"]
@@ -86,24 +84,8 @@ flowchart LR
         L4["#16 YouTube Audio/Video Support"]
     end
 
-    NearTerm --> MediumTerm --> LongTerm
+    NearTerm --> LongTerm
 ```
-
----
-
-### Phase 1: Near-Term Polish & High-Impact Parity
-
-Focus on closing remaining interaction gaps and high-leverage quality-of-life enhancements.
-
-| Issue | Feature | Description | Platforms |
-|---|---|---|---|
-| **#69** | **Playlist Management (Rename & Reorder)** | Allow renaming local playlists and dragging/moving tracks to reorder within a playlist (currently append and remove only). | Android, macOS |
-| **#63** | **Now Playing Like Button** | Add heart/like action directly onto the Now Playing player surface for phish.in and Relisten (requires plumbing track ID into `PlayerState`). | Android, macOS |
-| **#60** | **macOS Auto-Updates** | Integrate [Sparkle](https://sparkle-project.org) framework with a hosted appcast feed and signing keys for seamless desktop app updates. | macOS |
-| **#66** | **Sleep Timer** | Allow setting a timer to pause playback after a specified duration (15m, 30m, 45m, 1h) or at the end of the current track. | Android, macOS |
-| **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS |
-| **#64** | **Sync Screen Live Refresh** | Auto-refresh or poll the paired devices list while the Sync screen is open when a new device joins the sync group. | Android, macOS |
-| **#28** | **Unified Android Auto Browse Tree** | Merge Android Auto's separate "Artists" and "Years" browse roots into a single unified artist catalog matching the mobile app. | Android (Auto) |
 
 ---
 
@@ -118,9 +100,11 @@ Focus on advanced audio streaming, caching infrastructure, and richer catalog ex
 | **#27** | **FLAC Streaming Support** | Support lossless FLAC streaming from Relisten/archive.org (`flac_url`), with progressive MP3 fallback for Google Cast compatibility. | Android, macOS |
 | **#85** | **Post-Show Next Tour Stop Prompt** | When a show ends at the encore, stop playback automatically and surface an interactive prompt/banner to play the next consecutive show on the tour/run. | Android, macOS |
 | **#68** | **"Next Stop" Tour Picker for Defunct Artists** | For non-touring bands (e.g. Grateful Dead), allow the user to select a past tour or year to track on "Next Couch Tour Stop". | Android, macOS |
+| **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS |
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS |
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS |
 | **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS |
+| **#60** | **macOS Auto-Updates (Sparkle)** | Integrate [Sparkle](https://sparkle-project.org) framework with a hosted appcast feed and signing keys for seamless desktop app updates. | macOS |
 | **#10** | **Desktop Cast Support** | Add Google Cast / AirPlay sender integration into the macOS client. | macOS |
 
 ---
