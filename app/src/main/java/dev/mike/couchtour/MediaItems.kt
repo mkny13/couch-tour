@@ -23,6 +23,7 @@ internal data class QueueInfo(
     val subtitle: String,
     val art: String?,
     val artist: String = "Phish",
+    val artistId: String = "phish",
 )
 
 /** "1997-11-17 · McNichols Arena", falling back to the queue when a track lacks a show. */
@@ -39,7 +40,7 @@ internal fun albumFor(showDate: String?, venueName: String?, info: QueueInfo): S
 internal fun showTrackItems(show: Show): List<MediaItem> {
     val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
     val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
-    val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art)
+    val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art, artist = "Phish", artistId = "phish")
     return show.tracks.filter { it.playable }.map { mediaItem(it, info) }
 }
 
@@ -55,6 +56,8 @@ internal fun playlistTrackItems(playlist: Playlist): List<MediaItem> {
         playlist.name,
         subtitle,
         entries.firstOrNull()?.track?.showAlbumCoverUrl,
+        artist = "Phish",
+        artistId = "phish",
     )
     return entries.map { mediaItem(it.track, info, it) }
 }
@@ -97,6 +100,8 @@ internal fun recordingMediaItem(track: PlayableTrack, info: QueueInfo): MediaIte
     showDate = track.showDate,
     venueName = track.venueName,
     info = info,
+    artist = info.artist,
+    artistId = info.artistId,
     backend = Backend.RELISTEN.id,
     flacUrl = track.flacUrl,
 )
@@ -120,11 +125,14 @@ private fun coreMediaItem(
     // for a show, a phish.in playlist, or a Relisten tape. A local playlist (#12) can mix
     // backends within one queue, so it's the only caller that ever passes something else.
     artist: String = info.artist,
+    artistId: String = info.artistId,
     backend: String? = null,
     likedByUser: Boolean = false,
     likesCount: Int = 0,
     flacUrl: String? = null,
 ): MediaItem {
+    val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
+    val resolvedVenue = venueName ?: info.subtitle
     val extras = Bundle().apply {
         info.key?.let { putString(Keys.QUEUE_KEY, it) }
         putString(Keys.QUEUE_TITLE, info.title)
@@ -137,6 +145,10 @@ private fun coreMediaItem(
         putInt(Keys.LIKES_COUNT, likesCount)
         flacUrl?.let { putString(Keys.FLAC_URL, it) }
         if (url.isNotBlank()) putString(Keys.MP3_URL, url)
+        resolvedDate?.let { putString(Keys.SHOW_DATE, it) }
+        resolvedVenue?.let { putString(Keys.VENUE_NAME, it) }
+        putString(Keys.ARTIST_NAME, artist)
+        putString(Keys.ARTIST_ID, artistId)
     }
     val meta = MediaMetadata.Builder()
         .setTitle(title)
@@ -188,6 +200,7 @@ internal fun recordingTrackItems(detail: ShowDetail): List<MediaItem> {
         subtitle = summary.where,
         art = summary.artUrl ?: detail.tracks.firstOrNull()?.artUrl,
         artist = summary.artist.name,
+        artistId = summary.artist.id,
     )
     return detail.tracks.map { recordingMediaItem(it, info) }
 }
@@ -208,6 +221,7 @@ internal data class ResolvedLocalTrack(
     /** Per-track, unlike every other queue — see [coreMediaItem]'s `artist` param. */
     val artistName: String,
     val backend: String = Backend.PHISHIN.id,
+    val artistId: String = if (backend == Backend.PHISHIN.id) "phish" else "",
     val likedByUser: Boolean = false,
     val likesCount: Int = 0,
     val flacUrl: String? = null,
@@ -237,6 +251,7 @@ internal fun localPlaylistTrackItems(playlistId: String, name: String, resolved:
             venueName = it.venueName,
             info = info,
             artist = it.artistName,
+            artistId = it.artistId,
             backend = it.backend,
             likedByUser = it.likedByUser,
             likesCount = it.likesCount,

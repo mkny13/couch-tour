@@ -192,4 +192,27 @@ class MediaItemsTest {
         assertEquals("https://archive.org/scarlet.flac", item.mediaMetadata.extras?.getString(Keys.FLAC_URL))
         assertEquals("https://archive.org/scarlet.mp3", item.mediaMetadata.extras?.getString(Keys.MP3_URL))
     }
+
+    // ------------------------------------------------------- Show / Artist metadata
+
+    @Test
+    fun `media items carry show date, venue name, and artist details in extras`() {
+        val phishTrack = Track(id = 1, title = "Ghost", showDate = "1997-11-17", venueName = "McNichols Arena")
+        val phishInfo = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "McNichols Arena · Denver, CO", art = null)
+        val phishItem = mediaItem(phishTrack, phishInfo)
+        val pExtras = phishItem.mediaMetadata.extras
+
+        assertEquals("1997-11-17", pExtras?.getString(Keys.SHOW_DATE))
+        assertEquals("McNichols Arena", pExtras?.getString(Keys.VENUE_NAME))
+        assertEquals("Phish", pExtras?.getString(Keys.ARTIST_NAME))
+        assertEquals("phish", pExtras?.getString(Keys.ARTIST_ID))
+
+        val relistenItems = recordingTrackItems(detail())
+        val rExtras = relistenItems.first().mediaMetadata.extras
+
+        assertEquals("1977-05-08", rExtras?.getString(Keys.SHOW_DATE))
+        assertEquals("Barton Hall, Cornell University", rExtras?.getString(Keys.VENUE_NAME))
+        assertEquals("Grateful Dead", rExtras?.getString(Keys.ARTIST_NAME))
+        assertEquals("grateful-dead", rExtras?.getString(Keys.ARTIST_ID))
+    }
 }

@@ -2212,10 +2212,16 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val subtitle = when {
+                    state.showDate.isNotEmpty() && state.artistName.isNotEmpty() -> "${state.showDate} · ${state.artistName}"
+                    state.showDate.isNotEmpty() -> state.showDate
+                    state.showTitle.isNotEmpty() -> state.showTitle
+                    else -> state.queueTitle
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (state.showTitle.isNotEmpty()) {
+                    if (subtitle.isNotEmpty()) {
                         Text(
-                            state.showTitle,
+                            subtitle,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

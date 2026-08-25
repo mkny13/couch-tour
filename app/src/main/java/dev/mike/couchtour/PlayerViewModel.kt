@@ -21,6 +21,10 @@ data class PlayerState(
     val hasQueue: Boolean = false,
     val isPlaying: Boolean = false,
     val trackTitle: String = "",
+    val artistName: String = "",
+    val artistId: String = "",
+    val showDate: String = "",
+    val venueName: String = "",
     /** The show the track was played at — "1995-12-29 · Worcester Centrum Centre". */
     val showTitle: String = "",
     val queueTitle: String = "",
@@ -80,25 +84,67 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val flacUrl = extras?.getString(Keys.FLAC_URL)
         val isFlac = !flacUrl.isNullOrBlank()
         val audioFormat = if (isFlac) "FLAC" else "MP3"
+        val queueKey = extras?.getString(Keys.QUEUE_KEY)
+        val backend = extras?.getString(Keys.BACKEND)
+
+        var showDate = extras?.getString(Keys.SHOW_DATE).orEmpty()
+        var venueName = extras?.getString(Keys.VENUE_NAME).orEmpty()
+        var artistName = extras?.getString(Keys.ARTIST_NAME) ?: meta?.artist?.toString().orEmpty()
+        var artistId = extras?.getString(Keys.ARTIST_ID).orEmpty()
+
+        if (queueKey != null) {
+            when (val ref = parseQueueKey(queueKey)) {
+                null -> {}
+                else -> when (ref.kind) {
+                    QueueKind.SHOW -> {
+                        if (showDate.isEmpty()) showDate = ref.id
+                        if (artistName.isEmpty()) artistName = "Phish"
+                        if (artistId.isEmpty()) artistId = "phish"
+                    }
+                    QueueKind.RECORDING -> {
+                        parseRecordingId(ref.id)?.let { rec ->
+                            if (showDate.isEmpty()) showDate = rec.date
+                            if (artistId.isEmpty()) artistId = rec.artistSlug
+                            if (artistName.isEmpty()) artistName = rec.artistSlug.replace('-', ' ').split(' ').joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+        if (showDate.isEmpty() && show.isNotEmpty() && show.matches(Regex("\\d{4}-\\d{2}-\\d{2}.*"))) {
+            showDate = show.take(10)
+        }
+        if (artistName.isEmpty()) {
+            artistName = if (backend == Backend.PHISHIN.id || backend == null) "Phish" else "Artist"
+        }
+        if (artistId.isEmpty() && (backend == Backend.PHISHIN.id || backend == null)) {
+            artistId = "phish"
+        }
+
         _state.value = PlayerState(
             connected = true,
             hasQueue = c.mediaItemCount > 0,
             isPlaying = c.isPlaying,
             trackTitle = meta?.title?.toString().orEmpty(),
+            artistName = artistName,
+            artistId = artistId,
+            showDate = showDate,
+            venueName = venueName,
             // Don't say the same thing twice. Two ways it can happen: a track with no show
             // of its own falls back to the queue label verbatim, and a show played from its
             // own page has a queue line that is the show line plus the city. A prefix test
             // catches both. In a playlist the two are unrelated, so both lines survive.
             showTitle = if (queue.startsWith(show)) "" else show,
             queueTitle = queue,
-            queueKey = extras?.getString(Keys.QUEUE_KEY),
+            queueKey = queueKey,
             artUrl = meta?.artworkUri?.toString(),
             waveformUrl = extras?.getString(Keys.WAVEFORM),
             positionMs = c.currentPosition.coerceAtLeast(0),
             durationMs = c.duration.coerceAtLeast(0),
             trackIndex = c.currentMediaItemIndex,
             trackId = extras?.getString(Keys.TRACK_ID) ?: item?.mediaId,
-            backend = extras?.getString(Keys.BACKEND),
+            backend = backend,
             likedByUser = extras?.getBoolean(Keys.LIKED, false) ?: false,
             likesCount = extras?.getInt(Keys.LIKES_COUNT, 0) ?: 0,
             audioFormat = audioFormat,
@@ -198,6 +244,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             subtitle = summary.where,
             art = summary.artUrl ?: detail.tracks.firstOrNull()?.artUrl,
             artist = summary.artist.name,
+            artistId = summary.artist.id,
         )
         start(filtered.items.map { recordingMediaItem(it, info) }, filtered.startIndex, startPositionMs)
     }

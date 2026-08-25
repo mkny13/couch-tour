@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -138,6 +139,27 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
 
             Spacer(Modifier.height(28.dp))
 
+            val onGoToShow = {
+                val key = state.queueKey
+                if (key != null) {
+                    openQueueKey(key, nav)
+                } else if (state.showDate.isNotEmpty()) {
+                    if (state.backend == Backend.RELISTEN.id && state.artistId.isNotEmpty()) {
+                        nav.navigate("recording/relisten/${state.artistId}/${state.showDate}")
+                    } else {
+                        nav.navigate("show/${state.showDate}")
+                    }
+                }
+            }
+
+            val onGoToArtist = {
+                if (state.backend == Backend.RELISTEN.id && state.artistId.isNotEmpty()) {
+                    nav.navigate("artist/relisten/${state.artistId}")
+                } else {
+                    nav.navigate("artist/phishin/phish")
+                }
+            }
+
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -146,25 +168,62 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     Text(
                         state.trackTitle,
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(onClick = onGoToShow),
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = 2.dp),
                     ) {
-                        if (state.showTitle.isNotEmpty()) {
+                        if (state.showDate.isNotEmpty()) {
                             Text(
-                                state.showTitle,
+                                state.showDate,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false),
+                                modifier = Modifier
+                                    .clickable(onClick = onGoToShow)
+                                    .weight(1f, fill = false),
                             )
                             Spacer(Modifier.width(8.dp))
                         }
                         AudioQualityBadge(format = state.audioFormat, isFlac = state.isFlac)
+                    }
+                    if (state.artistName.isNotEmpty() || state.venueName.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp),
+                        ) {
+                            if (state.artistName.isNotEmpty()) {
+                                Text(
+                                    state.artistName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    modifier = Modifier.clickable(onClick = onGoToArtist),
+                                )
+                            }
+                            if (state.venueName.isNotEmpty()) {
+                                if (state.artistName.isNotEmpty()) {
+                                    Text(
+                                        " · ",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Text(
+                                    state.venueName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                     }
                 }
                 if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
