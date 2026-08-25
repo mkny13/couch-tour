@@ -183,6 +183,7 @@ fun App(
     ) { padding ->
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
+            composable("artists") { ArtistsScreen(nav) }
             composable("player") { NowPlayingScreen(vm, nav) }
             composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }
@@ -430,16 +431,14 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
 
             item { SectionHeader("Artists", divided = true) }
-            loaded(artists) { list ->
-                items(list, key = { "${it.backend.id}-${it.id}" }) { artist ->
-                    RowItem(
-                        title = artist.name,
-                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                        artUrl = null,
-                        trailingContent = { FavoriteButton(artist) },
-                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
-                    )
-                }
+            item {
+                RowItem(
+                    title = "Browse artists",
+                    subtitle = artists?.getOrNull()?.let { "${it.size} ${plural(it.size, "artist")} on phish.in and Relisten" }
+                        ?: "Explore artists on phish.in and Relisten",
+                    artUrl = null,
+                    onClick = { nav.navigate("artists") }
+                )
             }
 
             item { SectionHeader("Your phish.in account", divided = true) }
@@ -623,6 +622,33 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                 val artUrl = s.albumCoverUrl ?: s.coverArtUrls?.medium
                 tracksGroupedBySet(playable) { index, track ->
                     TrackRow(track, index + 1, date, artUrl, vm) { vm.playShow(s, index, 0) }
+                }
+            }
+        }
+    }
+}
+
+/** Full list of artists across all backends. */
+@Composable
+fun ArtistsScreen(nav: NavHostController) {
+    val rawArtists = loadOnce { loadArtistsByBackend() }
+    val favoriteKeys by Favorites.keys.collectAsState()
+    val artists = remember(rawArtists.value, favoriteKeys) {
+        rawArtists.value?.map { mergeArtists(it, favoriteKeys) }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Header("Artists", nav)
+        Loaded(artists) { list ->
+            LazyColumn {
+                items(list, key = { "${it.backend.id}-${it.id}" }) { artist ->
+                    RowItem(
+                        title = artist.name,
+                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                        artUrl = null,
+                        trailingContent = { FavoriteButton(artist) },
+                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                    )
                 }
             }
         }
