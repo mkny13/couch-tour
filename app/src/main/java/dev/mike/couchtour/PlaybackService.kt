@@ -135,6 +135,7 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
+        Favorites.init(this)
 
         val player = ExoPlayer.Builder(this)
             .setAudioAttributes(
@@ -399,21 +400,21 @@ class PlaybackService : MediaLibraryService() {
         val hasProgress = progressDao().inProgress().first().isNotEmpty()
         return buildList {
             if (hasProgress) add(browsableItem(BrowseNode.Continue.id, "Continue Listening"))
-            // Above Years, per the plan: Relisten carries far more artists than phish.in has
-            // years, so it's the entry point most trips down this tree will actually want.
             add(browsableItem(BrowseNode.Artists.id, "Artists"))
-            add(browsableItem(BrowseNode.Years.id, "Years"))
         }
     }
 
-    private suspend fun artistsChildren(): List<MediaItem> =
-        RelistenCatalogSource.artists().sortedByDescending { it.showCount }.map { artist ->
+    private suspend fun artistsChildren(): List<MediaItem> {
+        val byBackend = loadArtistsByBackend()
+        val favorites = Favorites.keys.value
+        return mergeArtists(byBackend, favorites).map { artist ->
             browsableItem(
                 id = BrowseNode.Artist(artist.backend.id, artist.id).id,
                 title = artist.name,
-                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                subtitle = if (artist.showCount > 0) "${artist.showCount} ${plural(artist.showCount, "show")}" else null,
             )
         }
+    }
 
     private suspend fun artistPeriodsChildren(node: BrowseNode.Artist): List<MediaItem> {
         val backend = Backend.from(node.backend) ?: return emptyList()

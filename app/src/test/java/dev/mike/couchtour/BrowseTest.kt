@@ -54,6 +54,18 @@ class BrowseTest {
     fun `round-trips the artists node and its children`() {
         assertEquals(BrowseNode.Artists, BrowseNode.parse(BrowseNode.Artists.id))
         assertEquals(
+            BrowseNode.Artist("phishin", "phish"),
+            BrowseNode.parse(BrowseNode.Artist("phishin", "phish").id)
+        )
+        assertEquals(
+            BrowseNode.ArtistPeriod("phishin", "phish", "1997"),
+            BrowseNode.parse(BrowseNode.ArtistPeriod("phishin", "phish", "1997").id)
+        )
+        assertEquals(
+            BrowseNode.Recording("phishin", "phish", "1997-11-17"),
+            BrowseNode.parse(BrowseNode.Recording("phishin", "phish", "1997-11-17").id)
+        )
+        assertEquals(
             BrowseNode.Artist("relisten", "grateful-dead"),
             BrowseNode.parse(BrowseNode.Artist("relisten", "grateful-dead").id)
         )

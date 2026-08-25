@@ -190,6 +190,28 @@ internal fun mergeArtists(
 }
 
 /**
+ * Fetches Phish (a phish.in constant with its show count summed from `years()`) alongside
+ * every Relisten artist. A Relisten outage still leaves Phish browsable; only surfaces an
+ * error if *both* backends fail.
+ *
+ * Returns the raw per-backend map rather than calling [mergeArtists] itself — merging also
+ * needs the favorited set, which is a [Favorites]-backed [kotlinx.coroutines.flow.StateFlow]
+ * callers recompose on, not something to fetch once and cache alongside the network data.
+ */
+internal suspend fun loadArtistsByBackend(): Map<Backend, List<ArtistRef>> {
+    val phishShows = runCatching { PhishInApi.years().sumOf { it.showsWithAudioCount } }
+    val relistenArtists = runCatching { RelistenCatalogSource.artists() }
+    if (phishShows.isFailure && relistenArtists.isFailure) {
+        throw relistenArtists.exceptionOrNull() ?: phishShows.exceptionOrNull()!!
+    }
+    val phish = PHISH.copy(showCount = phishShows.getOrDefault(0))
+    return mapOf(
+        Backend.PHISHIN to listOf(phish),
+        Backend.RELISTEN to relistenArtists.getOrDefault(emptyList()),
+    )
+}
+
+/**
  * Picks a random show for the Home screen's "Surprise me" button (#20). Neither backend
  * exposes a random-show endpoint, so this walks the same artist → period → show path the
  * browse screens do: a random artist from the merged list, a random period of that artist,

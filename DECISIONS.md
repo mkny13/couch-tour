@@ -2641,5 +2641,26 @@ Per Issue #64, both `SyncView.swift` (macOS) and `SyncScreen` (Android) previous
 - macOS Swift package tests (`swift test`): 212/212 tests passing.
 - macOS app target build (`xcodebuild`): Build succeeded.
 
+## Iteration 49 — Unified Android Auto browse hierarchy (#28, D186)
+
+### D186 — Unified artist catalog on Android Auto
+
+Per Issue #28 and [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md), Android Auto previously separated Phish into a top-level "Years" root while "Artists" only listed Relisten bands.
+
+- `Catalog.kt`: Made `loadArtistsByBackend()` an `internal suspend fun` shared between `MainActivity.kt` and `PlaybackService.kt`.
+- `PlaybackService.kt`:
+  - `onCreate()` initializes `Favorites.init(this)` so favorite keys are ready for head-unit browsing.
+  - `rootChildren()` exposes "Artists" as the single unified catalog root alongside "Continue Listening".
+  - `artistsChildren()` loads the merged artist catalog (`loadArtistsByBackend()` + `mergeArtists`), pinning Phish and favorited artists first, followed by Relisten artists sorted by show count.
+  - `artistPeriodsChildren`, `artistShowsChildren`, and `recordingChildren` route Phish uniformly through `BrowseNode.Artist("phishin", "phish")` and `PhishInSource`.
+  - Legacy `BrowseNode.Years` nodes remain parseable for backwards compatibility with stale or cached head-unit IDs.
+- `BrowseTest.kt`: Added tests verifying roundtrip parsing of unified `BrowseNode.Artist("phishin", "phish")` and child nodes.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 338/338 tests passing.
+- macOS Swift package tests (`swift test`): 212/212 tests passing.
+- macOS app target build (`xcodebuild`): Build succeeded.
+
+
 
 
