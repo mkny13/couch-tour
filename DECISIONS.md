@@ -2624,9 +2624,22 @@ Follow-up to #12 and #59: Local playlists originally shipped with append and rem
 - `LocalPlaylistTests.swift`: Unit tests for `renamePlaylist` and `reorderTracks`.
 - `LocalPlaylistView.swift`: Added Rename button in toolbar (`RenamePlaylistSheet`), drag-and-drop `.onMove` reordering, Move Up/Down buttons, and row context menus.
 
+## Iteration 48 — Live refresh for Sync device list (#64, D185)
+
+### D185 — Polling & manual refresh for paired sync device list
+
+Per Issue #64, both `SyncView.swift` (macOS) and `SyncScreen` (Android) previously only fetched `devices()` on initial mount or upon local pairing changes. When another device joined or was revoked elsewhere, the device list did not update until the screen was closed and reopened.
+
+**Android:**
+- `MainActivity.kt`: Added a periodic polling `LaunchedEffect(paired)` that triggers a refresh every 5 seconds while paired and viewing `SyncScreen`. Added a manual refresh `IconButton` (`Icons.Default.Refresh`) in the Devices section header.
+
+**macOS:**
+- `SyncView.swift`: Switched `.task` to `.task(id: syncSession.paired)` with a 5-second polling loop while paired and active. Added an explicit refresh button (`Image(systemName: "arrow.clockwise")`) in the Devices section header.
+
 **Testing:**
 - Android unit tests (`./gradlew testDebugUnitTest`): 338/338 tests passing.
 - macOS Swift package tests (`swift test`): 212/212 tests passing.
 - macOS app target build (`xcodebuild`): Build succeeded.
+
 
 

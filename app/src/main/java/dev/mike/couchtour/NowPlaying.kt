@@ -89,6 +89,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                 )
+                FeedbackButton(nav)
                 CastButton()
                 Box {
                     IconButton(onClick = { menuOpen = true }) {

@@ -103,7 +103,7 @@ struct SyncView: View {
             }
 
             if syncSession.paired {
-                Section("Devices") {
+                Section {
                     ForEach(devices) { device in
                         HStack {
                             VStack(alignment: .leading) {
@@ -113,6 +113,18 @@ struct SyncView: View {
                             Spacer()
                             Button("Revoke") { revoke(device.deviceId) }
                         }
+                    }
+                } header: {
+                    HStack {
+                        Text("Devices")
+                        Spacer()
+                        Button {
+                            Task { await refreshDevices() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -134,9 +146,13 @@ struct SyncView: View {
         // NavigationStack — the Settings window titles itself, and navigationTitle isn't
         // guaranteed to render outside a NavigationStack (D167 hit the same thing with
         // .inspector).
-        .task { if syncSession.paired { await refreshDevices() } }
-        .onChange(of: syncSession.paired) { _, paired in
-            if paired { Task { await refreshDevices() } }
+        // Live refresh the device list while this view is active (#64).
+        .task(id: syncSession.paired) {
+            guard syncSession.paired else { return }
+            while !Task.isCancelled {
+                await refreshDevices()
+                try? await Task.sleep(for: .seconds(5))
+            }
         }
     }
 

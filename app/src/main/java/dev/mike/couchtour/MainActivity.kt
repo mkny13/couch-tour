@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
@@ -301,6 +302,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             IconButton(onClick = { nav.navigate("sync") }) {
                 Icon(Icons.Default.Sync, "Sync")
             }
+            FeedbackButton(nav)
             CastButton()
         }
 
@@ -1321,6 +1323,15 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
     }
 
+    // Live refresh the device list while this screen is open (#64).
+    LaunchedEffect(paired) {
+        if (!paired) return@LaunchedEffect
+        while (true) {
+            delay(5_000)
+            refreshKey++
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         Header("Sync", nav)
         Text(
@@ -1466,7 +1477,22 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
 
         if (paired) {
             val devices = loadOnce(paired to refreshKey) { SyncSession.devices() }
-            SectionHeader("Devices", divided = true)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Devices",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { refreshKey++ }) {
+                    Icon(Icons.Default.Refresh, "Refresh devices")
+                }
+            }
+            HorizontalDivider()
             Loaded(devices.value) { list ->
                 list.forEach { device ->
                     RowItem(
@@ -2211,6 +2237,7 @@ fun Header(
         }
         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         trailing?.invoke()
+        FeedbackButton(nav)
         CastButton()
         // Back only unwinds one step; from a playlist four levels deep that's tedious.
         IconButton(onClick = { nav.popBackStack("home", inclusive = false) }) {
