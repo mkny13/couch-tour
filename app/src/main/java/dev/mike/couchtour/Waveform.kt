@@ -87,11 +87,45 @@ fun WaveformScrubber(
                 }
             }
     ) {
-        val image = bitmap ?: return@Canvas
-        val dst = IntSize(size.width.toInt(), size.height.toInt())
-        drawImage(image, dstSize = dst, colorFilter = ColorFilter.tint(unplayedColor))
-        clipRect(right = size.width * fraction) {
-            drawImage(image, dstSize = dst, colorFilter = ColorFilter.tint(playedColor))
+        val image = bitmap
+        if (image != null) {
+            val dst = IntSize(size.width.toInt(), size.height.toInt())
+            drawImage(image, dstSize = dst, colorFilter = ColorFilter.tint(unplayedColor))
+            clipRect(right = size.width * fraction) {
+                drawImage(image, dstSize = dst, colorFilter = ColorFilter.tint(playedColor))
+            }
+        } else {
+            val trackHeight = 4.dp.toPx()
+            val thumbRadius = 7.dp.toPx()
+            val centerY = size.height / 2f
+            val cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight / 2f, trackHeight / 2f)
+
+            // Unplayed background track
+            drawRoundRect(
+                color = unplayedColor,
+                topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - trackHeight / 2f),
+                size = androidx.compose.ui.geometry.Size(size.width, trackHeight),
+                cornerRadius = cornerRadius,
+            )
+            // Played progress track
+            val playedWidth = size.width * fraction
+            if (playedWidth > 0f) {
+                drawRoundRect(
+                    color = playedColor,
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, centerY - trackHeight / 2f),
+                    size = androidx.compose.ui.geometry.Size(playedWidth, trackHeight),
+                    cornerRadius = cornerRadius,
+                )
+            }
+            // Thumb
+            drawCircle(
+                color = playedColor,
+                radius = thumbRadius,
+                center = androidx.compose.ui.geometry.Offset(
+                    playedWidth.coerceIn(thumbRadius, (size.width - thumbRadius).coerceAtLeast(thumbRadius)),
+                    centerY
+                )
+            )
         }
     }
 }

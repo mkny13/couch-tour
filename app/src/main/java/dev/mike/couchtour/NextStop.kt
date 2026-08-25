@@ -186,11 +186,32 @@ suspend fun findNextTourStop(
     source: (Backend) -> MusicSource = ::sourceFor,
 ): ShowSummary? = runCatching {
     val src = source(artist.backend)
-    val periods = src.periods(artist)
+    val periods = src.periods(artist).filter { it.id != POPULAR_PERIOD_ID }
     val yearStr = currentDate.take(4)
-    val period = periods.firstOrNull { it.label == yearStr || it.label.contains(yearStr) || it.id == yearStr }
-        ?: periods.firstOrNull() ?: return null
-    val shows = src.shows(artist, period)
-    resolveNextConsecutiveShow(currentDate, tourName, shows)
+    val periodIndex = periods.indexOfFirst { it.label == yearStr || it.label.contains(yearStr) || it.id == yearStr }
+    val currentPeriod = if (periodIndex != -1) periods[periodIndex] else periods.firstOrNull() ?: return null
+    val shows = src.shows(artist, currentPeriod)
+    val currentShow = shows.firstOrNull { it.date == currentDate }
+    val effectiveTourName = tourName?.takeIf { it.isNotBlank() } ?: currentShow?.tourName
+
+    val nextInCurrent = resolveNextConsecutiveShow(currentDate, effectiveTourName, shows)
+    if (nextInCurrent != null) return nextInCurrent
+
+    // If no subsequent show was in this period (e.g. year-end show or tour spans across periods),
+    // check subsequent periods in chronological order.
+    val yearInt = yearStr.toIntOrNull()
+    if (yearInt != null) {
+        val nextPeriods = periods.filter { p ->
+            val pYear = p.label.take(4).toIntOrNull() ?: p.id.take(4).toIntOrNull()
+            pYear != null && pYear > yearInt
+        }.sortedBy { it.label }
+
+        for (np in nextPeriods.take(2)) {
+            val nextShows = runCatching { src.shows(artist, np) }.getOrDefault(emptyList())
+            val found = resolveNextConsecutiveShow(currentDate, effectiveTourName, nextShows)
+            if (found != null) return found
+        }
+    }
+    null
 }.getOrNull()
 

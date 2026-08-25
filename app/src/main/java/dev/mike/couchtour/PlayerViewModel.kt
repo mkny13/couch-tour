@@ -107,7 +107,19 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
         // When playback reaches the end of the show (after encore), prompt for next tour stop (#85)
         if (c.playbackState == Player.STATE_ENDED) {
-            val active = activeShowSummary
+            val key = extras?.getString(Keys.QUEUE_KEY)
+            val active = activeShowSummary ?: key?.let { k ->
+                when (val ref = parseQueueKey(k)) {
+                    null -> null
+                    else -> when (ref.kind) {
+                        QueueKind.SHOW -> ShowSummary(artist = PHISH, date = ref.id, venue = show, location = null, tourName = null)
+                        QueueKind.RECORDING -> parseRecordingId(ref.id)?.let { rec ->
+                            ShowSummary(artist = ArtistRef(id = rec.artistSlug, name = rec.artistSlug, backend = Backend.RELISTEN), date = rec.date, venue = show, location = null, tourName = null)
+                        }
+                        else -> null
+                    }
+                }
+            }
             if (active != null && lastResolvedEndedShowDate != active.date) {
                 lastResolvedEndedShowDate = active.date
                 viewModelScope.launch {
@@ -143,7 +155,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ play
 
     fun playShow(show: Show, startIndex: Int = 0, startPositionMs: Long = 0) {
-        activeShowSummary = ShowSummary(artist = PHISH, date = show.date, venue = show.venueName, location = show.location, tourName = null)
+        activeShowSummary = ShowSummary(artist = PHISH, date = show.date, venue = show.venueName, location = show.location, tourName = show.tourName)
         _postShowPrompt.value = null
         lastResolvedEndedShowDate = null
         val playable = show.tracks.filter { it.playable }

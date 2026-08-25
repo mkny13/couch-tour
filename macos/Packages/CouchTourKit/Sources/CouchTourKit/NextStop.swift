@@ -31,10 +31,31 @@ public func findNextTourStop(
 ) async -> ShowSummary? {
     let src = source(artist.backend)
     guard let periods = try? await src.periods(artist: artist) else { return nil }
+    let validPeriods = periods.filter { $0.id != "popular" }
     let yearStr = String(currentDate.prefix(4))
-    guard let period = periods.first(where: { $0.label == yearStr || $0.label.contains(yearStr) || $0.id == yearStr }) ?? periods.first else {
+    guard let period = validPeriods.first(where: { $0.label == yearStr || $0.label.contains(yearStr) || $0.id == yearStr }) ?? validPeriods.first else {
         return nil
     }
     guard let shows = try? await src.shows(artist: artist, period: period) else { return nil }
-    return resolveNextConsecutiveShow(currentDate: currentDate, tourName: tourName, candidateShows: shows)
+    let currentShow = shows.first(where: { $0.date == currentDate })
+    let effectiveTourName = tourName?.trimmingCharacters(in: .whitespaces).isEmpty == false ? tourName : currentShow?.tourName
+
+    if let nextInPeriod = resolveNextConsecutiveShow(currentDate: currentDate, tourName: effectiveTourName, candidateShows: shows) {
+        return nextInPeriod
+    }
+
+    if let yearInt = Int(yearStr) {
+        let nextPeriods = validPeriods.filter { p in
+            guard let pYear = Int(p.label.prefix(4)) ?? Int(p.id.prefix(4)) else { return false }
+            return pYear > yearInt
+        }.sorted { $0.label < $1.label }
+
+        for np in nextPeriods.prefix(2) {
+            if let nextShows = try? await src.shows(artist: artist, period: np),
+               let found = resolveNextConsecutiveShow(currentDate: currentDate, tourName: effectiveTourName, candidateShows: nextShows) {
+                return found
+            }
+        }
+    }
+    return nil
 }
