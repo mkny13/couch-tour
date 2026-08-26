@@ -62,4 +62,26 @@ final class AppModel: ObservableObject {
         guard let progressStore else { return }
         Task { try? await syncSession.sync(progressStore) }
     }
+
+    #if BETA
+    static func launchUpdateScript() {
+        let scriptURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("scripts/install-beta.sh")
+
+        let path = scriptURL.path
+        let appleScript = """
+        tell application "Terminal"
+            activate
+            do script "exec '\(path)'"
+        end tell
+        """
+        if let script = NSAppleScript(source: appleScript) {
+            var error: NSDictionary?
+            script.executeAndReturnError(&error)
+        }
+    }
+    #endif
 }
+

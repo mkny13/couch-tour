@@ -13,7 +13,10 @@ echo "Quitting any running instance..."
 pkill -f "$app_name/Contents/MacOS/Couch Tour Beta" 2>/dev/null || true
 sleep 1
 
-# See install.sh's matching comment: CouchTour.xcodeproj is generated, not committed (D103),
+echo "Fetching latest tags from origin..."
+git -C "$macos_dir" fetch --tags -q 2>/dev/null || true
+
+# CouchTour.xcodeproj is generated, not committed (D103),
 # so this has to run on every install or a new/removed .swift file silently doesn't reach the
 # build.
 if ! command -v xcodegen &>/dev/null; then
@@ -23,7 +26,9 @@ fi
 echo "Regenerating Xcode project..."
 (cd "$macos_dir" && xcodegen generate)
 
-raw_version="${1:-${VERSION:-$(git -C "$macos_dir" describe --tags --abbrev=0 2>/dev/null || echo "0.48")}}"
+latest_tag=$(git -C "$macos_dir" tag -l 'v*' 2>/dev/null | sort -V | tail -n 1)
+latest_tag="${latest_tag:-$(git -C "$macos_dir" describe --tags --abbrev=0 2>/dev/null || echo "0.51")}"
+raw_version="${1:-${VERSION:-$latest_tag}}"
 version="${raw_version#v}-beta"
 
 echo "Building Release ($version)..."

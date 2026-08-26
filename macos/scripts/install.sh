@@ -13,11 +13,12 @@ echo "Quitting any running instance..."
 pkill -f "$app_name/Contents/MacOS/Couch Tour" 2>/dev/null || true
 sleep 1
 
-# CouchTour.xcodeproj is generated, not committed (D103) — regenerating it here every run is
-# what makes this script safe to run blindly after a `git pull`. Without this step, adding or
-# removing a .swift file (as #25's batch did repeatedly — SearchView.swift,
-# NowPlayingInspector.swift, ArtworkView.swift, TrackGroups.swift) leaves `xcodebuild` building
-# an out-of-date project that silently omits the new files, with no error to signal it.
+echo "Fetching latest tags from origin..."
+git -C "$macos_dir" fetch --tags -q 2>/dev/null || true
+
+# CouchTour.xcodeproj is generated, not committed (D103),
+# so this has to run on every install or a new/removed .swift file silently doesn't reach the
+# build.
 if ! command -v xcodegen &>/dev/null; then
     echo "xcodegen not found. Install it with: brew install xcodegen" >&2
     exit 1
@@ -25,7 +26,9 @@ fi
 echo "Regenerating Xcode project..."
 (cd "$macos_dir" && xcodegen generate)
 
-raw_version="${1:-${VERSION:-$(git -C "$macos_dir" describe --tags --abbrev=0 2>/dev/null || echo "0.48")}}"
+latest_tag=$(git -C "$macos_dir" tag -l 'v*' 2>/dev/null | sort -V | tail -n 1)
+latest_tag="${latest_tag:-$(git -C "$macos_dir" describe --tags --abbrev=0 2>/dev/null || echo "0.51")}"
+raw_version="${1:-${VERSION:-$latest_tag}}"
 version="${raw_version#v}"
 
 echo "Building Release ($version)..."

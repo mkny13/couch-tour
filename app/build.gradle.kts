@@ -23,11 +23,11 @@ val releaseStoreFile = localProperties.getProperty("release.storeFile")
 
 fun gitVersionName(): String {
     return try {
-        val proc = ProcessBuilder("git", "describe", "--tags", "--abbrev=0").directory(rootDir).start()
+        val proc = ProcessBuilder("sh", "-c", "git tag -l 'v*' | sort -V | tail -n 1").directory(rootDir).start()
         val out = proc.inputStream.bufferedReader().readText().trim().removePrefix("v")
-        out.ifEmpty { "0.48" }
+        out.ifEmpty { "0.51" }
     } catch (_: Exception) {
-        "0.48"
+        "0.51"
     }
 }
 

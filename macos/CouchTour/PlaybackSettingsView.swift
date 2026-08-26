@@ -13,6 +13,14 @@ struct PlaybackSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            #if BETA
+            Section {
+                Button("Update Couch Tour Beta...") {
+                    AppModel.launchUpdateScript()
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            #endif
             Section {
                 Text(Bundle.main.appVersionString)
                     .font(.caption)

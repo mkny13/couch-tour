@@ -43,10 +43,19 @@ struct RootView: View {
                     Label(section.rawValue, systemImage: section.systemImage).tag(section)
                 }
                 .safeAreaInset(edge: .bottom) {
-                    Text(Bundle.main.appVersionString)
+                    VStack(spacing: 4) {
+                        Text(Bundle.main.appVersionString)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        #if BETA
+                        Button("Update to Latest Beta") {
+                            AppModel.launchUpdateScript()
+                        }
+                        .buttonStyle(.link)
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
+                        #endif
+                    }
+                    .padding(.vertical, 8)
                 }
                 .navigationTitle("Couch Tour")
                 .listStyle(.sidebar)
