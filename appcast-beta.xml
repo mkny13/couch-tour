@@ -1,15 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
-  <channel>
-    <title>Couch Tour Beta Changelog</title>
-    <link>https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml</link>
-    <description>Most recent changes with links to updates.</description>
-    <language>en</language>
-    <item>
-      <title>Version 0.53-beta</title>
-      <sparkle:releaseNotesLink>https://github.com/mkny13/couch-tour/releases/tag/v0.53</sparkle:releaseNotesLink>
-      <pubDate>Wed, 26 Aug 2026 11:58:36 +0000</pubDate>
-      <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.53/CouchTourBeta-v0.53.zip" sparkle:version="0.53-beta" sparkle:shortVersionString="0.53-beta" type="application/octet-stream" />
-    </item>
-  </channel>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+    <channel>
+        <title>Couch Tour Beta Changelog</title>
+        <link>https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml</link>
+        <description>Most recent changes with links to updates.</description>
+        <language>en</language>
+        <item>
+            <title>0.55-beta-beta</title>
+            <pubDate>Wed, 26 Aug 2026 19:48:26 +0000</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>0.55-beta-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.55-beta/CouchTourBeta-v0.55-beta.zip" length="7192342" type="application/octet-stream" sparkle:edSignature="8qF+pKwhgEFLojovUM3MLZE4uFu5045iBnl7rZXSt6CIgPJSoUiZ9GbnQgcrQmO1WZl/iU8yHIErD61DqExyAw=="/>
+        </item>
+        <item>
+            <title>Version 0.53-beta</title>
+            <sparkle:releaseNotesLink>https://github.com/mkny13/couch-tour/releases/tag/v0.53</sparkle:releaseNotesLink>
+            <pubDate>Wed, 26 Aug 2026 11:58:36 +0000</pubDate>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.53/CouchTourBeta-v0.53.zip" sparkle:version="0.53-beta" sparkle:shortVersionString="0.53-beta" type="application/octet-stream"/>
+        </item>
+    </channel>
 </rss>
