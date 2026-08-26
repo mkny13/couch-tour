@@ -45,7 +45,8 @@ jobs:
         run: |
           tag="${TAG_NAME:-$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.51")}"
           clean_ver="${tag#v}"
-          
+          clean_ver="${clean_ver%-beta}"
+
           if [ "$IS_BETA" = "true" ]; then
             scheme="CouchTourBeta"
             app_name="Couch Tour Beta.app"
@@ -57,12 +58,12 @@ jobs:
             zip_name="CouchTour-${tag}.zip"
             version="${clean_ver}"
           fi
-          
+
           cd macos
           xcodebuild -project CouchTour.xcodeproj -scheme "$scheme" \
             -configuration Release -destination 'platform=macOS' \
             -derivedDataPath build \
-            MARKETING_VERSION="$version" build
+            MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
             
           cd build/Build/Products/Release
           ditto -c -k --sequesterRsrc --keepParent "$app_name" "$zip_name"
