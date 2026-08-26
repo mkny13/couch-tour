@@ -39,6 +39,7 @@ targets:
       path: Generated/Info.plist
       properties:
         CFBundleDisplayName: "Couch Tour"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
     entitlements:
@@ -77,6 +78,7 @@ targets:
       path: Generated/CouchTourBeta/Info.plist
       properties:
         CFBundleDisplayName: "Couch Tour Beta"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
     entitlements:
