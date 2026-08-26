@@ -47,6 +47,8 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        com.apple.security.temporary-exception.apple-events:
+          - com.apple.Terminal
 
   # Side-installable beta, mirroring Android's sideInstall build (D137): a distinct bundle id
   # and display name so it installs alongside the regular app instead of replacing it. The
@@ -86,3 +88,5 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        com.apple.security.temporary-exception.apple-events:
+          - com.apple.Terminal

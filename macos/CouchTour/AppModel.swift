@@ -1,3 +1,4 @@
+import AppKit
 import CouchTourKit
 import Foundation
 
@@ -65,16 +66,20 @@ final class AppModel: ObservableObject {
 
     static func launchUpdateScript() {
         #if BETA
-        let scriptName = "scripts/install-beta.sh"
+        let scriptName = "scripts/install-beta.command"
+        let fallbackScriptName = "scripts/install-beta.sh"
         #else
-        let scriptName = "scripts/install.sh"
+        let scriptName = "scripts/install.command"
+        let fallbackScriptName = "scripts/install.sh"
         #endif
-        let scriptURL = URL(fileURLWithPath: #filePath)
+        let baseURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent(scriptName)
 
-        let path = scriptURL.path
+        let scriptURL = baseURL.appendingPathComponent(scriptName)
+        let fallbackURL = baseURL.appendingPathComponent(fallbackScriptName)
+
+        let path = fallbackURL.path
         let appleScript = """
         tell application "Terminal"
             activate
@@ -83,8 +88,11 @@ final class AppModel: ObservableObject {
         """
         if let script = NSAppleScript(source: appleScript) {
             var error: NSDictionary?
-            script.executeAndReturnError(&error)
+            let result = script.executeAndReturnError(&error)
+            if error == nil && result.stringValue != nil { return }
         }
+
+        NSWorkspace.shared.open(scriptURL)
     }
 }
 
