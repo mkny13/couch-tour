@@ -63,12 +63,16 @@ final class AppModel: ObservableObject {
         Task { try? await syncSession.sync(progressStore) }
     }
 
-    #if BETA
     static func launchUpdateScript() {
+        #if BETA
+        let scriptName = "scripts/install-beta.sh"
+        #else
+        let scriptName = "scripts/install.sh"
+        #endif
         let scriptURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("scripts/install-beta.sh")
+            .appendingPathComponent(scriptName)
 
         let path = scriptURL.path
         let appleScript = """
@@ -82,6 +86,5 @@ final class AppModel: ObservableObject {
             script.executeAndReturnError(&error)
         }
     }
-    #endif
 }
 

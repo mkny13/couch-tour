@@ -28,13 +28,17 @@ struct CouchTourApp: App {
                 .environmentObject(appModel.phishInSession)
         }
         .commands {
-            #if BETA
             CommandGroup(after: .appInfo) {
+                #if BETA
                 Button("Check for Beta Updates...") {
                     AppModel.launchUpdateScript()
                 }
+                #else
+                Button("Check for Updates...") {
+                    AppModel.launchUpdateScript()
+                }
+                #endif
             }
-            #endif
 
             CommandGroup(after: .sidebar) {
                 Button(appModel.showNowPlaying ? "Hide Now Playing" : "Show Now Playing") {

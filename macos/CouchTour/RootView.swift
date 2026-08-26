@@ -47,13 +47,11 @@ struct RootView: View {
                         Text(Bundle.main.appVersionString)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        #if BETA
-                        Button("Update to Latest Beta") {
+                        Button(updateButtonTitle) {
                             AppModel.launchUpdateScript()
                         }
                         .buttonStyle(.link)
                         .font(.caption2)
-                        #endif
                     }
                     .padding(.vertical, 8)
                 }
@@ -110,5 +108,13 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             appModel.syncNow()
         }
+    }
+
+    private var updateButtonTitle: String {
+        #if BETA
+        "Update to Latest Beta"
+        #else
+        "Update to Latest"
+        #endif
     }
 }
