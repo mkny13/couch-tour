@@ -95,6 +95,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -1001,15 +1002,19 @@ private fun RecordingTrackRow(
  * count — just a local like.
  */
 @Composable
-internal fun LikeTrackButton(trackId: String) {
+internal fun LikeTrackButton(
+    trackId: String,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 18.dp,
+) {
     val likedIds by LikedTracks.ids.collectAsState()
     val liked = trackId in likedIds
-    IconButton(onClick = { LikedTracks.toggle(trackId) }) {
+    IconButton(onClick = { LikedTracks.toggle(trackId) }, modifier = modifier) {
         Icon(
             if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
             if (liked) "Unlike" else "Like",
             tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(iconSize)
         )
     }
 }
@@ -2096,7 +2101,14 @@ private fun TrackRow(track: Track, number: Int, date: String, artUrl: String?, v
  * the count, since that's public, but tapping is inert.
  */
 @Composable
-internal fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initialCount: Int) {
+internal fun LikeButton(
+    type: Likable,
+    id: Long,
+    initiallyLiked: Boolean,
+    initialCount: Int,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 18.dp,
+) {
     val signedIn by Session.username.collectAsState()
     var liked by remember(id) { mutableStateOf(initiallyLiked) }
     var count by remember(id) { mutableIntStateOf(initialCount) }
@@ -2105,7 +2117,7 @@ internal fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initia
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .then(
                 if (signedIn == null) Modifier else Modifier.clickable(enabled = !busy) {
@@ -2131,7 +2143,7 @@ internal fun LikeButton(type: Likable, id: Long, initiallyLiked: Boolean, initia
             if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
             if (liked) "Unlike" else "Like",
             tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(iconSize)
         )
         if (count > 0) {
             Spacer(Modifier.width(4.dp))

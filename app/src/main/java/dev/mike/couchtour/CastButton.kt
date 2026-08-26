@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.mediarouter.media.MediaRouter
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.Dp
+
 /**
  * The cast button, and the device picker behind it.
  *
@@ -48,7 +51,11 @@ import androidx.mediarouter.media.MediaRouter
  * to, so it costs nothing on a phone that never sees a Chromecast.
  */
 @Composable
-fun CastButton() {
+fun CastButton(
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 26.dp,
+    tint: Color = LocalContentColor.current,
+) {
     val context = LocalContext.current
     // MediaRouter is main-thread-only, which composition is. It throws on a device with no
     // media route service at all, so it is allowed to simply not exist.
@@ -87,11 +94,12 @@ fun CastButton() {
     val connected = device != null
     if (routes.isEmpty() && !connected) return
 
-    IconButton(onClick = { open = true }) {
+    IconButton(onClick = { open = true }, modifier = modifier) {
         Icon(
             if (connected) Icons.Default.CastConnected else Icons.Default.Cast,
             if (connected) "Casting to $device" else "Cast",
-            tint = if (connected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            tint = if (connected) MaterialTheme.colorScheme.primary else tint,
+            modifier = Modifier.size(iconSize),
         )
     }
 

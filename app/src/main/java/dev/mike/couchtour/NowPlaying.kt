@@ -90,11 +90,19 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { nav.popBackStack() }) {
-                    Icon(Icons.Default.KeyboardArrowDown, "Close", tint = Color.White)
+                IconButton(
+                    onClick = { nav.popBackStack() },
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        "Close",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
                 }
                 Text(
                     if (castDevice != null) "Casting to $castDevice" else state.showTitle,
@@ -106,11 +114,19 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                         .weight(1f)
                         .padding(horizontal = 6.dp),
                 )
-                FeedbackButton(nav)
-                CastButton()
+                FeedbackButton(nav, modifier = Modifier.size(52.dp), iconSize = 28.dp, tint = Color.White)
+                CastButton(modifier = Modifier.size(52.dp), iconSize = 28.dp, tint = Color.White)
                 Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, "More", tint = Color.White)
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        modifier = Modifier.size(52.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            "More",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         val key = state.queueKey
@@ -249,13 +265,19 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     }
                 }
                 if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
-                    LikeTrackButton(state.trackId!!)
+                    LikeTrackButton(
+                        trackId = state.trackId!!,
+                        modifier = Modifier.size(52.dp),
+                        iconSize = 28.dp
+                    )
                 } else if (state.trackId != null && state.trackId?.toLongOrNull() != null) {
                     LikeButton(
-                        Likable.Track,
-                        state.trackId!!.toLong(),
-                        state.likedByUser,
-                        state.likesCount,
+                        type = Likable.Track,
+                        id = state.trackId!!.toLong(),
+                        initiallyLiked = state.likedByUser,
+                        initialCount = state.likesCount,
+                        modifier = Modifier.padding(start = 4.dp),
+                        iconSize = 28.dp
                     )
                 }
             }
@@ -289,7 +311,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
             Row(
                 Modifier
@@ -298,13 +320,21 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { vm.previous() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(28.dp))
+                IconButton(
+                    onClick = { vm.previous() },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SkipPrevious,
+                        "Previous",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
                 }
-                Spacer(Modifier.width(28.dp))
+                Spacer(Modifier.width(36.dp))
                 Box(
                     Modifier
-                        .size(64.dp)
+                        .size(72.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable { vm.togglePlayPause() },
@@ -312,8 +342,8 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 ) {
                     if (state.isBuffering) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(28.dp),
-                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 3.5.dp,
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
@@ -321,13 +351,21 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                             if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             if (state.isPlaying) "Pause" else "Play",
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(34.dp),
+                            modifier = Modifier.size(40.dp),
                         )
                     }
                 }
-                Spacer(Modifier.width(28.dp))
-                IconButton(onClick = { vm.next() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(36.dp))
+                IconButton(
+                    onClick = { vm.next() },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SkipNext,
+                        "Next",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
                 }
             }
         }
