@@ -81,6 +81,13 @@ struct CouchTourApp: App {
                     get: { appModel.playbackSettings.skipFiller },
                     set: { appModel.playbackSettings.skipFiller = $0 }
                 ))
+
+                if player.isCasting {
+                    Divider()
+                    Button("Disconnect Cast (\(player.castDeviceName ?? "Device"))") {
+                        player.disconnectCast()
+                    }
+                }
             }
         }
 

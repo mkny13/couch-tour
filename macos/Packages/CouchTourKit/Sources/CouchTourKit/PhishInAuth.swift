@@ -8,6 +8,8 @@ import Foundation
 /// never stored, matching Android's `TokenStore` exactly.
 public final class PhishInTokenStore {
     private let keychain: KeychainStoring
+    private var memoryJwt: String?
+    private var memoryUsername: String?
 
     private enum Key {
         static let jwt = "phishin.jwt"
@@ -16,19 +18,29 @@ public final class PhishInTokenStore {
 
     public init(keychain: KeychainStoring = SystemKeychain(service: "dev.mike.couchtour.phishin")) {
         self.keychain = keychain
+        self.memoryJwt = keychain.get(forKey: Key.jwt)
+        self.memoryUsername = keychain.get(forKey: Key.username)
     }
 
     public var jwt: String? {
-        get { keychain.get(forKey: Key.jwt) }
-        set { keychain.set(newValue, forKey: Key.jwt) }
+        get { keychain.get(forKey: Key.jwt) ?? memoryJwt }
+        set {
+            memoryJwt = newValue
+            keychain.set(newValue, forKey: Key.jwt)
+        }
     }
 
     public var username: String? {
-        get { keychain.get(forKey: Key.username) }
-        set { keychain.set(newValue, forKey: Key.username) }
+        get { keychain.get(forKey: Key.username) ?? memoryUsername }
+        set {
+            memoryUsername = newValue
+            keychain.set(newValue, forKey: Key.username)
+        }
     }
 
     public func clear() {
+        memoryJwt = nil
+        memoryUsername = nil
         keychain.set(nil, forKey: Key.jwt)
         keychain.set(nil, forKey: Key.username)
     }

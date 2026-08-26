@@ -2830,3 +2830,32 @@ Implemented native background auto-updates and manual update checks for distribu
   - Set `com.apple.security.cs.disable-library-validation: true` and deep code-signing (`codesign --force --deep --sign -`) in `install.sh` / `install-beta.sh` so ad-hoc signed local builds load embedded `Sparkle.framework` without dyld signature validation crashes.
 - **Automated GitHub Release Packaging (`macos-release.yml`):**
   - Added GitHub Actions workflow to build release `.app` bundles, package into `.zip` archives, and upload binaries alongside `appcast.xml` to GitHub Releases.
+
+## Iteration 57 — Desktop Cast & AirPlay Sender Integration on macOS (#10, D196)
+
+### D196 — Google Cast Sender Protocol, Bonjour Discovery, and AirPlay Route Selection (#10)
+
+Brought full remote casting capabilities to Couch Tour's macOS desktop client, mirroring the Android Cast implementation (D58, D62, D64, D68, D81, D187):
+
+- **Portable Google Cast Domain & Protocol Engine (`CouchTourKit`):**
+  - `CastModels.swift`: `CastDevice`, `CastKeys`, and `CastMediaStatus` models.
+  - `CastItemConverter`: Formats track/show metadata and queue items into Cast receiver media dictionaries, with lossless FLAC-to-MP3 fallback stream URL rewrite while preserving `flac_url` in `customData` (D187).
+  - `CastCodec.swift`: Pure Swift encoder/decoder for Google Cast V2 framing (4-byte length prefix + Protobuf packet binary + JSON payloads).
+  - `CastPlaybackStateMachine.swift`: Manages connection lifecycle, request sequencing, heartbeat pings/pongs, receiver status negotiation, media transport commands, and track finish events.
+- **macOS Discovery & TLS Connection (`macos/CouchTour`):**
+  - `CastDiscovery.swift`: Uses Network.framework `NWBrowser` for Bonjour DNS-SD (`_googlecast._tcp.local.`), parsing TXT records (`fn`, `md`, `id`) into a reactive list of available Cast devices.
+  - `CastClient.swift`: Manages TLS `NWConnection` to port 8009 with custom SecTrust handling for Cast devices' self-signed certificates, driving the state machine and dispatching playback updates.
+  - `AirRoutePicker.swift`: Wraps `AVRoutePickerView` via `NSViewRepresentable` for routing audio to AirPlay receivers, Apple TVs, and HomePods.
+- **Player & Transport Integration (`Player.swift`):**
+  - Connects/disconnects Cast receiver sessions, transparently routing play/pause, skip next/previous, seeking, and volume.
+  - Pauses local `queuePlayer` while casting and keeps `ProgressRecorder` / `SyncSession` synchronized with remote playback ticks.
+  - Coming back from the TV lands paused (following D62).
+- **UI Surfaces & Menu Controls (`MiniPlayerView.swift`, `NowPlayingInspector.swift`, `CastRoutePicker.swift`, `CouchTourApp.swift`):**
+  - Added `CastRoutePickerButton` popover in MiniPlayer and Now Playing inspector with live discovered Cast receivers list and embedded AirPlay picker.
+  - Active "Casting to [Device Name]" badge with 1-click disconnect and device switching.
+  - Added "Disconnect Cast" action to macOS Playback menu.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 355/355 tests passing (+9 new Cast tests).
+- macOS Xcode project generation (`xcodegen generate`) and app target build (`xcodebuild`): Build succeeded (`CouchTour`).
+

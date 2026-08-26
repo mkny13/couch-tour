@@ -45,7 +45,7 @@ final class PhishInAPIAuthRequestTests: XCTestCase {
 
         _ = try await PhishInAPI.login(email: "mike@example.com", password: "hunter2")
 
-        XCTAssertEqual("stale-token", server.takeRequest()!.value(forHTTPHeaderField: "X-Auth-Token"))
+        XCTAssertNil(server.takeRequest()!.value(forHTTPHeaderField: "X-Auth-Token"))
     }
 
     func testAuthenticatedRequestsCarryTheTokenAsXAuthTokenNotBearer() async throws {

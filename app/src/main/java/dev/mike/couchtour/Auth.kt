@@ -2,6 +2,7 @@ package dev.mike.couchtour
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -16,35 +17,47 @@ private const val KEY_USERNAME = "username"
 /**
  * Encrypted-at-rest storage for the phish.in JWT.
  *
- * The Android keystore can end up in an unrecoverable state (device restore, key reset),
- * in which case opening the encrypted store throws. Rather than crash on launch, we wipe
- * and retry once, and failing that fall back to holding the token in memory only — the
- * session lasts until the process dies and nothing sensitive is ever written in the clear.
+ * The Android keystore can end up in an unrecoverable state (device restore, key reset), in
+ * which case opening the encrypted store throws [KeyPermanentlyInvalidatedException] — that's
+ * the one case where the previously-written file can never be decrypted again, so we wipe and
+ * retry once. Any other exception (e.g. the keystore not yet unlocked right after a reboot,
+ * which often coincides with installing an update) is treated as transient: we fall back to
+ * holding the token in memory for this launch *without* deleting the file, so a later launch
+ * can still recover the persisted session instead of the user being silently logged out.
+ * Nothing sensitive is ever written in the clear either way.
  */
 class TokenStore(context: Context) {
 
-    private val prefs: SharedPreferences? = open(context) ?: run {
-        context.deleteSharedPreferences(PREFS)
+    private val prefs: SharedPreferences? = try {
         open(context)
+    } catch (e: KeyPermanentlyInvalidatedException) {
+        Log.w("TokenStore", "Keystore key permanently invalidated, wiping and retrying", e)
+        context.deleteSharedPreferences(PREFS)
+        try {
+            open(context)
+        } catch (e2: Exception) {
+            Log.w("TokenStore", "Encrypted prefs unavailable after wipe, session will not persist", e2)
+            null
+        }
+    } catch (e: Exception) {
+        Log.w("TokenStore", "Encrypted prefs unavailable, session will not persist this launch", e)
+        null
     }
 
     private var memoryJwt: String? = null
     private var memoryUsername: String? = null
 
-    private fun open(context: Context): SharedPreferences? = try {
+    private fun open(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
-        EncryptedSharedPreferences.create(
+        return EncryptedSharedPreferences.create(
             context,
             PREFS,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
-    } catch (e: Exception) {
-        Log.w("TokenStore", "Encrypted prefs unavailable, session will not persist", e)
-        null
     }
 
     var jwt: String?

@@ -51,12 +51,13 @@ struct AccountView: View {
     }
 
     private func logIn() {
-        guard !busy, !email.isEmpty, !password.isEmpty else { return }
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !busy, !trimmedEmail.isEmpty, !password.isEmpty else { return }
         busy = true
         error = nil
         Task {
             do {
-                try await session.login(email: email, password: password)
+                try await session.login(email: trimmedEmail, password: password)
                 password = ""
             } catch let apiError as APIException where apiError.unauthorized {
                 error = "Email or password not recognized."

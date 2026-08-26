@@ -15,6 +15,8 @@ struct HomeView: View {
     @State private var isFindingSurprise = false
     @State private var alertMessage: String?
     @State private var tourPickerArtist: ArtistRef?
+    @State private var showAccountSheet = false
+    @State private var showSyncSheet = false
 
     private var mergedArtists: [ArtistRef] {
         mergeArtists(relistenArtists: relistenArtists, favorites: appModel.favorites.keys)
@@ -71,6 +73,30 @@ struct HomeView: View {
         .navigationDestination(for: ShowSummary.self) { ShowDetailView(show: $0) }
         .sheet(item: $tourPickerArtist) { artist in
             TourPickerSheet(artist: artist)
+        }
+        .sheet(isPresented: $showAccountSheet) {
+            NavigationStack {
+                AccountView(session: appModel.phishInSession)
+                    .navigationTitle("Account")
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showAccountSheet = false }
+                        }
+                    }
+            }
+            .frame(minWidth: 420, minHeight: 280)
+        }
+        .sheet(isPresented: $showSyncSheet) {
+            NavigationStack {
+                SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
+                    .navigationTitle("Sync")
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showSyncSheet = false }
+                        }
+                    }
+            }
+            .frame(minWidth: 420, minHeight: 340)
         }
         .task {
             await reloadAll()
@@ -396,31 +422,37 @@ struct HomeView: View {
 
             HStack(spacing: 16) {
                 // Account status
-                HStack(spacing: 10) {
-                    Image(systemName: "person.crop.circle")
-                        .font(.title2)
-                        .foregroundStyle(.tint)
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let username = appModel.phishInSession.username {
-                            Text("Signed in as \(username)")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("phish.in account connected")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("phish.in Account")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("Not signed in")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                Button {
+                    showAccountSheet = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle")
+                            .font(.title2)
+                            .foregroundStyle(.tint)
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let username = appModel.phishInSession.username {
+                                Text("Signed in as \(username)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("phish.in account connected")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("phish.in Account")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("Not signed in · Click to log in")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                .buttonStyle(.plain)
 
                 // Skip filler toggle
                 HStack {
@@ -445,22 +477,28 @@ struct HomeView: View {
                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
 
                 // Sync status
-                HStack(spacing: 10) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.title2)
-                        .foregroundStyle(appModel.syncSession.paired ? .green : .secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sync")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text(appModel.syncSession.paired ? "Paired" : "Not paired")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                Button {
+                    showSyncSheet = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.title2)
+                            .foregroundStyle(appModel.syncSession.paired ? .green : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Sync")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text(appModel.syncSession.paired ? "Paired" : "Not paired · Click to set up")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                .buttonStyle(.plain)
             }
         }
     }

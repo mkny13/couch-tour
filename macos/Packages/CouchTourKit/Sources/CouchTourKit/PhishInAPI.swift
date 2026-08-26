@@ -340,10 +340,10 @@ public enum PhishInAPI {
     private static let decoder: JSONDecoder = JSONDecoder()
     private static let encoder: JSONEncoder = JSONEncoder()
 
-    private static func send(_ request: URLRequest) async throws -> Data {
+    private static func send(_ request: URLRequest, authenticated: Bool = true) async throws -> Data {
         var request = request
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let carriedToken = authToken
+        let carriedToken = authenticated ? authToken : nil
         if let carriedToken { request.setValue(carriedToken, forHTTPHeaderField: "X-Auth-Token") }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIException("No HTTP response") }
@@ -356,12 +356,12 @@ public enum PhishInAPI {
         try await send(URLRequest(url: url))
     }
 
-    private static func post<Body: Encodable>(_ url: URL, body: Body) async throws -> Data {
+    private static func post<Body: Encodable>(_ url: URL, body: Body, authenticated: Bool = true) async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try encoder.encode(body)
-        return try await send(request)
+        return try await send(request, authenticated: authenticated)
     }
 
     private static func delete(_ url: URL) async throws -> Data {
@@ -417,7 +417,7 @@ public enum PhishInAPI {
 
     public static func login(email: String, password: String) async throws -> LoginResponse {
         let url = path("auth", "login").url!
-        let data = try await post(url, body: LoginRequest(email: email, password: password))
+        let data = try await post(url, body: LoginRequest(email: email, password: password), authenticated: false)
         return try decoder.decode(LoginResponse.self, from: data)
     }
 

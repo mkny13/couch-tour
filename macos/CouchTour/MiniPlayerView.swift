@@ -77,6 +77,8 @@ struct MiniPlayerView: View {
                 scrubber
 
                 volumeControl
+
+                CastRoutePickerButton()
             }
             .buttonStyle(.borderless)
             .padding(.horizontal, 16)

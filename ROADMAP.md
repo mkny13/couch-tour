@@ -56,6 +56,9 @@ Historical implementation details and architectural choices are logged separatel
 - **Unified Android Auto Catalog**: Android Auto browse tree unified to the merged artist catalog (Phish, favorites, Relisten bands) (#28, D186).
 - **Native Feedback Launcher**: Direct in-app GitHub issue submission with pre-populated device/environment metadata (#87, D180).
 
+### 7. Desktop Power & Distribution (Shipped — Phase 2 Batch 3)
+- **Desktop Cast & AirPlay Sender Support**: Google Cast sender integration via Bonjour mDNS and TLS V2 channels with remote queue management, transport controls, and AirPlay output picker (#10, D196).
+
 ---
 
 ## Prioritized Product Roadmap
@@ -73,7 +76,6 @@ flowchart LR
         M7["#61 Multi-Level Catalog Cache"]
         M8["#62 Relisten Show Artwork"]
         M9["#60 macOS Auto-Updates (Sparkle)"]
-        M10["#10 Desktop Cast Support"]
     end
 
     subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]
@@ -105,7 +107,6 @@ Focus on advanced audio streaming, caching infrastructure, and richer catalog ex
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS |
 | **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS |
 | **#60** | **macOS Auto-Updates (Sparkle)** | Integrate [Sparkle](https://sparkle-project.org) framework with a hosted appcast feed and signing keys for seamless desktop app updates. | macOS |
-| **#10** | **Desktop Cast Support** | Add Google Cast / AirPlay sender integration into the macOS client. | macOS |
 
 ---
 

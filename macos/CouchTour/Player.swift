@@ -4,13 +4,9 @@ import Combine
 import CouchTourKit
 import MediaPlayer
 
-/// Wraps `AVQueuePlayer` over one show's filtered track list. This is app-target code, not
-/// `CouchTourKit` — like `PlaybackService.kt` on Android, it's inherently coupled to a
-/// platform media framework rather than portable logic (see the plan's M1/M2/M3 split).
-///
-/// `AVQueuePlayer` only ever advances forward through its queue and drains to empty at the
-/// end — there is no "next show" to roll into because only one show's tracks are ever loaded,
-/// so stopping at the encore (D13) is what happens by default, not something coded for.
+/// Wraps `AVQueuePlayer` and remote Google Cast client over one show's filtered track list.
+/// Like `PlaybackService.kt` on Android, it coordinates platform media players, progress recording,
+/// and remote Cast / AirPlay sender integrations.
 ///
 /// Progress writing lives here rather than in the UI, the same call Android's
 /// `PlaybackService` makes — the player itself is what knows when a track actually changed or
@@ -29,12 +25,21 @@ final class Player: NSObject, ObservableObject {
     @Published private(set) var artURL: String?
     @Published private(set) var postShowPrompt: ShowSummary?
 
+    // MARK: - Cast & Remote Routing State
+    @Published private(set) var isCasting = false
+    @Published private(set) var castDeviceName: String?
+    public let castDiscovery = CastDiscovery()
+    public let castClient = CastClient()
+
     /// App-level volume (0...1), independent of system volume — persisted so it survives a
     /// relaunch. `didSet` doesn't fire for the `init` assignment, so `init` also sets
     /// `queuePlayer.volume` directly.
     @Published var volume: Float = UserDefaults.standard.object(forKey: volumeDefaultsKey) as? Float ?? 1.0 {
         didSet {
             queuePlayer.volume = volume
+            if isCasting {
+                castClient.setVolume(Double(volume))
+            }
             UserDefaults.standard.set(volume, forKey: volumeDefaultsKey)
         }
     }
@@ -90,6 +95,7 @@ final class Player: NSObject, ObservableObject {
         configureRemoteCommands()
         configureSpaceKeyMonitor()
         observePlayer()
+        configureCastClient()
     }
 
     deinit {
@@ -98,24 +104,130 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Cast Integration
+
+    private func configureCastClient() {
+        castClient.onPositionTick = { [weak self] pos in
+            guard let self, self.isCasting else { return }
+            self.positionMs = pos
+            self.saveProgress(force: false)
+            self.updateNowPlayingElapsedTime()
+        }
+
+        castClient.onPlaybackStateChanged = { [weak self] playing in
+            guard let self, self.isCasting else { return }
+            self.isPlaying = playing
+            self.updateNowPlayingElapsedTime()
+            self.claimNowPlaying(playing: playing)
+            self.saveProgress(force: true)
+        }
+
+        castClient.onTrackFinished = { [weak self] in
+            guard let self, self.isCasting else { return }
+            self.handleRemoteTrackFinished()
+        }
+    }
+
+    public func connectCast(to device: CastDevice) {
+        isCasting = true
+        castDeviceName = device.name
+        queuePlayer.pause()
+
+        castClient.connect(to: device)
+        if let track = currentTrack {
+            castClient.load(
+                track: track,
+                show: show,
+                queueKey: queueKey,
+                resumePositionMs: positionMs
+            )
+            castClient.setVolume(Double(volume))
+        }
+        updateNowPlayingInfo()
+    }
+
+    public func disconnectCast() {
+        guard isCasting else { return }
+        let currentPos = positionMs
+        let wasPlaying = isPlaying
+
+        castClient.disconnect()
+        isCasting = false
+        castDeviceName = nil
+
+        // D62: Coming back from the TV lands paused
+        isPlaying = false
+        if let currentTrack, let currentIndex {
+            startQueue(tracks: tracks, startIndex: currentIndex, resumePositionMs: currentPos)
+            queuePlayer.pause()
+        }
+        updateNowPlayingInfo()
+        saveProgress(force: true)
+    }
+
+    private func handleRemoteTrackFinished() {
+        guard let currentIndex else { return }
+        let nextIndex = currentIndex + 1
+        if tracks.indices.contains(nextIndex) {
+            seek(toTrack: nextIndex)
+        } else {
+            // Show finished
+            recorder.markFinished(queueKey: queueKey)
+            self.currentIndex = nil
+            self.isPlaying = false
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            MPNowPlayingInfoCenter.default().playbackState = .stopped
+            if let finishedShow = self.show {
+                Task { @MainActor [weak self] in
+                    let nextStop = await findNextTourStop(
+                        artist: finishedShow.artist,
+                        currentDate: finishedShow.date,
+                        tourName: finishedShow.tourName
+                    )
+                    if let self, self.currentIndex == nil {
+                        self.postShowPrompt = nextStop
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Queue Playback
+
     /// Starts a queue-key-bearing show or recording. `resumePositionMs`, when non-zero, is
     /// applied once the starting track is actually ready — see `pendingResumeMs`.
     func play(detail: ShowDetail, startIndex: Int = 0, resumePositionMs: Int64 = 0) {
         show = detail.summary
         queueKey = detail.queueKey
-        // Same fallback Android's recordingTrackItems uses: the show's own art, else the
-        // first track's, since a Relisten show summary often carries no art of its own.
         artURL = detail.summary.artURL ?? detail.tracks.first?.artURL
         loadArtwork(for: artURL)
-        startQueue(tracks: detail.tracks, startIndex: startIndex, resumePositionMs: resumePositionMs)
+
+        let filtered = filterPlaybackTracks(
+            tracks: detail.tracks,
+            startIndex: startIndex,
+            skipFiller: playbackSettings?.skipFiller ?? false
+        )
+        self.tracks = filtered.tracks
+        self.currentIndex = filtered.startIndex
+        postShowPrompt = nil
+
+        if isCasting, let track = currentTrack {
+            positionMs = resumePositionMs
+            castClient.load(
+                track: track,
+                show: show,
+                queueKey: queueKey,
+                resumePositionMs: resumePositionMs
+            )
+            updateNowPlayingInfo()
+            claimNowPlaying(playing: true)
+            saveProgress(force: true)
+        } else {
+            startQueue(tracks: detail.tracks, startIndex: startIndex, resumePositionMs: resumePositionMs)
+        }
     }
 
-    /// Fetches and caches the `NSImage` for the system Now Playing widget (D107). Guards
-    /// against a stale load landing after the show has already changed again.
     private func loadArtwork(for urlString: String?) {
-        // Cleared synchronously rather than left stale until the new fetch resolves — otherwise
-        // switching shows could briefly attach the previous show's art to the new track's
-        // Now Playing metadata.
         artworkImage = nil
         guard let urlString, let url = URL(string: urlString) else {
             artworkLoadURL = nil
@@ -134,31 +246,57 @@ final class Player: NSObject, ObservableObject {
     }
 
     func togglePlayPause() {
-        if queuePlayer.rate == 0 {
-            queuePlayer.play()
+        if isCasting {
+            if isPlaying {
+                castClient.pause()
+            } else {
+                castClient.play()
+            }
         } else {
-            queuePlayer.pause()
+            if queuePlayer.rate == 0 {
+                queuePlayer.play()
+            } else {
+                queuePlayer.pause()
+            }
         }
     }
 
     func skipToNext() {
-        queuePlayer.advanceToNextItem()
+        if isCasting {
+            guard let currentIndex, currentIndex < tracks.count - 1 else { return }
+            seek(toTrack: currentIndex + 1)
+        } else {
+            queuePlayer.advanceToNextItem()
+        }
     }
 
-    /// `AVQueuePlayer` has no notion of "previous" — it only ever advances. Going back means
-    /// rebuilding the queue from one track earlier, the same path `seek(toTrack:)` uses.
     func skipToPrevious() {
         guard let currentIndex, currentIndex > 0 else { return }
         seek(toTrack: currentIndex - 1)
     }
 
     func seek(toTrack index: Int) {
-        startQueue(tracks: tracks, startIndex: index)
+        guard tracks.indices.contains(index) else { return }
+        if isCasting {
+            currentIndex = index
+            positionMs = 0
+            if let track = currentTrack {
+                castClient.load(track: track, show: show, queueKey: queueKey, resumePositionMs: 0)
+            }
+            updateNowPlayingInfo()
+            saveProgress(force: true)
+        } else {
+            startQueue(tracks: tracks, startIndex: index)
+        }
     }
 
     func seek(toMs ms: Int64) {
-        queuePlayer.seek(to: CMTime(value: ms, timescale: 1000))
         positionMs = ms
+        if isCasting {
+            castClient.seek(toMs: ms)
+        } else {
+            queuePlayer.seek(to: CMTime(value: ms, timescale: 1000))
+        }
         updateNowPlayingElapsedTime()
         saveProgress(force: true)
     }
@@ -186,8 +324,6 @@ final class Player: NSObject, ObservableObject {
         observeCurrentItemReadyForResume()
         queuePlayer.play()
         updateNowPlayingInfo()
-        // Force .playing before the rate KVO fires — media keys stay with Spotify
-        // if we claim the Now Playing slot while still .paused (D179).
         claimNowPlaying(playing: true)
         saveProgress(force: true)
     }
@@ -200,29 +336,27 @@ final class Player: NSObject, ObservableObject {
         }
         rateObservation = queuePlayer.observe(\.rate, options: [.new]) { [weak self] _, change in
             Task { @MainActor in
-                self?.isPlaying = (change.newValue ?? 0) > 0
-                self?.updateNowPlayingElapsedTime()
-                // Re-claim on every transition to playing — Spotify will have taken
-                // the session if anything played there while we were paused.
-                if (change.newValue ?? 0) > 0 { self?.claimNowPlaying(playing: true) }
-                self?.saveProgress(force: true)
+                guard let self, !self.isCasting else { return }
+                self.isPlaying = (change.newValue ?? 0) > 0
+                self.updateNowPlayingElapsedTime()
+                if (change.newValue ?? 0) > 0 { self.claimNowPlaying(playing: true) }
+                self.saveProgress(force: true)
             }
         }
         timeObserverToken = queuePlayer.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
-            guard let self, time.isValid, !time.isIndefinite else { return }
+            guard let self, !self.isCasting, time.isValid, !time.isIndefinite else { return }
             self.positionMs = Int64(time.seconds * 1000)
             self.saveProgress(force: false)
         }
     }
 
     private func currentItemDidChange() {
+        guard !isCasting else { return }
         guard let item = queuePlayer.currentItem,
               let index = items.firstIndex(where: { $0 === item }) else {
-            // The queue drained — the show finished. Nothing to advance into (D13). The
-            // stopping point stays exactly as last saved; only the flag changes (D20).
             recorder.markFinished(queueKey: queueKey)
             currentIndex = nil
             isPlaying = false
@@ -260,8 +394,6 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
-    /// Applies `pendingResumeMs` the moment the just-started item is actually ready — seeking
-    /// any earlier is silently dropped by AVFoundation.
     private func observeCurrentItemReadyForResume() {
         guard let item = queuePlayer.currentItem else { return }
         itemStatusObservation = item.observe(\.status, options: [.new]) { [weak self] observedItem, _ in
@@ -279,8 +411,6 @@ final class Player: NSObject, ObservableObject {
             queueKey: queueKey, show: show, track: currentTrack, trackIndex: currentIndex,
             positionMs: positionMs, artURL: artURL, force: force
         )
-        // Only on the same events that bypass the local 5s throttle — the periodic tick
-        // shouldn't also be resetting a sync debounce every half-second.
         if force, let syncSession, let progressStore {
             syncSession.requestDebouncedPush(progressStore)
         }
@@ -292,7 +422,6 @@ final class Player: NSObject, ObservableObject {
         spaceKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard SpacePlaybackHotkey.shouldHandle(event, firstResponder: NSApp.keyWindow?.firstResponder)
             else { return event }
-            // Held Space would otherwise toggle on every repeat tick.
             if !event.isARepeat {
                 Task { @MainActor in self?.togglePlayPause() }
             }
@@ -300,10 +429,6 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
-    /// Publish `playbackState` on the shared Now Playing center. macOS does not
-    /// infer this from AVPlayer (iOS does), and the keyboard play/pause key follows
-    /// whichever app last set `.playing` — leaving it unset is why Spotify kept
-    /// the key while we were the ones making sound (D179).
     private func claimNowPlaying(playing: Bool? = nil) {
         let center = MPNowPlayingInfoCenter.default()
         if let playing {
@@ -317,7 +442,7 @@ final class Player: NSObject, ObservableObject {
         let center = MPNowPlayingInfoCenter.default()
         if currentTrack == nil {
             center.playbackState = .stopped
-        } else if queuePlayer.rate > 0 {
+        } else if isPlaying {
             center.playbackState = .playing
         } else {
             center.playbackState = .paused
@@ -328,11 +453,23 @@ final class Player: NSObject, ObservableObject {
         let center = MPRemoteCommandCenter.shared()
 
         center.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.queuePlayer.play() }
+            Task { @MainActor in
+                if self?.isCasting == true {
+                    self?.castClient.play()
+                } else {
+                    self?.queuePlayer.play()
+                }
+            }
             return .success
         }
         center.pauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.queuePlayer.pause() }
+            Task { @MainActor in
+                if self?.isCasting == true {
+                    self?.castClient.pause()
+                } else {
+                    self?.queuePlayer.pause()
+                }
+            }
             return .success
         }
         center.togglePlayPauseCommand.addTarget { [weak self] _ in
@@ -354,10 +491,6 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
-    /// Full metadata — called on track change. Title/artist/album mirror the Android
-    /// MediaSession exactly (MediaItems.kt's `coreMediaItem`/`albumFor`, D50): album is the
-    /// show the track was actually played at, which is what lets an external scrobbler like
-    /// the Last.fm app work from this MediaPlayer info alone.
     private func updateNowPlayingInfo() {
         guard let track = currentTrack, let show else {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
@@ -371,9 +504,6 @@ final class Player: NSObject, ObservableObject {
         info[MPMediaItemPropertyPlaybackDuration] = Double(track.durationMs) / 1000
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
-        // Rebuilt from a stored image rather than fetched here — this method reconstructs the
-        // whole dictionary on every track change, and the async fetch in loadArtwork(for:) may
-        // not have completed yet when that happens.
         if let artworkImage {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artworkImage.size) { _ in artworkImage }
         }
@@ -381,8 +511,6 @@ final class Player: NSObject, ObservableObject {
         applyPlaybackState()
     }
 
-    /// The lightweight per-tick update — only the elapsed-time key changes while a track
-    /// plays, so this avoids rebuilding the whole dictionary every 0.5s.
     private func updateNowPlayingElapsedTime() {
         guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000
@@ -391,8 +519,6 @@ final class Player: NSObject, ObservableObject {
         applyPlaybackState()
     }
 
-    /// "1997-11-17 · McNichols Arena", falling back to the show summary when a track carries
-    /// no show info of its own — port of `albumFor` in Android's MediaItems.kt.
     private func albumTitle(for track: PlayableTrack, show: ShowSummary) -> String {
         let fromTrack = [track.showDate, track.venueName].compactMap { $0 }.joined(separator: " · ")
         if !fromTrack.isEmpty { return fromTrack }

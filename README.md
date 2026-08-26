@@ -113,7 +113,7 @@ parts of casting that don't need a Chromecast — that queue items declare a MIM
 that the queue survives the round trip through a receiver. Report lands at
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-346 macOS package tests under `macos/Packages/CouchTourKit`:
+355 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test
