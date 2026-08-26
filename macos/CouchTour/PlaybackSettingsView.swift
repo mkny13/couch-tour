@@ -4,6 +4,7 @@ import SwiftUI
 /// Playback preferences tab in macOS Settings (⌘,) (#49).
 struct PlaybackSettingsView: View {
     @ObservedObject var settings: PlaybackSettings
+    @ObservedObject var updater: UpdaterViewModel
 
     var body: some View {
         Form {
@@ -13,18 +14,13 @@ struct PlaybackSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section {
-                #if BETA
-                Button("Update Couch Tour Beta...") {
-                    AppModel.launchUpdateScript()
+            Section("Software Updates") {
+                Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
+                Button("Check for Updates...") {
+                    updater.checkForUpdates()
                 }
+                .disabled(!updater.canCheckForUpdates)
                 .frame(maxWidth: .infinity, alignment: .center)
-                #else
-                Button("Update Couch Tour...") {
-                    AppModel.launchUpdateScript()
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                #endif
             }
             Section {
                 Text(Bundle.main.appVersionString)

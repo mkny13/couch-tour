@@ -49,11 +49,12 @@ struct RootView: View {
                         Text(Bundle.main.appVersionString)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        Button(updateButtonTitle) {
-                            AppModel.launchUpdateScript()
+                        Button("Check for Updates...") {
+                            appModel.checkForUpdates()
                         }
                         .buttonStyle(.link)
                         .font(.caption2)
+                        .disabled(!appModel.updater.canCheckForUpdates)
                     }
                     .padding(.vertical, 8)
                 }

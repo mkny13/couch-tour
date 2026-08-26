@@ -29,15 +29,10 @@ struct CouchTourApp: App {
         }
         .commands {
             CommandGroup(after: .appInfo) {
-                #if BETA
-                Button("Check for Beta Updates...") {
-                    AppModel.launchUpdateScript()
-                }
-                #else
                 Button("Check for Updates...") {
-                    AppModel.launchUpdateScript()
+                    appModel.checkForUpdates()
                 }
-                #endif
+                .disabled(!appModel.updater.canCheckForUpdates)
             }
 
             CommandGroup(after: .sidebar) {
@@ -96,7 +91,7 @@ struct CouchTourApp: App {
         // section or its own window, same reasoning. Playback settings (#49) forms the third tab.
         Settings {
             TabView {
-                PlaybackSettingsView(settings: appModel.playbackSettings)
+                PlaybackSettingsView(settings: appModel.playbackSettings, updater: appModel.updater)
                     .tabItem { Label("Playback", systemImage: "play.circle") }
                 AccountView(session: appModel.phishInSession)
                     .tabItem { Label("Account", systemImage: "person.circle") }

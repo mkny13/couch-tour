@@ -13,6 +13,9 @@ options:
 packages:
   CouchTourKit:
     path: Packages/CouchTourKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    version: 2.6.4
 
 targets:
   CouchTour:
@@ -24,6 +27,8 @@ targets:
     dependencies:
       - package: CouchTourKit
         product: CouchTourKit
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.mike.couchtour.mac
@@ -42,6 +47,9 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
+        SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml"
+        SUPublicEDKey: "n+C3drmqPeBN9G7dNDgkGknwMkHW99Y7CIGfXxx44WA="
+        SUEnableAutomaticChecks: true
     entitlements:
       path: Generated/CouchTour.entitlements
       properties:
@@ -62,6 +70,8 @@ targets:
     dependencies:
       - package: CouchTourKit
         product: CouchTourKit
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.mike.couchtour.mac.beta
@@ -81,6 +91,9 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
+        SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml"
+        SUPublicEDKey: "n+C3drmqPeBN9G7dNDgkGknwMkHW99Y7CIGfXxx44WA="
+        SUEnableAutomaticChecks: true
     entitlements:
       path: Generated/CouchTourBeta/CouchTour.entitlements
       properties:

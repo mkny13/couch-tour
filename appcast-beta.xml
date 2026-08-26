@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Couch Tour Beta Changelog</title>
+    <link>https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml</link>
+    <description>Most recent changes with links to updates.</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.53-beta</title>
+      <sparkle:releaseNotesLink>https://github.com/mkny13/couch-tour/releases/tag/v0.53</sparkle:releaseNotesLink>
+      <pubDate>Wed, 26 Aug 2026 11:58:36 +0000</pubDate>
+      <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.53/CouchTourBeta-v0.53.zip" sparkle:version="0.53-beta" sparkle:shortVersionString="0.53-beta" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

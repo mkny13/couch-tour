@@ -28,6 +28,7 @@ final class AppModel: ObservableObject {
     #else
     let phishInSession = PhishInSession()
     #endif
+    let updater = UpdaterViewModel()
     /// Whether the Now Playing inspector is open. Lives here, not as local `@State` in
     /// RootView, because CouchTourApp's View-menu toggle needs to reach it too.
     @Published var showNowPlaying = false
@@ -62,6 +63,10 @@ final class AppModel: ObservableObject {
     func syncNow() {
         guard let progressStore else { return }
         Task { try? await syncSession.sync(progressStore) }
+    }
+
+    func checkForUpdates() {
+        updater.checkForUpdates()
     }
 
     static func launchUpdateScript() {

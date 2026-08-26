@@ -1,0 +1,75 @@
+name: Build and Release macOS App
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v0.51 or v0.53)"
+        required: true
+        type: string
+      is_beta:
+        description: "Build beta target (CouchTourBeta)"
+        required: false
+        type: boolean
+        default: false
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install tools
+        run: |
+          brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          cd macos
+          xcodegen generate
+
+      - name: Build macOS app
+        env:
+          IS_BETA: ${{ inputs.is_beta || github.event.release.prerelease }}
+          TAG_NAME: ${{ inputs.release_tag || github.event.release.tag_name }}
+        run: |
+          tag="${TAG_NAME:-$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.51")}"
+          clean_ver="${tag#v}"
+          
+          if [ "$IS_BETA" = "true" ]; then
+            scheme="CouchTourBeta"
+            app_name="Couch Tour Beta.app"
+            zip_name="CouchTourBeta-${tag}.zip"
+            version="${clean_ver}-beta"
+          else
+            scheme="CouchTour"
+            app_name="Couch Tour.app"
+            zip_name="CouchTour-${tag}.zip"
+            version="${clean_ver}"
+          fi
+          
+          cd macos
+          xcodebuild -project CouchTour.xcodeproj -scheme "$scheme" \
+            -configuration Release -destination 'platform=macOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION="$version" build
+            
+          cd build/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent "$app_name" "$zip_name"
+          
+          echo "ZIP_PATH=macos/build/Build/Products/Release/$zip_name" >> $GITHUB_ENV
+          echo "ZIP_NAME=$zip_name" >> $GITHUB_ENV
+          echo "TAG_NAME=$tag" >> $GITHUB_ENV
+
+      - name: Upload zip to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$TAG_NAME" "$ZIP_PATH" --clobber
