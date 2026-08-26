@@ -6,12 +6,12 @@
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
-            <title>0.55-beta-beta</title>
-            <pubDate>Wed, 26 Aug 2026 19:49:13 +0000</pubDate>
-            <sparkle:version>1</sparkle:version>
-            <sparkle:shortVersionString>0.55-beta-beta</sparkle:shortVersionString>
+            <title>0.56-beta</title>
+            <pubDate>Wed, 26 Aug 2026 19:55:01 +0000</pubDate>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>0.56-beta</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.55-beta/CouchTourBeta-v0.55-beta.zip" length="7192342" type="application/octet-stream" sparkle:edSignature="AiNAlWpTVmtBnVs1hHqq/jEXVzLu4CKxW/oNEibxIcxIk82fJFrkCZhvDfqpOqi4jR4gAdWUDTm6JJhFQasIDQ=="/>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.56-beta/CouchTourBeta-v0.56-beta.zip" length="7192343" type="application/octet-stream" sparkle:edSignature="QhVRulNrj5Pf5IuDksYrVD8AQmj170rPDjoSGjI3GmTUafGfIKZjNms1djbHLhsJMAbGACKB4TLJXUn8mDxEDg=="/>
         </item>
         <item>
             <title>Version 0.53-beta</title>
