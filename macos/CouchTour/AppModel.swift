@@ -34,7 +34,7 @@ final class AppModel: ObservableObject {
     /// The sidebar's current section. Lives here rather than as `@State` in RootView for the
     /// same reason `showNowPlaying` does — CouchTourApp's ⌘F command switches to Search from
     /// outside RootView.
-    @Published var selection: SidebarSection? = .artists
+    @Published var selection: SidebarSection? = .home
     /// Set true to ask SearchView to focus its search field, then cleared by SearchView once
     /// it does — a one-shot signal rather than persistent state, so it doesn't fight the
     /// field's own focus once the user starts typing.
@@ -66,27 +66,16 @@ final class AppModel: ObservableObject {
 
     static func launchUpdateScript() {
         #if BETA
-        let scriptName = "scripts/install-beta.sh"
+        let scriptName = "scripts/install-beta.command"
         #else
-        let scriptName = "scripts/install.sh"
+        let scriptName = "scripts/install.command"
         #endif
         let baseURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
 
         let scriptURL = baseURL.appendingPathComponent(scriptName)
-        let path = scriptURL.path
-
-        let appleScript = """
-        tell application "Terminal"
-            activate
-            do script "exec '\(path)'"
-        end tell
-        """
-        if let script = NSAppleScript(source: appleScript) {
-            var error: NSDictionary?
-            script.executeAndReturnError(&error)
-        }
+        NSWorkspace.shared.open(scriptURL)
     }
 }
 

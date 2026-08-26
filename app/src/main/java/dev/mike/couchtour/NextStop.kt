@@ -106,26 +106,75 @@ internal fun oldestUnplayed(candidates: List<ShowSummary>, played: Set<String>):
         .minWithOrNull(compareBy({ it.date }, { it.artist.key }))
 
 /**
- * Fetches every favorited artist's current-tour shows, within [MAX_TOUR_ARTISTS] per backend.
+ * Fetches every favorited artist's current-tour shows, within [MAX_TOUR_ARTISTS] per backend,
+ * taking into account any configured [ArtistTourPreferenceEntity] for defunct or specific-tour tracking.
  * Artists are fanned out concurrently; each artist's own fetch is wrapped in [runCatching] so
  * one backend erroring costs only its own result, matching [OnThisDate]'s degrade-not-fail
  * shape. [source] is injectable so this runs without a network call in tests.
  */
 suspend fun currentTours(
     favorites: List<ArtistRef>,
+    preferences: Map<String, ArtistTourPreferenceEntity> = emptyMap(),
     source: (Backend) -> MusicSource = ::sourceFor,
 ): List<ShowSummary> = coroutineScope {
     val participating = favorites.groupBy { it.backend }
         .flatMap { (_, artists) -> artists.take(MAX_TOUR_ARTISTS) }
 
     participating
-        .map { artist -> async { runCatching { tourFor(artist, source) }.getOrDefault(emptyList()) } }
+        .map { artist ->
+            val pref = preferences[artist.key] ?: preferences[artist.id]
+            async { runCatching { tourFor(artist, pref, source) }.getOrDefault(emptyList()) }
+        }
         .awaitAll()
         .flatten()
 }
 
-private suspend fun tourFor(artist: ArtistRef, source: (Backend) -> MusicSource): List<ShowSummary> = coroutineScope {
+/**
+ * Resolves tour shows for an artist. If [preference] is specified (tour or year), candidate shows
+ * are filtered/fetched accordingly. Otherwise, standard current tour resolution is applied.
+ */
+internal suspend fun tourFor(
+    artist: ArtistRef,
+    preference: ArtistTourPreferenceEntity? = null,
+    source: (Backend) -> MusicSource = ::sourceFor,
+): List<ShowSummary> = coroutineScope {
     val src = source(artist.backend)
+
+    if (preference != null) {
+        val prefTour = preference.tourName?.takeIf { it.isNotBlank() && it != NOT_PART_OF_A_TOUR }
+        val prefYear = preference.year?.takeIf { it.isNotBlank() }
+
+        if (prefTour != null) {
+            val allPeriods = src.periods(artist).filter { it.id != POPULAR_PERIOD_ID }
+            val candidatePeriods = if (prefYear != null) {
+                allPeriods.filter { it.label == prefYear || it.id == prefYear || it.label.contains(prefYear) }
+                    .ifEmpty { allPeriods }
+            } else {
+                allPeriods
+            }
+            val shows = candidatePeriods
+                .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
+                .awaitAll()
+                .flatten()
+            val matches = shows.filter { it.tourName == prefTour }
+            if (matches.isNotEmpty()) {
+                return@coroutineScope matches
+            }
+        }
+
+        if (prefYear != null) {
+            val allPeriods = src.periods(artist).filter { it.id != POPULAR_PERIOD_ID }
+            val yearPeriods = allPeriods.filter { it.label == prefYear || it.id == prefYear || it.label.contains(prefYear) }
+            val shows = yearPeriods
+                .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
+                .awaitAll()
+                .flatten()
+            if (shows.isNotEmpty()) {
+                return@coroutineScope shows
+            }
+        }
+    }
+
     val periods = recentPeriods(src.periods(artist))
     val shows = periods
         .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
@@ -136,21 +185,35 @@ private suspend fun tourFor(artist: ArtistRef, source: (Backend) -> MusicSource)
 
 /**
  * The Home screen's entry point: [currentTours] behind a one-entry in-memory cache, the same
- * shape as [OnThisDate] — keyed on the date plus the favorited artists, since that's exactly
+ * shape as [OnThisDate] — keyed on the date plus the favorited artists and preferences, since that's exactly
  * what the network fetch depends on. The unplayed filter is deliberately *not* part of this
  * cache; apply [oldestUnplayed] to the result against a live finished-keys set instead.
  */
 object NextStop {
     @Volatile internal var cached: Pair<String, List<ShowSummary>>? = null
 
-    internal fun cacheKey(favorites: List<ArtistRef>, today: String): String =
-        today + "|" + favorites.map { it.key }.sorted().joinToString(",")
+    internal fun cacheKey(
+        favorites: List<ArtistRef>,
+        today: String,
+        preferences: Map<String, ArtistTourPreferenceEntity> = emptyMap(),
+    ): String {
+        val favsKey = favorites.map { it.key }.sorted().joinToString(",")
+        val prefsKey = preferences.entries
+            .sortedBy { it.key }
+            .joinToString(",") { "${it.key}:${it.value.tourName.orEmpty()}:${it.value.year.orEmpty()}" }
+        return "$today|$favsKey|$prefsKey"
+    }
 
-    suspend fun load(favorites: List<ArtistRef>, today: String): List<ShowSummary> {
+    suspend fun load(
+        favorites: List<ArtistRef>,
+        today: String,
+        preferences: Map<String, ArtistTourPreferenceEntity> = emptyMap(),
+        source: (Backend) -> MusicSource = ::sourceFor,
+    ): List<ShowSummary> {
         if (favorites.isEmpty()) return emptyList()
-        val key = cacheKey(favorites, today)
+        val key = cacheKey(favorites, today, preferences)
         cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
-        val shows = currentTours(favorites)
+        val shows = currentTours(favorites, preferences, source)
         cached = key to shows
         return shows
     }

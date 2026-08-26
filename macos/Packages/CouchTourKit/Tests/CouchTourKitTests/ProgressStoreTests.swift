@@ -297,4 +297,176 @@ final class ProgressStoreTests: XCTestCase {
     func testHistoryArtistsOfAnEmptyHistoryIsEmpty() throws {
         XCTAssertEqual([], historyArtists(try store.history()))
     }
+
+    // ------------------------------------------------ MARK: - Artist Tour Preferences (#68)
+
+    func testSaveAndGetTourPreference() throws {
+        let pref = ArtistTourPreference(
+            artistKey: "relisten:grateful-dead",
+            tourName: "Spring 1977",
+            year: "1977",
+            updatedAt: 12_345
+        )
+        try store.saveTourPreference(pref)
+
+        let retrieved = try store.getTourPreference(artistKey: "relisten:grateful-dead")
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual("relisten:grateful-dead", retrieved?.artistKey)
+        XCTAssertEqual("Spring 1977", retrieved?.tourName)
+        XCTAssertEqual("1977", retrieved?.year)
+        XCTAssertEqual(12_345, retrieved?.updatedAt)
+    }
+
+    func testSaveTourPreferenceConvenienceMethod() throws {
+        try store.saveTourPreference(
+            artistKey: "relisten:jgb",
+            tourName: "Fall 1989",
+            year: "1989",
+            now: 54_321
+        )
+
+        let retrieved = try store.getTourPreference(artistKey: "relisten:jgb")
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual("relisten:jgb", retrieved?.artistKey)
+        XCTAssertEqual("Fall 1989", retrieved?.tourName)
+        XCTAssertEqual("1989", retrieved?.year)
+        XCTAssertEqual(54_321, retrieved?.updatedAt)
+    }
+
+    func testUpdateTourPreferenceOverwritesPrevious() throws {
+        let pref1 = ArtistTourPreference(
+            artistKey: "relisten:grateful-dead",
+            tourName: "Spring 1977",
+            year: "1977",
+            updatedAt: 1_000
+        )
+        try store.saveTourPreference(pref1)
+
+        let pref2 = ArtistTourPreference(
+            artistKey: "relisten:grateful-dead",
+            tourName: "Europe '72",
+            year: "1972",
+            updatedAt: 2_000
+        )
+        try store.saveTourPreference(pref2)
+
+        let retrieved = try store.getTourPreference(artistKey: "relisten:grateful-dead")
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual("Europe '72", retrieved?.tourName)
+        XCTAssertEqual("1972", retrieved?.year)
+        XCTAssertEqual(2_000, retrieved?.updatedAt)
+
+        let all = try store.getAllTourPreferences()
+        XCTAssertEqual(1, all.count)
+    }
+
+    func testGetAllTourPreferencesOrderedByUpdatedAtDesc() throws {
+        try store.saveTourPreference(ArtistTourPreference(artistKey: "artist:a", tourName: "Tour A", year: "1991", updatedAt: 100))
+        try store.saveTourPreference(ArtistTourPreference(artistKey: "artist:b", tourName: "Tour B", year: "1992", updatedAt: 300))
+        try store.saveTourPreference(ArtistTourPreference(artistKey: "artist:c", tourName: "Tour C", year: "1993", updatedAt: 200))
+
+        let all = try store.getAllTourPreferences()
+        XCTAssertEqual(["artist:b", "artist:c", "artist:a"], all.map { $0.artistKey })
+    }
+
+    func testDeleteTourPreference() throws {
+        let pref = ArtistTourPreference(artistKey: "relisten:grateful-dead", tourName: "1977", year: "1977")
+        try store.saveTourPreference(pref)
+        XCTAssertNotNil(try store.getTourPreference(artistKey: "relisten:grateful-dead"))
+
+        try store.deleteTourPreference(artistKey: "relisten:grateful-dead")
+        XCTAssertNil(try store.getTourPreference(artistKey: "relisten:grateful-dead"))
+    }
+
+    func testDeleteNonExistentTourPreferenceIsNoOp() throws {
+        try store.saveTourPreference(ArtistTourPreference(artistKey: "artist:a", tourName: "Tour A", year: "1991"))
+        XCTAssertNoThrow(try store.deleteTourPreference(artistKey: "artist:nonexistent"))
+        XCTAssertEqual(1, try store.getAllTourPreferences().count)
+    }
+
+    func testTrackedTourStoreSharingProgressStore() throws {
+        let trackedStore = try TrackedTourStore(sharing: store)
+
+        let pref = ArtistTourPreference(artistKey: "relisten:wsp", tourName: "Spring 1996", year: "1996", updatedAt: 9_999)
+        try trackedStore.savePreference(pref)
+
+        let fromProgressStore = try store.getTourPreference(artistKey: "relisten:wsp")
+        let fromTrackedStore = try trackedStore.preference(for: "relisten:wsp")
+
+        XCTAssertEqual(pref, fromProgressStore)
+        XCTAssertEqual(pref, fromTrackedStore)
+
+        let all = try trackedStore.allPreferences()
+        XCTAssertEqual(1, all.count)
+        XCTAssertEqual("relisten:wsp", all.first?.artistKey)
+
+        try trackedStore.deletePreference(for: "relisten:wsp")
+        XCTAssertNil(try store.getTourPreference(artistKey: "relisten:wsp"))
+        XCTAssertNil(try trackedStore.preference(for: "relisten:wsp"))
+    }
+
+    func testV9MigrationPreservesExistingData() throws {
+        let queue = try DatabaseQueue()
+
+        var partialMigrator = DatabaseMigrator()
+        partialMigrator.registerMigration("v6_initial") { db in
+            try db.create(table: "progress") { t in
+                t.column("queueKey", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("subtitle", .text).notNull()
+                t.column("artUrl", .text)
+                t.column("trackIndex", .integer).notNull()
+                t.column("positionMs", .integer).notNull()
+                t.column("trackTitle", .text).notNull()
+                t.column("updatedAt", .integer).notNull()
+                t.column("finished", .boolean).notNull().defaults(to: false)
+                t.column("dismissed", .boolean).notNull().defaults(to: false)
+                t.column("artist", .text).notNull().defaults(to: "")
+            }
+        }
+        partialMigrator.registerMigration("v7_deletedAt") { db in
+            try db.alter(table: "progress") { t in
+                t.add(column: "deletedAt", .integer)
+            }
+        }
+        try partialMigrator.migrate(queue)
+
+        // Insert pre-migration row
+        try queue.write { db in
+            let prog = self.progress(key: "show:1997-11-17", trackIndex: 3, positionMs: 12_000)
+            try prog.save(db)
+        }
+
+        // Now run full migrator including v9_artistTourPreferences
+        var fullMigrator = partialMigrator
+        fullMigrator.registerMigration("v9_artistTourPreferences") { db in
+            try db.create(table: "artist_tour_preferences") { t in
+                t.column("artistKey", .text).primaryKey()
+                t.column("tourName", .text)
+                t.column("year", .text)
+                t.column("updatedAt", .integer).notNull()
+            }
+        }
+        try fullMigrator.migrate(queue)
+
+        // Verify pre-existing data is intact
+        try queue.read { db in
+            let prog = try PlaybackProgress.fetchOne(db, key: "show:1997-11-17")
+            XCTAssertNotNil(prog)
+            XCTAssertEqual(3, prog?.trackIndex)
+            XCTAssertEqual(12_000, prog?.positionMs)
+        }
+
+        // Verify artist_tour_preferences table works on migrated database
+        try queue.write { db in
+            let pref = ArtistTourPreference(artistKey: "relisten:grateful-dead", tourName: "Spring 1977", year: "1977")
+            try pref.save(db)
+        }
+
+        try queue.read { db in
+            let pref = try ArtistTourPreference.fetchOne(db, key: "relisten:grateful-dead")
+            XCTAssertNotNil(pref)
+            XCTAssertEqual("Spring 1977", pref?.tourName)
+        }
+    }
 }

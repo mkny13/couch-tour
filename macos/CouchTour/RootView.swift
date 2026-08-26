@@ -2,18 +2,20 @@ import AppKit
 import SwiftUI
 
 enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
+    case home = "Home"
     case continueListening = "Continue Listening"
     case artists = "Artists"
-    case search = "Search"
-    case history = "History"
     /// Account-free, spans both backends (#59) — its own top-level section rather than
     /// nested under Artists, the same peer-level placement Account/Sync got in Settings.
     case playlists = "Playlists"
+    case history = "History"
+    case search = "Search"
 
     var id: String { rawValue }
 
     var systemImage: String {
         switch self {
+        case .home: return "house"
         case .continueListening: return "play.circle"
         case .artists: return "music.mic"
         case .search: return "magnifyingglass"
@@ -62,7 +64,9 @@ struct RootView: View {
                 // content, so drill-down state (Artists → Periods → Shows → Show) doesn't
                 // leak across sidebar sections and resets when you switch away and back.
                 Group {
-                    switch appModel.selection ?? .artists {
+                    switch appModel.selection ?? .home {
+                    case .home:
+                        NavigationStack { HomeView() }
                     case .artists:
                         NavigationStack { ArtistsView() }
                     case .search:

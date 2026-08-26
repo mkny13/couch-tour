@@ -75,6 +75,7 @@ public struct Show: Codable, Equatable {
     public let coverArtUrls: CoverArt?
     public let venue: Venue?
     public let tracks: [Track]
+    public let tags: [Tag]
 
     public var location: String? { venue?.location }
 
@@ -88,13 +89,14 @@ public struct Show: Codable, Equatable {
         case likedByUser = "liked_by_user"
         case albumCoverUrl = "album_cover_url"
         case coverArtUrls = "cover_art_urls"
-        case venue, tracks
+        case venue, tracks, tags
     }
 
     public init(
         date: String, venueName: String? = nil, tourName: String? = nil, audioStatus: String = "missing",
         duration: Int64 = 0, id: Int64 = 0, likesCount: Int = 0, likedByUser: Bool = false,
-        albumCoverUrl: String? = nil, coverArtUrls: CoverArt? = nil, venue: Venue? = nil, tracks: [Track] = []
+        albumCoverUrl: String? = nil, coverArtUrls: CoverArt? = nil, venue: Venue? = nil, tracks: [Track] = [],
+        tags: [Tag] = []
     ) {
         self.date = date
         self.venueName = venueName
@@ -108,6 +110,7 @@ public struct Show: Codable, Equatable {
         self.coverArtUrls = coverArtUrls
         self.venue = venue
         self.tracks = tracks
+        self.tags = tags
     }
 
     public init(from decoder: Decoder) throws {
@@ -124,6 +127,7 @@ public struct Show: Codable, Equatable {
         coverArtUrls = try c.decodeIfPresent(CoverArt.self, forKey: .coverArtUrls)
         venue = try c.decodeIfPresent(Venue.self, forKey: .venue)
         tracks = try c.decodeIfPresent([Track].self, forKey: .tracks) ?? []
+        tags = try c.decodeIfPresent([Tag].self, forKey: .tags) ?? []
     }
 }
 
@@ -144,6 +148,7 @@ public struct Track: Codable, Equatable, Sendable {
     public let venueName: String?
     public let venueLocation: String?
     public let showAlbumCoverUrl: String?
+    public let tags: [Tag]
 
     public var playable: Bool {
         guard let url = mp3Url, !url.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
@@ -163,13 +168,14 @@ public struct Track: Codable, Equatable, Sendable {
         case venueName = "venue_name"
         case venueLocation = "venue_location"
         case showAlbumCoverUrl = "show_album_cover_url"
+        case tags
     }
 
     public init(
         id: Int64, title: String, likesCount: Int = 0, likedByUser: Bool = false, position: Int = 0,
         duration: Int64 = 0, setName: String = "", audioStatus: String = "missing", mp3Url: String? = nil,
         waveformImageUrl: String? = nil, showDate: String? = nil, venueName: String? = nil,
-        venueLocation: String? = nil, showAlbumCoverUrl: String? = nil
+        venueLocation: String? = nil, showAlbumCoverUrl: String? = nil, tags: [Tag] = []
     ) {
         self.id = id
         self.title = title
@@ -185,6 +191,7 @@ public struct Track: Codable, Equatable, Sendable {
         self.venueName = venueName
         self.venueLocation = venueLocation
         self.showAlbumCoverUrl = showAlbumCoverUrl
+        self.tags = tags
     }
 
     public init(from decoder: Decoder) throws {
@@ -203,6 +210,7 @@ public struct Track: Codable, Equatable, Sendable {
         venueName = try c.decodeIfPresent(String.self, forKey: .venueName)
         venueLocation = try c.decodeIfPresent(String.self, forKey: .venueLocation)
         showAlbumCoverUrl = try c.decodeIfPresent(String.self, forKey: .showAlbumCoverUrl)
+        tags = try c.decodeIfPresent([Tag].self, forKey: .tags) ?? []
     }
 }
 

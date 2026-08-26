@@ -2705,3 +2705,108 @@ Following up on FLAC streaming support (#27), users need clarity on whether loss
 - Android unit tests (`./gradlew testDebugUnitTest`): 344/344 tests passing.
 - macOS Swift package tests (`swift test`): 216/216 tests passing.
 - macOS app target build (`xcodebuild`): Build succeeded (`CouchTour`).
+
+## Iteration 51 — Next Couch Tour Stop Tour Picker for Defunct Artists (#68, D190)
+
+### D190 — Next Couch Tour Stop Tour Picker for Defunct Artists (#68)
+
+For defunct or non-touring artists (such as the Grateful Dead), the latest shows in the archive are often marked with the sentinel `"Not Part of a Tour"` rather than belonging to an active touring cycle. Previously, such artists either opted out of the Next Couch Tour Stop shelf entirely or had untoured standalone shows fall back arbitrarily.
+
+To give users full control over which era, tour, or year they want to track on the Next Couch Tour Stop shelf for any artist:
+
+- **Schema Migration v9:**
+  - **Android (Room):** `MIGRATION_8_9` in `Progress.kt` adds table `artist_tour_preferences` (`artist_key` TEXT PRIMARY KEY, `tour_name` TEXT, `year` TEXT, `updated_at` INTEGER NOT NULL).
+  - **macOS (GRDB):** Migration v9 in `ProgressStore.swift` creates `artist_tour_preferences` table with matching schema and constraints.
+- **Preference Storage & DAOs:**
+  - `ArtistTourPreferenceEntity` and `ArtistTourPreferenceDao` (`Progress.kt`) provide CRUD operations (`getPreference`, `getAllPreferences`, `setPreference`, `deletePreference`).
+  - `ArtistTourPreference` and `ArtistTourPreferenceStore` (`ProgressStore.swift`) provide async persistence via GRDB on macOS.
+- **NextStop Resolution Engine:**
+  - `NextStop.kt` & `NextStop.swift`: `tourFor` checks for a configured preference. If a specific `tour_name` is selected, all candidate periods are queried to find matching tour shows. If a specific `year` is selected, candidate shows are fetched from that year's period. If no preference is set, the engine falls back to standard `recentPeriods(TOUR_PERIODS)` and `currentTourShows`.
+  - Cache key `NextStop.cacheKey` incorporates sorted artist keys and preference mappings (`artist_key:tour_name:year`) so network caches invalidate immediately when preferences change.
+- **Interactive Tour Picker UI:**
+  - **Android:** `TourPickerDialog` in `MainActivity.kt` provides a searchable dialog allowing users to pick from past tours or individual years for any defunct or favorited artist.
+  - **macOS:** `TourPickerSheet.swift` provides a native SwiftUI sheet for selecting tours and years with instant persistence.
+
+## Iteration 52 — Unified Tag Model & Normalization across Phish.in and Relisten (#67, D191)
+
+### D191 — Unified Tag Model & Normalization across Phish.in and Relisten (#67)
+
+Live music archives feature rich metadata descriptors—such as soundboard recordings, matrix sources, guest appearances, and bustouts. However, Phish.in exposes explicit structured tag endpoints while Relisten expresses source properties via boolean flags and taper notes.
+
+- **Unified Domain Model:**
+  - `TagRef` and `Tag` domain models (`Catalog.kt`, `Catalog.swift`) represent unified tag descriptors with `name: String`, `description: String?`, `color: String?`, and `priority: Int`.
+- **Phish.in Tag Ingestion:**
+  - `PhishInAPI` and `Api.kt` ingest native tags from `phish.in/api/v2/tags` and nested show / track metadata, mapping them directly to `TagRef` collections on `ShowSummary`, `ShowDetail`, and `PlayableTrack`.
+- **Relisten Synthetic Tag Normalization:**
+  - `deriveSyntheticTags(isSoundboard, looksLikeMatrix, hasFlac)` generates standardized synthetic tags across Relisten sources and recordings:
+    - `"SBD"` (priority 100): Soundboard recording
+    - `"Matrix"` (priority 90): Matrix recording (SBD + AUD)
+    - `"FLAC"` (priority 80): Lossless FLAC audio stream
+- **Tag Filtering & Discovery Surfaces:**
+  - `filterByTag(tagName)` / `filterShowsByTag` / `filterTracksByTag` provide pure, platform-neutral filtering across show and track lists.
+  - Interactive horizontal tag filter chip bars integrated into Show listings (`ShowsView.swift`, `MainActivity.kt`), Search surfaces (`SearchView.swift`), and Show detail headers.
+
+## Iteration 53 — Recency-Weighted Momentum & Trending Sort (#21, D192)
+
+### D192 — Recency-Weighted Momentum & Trending Sort across 48h, 7d, 30d time windows (#21)
+
+Relisten tracks multi-window listening velocity and trending metrics for archival recordings, but these signals were previously unused for catalog discovery.
+
+- **Popularity & Momentum Data Model:**
+  - `Popularity` model on Android (`Catalog.kt`) and macOS (`Catalog.swift`) encapsulates `momentumScore`, `trendRatio`, `hotScore48h`, `hotScore7d`, and `hotScore30d`.
+  - Parsed from Relisten API v2/v3 responses (`Relisten.kt`, `RelistenAPI.swift`) and mapped onto `ShowSummary` and `ShowDetail`.
+- **Multi-Window Sorting Modes:**
+  - `ShowSortMode` enum provides comprehensive sorting algorithms:
+    - `DATE_ASC` ("Date (Oldest)") / `DATE_DESC` ("Date (Newest)")
+    - `TOP_RATED` ("Top Rated"): sorted by rating descending, tie-broken by date.
+    - `TRENDING_48H` ("Trending (48h)"): sorted by 48-hour velocity (`hotScore48h`), tie-broken by `momentumScore`, `rating`, `date`.
+    - `HOT_7D` ("Hot (7d)"): sorted by 7-day velocity (`hotScore7d`), tie-broken by `momentumScore`, `rating`, `date`.
+    - `POPULAR_30D` ("Popular (30d)"): sorted by 30-day velocity (`hotScore30d`), tie-broken by `momentumScore`, `rating`, `date`.
+    - `MOMENTUM` ("Momentum"): sorted by overall momentum score (`momentumScore`), tie-broken by `hotScore48h`, `rating`, `date`.
+- **UI Surfaces:**
+  - Sort mode selectors and menus in `MainActivity.kt` and `ShowsView.swift` / `PeriodsView.swift`.
+  - Visual momentum indicators (e.g. `⚡ 12.4` and `★ 4.8`) rendered on show rows, cards, and detail headers.
+
+## Iteration 54 — Deterministic Procedural Show Artwork & Cassette Graphics (#62, D193)
+
+### D193 — Deterministic Procedural Show Artwork & Cassette Graphic Placeholders (#62)
+
+Live concert recordings in Relisten and archive.org lack standardized square album artwork, previously falling back to generic grey placeholder icons across browse grids, player views, and notifications.
+
+- **Deterministic Procedural Artwork Generation:**
+  - Implemented `Artwork.kt` (Android / Jetpack Compose) and `Artwork.swift` (macOS SwiftPM / SwiftUI) with pure deterministic generators (`ShowArtworkGenerator`, `ArtworkPalette`).
+  - Uses 64-bit FNV-1a hashing on seed strings composed of normalized artist names and show dates (`"artist:yyyy-MM-dd"`).
+- **Curated & Procedural Palettes:**
+  - Curated distinct color schemes for iconic live bands (Grateful Dead psychedelic amber/rose/indigo, Jerry Garcia Band burgundy/gold, Phish aqua/purple, Goose neon teal, Billy Strings bluegrass cedar).
+  - 12 procedural fallback palettes derived from vintage concert posters, light shows, and cassette tape aesthetics.
+- **Procedural Cassette & Concert Poster Graphics:**
+  - Renders vintage cassette J-card tape shells, magnetic spools, textured header stripes, and stylized date/venue typography directly on canvas.
+  - Replaces all generic placeholder icons across Browse views (`ShowsView`, `ArtistsView`, `PeriodsView`), Show Details (`ShowDetailView`), History, Continue Listening, MiniPlayer, and Now Playing surfaces.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 461/461 tests passing.
+- macOS Swift package tests (`swift test`): 346/346 tests passing.
+- macOS Xcode project generation (`xcodegen generate`): Verified clean project generation.
+
+## Iteration 55 — macOS Home Screen & Feature Parity with Android (D194)
+
+### D194 — Native macOS Home Dashboard & Discovery Parity
+
+Brought the macOS client to full feature parity with Android's home dashboard:
+
+- **Anniversary Engine (`OnThisDate.swift`):**
+  - Added concurrent multi-artist fetching for historical shows matching today's calendar date across favorited Phish and Relisten artists.
+  - Implemented phish.in chunked batch querying under the 900-show request limit, with in-memory caching and automatic invalidation.
+- **1-Click "Surprise Me" Player (`Catalog.swift`):**
+  - Added `pickRandomShow(artists:source:)` for instantaneous random concert discovery and playback.
+- **Native macOS Home Screen (`HomeView.swift`):**
+  - Header with "Surprise Me" action.
+  - Horizontal card carousels for "Continue Listening" and "On This Date".
+  - "Next Couch Tour Stop" card resolving unplayed tour shows with `TourPickerSheet` for configuring historical tours.
+  - "Favorite Artists" grid with show counts and star toggles.
+  - "Library & Explore" navigation shortcuts (Browse Artists, Playlists, History).
+  - "Settings & Status" overview with live phish.in connection, skip filler toggle, and device sync status.
+- **Root Navigation Integration (`RootView.swift`, `AppModel.swift`):**
+  - Added `.home` ("Home", `house` icon) as the default top destination in `SidebarSection`.
+
+

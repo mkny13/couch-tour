@@ -55,6 +55,29 @@ public struct PlaybackProgress: Codable, Equatable, FetchableRecord, Persistable
     }
 }
 
+/// Defunct / non-touring artist tour and year tracking preferences (#68, D190).
+/// Persisted in GRDB on macOS and Room on Android (MIGRATION_8_9).
+public struct ArtistTourPreference: Codable, Equatable, Hashable, FetchableRecord, PersistableRecord, TableRecord, Sendable {
+    public static let databaseTableName = "artist_tour_preferences"
+
+    public var artistKey: String
+    public var tourName: String?
+    public var year: String?
+    public var updatedAt: Int64
+
+    public init(
+        artistKey: String,
+        tourName: String? = nil,
+        year: String? = nil,
+        updatedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+    ) {
+        self.artistKey = artistKey
+        self.tourName = tourName
+        self.year = year
+        self.updatedAt = updatedAt
+    }
+}
+
 /// GRDB wrapper around the `progress` table. Query shapes mirror Android's `ProgressDao`
 /// one-for-one so the two clients' notions of "history" and "continue listening" never diverge.
 public final class ProgressStore {
@@ -120,6 +143,14 @@ public final class ProgressStore {
         migrator.registerMigration("v7_deletedAt") { db in
             try db.alter(table: "progress") { t in
                 t.add(column: "deletedAt", .integer)
+            }
+        }
+        migrator.registerMigration("v9_artistTourPreferences") { db in
+            try db.create(table: "artist_tour_preferences") { t in
+                t.column("artistKey", .text).primaryKey()
+                t.column("tourName", .text)
+                t.column("year", .text)
+                t.column("updatedAt", .integer).notNull()
             }
         }
         return migrator
@@ -228,6 +259,106 @@ public final class ProgressStore {
                 .filter(Column("updatedAt") > since)
                 .fetchAll(db)
         }
+    }
+
+    // MARK: - Artist Tour Preferences (#68)
+
+    public func saveTourPreference(_ preference: ArtistTourPreference) throws {
+        try dbQueue.write { db in
+            try preference.save(db)
+        }
+    }
+
+    public func saveTourPreference(
+        artistKey: String,
+        tourName: String? = nil,
+        year: String? = nil,
+        now: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+    ) throws {
+        let pref = ArtistTourPreference(artistKey: artistKey, tourName: tourName, year: year, updatedAt: now)
+        try saveTourPreference(pref)
+    }
+
+    public func getTourPreference(artistKey: String) throws -> ArtistTourPreference? {
+        try dbQueue.read { db in
+            try ArtistTourPreference.fetchOne(db, key: artistKey)
+        }
+    }
+
+    public func getAllTourPreferences() throws -> [ArtistTourPreference] {
+        try dbQueue.read { db in
+            try ArtistTourPreference.order(Column("updatedAt").desc).fetchAll(db)
+        }
+    }
+
+    public func deleteTourPreference(artistKey: String) throws {
+        try dbQueue.write { db in
+            _ = try ArtistTourPreference.deleteOne(db, key: artistKey)
+        }
+    }
+}
+
+/// Store sharing ProgressStore.dbQueue for artist tour preferences (D180, D190).
+public final class TrackedTourStore: Sendable {
+    private let dbQueue: DatabaseQueue
+
+    public init(sharing progressStore: ProgressStore) throws {
+        self.dbQueue = progressStore.dbQueue
+        try migrator.migrate(dbQueue)
+    }
+
+    public static func inMemory() throws -> TrackedTourStore {
+        try TrackedTourStore(dbQueue: DatabaseQueue())
+    }
+
+    private init(dbQueue: DatabaseQueue) throws {
+        self.dbQueue = dbQueue
+        try migrator.migrate(dbQueue)
+    }
+
+    private var migrator: DatabaseMigrator {
+        var migrator = DatabaseMigrator()
+        migrator.registerMigration("v9_artistTourPreferences") { db in
+            try db.create(table: "artist_tour_preferences") { t in
+                t.column("artistKey", .text).primaryKey()
+                t.column("tourName", .text)
+                t.column("year", .text)
+                t.column("updatedAt", .integer).notNull()
+            }
+        }
+        return migrator
+    }
+
+    public func saveTourPreference(_ preference: ArtistTourPreference) throws {
+        try dbQueue.write { db in try preference.save(db) }
+    }
+
+    public func getTourPreference(artistKey: String) throws -> ArtistTourPreference? {
+        try dbQueue.read { db in try ArtistTourPreference.fetchOne(db, key: artistKey) }
+    }
+
+    public func getAllTourPreferences() throws -> [ArtistTourPreference] {
+        try dbQueue.read { db in try ArtistTourPreference.order(Column("updatedAt").desc).fetchAll(db) }
+    }
+
+    public func deleteTourPreference(artistKey: String) throws {
+        try dbQueue.write { db in _ = try ArtistTourPreference.deleteOne(db, key: artistKey) }
+    }
+
+    public func savePreference(_ preference: ArtistTourPreference) throws {
+        try saveTourPreference(preference)
+    }
+
+    public func preference(for artistKey: String) throws -> ArtistTourPreference? {
+        try getTourPreference(artistKey: artistKey)
+    }
+
+    public func allPreferences() throws -> [ArtistTourPreference] {
+        try getAllTourPreferences()
+    }
+
+    public func deletePreference(for artistKey: String) throws {
+        try deleteTourPreference(artistKey: artistKey)
     }
 }
 

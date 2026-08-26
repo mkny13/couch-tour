@@ -37,6 +37,15 @@ data class Period(
 )
 
 @Serializable
+data class Tag(
+    val name: String,
+    val description: String? = null,
+    val color: String? = null,
+    val priority: Int = 0,
+    val notes: String? = null,
+)
+
+@Serializable
 data class Show(
     val date: String,
     @SerialName("venue_name") val venueName: String? = null,
@@ -50,6 +59,7 @@ data class Show(
     @SerialName("cover_art_urls") val coverArtUrls: CoverArt? = null,
     val venue: Venue? = null,
     val tracks: List<Track> = emptyList(),
+    val tags: List<Tag> = emptyList(),
 ) {
     val location: String? get() = venue?.location
 }
@@ -87,6 +97,7 @@ data class Track(
     @SerialName("venue_name") val venueName: String? = null,
     @SerialName("venue_location") val venueLocation: String? = null,
     @SerialName("show_album_cover_url") val showAlbumCoverUrl: String? = null,
+    val tags: List<Tag> = emptyList(),
 ) {
     val playable: Boolean get() = !mp3Url.isNullOrBlank() && audioStatus != "missing"
 }

@@ -60,6 +60,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     val progressDao = PhishInDb.get(app).progressDao()
     val localPlaylistDao = PhishInDb.get(app).localPlaylistDao()
+    val artistTourPreferenceDao = PhishInDb.get(app).artistTourPreferenceDao()
 
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
@@ -404,6 +405,25 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun progressFor(key: String): Progress? = progressDao.get(key)
+
+    fun setArtistTourPreference(artistKey: String, tourName: String?, year: String?) {
+        viewModelScope.launch {
+            artistTourPreferenceDao.upsertPreference(
+                ArtistTourPreferenceEntity(
+                    artistKey = artistKey,
+                    tourName = tourName,
+                    year = year,
+                    updatedAt = System.currentTimeMillis(),
+                )
+            )
+        }
+    }
+
+    fun clearArtistTourPreference(artistKey: String) {
+        viewModelScope.launch {
+            artistTourPreferenceDao.deletePreference(artistKey)
+        }
+    }
 
     // --------------------------------------------------------------- controls
 

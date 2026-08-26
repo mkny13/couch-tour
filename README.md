@@ -100,7 +100,7 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Tests
 
-344 unit tests, no device or emulator required:
+461 Android unit tests, no device or emulator required:
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -112,6 +112,12 @@ Room queries, every database migration, the Android Auto browse-tree media IDs, 
 parts of casting that don't need a Chromecast — that queue items declare a MIME type, and
 that the queue survives the round trip through a receiver. Report lands at
 `app/build/reports/tests/testDebugUnitTest/index.html`.
+
+346 macOS package tests under `macos/Packages/CouchTourKit`:
+
+```bash
+cd macos/Packages/CouchTourKit && swift test
+```
 
 Install to a connected device or running emulator:
 

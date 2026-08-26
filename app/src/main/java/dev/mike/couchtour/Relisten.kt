@@ -62,6 +62,31 @@ data class RelistenTour(
     val name: String? = null,
 )
 
+@Serializable
+data class RelistenPopularityWindow(
+    val plays: Int = 0,
+    val hours: Double = 0.0,
+    @SerialName("hot_score") val hotScore: Double = 0.0,
+)
+
+@Serializable
+data class RelistenPopularityWindows(
+    @SerialName("48h") val window48h: RelistenPopularityWindow? = null,
+    @SerialName("7d") val window7d: RelistenPopularityWindow? = null,
+    @SerialName("30d") val window30d: RelistenPopularityWindow? = null,
+) {
+    val w48h: RelistenPopularityWindow? get() = window48h
+    val w7d: RelistenPopularityWindow? get() = window7d
+    val w30d: RelistenPopularityWindow? get() = window30d
+}
+
+@Serializable
+data class RelistenPopularity(
+    @SerialName("momentum_score") val momentumScore: Double = 0.0,
+    @SerialName("trend_ratio") val trendRatio: Double = 0.0,
+    val windows: RelistenPopularityWindows? = null,
+)
+
 /** A show as it appears in a year's `shows` list — no sources, just enough to browse.
  *  [avgRating] (0-10) is a genuine field on this endpoint, confirmed live (#21) — the show
  *  detail endpoint's per-source `avg_rating_weighted` was long assumed to be the only place
@@ -75,6 +100,9 @@ data class RelistenShowSummary(
     val tour: RelistenTour? = null,
     @SerialName("source_count") val sourceCount: Int = 0,
     @SerialName("avg_rating") val avgRating: Double = 0.0,
+    @SerialName("has_soundboard_source") val hasSoundboardSource: Boolean = false,
+    @SerialName("has_streamable_flac_source") val hasStreamableFlacSource: Boolean = false,
+    val popularity: RelistenPopularity? = null,
 )
 
 /** `/v3/artists/{artistUuid}/years/{yearUuid}` */
@@ -122,6 +150,9 @@ data class RelistenShowWithSources(
     val venue: RelistenVenue? = null,
     val tour: RelistenTour? = null,
     val sources: List<RelistenSource> = emptyList(),
+    @SerialName("has_soundboard_source") val hasSoundboardSource: Boolean = false,
+    @SerialName("has_streamable_flac_source") val hasStreamableFlacSource: Boolean = false,
+    val popularity: RelistenPopularity? = null,
 )
 
 // -------------------------------------------------------------------- search
@@ -195,6 +226,14 @@ internal fun RelistenArtist.toArtistRef() = ArtistRef(
 
 internal fun RelistenYear.toPeriodRef() = PeriodRef(id = uuid, label = year, showCount = showCount)
 
+internal fun RelistenPopularity.toPopularity() = Popularity(
+    momentumScore = momentumScore,
+    trendRatio = trendRatio,
+    hotScore48h = windows?.window48h?.hotScore ?: 0.0,
+    hotScore7d = windows?.window7d?.hotScore ?: 0.0,
+    hotScore30d = windows?.window30d?.hotScore ?: 0.0,
+)
+
 internal fun RelistenShowSummary.toShowSummary(artist: ArtistRef) = ShowSummary(
     artist = artist,
     date = displayDate,
@@ -203,37 +242,58 @@ internal fun RelistenShowSummary.toShowSummary(artist: ArtistRef) = ShowSummary(
     tourName = tour?.name,
     recordingCount = sourceCount.coerceAtLeast(1),
     rating = avgRating,
+    popularity = popularity?.toPopularity(),
+    tags = deriveSyntheticTags(isSoundboard = hasSoundboardSource, hasFlac = hasStreamableFlacSource),
 )
 
 internal fun RelistenSource.toRecordingRef(): RecordingRef {
     val hasFlac = sets.any { set -> set.tracks.any { !it.flacUrl.isNullOrBlank() } }
+    val taperStr = taper?.takeIf { it.isNotBlank() }
+    val lineageStr = lineage?.takeIf { it.isNotBlank() }
+    val matrixCheck = listOfNotNull(taperStr, lineageStr).any { it.contains("matrix", ignoreCase = true) }
+    val synthetic = deriveSyntheticTags(
+        isSoundboard = isSoundboard,
+        looksLikeMatrix = matrixCheck,
+        hasFlac = hasFlac,
+    )
     return RecordingRef(
         id = uuid,
         // Relisten sends "" rather than omitting the field on plenty of sources — blank, not
         // just null, has to fall through to the SBD/AUD label or every one of them shows empty.
-        label = taper?.takeIf { it.isNotBlank() } ?: if (isSoundboard) "Soundboard" else "Audience",
+        label = taperStr ?: if (isSoundboard) "Soundboard" else "Audience",
         isSoundboard = isSoundboard,
         hasFlac = hasFlac,
         rating = avgRatingWeighted,
         reviewCount = numReviews,
-        taper = taper?.takeIf { it.isNotBlank() },
-        lineage = lineage?.takeIf { it.isNotBlank() },
+        taper = taperStr,
+        lineage = lineageStr,
+        tags = synthetic,
     )
 }
 
-internal fun RelistenSourceTrack.toPlayableTrack(artist: ArtistRef, showDate: String, venueName: String?, setName: String) =
-    PlayableTrack(
-        id = uuid,
-        title = title,
-        // Suppressed for an artist without real sets (D-verified: Dead sources carry one
-        // wrapper set literally named "Set") rather than every screen re-checking hasSets.
-        setName = if (artist.hasSets) setName else "",
-        durationMs = duration * 1000,
-        url = mp3Url.orEmpty(),
-        showDate = showDate,
-        venueName = venueName,
-        flacUrl = flacUrl,
-    )
+internal fun RelistenSourceTrack.toPlayableTrack(
+    artist: ArtistRef,
+    showDate: String,
+    venueName: String?,
+    setName: String,
+    sourceTags: List<TagRef> = emptyList(),
+) = PlayableTrack(
+    id = uuid,
+    title = title,
+    // Suppressed for an artist without real sets (D-verified: Dead sources carry one
+    // wrapper set literally named "Set") rather than every screen re-checking hasSets.
+    setName = if (artist.hasSets) setName else "",
+    durationMs = duration * 1000,
+    url = mp3Url.orEmpty(),
+    showDate = showDate,
+    venueName = venueName,
+    flacUrl = flacUrl,
+    tags = if (!flacUrl.isNullOrBlank() && sourceTags.none { it.name.equals("FLAC", ignoreCase = true) }) {
+        sourceTags + SYNTHETIC_TAG_FLAC
+    } else {
+        sourceTags
+    },
+)
 
 /**
  * [recordingId] null takes the default tape — the first source, since Relisten already
@@ -242,14 +302,24 @@ internal fun RelistenSourceTrack.toPlayableTrack(artist: ArtistRef, showDate: St
  */
 internal fun RelistenShowWithSources.toShowDetail(artist: ArtistRef, recordingId: String? = null): ShowDetail {
     val chosen = recordingId?.let { id -> sources.firstOrNull { it.uuid == id } } ?: sources.firstOrNull()
+    val chosenRecording = chosen?.toRecordingRef()
+    val chosenTags = chosenRecording?.tags.orEmpty()
     val tracks = chosen?.sets
         ?.sortedBy { it.index }
         ?.flatMap { set ->
             set.tracks
                 .filter { !it.mp3Url.isNullOrBlank() }
-                .map { it.toPlayableTrack(artist, displayDate, venue?.name, set.name) }
+                .map { it.toPlayableTrack(artist, displayDate, venue?.name, set.name, sourceTags = chosenTags) }
         }
         .orEmpty()
+    val hasAnySbd = hasSoundboardSource || sources.any { it.isSoundboard }
+    val hasAnyFlac = hasStreamableFlacSource || sources.any { src -> src.sets.any { set -> set.tracks.any { !it.flacUrl.isNullOrBlank() } } }
+    val hasAnyMatrix = sources.any { it.toRecordingRef().looksLikeMatrix }
+    val summaryTags = if (chosenRecording != null) {
+        chosenTags
+    } else {
+        deriveSyntheticTags(isSoundboard = hasAnySbd, looksLikeMatrix = hasAnyMatrix, hasFlac = hasAnyFlac)
+    }
     return ShowDetail(
         summary = ShowSummary(
             artist = artist,
@@ -258,8 +328,10 @@ internal fun RelistenShowWithSources.toShowDetail(artist: ArtistRef, recordingId
             location = venue?.location,
             tourName = tour?.name,
             recordingCount = sources.size.coerceAtLeast(1),
+            popularity = popularity?.toPopularity(),
+            tags = summaryTags,
         ),
-        recording = chosen?.toRecordingRef(),
+        recording = chosenRecording,
         alternates = sources.filter { it.uuid != chosen?.uuid }.map { it.toRecordingRef() },
         tracks = tracks,
     )

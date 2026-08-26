@@ -20,7 +20,7 @@ public enum Backend: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-public struct ArtistRef: Hashable, Sendable {
+public struct ArtistRef: Hashable, Sendable, Identifiable {
     public let backend: Backend
     /// phish.in has one artist; on Relisten this is the artist's slug, e.g. "grateful-dead".
     public let id: String
@@ -50,7 +50,7 @@ public struct ArtistRef: Hashable, Sendable {
 /// A browsable slice of an artist's catalog. On phish.in this is a period and may be a range
 /// ("1983-1987"), which is why `id` is carried verbatim — `showsForPeriod` needs it back to
 /// pick `year_range=` over `year=` (D11). On Relisten it is a year's uuid.
-public struct PeriodRef: Hashable, Sendable {
+public struct PeriodRef: Hashable, Sendable, Identifiable {
     public let id: String
     public let label: String
     public let showCount: Int
@@ -64,6 +64,226 @@ public struct PeriodRef: Hashable, Sendable {
     }
 }
 
+public struct Tag: Codable, Hashable, Sendable, Identifiable {
+    public let name: String
+    public let description: String?
+    public let color: String?
+    public let priority: Int
+    public let notes: String?
+
+    public var id: String { name }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case description
+        case color
+        case priority
+        case notes
+    }
+
+    public init(name: String, description: String? = nil, color: String? = nil, priority: Int = 0, notes: String? = nil) {
+        self.name = name
+        self.description = description
+        self.color = color
+        self.priority = priority
+        self.notes = notes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        color = try c.decodeIfPresent(String.self, forKey: .color)
+        priority = try c.decodeIfPresent(Int.self, forKey: .priority) ?? 0
+        notes = try c.decodeIfPresent(String.self, forKey: .notes)
+    }
+}
+
+public struct WindowPopularity: Codable, Hashable, Sendable {
+    public let plays: Int
+    public let hours: Double
+    public let hotScore: Double
+
+    enum CodingKeys: String, CodingKey {
+        case plays
+        case hours
+        case hotScore = "hot_score"
+    }
+
+    public init(plays: Int = 0, hours: Double = 0.0, hotScore: Double = 0.0) {
+        self.plays = plays
+        self.hours = hours
+        self.hotScore = hotScore
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        plays = try c.decodeIfPresent(Int.self, forKey: .plays) ?? 0
+        hours = try c.decodeIfPresent(Double.self, forKey: .hours) ?? 0.0
+        hotScore = try c.decodeIfPresent(Double.self, forKey: .hotScore) ?? 0.0
+    }
+}
+
+public typealias RelistenPopularityWindow = WindowPopularity
+
+public struct RelistenPopularity: Codable, Hashable, Sendable {
+    public let momentumScore: Double
+    public let trendRatio: Double
+    public let windows: [String: WindowPopularity]
+
+    enum CodingKeys: String, CodingKey {
+        case momentumScore = "momentum_score"
+        case trendRatio = "trend_ratio"
+        case windows
+    }
+
+    public init(momentumScore: Double = 0.0, trendRatio: Double = 0.0, windows: [String: WindowPopularity] = [:]) {
+        self.momentumScore = momentumScore
+        self.trendRatio = trendRatio
+        self.windows = windows
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        momentumScore = try c.decodeIfPresent(Double.self, forKey: .momentumScore) ?? 0.0
+        trendRatio = try c.decodeIfPresent(Double.self, forKey: .trendRatio) ?? 0.0
+        windows = try c.decodeIfPresent([String: WindowPopularity].self, forKey: .windows) ?? [:]
+    }
+
+    public var hotScore48h: Double { windows["48h"]?.hotScore ?? 0.0 }
+    public var hotScore7d: Double { windows["7d"]?.hotScore ?? 0.0 }
+    public var hotScore30d: Double { windows["30d"]?.hotScore ?? 0.0 }
+    public var plays48h: Int { windows["48h"]?.plays ?? 0 }
+    public var plays7d: Int { windows["7d"]?.plays ?? 0 }
+    public var plays30d: Int { windows["30d"]?.plays ?? 0 }
+}
+
+public enum ShowSortOption: String, CaseIterable, Identifiable, Sendable {
+    case dateDesc
+    case dateAsc
+    case ratingDesc
+    case trending48h
+    case hot7d
+    case popular30d
+    case momentum
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .dateDesc: return "Date (Newest First)"
+        case .dateAsc: return "Date (Oldest First)"
+        case .ratingDesc: return "Top Rated"
+        case .trending48h: return "Trending (48h)"
+        case .hot7d: return "Hot (7d)"
+        case .popular30d: return "Popular (30d)"
+        case .momentum: return "Momentum"
+        }
+    }
+}
+
+public func sortShows(_ shows: [ShowSummary], by option: ShowSortOption) -> [ShowSummary] {
+    switch option {
+    case .dateDesc:
+        return shows.sorted { lhs, rhs in
+            lhs.date > rhs.date
+        }
+    case .dateAsc:
+        return shows.sorted { lhs, rhs in
+            lhs.date < rhs.date
+        }
+    case .ratingDesc:
+        return shows.sorted { lhs, rhs in
+            if lhs.rating != rhs.rating {
+                return lhs.rating > rhs.rating
+            }
+            return lhs.date > rhs.date
+        }
+    case .trending48h:
+        return shows.sorted { lhs, rhs in
+            let lhsScore = lhs.hotScore48h
+            let rhsScore = rhs.hotScore48h
+            if lhsScore != rhsScore {
+                return lhsScore > rhsScore
+            }
+            if lhs.momentumScore != rhs.momentumScore {
+                return lhs.momentumScore > rhs.momentumScore
+            }
+            return lhs.date > rhs.date
+        }
+    case .hot7d:
+        return shows.sorted { lhs, rhs in
+            let lhsScore = lhs.hotScore7d
+            let rhsScore = rhs.hotScore7d
+            if lhsScore != rhsScore {
+                return lhsScore > rhsScore
+            }
+            if lhs.momentumScore != rhs.momentumScore {
+                return lhs.momentumScore > rhs.momentumScore
+            }
+            return lhs.date > rhs.date
+        }
+    case .popular30d:
+        return shows.sorted { lhs, rhs in
+            let lhsScore = lhs.hotScore30d
+            let rhsScore = rhs.hotScore30d
+            if lhsScore != rhsScore {
+                return lhsScore > rhsScore
+            }
+            if lhs.momentumScore != rhs.momentumScore {
+                return lhs.momentumScore > rhs.momentumScore
+            }
+            return lhs.date > rhs.date
+        }
+    case .momentum:
+        return shows.sorted { lhs, rhs in
+            if lhs.momentumScore != rhs.momentumScore {
+                return lhs.momentumScore > rhs.momentumScore
+            }
+            if lhs.trendRatio != rhs.trendRatio {
+                return lhs.trendRatio > rhs.trendRatio
+            }
+            return lhs.date > rhs.date
+        }
+    }
+}
+
+public func filterShowsByTag(_ shows: [ShowSummary], tagName: String) -> [ShowSummary] {
+    let trimmed = tagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty || trimmed.caseInsensitiveCompare("All") == .orderedSame {
+        return shows
+    }
+    return shows.filter { show in
+        show.tags.contains { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }
+    }
+}
+
+public func filterTracksByTag(_ tracks: [PlayableTrack], tagName: String) -> [PlayableTrack] {
+    let trimmed = tagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty || trimmed.caseInsensitiveCompare("All") == .orderedSame {
+        return tracks
+    }
+    return tracks.filter { track in
+        track.tags.contains { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }
+    }
+}
+
+extension Array where Element == ShowSummary {
+    public func filterByTag(_ tagName: String) -> [ShowSummary] {
+        filterShowsByTag(self, tagName: tagName)
+    }
+
+    public func sorted(by option: ShowSortOption) -> [ShowSummary] {
+        sortShows(self, by: option)
+    }
+}
+
+extension Array where Element == PlayableTrack {
+    public func filterByTag(_ tagName: String) -> [PlayableTrack] {
+        filterTracksByTag(self, tagName: tagName)
+    }
+}
+
 public struct ShowSummary: Hashable, Sendable {
     public let artist: ArtistRef
     public let date: String
@@ -74,10 +294,22 @@ public struct ShowSummary: Hashable, Sendable {
     /// Some of the audio is missing. phish.in's `audio_status`; Relisten has no analogue.
     public let partial: Bool
     public let recordingCount: Int
+    public let rating: Double
+    public let tags: [Tag]
+    public let popularity: RelistenPopularity?
 
     public init(
-        artist: ArtistRef, date: String, venue: String? = nil, location: String? = nil,
-        tourName: String? = nil, artURL: String? = nil, partial: Bool = false, recordingCount: Int = 1
+        artist: ArtistRef,
+        date: String,
+        venue: String? = nil,
+        location: String? = nil,
+        tourName: String? = nil,
+        artURL: String? = nil,
+        partial: Bool = false,
+        recordingCount: Int = 1,
+        rating: Double = 0.0,
+        tags: [Tag] = [],
+        popularity: RelistenPopularity? = nil
     ) {
         self.artist = artist
         self.date = date
@@ -87,12 +319,21 @@ public struct ShowSummary: Hashable, Sendable {
         self.artURL = artURL
         self.partial = partial
         self.recordingCount = recordingCount
+        self.rating = rating
+        self.tags = tags
+        self.popularity = popularity
     }
 
     /// "McNichols Arena · Denver, CO"
     public var where_: String {
         [venue, location].compactMap { $0 }.joined(separator: " · ")
     }
+
+    public var momentumScore: Double { popularity?.momentumScore ?? 0.0 }
+    public var trendRatio: Double { popularity?.trendRatio ?? 0.0 }
+    public var hotScore48h: Double { popularity?.hotScore48h ?? 0.0 }
+    public var hotScore7d: Double { popularity?.hotScore7d ?? 0.0 }
+    public var hotScore30d: Double { popularity?.hotScore30d ?? 0.0 }
 }
 
 /// One tape of one show.
@@ -101,7 +342,7 @@ public struct ShowSummary: Hashable, Sendable {
 /// average Grateful Dead show — different tapers, different lineage, different soundboard or
 /// audience provenance — and each splits the music into its own tracks. That last part is why
 /// a recording is part of a queue key and not a display detail.
-public struct RecordingRef: Hashable {
+public struct RecordingRef: Hashable, Sendable {
     public let id: String
     public let label: String
     public let isSoundboard: Bool
@@ -130,9 +371,23 @@ public struct RecordingRef: Hashable {
     public var looksLikeMatrix: Bool {
         [taper, lineage].compactMap { $0 }.contains { $0.range(of: "matrix", options: .caseInsensitive) != nil }
     }
+
+    public var tags: [Tag] {
+        var result: [Tag] = []
+        if isSoundboard {
+            result.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
+        }
+        if looksLikeMatrix {
+            result.append(Tag(name: "Matrix", description: "Matrix recording (SBD + AUD)", priority: 8))
+        }
+        if hasFlac {
+            result.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
+        }
+        return result
+    }
 }
 
-public struct PlayableTrack: Equatable {
+public struct PlayableTrack: Equatable, Sendable {
     public let id: String
     public let title: String
     public let setName: String
@@ -149,11 +404,24 @@ public struct PlayableTrack: Equatable {
     /// Relisten likes are tracked locally by id instead, see `LikedTracks`.
     public let likesCount: Int
     public let likedByUser: Bool
+    public let tags: [Tag]
+    public let popularity: RelistenPopularity?
 
     public init(
-        id: String, title: String, setName: String = "", durationMs: Int64 = 0, url: String,
-        waveformURL: String? = nil, showDate: String? = nil, venueName: String? = nil, artURL: String? = nil,
-        flacUrl: String? = nil, likesCount: Int = 0, likedByUser: Bool = false
+        id: String,
+        title: String,
+        setName: String = "",
+        durationMs: Int64 = 0,
+        url: String,
+        waveformURL: String? = nil,
+        showDate: String? = nil,
+        venueName: String? = nil,
+        artURL: String? = nil,
+        flacUrl: String? = nil,
+        likesCount: Int = 0,
+        likedByUser: Bool = false,
+        tags: [Tag] = [],
+        popularity: RelistenPopularity? = nil
     ) {
         self.id = id
         self.title = title
@@ -167,26 +435,37 @@ public struct PlayableTrack: Equatable {
         self.flacUrl = flacUrl
         self.likesCount = likesCount
         self.likedByUser = likedByUser
+        self.tags = tags
+        self.popularity = popularity
     }
 }
 
-public struct ShowDetail: Equatable {
+public struct ShowDetail: Equatable, Sendable {
     public let summary: ShowSummary
     public let recording: RecordingRef?
     public let alternates: [RecordingRef]
     public let tracks: [PlayableTrack]
+    public let tags: [Tag]
+    public let popularity: RelistenPopularity?
     /// Set only for a local playlist queue (#59), which spans arbitrary shows so the derived
     /// key below doesn't apply — the caller passes `localPlaylistQueueKey(id)` in directly.
     private let explicitQueueKey: String?
 
     public init(
-        summary: ShowSummary, recording: RecordingRef? = nil, alternates: [RecordingRef] = [],
-        tracks: [PlayableTrack] = [], queueKey: String? = nil
+        summary: ShowSummary,
+        recording: RecordingRef? = nil,
+        alternates: [RecordingRef] = [],
+        tracks: [PlayableTrack] = [],
+        tags: [Tag]? = nil,
+        popularity: RelistenPopularity? = nil,
+        queueKey: String? = nil
     ) {
         self.summary = summary
         self.recording = recording
         self.alternates = alternates
         self.tracks = tracks
+        self.tags = tags ?? summary.tags
+        self.popularity = popularity ?? summary.popularity
         self.explicitQueueKey = queueKey
     }
 
@@ -207,6 +486,10 @@ public struct ShowDetail: Equatable {
             return recordingQueueKey(summary.artist.id, summary.date, recording.id)
         }
     }
+}
+
+public func recordingShowKey(_ artistSlug: String, _ date: String) -> String {
+    "relisten:\(artistSlug)/\(date)"
 }
 
 // ------------------------------------------------------------------- search
@@ -417,7 +700,10 @@ extension Show {
             tourName: tourName,
             artURL: albumCoverUrl ?? coverArtUrls?.medium,
             partial: audioStatus == "partial",
-            recordingCount: 1
+            recordingCount: 1,
+            rating: Double(likesCount),
+            tags: tags,
+            popularity: nil
         )
     }
 
@@ -426,7 +712,7 @@ extension Show {
         // Filtering here is what keeps the UI and the queue builder agreeing on what index 4
         // means (D12) — they both read this list rather than filtering separately.
         let playableTracks = tracks.filter { $0.playable }.map { $0.toPlayableTrack(showArt: summary.artURL) }
-        return ShowDetail(summary: summary, tracks: playableTracks)
+        return ShowDetail(summary: summary, tracks: playableTracks, tags: tags)
     }
 }
 
@@ -443,8 +729,48 @@ extension Track {
             showDate: showDate,
             venueName: venueName,
             artURL: showAlbumCoverUrl ?? showArt,
+            flacUrl: nil,
             likesCount: likesCount,
-            likedByUser: likedByUser
+            likedByUser: likedByUser,
+            tags: tags,
+            popularity: nil
         )
     }
 }
+
+public enum CatalogError: LocalizedError, Sendable {
+    case noArtists
+    case noPeriods
+    case noShows
+
+    public var errorDescription: String? {
+        switch self {
+        case .noArtists: return "No artists available"
+        case .noPeriods: return "No years/periods available for this artist"
+        case .noShows: return "No shows available for this period"
+        }
+    }
+}
+
+/// Picks a random show across artists for the "Surprise Me" feature.
+public func pickRandomShow(
+    artists: [ArtistRef],
+    source: (Backend) -> MusicSource = sourceFor
+) async throws -> ShowSummary {
+    guard let artist = artists.randomElement() else {
+        throw CatalogError.noArtists
+    }
+    let src = source(artist.backend)
+    let periods = try await src.periods(artist: artist)
+    guard let period = periods.randomElement() else {
+        throw CatalogError.noPeriods
+    }
+    let shows = try await src.shows(artist: artist, period: period)
+    let completeShows = shows.filter { !$0.partial }
+    let candidates = completeShows.isEmpty ? shows : completeShows
+    guard let show = candidates.randomElement() else {
+        throw CatalogError.noShows
+    }
+    return show
+}
+

@@ -3,6 +3,7 @@ package dev.mike.couchtour
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
 /**
@@ -17,6 +18,111 @@ import kotlin.random.Random
  * The mapping lives in pure functions rather than inside the [MusicSource] implementations
  * so it can be tested without a network call (D36).
  */
+
+@Serializable
+data class TagRef(
+    val name: String,
+    val description: String? = null,
+    val color: String? = null,
+    val priority: Int = 0,
+)
+
+val SYNTHETIC_TAG_SBD = TagRef(name = "SBD", description = "Soundboard recording", priority = 100)
+val SYNTHETIC_TAG_MATRIX = TagRef(name = "Matrix", description = "Matrix recording (SBD + AUD)", priority = 90)
+val SYNTHETIC_TAG_FLAC = TagRef(name = "FLAC", description = "Lossless FLAC audio", priority = 80)
+
+fun deriveSyntheticTags(
+    isSoundboard: Boolean = false,
+    looksLikeMatrix: Boolean = false,
+    hasFlac: Boolean = false,
+): List<TagRef> {
+    val tags = mutableListOf<TagRef>()
+    if (isSoundboard) tags.add(SYNTHETIC_TAG_SBD)
+    if (looksLikeMatrix) tags.add(SYNTHETIC_TAG_MATRIX)
+    if (hasFlac) tags.add(SYNTHETIC_TAG_FLAC)
+    return tags
+}
+
+fun deriveSyntheticTags(recording: RecordingRef): List<TagRef> =
+    deriveSyntheticTags(
+        isSoundboard = recording.isSoundboard,
+        looksLikeMatrix = recording.looksLikeMatrix,
+        hasFlac = recording.hasFlac,
+    )
+
+fun Tag.toTagRef() = TagRef(name = name, description = description, color = color, priority = priority)
+fun TagRef.toTag() = Tag(name = name, description = description, color = color, priority = priority)
+
+@Serializable
+data class Popularity(
+    val momentumScore: Double = 0.0,
+    val trendRatio: Double = 0.0,
+    val hotScore48h: Double = 0.0,
+    val hotScore7d: Double = 0.0,
+    val hotScore30d: Double = 0.0,
+)
+
+enum class ShowSortMode(val label: String) {
+    DATE_ASC("Date (Oldest)"),
+    DATE_DESC("Date (Newest)"),
+    TOP_RATED("Top Rated"),
+    TRENDING_48H("Trending (48h)"),
+    HOT_7D("Hot (7d)"),
+    POPULAR_30D("Popular (30d)"),
+    MOMENTUM("Momentum");
+
+    companion object {
+        val DATE = DATE_DESC
+        val RATING = TOP_RATED
+        val TRENDING_7D = HOT_7D
+        val TRENDING_30D = POPULAR_30D
+    }
+}
+
+fun List<ShowSummary>.sortedByMode(mode: ShowSortMode): List<ShowSummary> = when (mode) {
+    ShowSortMode.DATE_ASC -> sortedWith(compareBy({ it.date }, { it.artist.name }))
+    ShowSortMode.DATE_DESC -> sortedWith(compareByDescending<ShowSummary> { it.date }.thenBy { it.artist.name })
+    ShowSortMode.TOP_RATED -> sortedWith(
+        compareByDescending<ShowSummary> { it.rating }
+            .thenByDescending { it.date }
+    )
+    ShowSortMode.TRENDING_48H -> sortedWith(
+        compareByDescending<ShowSummary> { it.hotScore48h }
+            .thenByDescending { it.momentumScore }
+            .thenByDescending { it.rating }
+            .thenByDescending { it.date }
+    )
+    ShowSortMode.HOT_7D -> sortedWith(
+        compareByDescending<ShowSummary> { it.hotScore7d }
+            .thenByDescending { it.momentumScore }
+            .thenByDescending { it.rating }
+            .thenByDescending { it.date }
+    )
+    ShowSortMode.POPULAR_30D -> sortedWith(
+        compareByDescending<ShowSummary> { it.hotScore30d }
+            .thenByDescending { it.momentumScore }
+            .thenByDescending { it.rating }
+            .thenByDescending { it.date }
+    )
+    ShowSortMode.MOMENTUM -> sortedWith(
+        compareByDescending<ShowSummary> { it.momentumScore }
+            .thenByDescending { it.hotScore48h }
+            .thenByDescending { it.rating }
+            .thenByDescending { it.date }
+    )
+}
+
+fun List<ShowSummary>.sortedBy(mode: ShowSortMode): List<ShowSummary> = sortedByMode(mode)
+
+@JvmName("filterShowsByTag")
+fun List<ShowSummary>.filterByTag(tagName: String): List<ShowSummary> =
+    if (tagName.isBlank() || tagName.equals("All", ignoreCase = true)) this
+    else filter { show -> show.tags.any { it.name.equals(tagName, ignoreCase = true) } }
+
+@JvmName("filterTracksByTag")
+fun List<PlayableTrack>.filterByTag(tagName: String): List<PlayableTrack> =
+    if (tagName.isBlank() || tagName.equals("All", ignoreCase = true)) this
+    else filter { track -> track.tags.any { it.name.equals(tagName, ignoreCase = true) } }
 
 enum class Backend(val id: String) {
     PHISHIN("phishin"),
@@ -72,9 +178,16 @@ data class ShowSummary(
      *  there's no per-show equivalent on phish.in, where popularity means [Show.likesCount]
      *  and is queried server-side instead (see [POPULAR_PERIOD_ID]). */
     val rating: Double = 0.0,
+    val popularity: Popularity? = null,
+    val tags: List<TagRef> = emptyList(),
 ) {
     /** "McNichols Arena · Denver, CO" */
     val where: String get() = listOfNotNull(venue, location).joinToString(" · ")
+
+    val momentumScore: Double get() = popularity?.momentumScore ?: 0.0
+    val hotScore48h: Double get() = popularity?.hotScore48h ?: 0.0
+    val hotScore7d: Double get() = popularity?.hotScore7d ?: 0.0
+    val hotScore30d: Double get() = popularity?.hotScore30d ?: 0.0
 }
 
 /**
@@ -94,6 +207,7 @@ data class RecordingRef(
     val reviewCount: Int = 0,
     val taper: String? = null,
     val lineage: String? = null,
+    val tags: List<TagRef> = emptyList(),
 ) {
     /**
      * Relisten has no structured "matrix" flag — only [isSoundboard]. Where a matrix mix
@@ -119,6 +233,7 @@ data class PlayableTrack(
     val venueName: String? = null,
     val artUrl: String? = null,
     val flacUrl: String? = null,
+    val tags: List<TagRef> = emptyList(),
 )
 
 data class ShowDetail(
@@ -361,6 +476,7 @@ internal fun Show.toShowSummary() = ShowSummary(
     artUrl = albumCoverUrl ?: coverArtUrls?.medium,
     partial = audioStatus == "partial",
     recordingCount = 1,
+    tags = tags.map { it.toTagRef() },
 )
 
 internal fun Show.toShowDetail(): ShowDetail {
@@ -390,6 +506,7 @@ internal fun Track.toPlayableTrack(showArt: String?) = PlayableTrack(
     showDate = showDate,
     venueName = venueName,
     artUrl = showAlbumCoverUrl ?: showArt,
+    tags = tags.map { it.toTagRef() },
 )
 
 // -------------------------------------------------------------------- sharing

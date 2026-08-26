@@ -390,4 +390,102 @@ class CatalogTest {
         val picked = pickRandomShow(listOf(artist), random = Random(0)) { source }
         assertEquals(onlyPartial, picked)
     }
+
+    // ------------------------------------------------------------- tag & sort integration
+
+    @Test
+    fun `filterByTag filters shows by tag name case-insensitively and returns all for All or blank`() {
+        val sbd = TagRef(name = "SBD", priority = 10)
+        val matrix = TagRef(name = "Matrix", priority = 5)
+        val guest = TagRef(name = "Guest", priority = 2)
+
+        val show1 = ShowSummary(artist = dead, date = "1977-05-08", tags = listOf(sbd, matrix))
+        val show2 = ShowSummary(artist = dead, date = "1977-05-09", tags = listOf(sbd))
+        val show3 = ShowSummary(artist = dead, date = "1977-05-11", tags = listOf(guest))
+        val show4 = ShowSummary(artist = dead, date = "1977-05-12", tags = emptyList())
+        val list = listOf(show1, show2, show3, show4)
+
+        assertEquals(listOf("1977-05-08", "1977-05-09"), list.filterByTag("SBD").map { it.date })
+        assertEquals(listOf("1977-05-08", "1977-05-09"), list.filterByTag("sbd").map { it.date })
+        assertEquals(listOf("1977-05-08"), list.filterByTag("Matrix").map { it.date })
+        assertEquals(listOf("1977-05-11"), list.filterByTag("Guest").map { it.date })
+        assertEquals(4, list.filterByTag("All").size)
+        assertEquals(4, list.filterByTag("all").size)
+        assertEquals(4, list.filterByTag("").size)
+        assertEquals(4, list.filterByTag("   ").size)
+        assertTrue(list.filterByTag("NonExistent").isEmpty())
+    }
+
+    @Test
+    fun `filterByTag filters tracks by tag name case-insensitively and returns all for All or blank`() {
+        val jamcharts = TagRef(name = "Jamcharts", priority = 8)
+        val bustout = TagRef(name = "Bustout", priority = 6)
+
+        val t1 = PlayableTrack(id = "1", title = "Ghost", url = "http://a.mp3", tags = listOf(jamcharts))
+        val t2 = PlayableTrack(id = "2", title = "Destiny Unbound", url = "http://b.mp3", tags = listOf(bustout))
+        val t3 = PlayableTrack(id = "3", title = "Possum", url = "http://c.mp3", tags = emptyList())
+        val tracks = listOf(t1, t2, t3)
+
+        assertEquals(listOf("Ghost"), tracks.filterByTag("Jamcharts").map { it.title })
+        assertEquals(listOf("Ghost"), tracks.filterByTag("jamcharts").map { it.title })
+        assertEquals(listOf("Destiny Unbound"), tracks.filterByTag("Bustout").map { it.title })
+        assertEquals(3, tracks.filterByTag("All").size)
+        assertEquals(3, tracks.filterByTag("").size)
+        assertTrue(tracks.filterByTag("NonExistent").isEmpty())
+    }
+
+    @Test
+    fun `sortedByMode orders shows according to ShowSortMode rules`() {
+        val s1 = ShowSummary(
+            artist = dead, date = "1977-05-07", rating = 8.5,
+            popularity = Popularity(momentumScore = 0.5, hotScore48h = 10.0, hotScore7d = 50.0, hotScore30d = 100.0)
+        )
+        val s2 = ShowSummary(
+            artist = dead, date = "1977-05-08", rating = 9.8,
+            popularity = Popularity(momentumScore = 0.9, hotScore48h = 40.0, hotScore7d = 120.0, hotScore30d = 300.0)
+        )
+        val s3 = ShowSummary(
+            artist = dead, date = "1977-05-09", rating = 9.0,
+            popularity = Popularity(momentumScore = 0.7, hotScore48h = 25.0, hotScore7d = 90.0, hotScore30d = 200.0)
+        )
+        val list = listOf(s1, s3, s2)
+
+        assertEquals(listOf("1977-05-07", "1977-05-08", "1977-05-09"), list.sortedByMode(ShowSortMode.DATE_ASC).map { it.date })
+        assertEquals(listOf("1977-05-09", "1977-05-08", "1977-05-07"), list.sortedByMode(ShowSortMode.DATE_DESC).map { it.date })
+        assertEquals(listOf("1977-05-08", "1977-05-09", "1977-05-07"), list.sortedByMode(ShowSortMode.TOP_RATED).map { it.date })
+        assertEquals(listOf("1977-05-08", "1977-05-09", "1977-05-07"), list.sortedByMode(ShowSortMode.TRENDING_48H).map { it.date })
+        assertEquals(listOf("1977-05-08", "1977-05-09", "1977-05-07"), list.sortedByMode(ShowSortMode.HOT_7D).map { it.date })
+        assertEquals(listOf("1977-05-08", "1977-05-09", "1977-05-07"), list.sortedByMode(ShowSortMode.POPULAR_30D).map { it.date })
+        assertEquals(listOf("1977-05-08", "1977-05-09", "1977-05-07"), list.sortedByMode(ShowSortMode.MOMENTUM).map { it.date })
+    }
+
+    @Test
+    fun `tag filtering and sort mode can be combined seamlessly`() {
+        val sbd = TagRef(name = "SBD", priority = 10)
+        val aud = TagRef(name = "AUD", priority = 1)
+
+        val s1 = ShowSummary(artist = dead, date = "1977-05-07", tags = listOf(sbd), popularity = Popularity(hotScore48h = 10.0))
+        val s2 = ShowSummary(artist = dead, date = "1977-05-08", tags = listOf(sbd), popularity = Popularity(hotScore48h = 50.0))
+        val s3 = ShowSummary(artist = dead, date = "1977-05-09", tags = listOf(aud), popularity = Popularity(hotScore48h = 99.0))
+        val list = listOf(s1, s2, s3)
+
+        val filteredAndSorted = list.filterByTag("SBD").sortedByMode(ShowSortMode.TRENDING_48H)
+        assertEquals(listOf("1977-05-08", "1977-05-07"), filteredAndSorted.map { it.date })
+    }
+
+    @Test
+    fun `tag models round trip between Tag and TagRef`() {
+        val tag = Tag(name = "Soundboard", description = "Direct SBD feed", color = "#00FF00", priority = 10, notes = "Clean")
+        val ref = tag.toTagRef()
+        assertEquals("Soundboard", ref.name)
+        assertEquals("Direct SBD feed", ref.description)
+        assertEquals("#00FF00", ref.color)
+        assertEquals(10, ref.priority)
+
+        val tagBack = ref.toTag()
+        assertEquals(tag.name, tagBack.name)
+        assertEquals(tag.description, tagBack.description)
+        assertEquals(tag.color, tagBack.color)
+        assertEquals(tag.priority, tagBack.priority)
+    }
 }

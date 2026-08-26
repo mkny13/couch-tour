@@ -256,4 +256,57 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual(12, playable.likesCount)
         XCTAssertTrue(playable.likedByUser)
     }
+
+    // ---------------------------------------------------------------- pickRandomShow
+
+    private final class MockCatalogSource: MusicSource {
+        let backend: Backend
+        var periodsHandler: ((ArtistRef) -> [PeriodRef])?
+        var showsHandler: ((ArtistRef, PeriodRef) -> [ShowSummary])?
+
+        init(backend: Backend) {
+            self.backend = backend
+        }
+
+        func artists() async throws -> [ArtistRef] { [] }
+        func periods(artist: ArtistRef) async throws -> [PeriodRef] {
+            periodsHandler?(artist) ?? []
+        }
+        func shows(artist: ArtistRef, period: PeriodRef) async throws -> [ShowSummary] {
+            showsHandler?(artist, period) ?? []
+        }
+        func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
+            fatalError("Not used")
+        }
+        func search(term: String) async throws -> SearchHits {
+            SearchHits()
+        }
+    }
+
+    func testPickRandomShowPrefersCompleteShows() async throws {
+        let mock = MockCatalogSource(backend: .phishin)
+        mock.periodsHandler = { _ in [PeriodRef(id: "1997", label: "1997")] }
+        mock.showsHandler = { artist, _ in
+            [
+                ShowSummary(artist: artist, date: "1997-11-16", partial: true),
+                ShowSummary(artist: artist, date: "1997-11-17", partial: false),
+            ]
+        }
+
+        let show = try await pickRandomShow(artists: [PHISH], source: { _ in mock })
+        XCTAssertEqual("1997-11-17", show.date)
+        XCTAssertFalse(show.partial)
+    }
+
+    func testPickRandomShowThrowsOnEmptyArtists() async {
+        do {
+            _ = try await pickRandomShow(artists: [])
+            XCTFail("Should have thrown")
+        } catch CatalogError.noArtists {
+            // Expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
 }
+

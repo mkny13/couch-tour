@@ -321,4 +321,107 @@ class NextStopTest {
         val next = findNextTourStop(PHISH, "1997-11-17", "1997 Fall Tour") { source }
         assertEquals("1997-11-19", next?.date)
     }
+
+    // ------------------------------------------------------------------ defunct artist preferences (#68)
+
+    @Test
+    fun `tourFor resolves shows by preference tour name when specified`() = runBlocking {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val p1977 = PeriodRef("uuid-1977", "1977")
+        val p1972 = PeriodRef("uuid-1972", "1972")
+        val source = FakeSource(
+            Backend.RELISTEN,
+            periodsByArtist = mapOf("grateful-dead" to listOf(p1977, p1972)),
+            showsByPeriod = mapOf(
+                "uuid-1977" to listOf(
+                    ShowSummary(artist = dead, date = "1977-05-08", tourName = "Spring 1977"),
+                    ShowSummary(artist = dead, date = "1977-05-09", tourName = "Spring 1977"),
+                    ShowSummary(artist = dead, date = "1977-10-11", tourName = "Fall 1977"),
+                ),
+                "uuid-1972" to listOf(
+                    ShowSummary(artist = dead, date = "1972-04-08", tourName = "Europe '72"),
+                ),
+            ),
+        )
+
+        val pref = ArtistTourPreferenceEntity(artistKey = dead.key, tourName = "Spring 1977")
+        val result = tourFor(dead, pref) { source }
+        assertEquals(2, result.size)
+        assertTrue(result.all { it.tourName == "Spring 1977" })
+    }
+
+    @Test
+    fun `tourFor resolves shows by preference year when specified`() = runBlocking {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val p1977 = PeriodRef("uuid-1977", "1977")
+        val p1972 = PeriodRef("uuid-1972", "1972")
+        val source = FakeSource(
+            Backend.RELISTEN,
+            periodsByArtist = mapOf("grateful-dead" to listOf(p1977, p1972)),
+            showsByPeriod = mapOf(
+                "uuid-1977" to listOf(
+                    ShowSummary(artist = dead, date = "1977-05-08", tourName = "Not Part of a Tour"),
+                    ShowSummary(artist = dead, date = "1977-05-09", tourName = "Not Part of a Tour"),
+                ),
+                "uuid-1972" to listOf(
+                    ShowSummary(artist = dead, date = "1972-04-08", tourName = "Europe '72"),
+                ),
+            ),
+        )
+
+        val pref = ArtistTourPreferenceEntity(artistKey = dead.key, year = "1977")
+        val result = tourFor(dead, pref) { source }
+        assertEquals(2, result.size)
+        assertEquals(listOf("1977-05-08", "1977-05-09"), result.map { it.date })
+    }
+
+    @Test
+    fun `tourFor falls back to empty when defunct artist has no preference and latest show is untoured`() = runBlocking {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val p1995 = PeriodRef("uuid-1995", "1995")
+        val source = FakeSource(
+            Backend.RELISTEN,
+            periodsByArtist = mapOf("grateful-dead" to listOf(p1995)),
+            showsByPeriod = mapOf(
+                "uuid-1995" to listOf(
+                    ShowSummary(artist = dead, date = "1995-07-09", tourName = "Not Part of a Tour"),
+                ),
+            ),
+        )
+
+        val result = tourFor(dead, preference = null) { source }
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `currentTours resolves defunct artist shows when preference is provided in preferences map`() = runBlocking {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val p1977 = PeriodRef("uuid-1977", "1977")
+        val source = FakeSource(
+            Backend.RELISTEN,
+            periodsByArtist = mapOf("grateful-dead" to listOf(p1977)),
+            showsByPeriod = mapOf(
+                "uuid-1977" to listOf(
+                    ShowSummary(artist = dead, date = "1977-05-08", tourName = "Spring 1977"),
+                ),
+            ),
+        )
+
+        val prefs = mapOf(dead.key to ArtistTourPreferenceEntity(artistKey = dead.key, tourName = "Spring 1977"))
+        val result = currentTours(listOf(dead), preferences = prefs) { source }
+        assertEquals(1, result.size)
+        assertEquals("1977-05-08", result[0].date)
+    }
+
+    @Test
+    fun `NextStop cache key changes when preferences change`() {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val pref1 = mapOf(dead.key to ArtistTourPreferenceEntity(artistKey = dead.key, year = "1977"))
+        val pref2 = mapOf(dead.key to ArtistTourPreferenceEntity(artistKey = dead.key, year = "1972"))
+        val key1 = NextStop.cacheKey(listOf(dead), "2026-11-17", pref1)
+        val key2 = NextStop.cacheKey(listOf(dead), "2026-11-17", pref2)
+        val keyEmpty = NextStop.cacheKey(listOf(dead), "2026-11-17")
+        assertTrue(key1 != key2)
+        assertTrue(key1 != keyEmpty)
+    }
 }

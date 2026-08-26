@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -108,14 +109,47 @@ interface ProgressDao {
     suspend fun changedSince(since: Long): List<Progress>
 }
 
+@Entity(tableName = "artist_tour_preferences")
+data class ArtistTourPreferenceEntity(
+    @PrimaryKey @ColumnInfo(name = "artist_key") val artistKey: String,
+    @ColumnInfo(name = "tour_name") val tourName: String? = null,
+    @ColumnInfo(name = "year") val year: String? = null,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Dao
+interface ArtistTourPreferenceDao {
+    @Query("SELECT * FROM artist_tour_preferences WHERE artist_key = :artistKey")
+    suspend fun getPreference(artistKey: String): ArtistTourPreferenceEntity?
+
+    @Query("SELECT * FROM artist_tour_preferences WHERE artist_key = :artistKey")
+    fun getPreferenceFlow(artistKey: String): Flow<ArtistTourPreferenceEntity?>
+
+    @Query("SELECT * FROM artist_tour_preferences")
+    fun getAllPreferences(): Flow<List<ArtistTourPreferenceEntity>>
+
+    @Query("SELECT * FROM artist_tour_preferences")
+    suspend fun getAllPreferencesSync(): List<ArtistTourPreferenceEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPreference(preference: ArtistTourPreferenceEntity)
+
+    @Query("DELETE FROM artist_tour_preferences WHERE artist_key = :artistKey")
+    suspend fun deletePreference(artistKey: String)
+
+    @Query("DELETE FROM artist_tour_preferences")
+    suspend fun clearAll()
+}
+
 @Database(
-    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class],
-    version = 8,
+    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class],
+    version = 9,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
     abstract fun localPlaylistDao(): LocalPlaylistDao
+    abstract fun artistTourPreferenceDao(): ArtistTourPreferenceDao
 
     companion object {
         /**
@@ -213,6 +247,15 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /** Adds artist tour preferences (#68) for defunct/non-touring artists. */
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (`artist_key` TEXT NOT NULL, `tour_name` TEXT, `year` TEXT, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`artist_key`))"
+                )
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -225,7 +268,7 @@ abstract class PhishInDb : RoomDatabase() {
                 "phishin.db"
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                MIGRATION_6_7, MIGRATION_7_8,
+                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
             )
                 .build().also { instance = it }
         }

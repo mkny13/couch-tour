@@ -156,6 +156,9 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
             ArtworkBox(
                 artUrl = state.artUrl,
                 contentDescription = state.trackTitle,
+                artistName = state.artistName.ifEmpty { if (state.backend == Backend.PHISHIN.id) PHISH.name else null },
+                showDate = state.showDate,
+                venueName = state.venueName,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .fillMaxWidth(0.82f)
@@ -372,24 +375,26 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
     }
 }
 
-/** Artwork with a fallback icon behind it, so a null or failed [artUrl] isn't a blank hole. */
+/** Artwork with a procedural artwork fallback, so a null or failed [artUrl] renders vintage cassette graphics instead of a blank hole. */
 @Composable
-fun ArtworkBox(artUrl: String?, contentDescription: String?, modifier: Modifier = Modifier) {
-    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-        Icon(
-            Icons.Default.Album,
-            null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.align(Alignment.Center).fillMaxSize(0.4f),
-        )
-        if (artUrl != null) {
-            AsyncImage(
-                model = artUrl,
-                contentDescription = contentDescription,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
+fun ArtworkBox(
+    artUrl: String?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    show: ShowSummary? = null,
+    artistName: String? = null,
+    showDate: String? = null,
+    venueName: String? = null,
+) {
+    ShowArtwork(
+        artUrl = artUrl,
+        show = show,
+        artistName = artistName,
+        date = showDate,
+        venue = venueName,
+        contentDescription = contentDescription,
+        modifier = modifier,
+    )
 }
 
 @Composable

@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -328,6 +331,10 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
 
         val favoritedArtists = artists?.getOrNull()?.filter { it.key in favoriteKeys }.orEmpty()
+        val preferences by vm.artistTourPreferenceDao.getAllPreferences().collectAsState(initial = emptyList())
+        val preferencesMap = remember(preferences) { preferences.associateBy { it.artistKey } }
+        var tourPickerArtist by remember { mutableStateOf<ArtistRef?>(null) }
+
         // A second, independent load rather than part of loadArtistsByBackend's: it is a
         // multi-request walk of the favorited artists' catalogs (#13), far slower than the
         // artist list, and the screen's first paint must not wait on it. Keyed on the date and
@@ -340,8 +347,8 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         // isn't: it depends on the progress table, which changes the moment a show finishes.
         // So only currentTours' network result is behind loadOnce; oldestUnplayed runs fresh
         // on every recomposition against a live finishedKeys read.
-        val nextStopShows = loadOnce(today to favoritedArtists.map { it.key }) {
-            NextStop.load(favoritedArtists, today)
+        val nextStopShows = loadOnce(Triple(today, favoritedArtists.map { it.key }, preferencesMap)) {
+            NextStop.load(favoritedArtists, today, preferencesMap)
         }
         val finishedKeys by vm.progressDao.finishedKeys().collectAsState(initial = emptyList())
         val nextStop = remember(nextStopShows.value, finishedKeys) {
@@ -377,20 +384,56 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
 
             // Genuinely silent, not routed through loaded() — its null branch shows a spinner,
             // which is wrong for a discovery extra with nothing to announce while it loads.
-            nextStop?.let { show ->
+            if (nextStop != null) {
+                val show = nextStop
                 item { SectionHeader("Next Couch Tour stop", divided = true) }
                 item {
-                    RowItem(
-                        title = "${show.date} · ${show.artist.name}",
-                        subtitle = listOfNotNull(show.tourName, show.where.ifBlank { null }).joinToString(" — "),
-                        artUrl = show.artUrl,
-                        onClick = {
-                            when (show.artist.backend) {
-                                Backend.PHISHIN -> nav.navigate("show/${show.date}")
-                                Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
-                            }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            RowItem(
+                                title = "${show.date} · ${show.artist.name}",
+                                subtitle = listOfNotNull(show.tourName, show.where.ifBlank { null }).joinToString(" — "),
+                                artUrl = show.artUrl,
+                                show = show,
+                                onClick = {
+                                    when (show.artist.backend) {
+                                        Backend.PHISHIN -> nav.navigate("show/${show.date}")
+                                        Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                                    }
+                                }
+                            )
                         }
-                    )
+                        IconButton(
+                            onClick = { tourPickerArtist = show.artist },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Change Tour",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            } else if (favoritedArtists.isNotEmpty()) {
+                val untouredDefunct = favoritedArtists.filter { artist ->
+                    val pref = preferencesMap[artist.key] ?: preferencesMap[artist.id]
+                    pref == null || (pref.tourName == null && pref.year == null)
+                }
+                if (untouredDefunct.isNotEmpty()) {
+                    item { SectionHeader("Next Couch Tour stop", divided = true) }
+                    items(untouredDefunct, key = { "defunct-picker-${it.key}" }) { artist ->
+                        RowItem(
+                            title = "Choose tour/year for ${artist.name}",
+                            subtitle = "Pick a historical tour or year to track on your Next Stop shelf",
+                            artUrl = null,
+                            onClick = { tourPickerArtist = artist }
+                        )
+                    }
                 }
             }
 
@@ -523,6 +566,22 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 )
             }
         }
+
+        tourPickerArtist?.let { artist ->
+            TourPickerDialog(
+                artist = artist,
+                currentPreference = preferencesMap[artist.key] ?: preferencesMap[artist.id],
+                onDismiss = { tourPickerArtist = null },
+                onSave = { tour, yr ->
+                    vm.setArtistTourPreference(artist.key, tour, yr)
+                    tourPickerArtist = null
+                },
+                onClear = {
+                    vm.clearArtistTourPreference(artist.key)
+                    tourPickerArtist = null
+                }
+            )
+        }
     }
 }
 
@@ -573,18 +632,61 @@ fun ShowsScreen(period: String, nav: NavHostController) {
     val shows = loadOnce(period) {
         if (isPopular) PhishInApi.popularShows() else PhishInApi.showsForPeriod(period)
     }
+    var selectedTag by rememberSaveable(period) { mutableStateOf<String?>("All") }
 
     Column(Modifier.fillMaxSize()) {
         Header(if (isPopular) POPULAR_PERIOD_LABEL else period, nav)
         Loaded(shows.value) { list ->
+            val availableTags = remember(list) {
+                val tags = list.flatMap { it.tags }
+                    .distinctBy { it.name.lowercase() }
+                    .sortedWith(compareByDescending<Tag> { it.priority }.thenBy { it.name })
+                    .map { it.name }
+                if (tags.isNotEmpty()) listOf("All") + tags else emptyList()
+            }
+            val filtered = if (selectedTag.isNullOrBlank() || selectedTag.equals("All", ignoreCase = true)) {
+                list
+            } else {
+                list.filter { show -> show.tags.any { it.name.equals(selectedTag, ignoreCase = true) } }
+            }
+
             LazyColumn {
-                items(list, key = { it.date }) { show ->
+                if (availableTags.size > 1) {
+                    item {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        ) {
+                            items(availableTags, key = { it }) { tag ->
+                                val isSelected = (selectedTag == null && tag == "All") ||
+                                    selectedTag.equals(tag, ignoreCase = true)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { selectedTag = if (tag == "All") null else tag },
+                                    label = { Text(tag) },
+                                )
+                            }
+                        }
+                    }
+                }
+                if (filtered.isEmpty()) {
+                    item {
+                        Text(
+                            "No shows match tag \"$selectedTag\".",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
+                items(filtered, key = { it.date }) { show ->
                     val isPartial = show.audioStatus == "partial"
                     RowItem(
                         title = show.date,
                         subtitle = listOfNotNull(show.venueName, show.location)
                             .joinToString(" · "),
                         artUrl = show.coverArtUrls?.small,
+                        tags = show.tags.map { it.toTagRef() },
                         trailing = when {
                             isPopular -> "♥ ${show.likesCount}"
                             isPartial -> "partial"
@@ -716,47 +818,100 @@ fun ArtistShowsScreen(
             ?: source.periods(artist).firstOrNull { it.id == periodId } ?: error("Unknown period $periodId")
         Triple(artist, period, source.shows(artist, period))
     }
-    // Relisten's shows list already carries avg_rating (confirmed live, #21) — sorting here
-    // is free, no extra fetch, which is why this is scoped to a period already drilled into
-    // rather than a global "top rated" browse like phish.in's.
-    var sortByRating by rememberSaveable(periodId) { mutableStateOf(false) }
+    var sortMode by rememberSaveable(periodId) { mutableStateOf(ShowSortMode.DATE_DESC) }
+    var selectedTag by rememberSaveable(periodId) { mutableStateOf<String?>("All") }
+
+    val sortOptions = listOf(
+        ShowSortMode.DATE_DESC to "Date",
+        ShowSortMode.TOP_RATED to "Top rated",
+        ShowSortMode.TRENDING_48H to "Trending 48h",
+        ShowSortMode.HOT_7D to "Hot 7d",
+        ShowSortMode.POPULAR_30D to "Popular 30d",
+        ShowSortMode.MOMENTUM to "Momentum",
+    )
 
     Column(Modifier.fillMaxSize()) {
         Header(loaded.value?.getOrNull()?.second?.label ?: periodId, nav)
         Loaded(loaded.value) { (_, _, shows) ->
-            val ordered = if (sortByRating) shows.sortedByDescending { it.rating } else shows
+            val availableTags = remember(shows) {
+                val tags = shows.flatMap { it.tags }
+                    .distinctBy { it.name.lowercase() }
+                    .sortedWith(compareByDescending<TagRef> { it.priority }.thenBy { it.name })
+                    .map { it.name }
+                if (tags.isNotEmpty()) listOf("All") + tags else emptyList()
+            }
+            val filteredShows = if (selectedTag.isNullOrBlank() || selectedTag.equals("All", ignoreCase = true)) {
+                shows
+            } else {
+                shows.filterByTag(selectedTag!!)
+            }
+            val ordered = filteredShows.sortedByMode(sortMode)
+
             LazyColumn {
                 item {
-                    LazyRow(
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(vertical = 8.dp),
-                    ) {
-                        item {
-                            FilterChip(
-                                selected = !sortByRating,
-                                onClick = { sortByRating = false },
-                                label = { Text("Date") },
-                            )
+                    Column(Modifier.padding(vertical = 4.dp)) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        ) {
+                            items(sortOptions, key = { it.first.name }) { (mode, label) ->
+                                FilterChip(
+                                    selected = sortMode == mode,
+                                    onClick = { sortMode = mode },
+                                    label = { Text(label) },
+                                )
+                            }
                         }
-                        item {
-                            FilterChip(
-                                selected = sortByRating,
-                                onClick = { sortByRating = true },
-                                label = { Text("Top rated") },
-                            )
+                        if (availableTags.size > 1) {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(vertical = 4.dp),
+                            ) {
+                                items(availableTags, key = { it }) { tag ->
+                                    val isSelected = (selectedTag == null && tag == "All") ||
+                                        selectedTag.equals(tag, ignoreCase = true)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { selectedTag = if (tag == "All") null else tag },
+                                        label = { Text(tag) },
+                                    )
+                                }
+                            }
                         }
+                    }
+                }
+                if (ordered.isEmpty()) {
+                    item {
+                        Text(
+                            "No shows match tag \"$selectedTag\".",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
                     }
                 }
                 items(ordered, key = { it.date }) { show ->
                     val hasRating = show.rating > 0
                     val tapesLabel = if (show.recordingCount > 1) "${show.recordingCount} tapes" else null
+                    val trailingText = when (sortMode) {
+                        ShowSortMode.TRENDING_48H -> if (show.hotScore48h > 0) "🔥 ${"%.1f".format(show.hotScore48h)}" else if (hasRating) "★ ${"%.1f".format(show.rating)}" else null
+                        ShowSortMode.HOT_7D -> if (show.hotScore7d > 0) "🔥 ${"%.1f".format(show.hotScore7d)}" else if (hasRating) "★ ${"%.1f".format(show.rating)}" else null
+                        ShowSortMode.POPULAR_30D -> if (show.hotScore30d > 0) "🔥 ${"%.1f".format(show.hotScore30d)}" else if (hasRating) "★ ${"%.1f".format(show.rating)}" else null
+                        ShowSortMode.MOMENTUM -> if (show.momentumScore > 0) "⚡ ${"%.2f".format(show.momentumScore)}" else if (hasRating) "★ ${"%.1f".format(show.rating)}" else null
+                        ShowSortMode.TOP_RATED -> if (hasRating) "★ ${"%.1f".format(show.rating)}" else null
+                        else -> if (hasRating) "★ ${"%.1f".format(show.rating)}" else tapesLabel
+                    }
+                    val trailingSecondary = if (trailingText != null && trailingText != tapesLabel) tapesLabel else null
+
                     RowItem(
                         title = show.date,
                         subtitle = show.where,
                         artUrl = show.artUrl,
-                        trailing = if (hasRating) "★ ${"%.1f".format(show.rating)}" else tapesLabel,
-                        trailingSecondary = if (hasRating) tapesLabel else null,
+                        tags = show.tags,
+                        show = show,
+                        trailing = trailingText,
+                        trailingSecondary = trailingSecondary,
                         onClick = { nav.navigate("recording/$backendId/$artistId/${show.date}") }
                     )
                 }
@@ -826,9 +981,8 @@ private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: Str
     val summary = detail.summary
     Column {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = summary.artUrl,
-                contentDescription = null,
+            ShowArtwork(
+                show = summary,
                 modifier = Modifier.size(88.dp).clip(RoundedCornerShape(8.dp))
             )
             Spacer(Modifier.width(14.dp))
@@ -842,6 +996,18 @@ private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: Str
                 }
             }
             ShareButton(showShareText(summary.artist, date))
+        }
+        val headerTags = detail.recording?.tags?.takeIf { it.isNotEmpty() } ?: summary.tags
+        if (headerTags.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 8.dp),
+            ) {
+                items(headerTags.sortedByDescending { it.priority }) { tag ->
+                    TagBadge(tag)
+                }
+            }
         }
         // No source to switch on a single-source artist (Phish) or a show with only one.
         if (summary.artist.hasMultipleSources && detail.alternates.isNotEmpty()) {
@@ -965,6 +1131,52 @@ private fun SourceBadge(text: String, color: Color) {
 }
 
 @Composable
+fun TagBadge(
+    tag: TagRef,
+    modifier: Modifier = Modifier,
+) {
+    val fallbackColor = when (tag.name.uppercase()) {
+        "SBD", "SOUNDBOARD" -> MaterialTheme.colorScheme.primary
+        "FLAC" -> MaterialTheme.colorScheme.secondary
+        "MATRIX", "MATRIX?" -> MaterialTheme.colorScheme.tertiary
+        "JAMCHARTS" -> Color(0xFFE91E63)
+        "BUSTOUT", "BUSTOUT*" -> Color(0xFFFF9800)
+        "GUEST" -> Color(0xFF9C27B0)
+        "LORE" -> Color(0xFF009688)
+        else -> MaterialTheme.colorScheme.outline
+    }
+    val badgeColor = parseTagColor(tag.color, fallbackColor)
+    Surface(
+        color = badgeColor.copy(alpha = 0.18f),
+        contentColor = badgeColor,
+        shape = RoundedCornerShape(4.dp),
+        modifier = modifier.padding(end = 4.dp),
+    ) {
+        Text(
+            text = tag.name,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
+private fun parseTagColor(colorStr: String?, defaultColor: Color): Color {
+    if (colorStr.isNullOrBlank()) return defaultColor
+    return try {
+        val hex = colorStr.trim().removePrefix("#")
+        val colorInt = when (hex.length) {
+            6 -> (0xFF000000 or hex.toLong(16)).toInt()
+            8 -> hex.toLong(16).toInt()
+            else -> return defaultColor
+        }
+        Color(colorInt)
+    } catch (_: Throwable) {
+        defaultColor
+    }
+}
+
+@Composable
 private fun RecordingTrackRow(
     track: PlayableTrack,
     number: Int,
@@ -979,7 +1191,19 @@ private fun RecordingTrackRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("$number", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.width(28.dp))
-        Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(track.title, fontSize = 15.sp, maxLines = 1)
+            if (track.tags.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 2.dp),
+                ) {
+                    track.tags.sortedByDescending { it.priority }.take(3).forEach { tag ->
+                        TagBadge(tag)
+                    }
+                }
+            }
+        }
         Text(fmt(track.durationMs), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         // Relisten has no per-track page (trackShareUrl always null for it) — the share
         // falls back to the show link, so no trackSlug to pass here.
@@ -1119,6 +1343,126 @@ private fun RenamePlaylistDialog(currentName: String, onDismiss: () -> Unit, onR
 }
 
 @Composable
+private fun TourPickerDialog(
+    artist: ArtistRef,
+    currentPreference: ArtistTourPreferenceEntity?,
+    onDismiss: () -> Unit,
+    onSave: (tourName: String?, year: String?) -> Unit,
+    onClear: () -> Unit,
+) {
+    val periodsState = loadOnce(artist.key) {
+        val src = sourceFor(artist.backend)
+        src.periods(artist).filter { it.id != POPULAR_PERIOD_ID }
+    }
+    var selectedYear by rememberSaveable(currentPreference) { mutableStateOf(currentPreference?.year.orEmpty()) }
+    var tourNameInput by rememberSaveable(currentPreference) { mutableStateOf(currentPreference?.tourName.orEmpty()) }
+    var mode by rememberSaveable { mutableStateOf(if (currentPreference?.tourName != null && currentPreference.year == null) "tour" else "year") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Track tour for ${artist.name}") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Choose a historical tour or specific year to track on your Next Stop shelf.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = mode == "year",
+                        onClick = { mode = "year" },
+                        label = { Text("By Year") }
+                    )
+                    FilterChip(
+                        selected = mode == "tour",
+                        onClick = { mode = "tour" },
+                        label = { Text("By Tour Name") }
+                    )
+                }
+
+                if (mode == "year") {
+                    Loaded(periodsState.value) { periods ->
+                        val validYears = periods.map { it.label }.filter { it.isNotBlank() }
+                        Text("Select year:", style = MaterialTheme.typography.labelMedium)
+                        LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 240.dp)) {
+                            items(validYears) { yr ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedYear = yr }
+                                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        yr,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = if (selectedYear == yr) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (selectedYear == yr) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = tourNameInput,
+                        onValueChange = { tourNameInput = it },
+                        label = { Text("Tour Name (e.g. Europe '72, Spring 1977)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (selectedYear.isNotBlank()) {
+                        Text(
+                            "Optional Year filter: $selectedYear",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = (mode == "year" && selectedYear.isNotBlank()) || (mode == "tour" && tourNameInput.isNotBlank()),
+                onClick = {
+                    if (mode == "year") {
+                        onSave(null, selectedYear.trim())
+                    } else {
+                        onSave(tourNameInput.trim(), selectedYear.takeIf { it.isNotBlank() })
+                    }
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            Row {
+                if (currentPreference != null) {
+                    TextButton(onClick = onClear) { Text("Reset") }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        }
+    )
+}
+
+@Composable
 private fun SearchResultsList(
     results: SearchHits?,
     vm: PlayerViewModel,
@@ -1129,11 +1473,34 @@ private fun SearchResultsList(
         return
     }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedTag by rememberSaveable { mutableStateOf<String?>("All") }
     val artistsPresent = results.artistsPresent
     // Selection survives to a different query only by accident of key reuse — clear it once
     // the artist it named is no longer among the hits.
     val selectedArtist = artistsPresent.firstOrNull { "${it.backend.id}/${it.id}" == selected }
-    val r = results.filteredTo(selectedArtist)
+    val rArtist = results.filteredTo(selectedArtist)
+
+    val availableTags = remember(rArtist) {
+        val showTags = rArtist.shows.flatMap { it.tags }.map { it.name }
+        val trackTags = rArtist.tracks.flatMap { it.tags }.map { it.name }
+        val all = (showTags + trackTags).distinctBy { it.lowercase() }
+        if (all.isNotEmpty()) listOf("All") + all else emptyList()
+    }
+
+    val r = remember(rArtist, selectedTag) {
+        if (selectedTag.isNullOrBlank() || selectedTag.equals("All", ignoreCase = true)) {
+            rArtist
+        } else {
+            val tag = selectedTag!!
+            rArtist.copy(
+                shows = rArtist.shows.filterByTag(tag),
+                tracks = rArtist.tracks.filter { it.tags.any { t -> t.name.equals(tag, ignoreCase = true) } },
+                artists = emptyList(),
+                slices = emptyList(),
+                playlists = emptyList(),
+            )
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         if (artistsPresent.size > 1) {
@@ -1157,7 +1524,25 @@ private fun SearchResultsList(
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
+        }
+
+        if (availableTags.size > 1) {
+            LazyRow(
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(availableTags, key = { it }) { tag ->
+                    val isSelected = (selectedTag == null && tag == "All") ||
+                        selectedTag.equals(tag, ignoreCase = true)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedTag = if (tag == "All") null else tag },
+                        label = { Text(tag) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
         }
 
         if (r.isEmpty) {
@@ -1194,6 +1579,8 @@ private fun SearchResultsList(
                             show.where.ifBlank { null },
                         ).joinToString(" · "),
                         artUrl = show.artUrl,
+                        tags = show.tags,
+                        show = show,
                         onClick = {
                             when (show.artist.backend) {
                                 Backend.PHISHIN -> nav.navigate("show/${show.date}")
@@ -1234,6 +1621,7 @@ private fun SearchResultsList(
                             track.showDate, track.venueName, track.venueLocation
                         ).joinToString(" · "),
                         artUrl = track.showAlbumCoverUrl,
+                        tags = track.tags.map { it.toTagRef() },
                         trailing = fmt(track.duration),
                         trailingContent = {
                             LikeButton(
@@ -1867,21 +2255,36 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
 
 @Composable
 private fun ShowHeader(show: Show, trackCount: Int) {
-    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        AsyncImage(
-            model = show.albumCoverUrl ?: show.coverArtUrls?.medium,
-            contentDescription = null,
-            modifier = Modifier.size(88.dp).clip(RoundedCornerShape(8.dp))
-        )
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(PHISH.name, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-            Text(show.venueName.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text(show.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-            Text("$trackCount tracks · ${fmt(show.duration)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+    Column {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            ShowArtwork(
+                artUrl = show.albumCoverUrl ?: show.coverArtUrls?.medium,
+                artistName = PHISH.name,
+                date = show.date,
+                venue = show.venueName,
+                modifier = Modifier.size(88.dp).clip(RoundedCornerShape(8.dp))
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(PHISH.name, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                Text(show.venueName.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text(show.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                Text("$trackCount tracks · ${fmt(show.duration)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+            }
+            ShareButton(showShareText(PHISH, show.date))
+            LikeButton(Likable.Show, show.id, show.likedByUser, show.likesCount)
         }
-        ShareButton(showShareText(PHISH, show.date))
-        LikeButton(Likable.Show, show.id, show.likedByUser, show.likesCount)
+        if (show.tags.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 8.dp),
+            ) {
+                items(show.tags.sortedByDescending { it.priority }) { tag ->
+                    TagBadge(tag.toTagRef())
+                }
+            }
+        }
     }
 }
 
@@ -1939,9 +2342,8 @@ private fun AnniversaryCard(show: ShowSummary, nav: NavHostController) {
                 }
             }
     ) {
-        AsyncImage(
-            model = show.artUrl,
-            contentDescription = null,
+        ShowArtwork(
+            show = show,
             modifier = Modifier
                 .size(132.dp)
                 .clip(RoundedCornerShape(8.dp))
@@ -1963,9 +2365,11 @@ private fun ResumeCard(progress: Progress, vm: PlayerViewModel, nav: NavHostCont
 
     Column(Modifier.width(132.dp)) {
         Box {
-            AsyncImage(
-                model = progress.artUrl,
-                contentDescription = null,
+            ShowArtwork(
+                artUrl = progress.artUrl,
+                artistName = progress.artist,
+                date = progress.title,
+                venue = progress.subtitle,
                 modifier = Modifier
                     .size(132.dp)
                     .clip(RoundedCornerShape(8.dp))
@@ -2048,6 +2452,9 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
                             title = p.title,
                             subtitle = p.subtitle,
                             artUrl = p.artUrl,
+                            artistName = p.artist,
+                            date = p.title,
+                            venue = p.subtitle,
                             onClick = { openQueue(p, nav) },
                             trailing = when {
                                 p.finished -> "✓ completed"
@@ -2079,7 +2486,19 @@ private fun TrackRow(track: Track, number: Int, date: String, artUrl: String?, v
     ) {
         Text("$number", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.width(28.dp))
         // The set is already the section header above; repeating it per row is noise.
-        Text(track.title, fontSize = 15.sp, maxLines = 1, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(track.title, fontSize = 15.sp, maxLines = 1)
+            if (track.tags.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 2.dp),
+                ) {
+                    track.tags.sortedByDescending { it.priority }.take(3).forEach { tag ->
+                        TagBadge(tag.toTagRef())
+                    }
+                }
+            }
+        }
         Text(fmt(track.duration), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         ShareButton(trackShareText(PHISH, date, track.title, track.slug))
         LikeButton(Likable.Track, track.id, track.likedByUser, track.likesCount)
@@ -2214,6 +2633,9 @@ private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostCont
             ArtworkBox(
                 artUrl = state.artUrl,
                 contentDescription = "Open ${state.queueTitle}",
+                artistName = state.artistName.ifEmpty { if (state.backend == Backend.PHISHIN.id) PHISH.name else null },
+                showDate = state.showDate,
+                venueName = state.venueName,
                 modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
             )
             Spacer(Modifier.width(10.dp))
@@ -2321,12 +2743,18 @@ private fun SectionHeader(text: String, divided: Boolean = false) {
 private fun RowItem(
     title: String,
     subtitle: String,
-    artUrl: String?,
+    artUrl: String? = null,
+    tags: List<TagRef> = emptyList(),
     trailing: String? = null,
     /** A second, dimmer line under [trailing] — e.g. History's "last played" timestamp. */
     trailingSecondary: String? = null,
     /** Slot for a control that isn't part of the row's own click target, e.g. a heart. */
     trailingContent: (@Composable () -> Unit)? = null,
+    show: ShowSummary? = null,
+    artistName: String? = null,
+    date: String? = null,
+    venue: String? = null,
+    showArtwork: Boolean = (artUrl != null || show != null || (date != null && artistName != null)),
     onClick: () -> Unit,
 ) {
     Row(
@@ -2337,16 +2765,27 @@ private fun RowItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Rows without artwork (playlists, account actions) shouldn't reserve the slot.
-        if (artUrl != null) {
-            AsyncImage(
-                model = artUrl,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp))
+        if (showArtwork) {
+            ShowArtwork(
+                artUrl = artUrl ?: show?.artUrl,
+                show = show,
+                artistName = artistName ?: show?.artist?.name,
+                date = date ?: show?.date ?: title.takeIf { it.matches(Regex("""\d{4}-\d{2}-\d{2}""")) },
+                venue = venue ?: show?.venue ?: subtitle,
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)),
             )
             Spacer(Modifier.width(12.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                if (tags.isNotEmpty()) {
+                    Spacer(Modifier.width(6.dp))
+                    tags.sortedByDescending { it.priority }.take(2).forEach { tag ->
+                        TagBadge(tag)
+                    }
+                }
+            }
             if (subtitle.isNotBlank()) Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         if (trailing != null) {

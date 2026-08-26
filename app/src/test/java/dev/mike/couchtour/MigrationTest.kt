@@ -103,6 +103,29 @@ class MigrationTest {
     """.trimIndent()
     private val v7IdentityHash = "8f6c5f6f3e350c0e2308865a07dac721"
 
+    // From app/schemas/dev.mike.couchtour.PhishInDb/8.json — progress table from v7, with
+    // local_playlists and local_playlist_tracks tables added.
+    private val v8CreateTable = v7CreateTable
+    private val v8LocalPlaylistsTable = """
+        CREATE TABLE IF NOT EXISTS `local_playlists` (
+            `id` TEXT NOT NULL, `name` TEXT NOT NULL,
+            `trackCount` INTEGER NOT NULL DEFAULT 0,
+            `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )
+    """.trimIndent()
+    private val v8LocalPlaylistTracksTable = """
+        CREATE TABLE IF NOT EXISTS `local_playlist_tracks` (
+            `rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `playlistId` TEXT NOT NULL, `position` INTEGER NOT NULL,
+            `backend` TEXT NOT NULL, `trackId` TEXT NOT NULL, `showDate` TEXT NOT NULL,
+            `artistSlug` TEXT, `recordingId` TEXT, `title` TEXT NOT NULL,
+            `durationMs` INTEGER NOT NULL DEFAULT 0, `venueName` TEXT, `artUrl` TEXT,
+            FOREIGN KEY(`playlistId`) REFERENCES `local_playlists`(`id`) ON DELETE CASCADE
+        )
+    """.trimIndent()
+    private val v8IdentityHash = "20865f2b52a888b430c22cc90f62eb2f"
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -254,6 +277,40 @@ class MigrationTest {
         db.close()
     }
 
+    private fun createV8DatabaseWithRows() {
+        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        db.execSQL(v8CreateTable)
+        db.execSQL(v8LocalPlaylistsTable)
+        db.execSQL(v8LocalPlaylistTracksTable)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId` ON `local_playlist_tracks` (`playlistId`)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+        db.execSQL(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            arrayOf(v8IdentityHash),
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish',NULL)"""
+        )
+        db.execSQL(
+            """INSERT INTO local_playlists (id, name, trackCount, createdAt, updatedAt)
+               VALUES ('p1', 'Key Jams', 1, 1000, 1000)"""
+        )
+        db.execSQL(
+            """INSERT INTO local_playlist_tracks
+               (playlistId, position, backend, trackId, showDate, artistSlug, recordingId, title, durationMs, venueName, artUrl)
+               VALUES ('p1', 0, 'phishin', '42', '1997-11-17', NULL, NULL, 'Tweezer', 300000, 'McNichols', NULL)"""
+        )
+        db.version = 8
+        db.close()
+    }
+
     private fun openWithCurrentSchema(): PhishInDb =
         Room.databaseBuilder(context, PhishInDb::class.java, dbFile.name)
             .addMigrations(
@@ -264,6 +321,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_5_6,
                 PhishInDb.MIGRATION_6_7,
                 PhishInDb.MIGRATION_7_8,
+                PhishInDb.MIGRATION_8_9,
             )
             .allowMainThreadQueries()
             .build()
@@ -531,6 +589,60 @@ class MigrationTest {
             assertEquals(1, playlist.trackCount)
             assertEquals(2000L, playlist.updatedAt)
             assertEquals(listOf("Tweezer"), dao.tracksOnce("p1").map { it.title })
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v8 -> v9
+
+    @Test
+    fun `migrating from v8 keeps every progress and playlist row untouched`() = runBlocking {
+        createV8DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val progressDao = db.progressDao()
+            val playlistDao = db.localPlaylistDao()
+
+            assertEquals(2, progressDao.history().first().size)
+            assertTrue(progressDao.get("show:1992-12-02")!!.finished)
+            assertNull(progressDao.get("show:1997-02-13")!!.deletedAt)
+
+            val playlist = playlistDao.playlist("p1")!!
+            assertEquals("Key Jams", playlist.name)
+            assertEquals(1, playlist.trackCount)
+            val tracks = playlistDao.tracksOnce("p1")
+            assertEquals(1, tracks.size)
+            assertEquals("Tweezer", tracks[0].title)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `a database migrated from v8 accepts artist tour preferences`() = runBlocking {
+        createV8DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val prefDao = db.artistTourPreferenceDao()
+            val pref = ArtistTourPreferenceEntity(
+                artistKey = "relisten:grateful-dead",
+                tourName = "Spring 1977",
+                year = "1977",
+                updatedAt = 123456789L,
+            )
+            prefDao.upsertPreference(pref)
+
+            val retrieved = prefDao.getPreference("relisten:grateful-dead")
+            assertEquals(pref, retrieved)
+
+            val all = prefDao.getAllPreferences().first()
+            assertEquals(listOf(pref), all)
+
+            prefDao.deletePreference("relisten:grateful-dead")
+            assertNull(prefDao.getPreference("relisten:grateful-dead"))
         } finally {
             db.close()
         }

@@ -70,16 +70,19 @@ public struct RelistenYear: Codable, Equatable {
     public let uuid: String
     public let year: String
     public let showCount: Int
+    public let popularity: RelistenPopularity?
 
     enum CodingKeys: String, CodingKey {
         case uuid, year
         case showCount = "show_count"
+        case popularity
     }
 
-    public init(uuid: String, year: String, showCount: Int = 0) {
+    public init(uuid: String, year: String, showCount: Int = 0, popularity: RelistenPopularity? = nil) {
         self.uuid = uuid
         self.year = year
         self.showCount = showCount
+        self.popularity = popularity
     }
 
     public init(from decoder: Decoder) throws {
@@ -87,6 +90,7 @@ public struct RelistenYear: Codable, Equatable {
         uuid = try c.decode(String.self, forKey: .uuid)
         year = try c.decode(String.self, forKey: .year)
         showCount = try c.decodeIfPresent(Int.self, forKey: .showCount) ?? 0
+        popularity = try c.decodeIfPresent(RelistenPopularity.self, forKey: .popularity)
     }
 }
 
@@ -112,18 +116,39 @@ public struct RelistenShowSummary: Codable, Equatable {
     public let venue: RelistenVenue?
     public let tour: RelistenTour?
     public let sourceCount: Int
+    public let avgRating: Double
+    public let hasSoundboardSource: Bool
+    public let hasStreamableFlacSource: Bool
+    public let popularity: RelistenPopularity?
 
     enum CodingKeys: String, CodingKey {
         case displayDate = "display_date"
         case venue, tour
         case sourceCount = "source_count"
+        case avgRating = "avg_rating"
+        case hasSoundboardSource = "has_soundboard_source"
+        case hasStreamableFlacSource = "has_streamable_flac_source"
+        case popularity
     }
 
-    public init(displayDate: String, venue: RelistenVenue? = nil, tour: RelistenTour? = nil, sourceCount: Int = 0) {
+    public init(
+        displayDate: String,
+        venue: RelistenVenue? = nil,
+        tour: RelistenTour? = nil,
+        sourceCount: Int = 0,
+        avgRating: Double = 0.0,
+        hasSoundboardSource: Bool = false,
+        hasStreamableFlacSource: Bool = false,
+        popularity: RelistenPopularity? = nil
+    ) {
         self.displayDate = displayDate
         self.venue = venue
         self.tour = tour
         self.sourceCount = sourceCount
+        self.avgRating = avgRating
+        self.hasSoundboardSource = hasSoundboardSource
+        self.hasStreamableFlacSource = hasStreamableFlacSource
+        self.popularity = popularity
     }
 
     public init(from decoder: Decoder) throws {
@@ -132,6 +157,10 @@ public struct RelistenShowSummary: Codable, Equatable {
         venue = try c.decodeIfPresent(RelistenVenue.self, forKey: .venue)
         tour = try c.decodeIfPresent(RelistenTour.self, forKey: .tour)
         sourceCount = try c.decodeIfPresent(Int.self, forKey: .sourceCount) ?? 0
+        avgRating = try c.decodeIfPresent(Double.self, forKey: .avgRating) ?? 0.0
+        hasSoundboardSource = try c.decodeIfPresent(Bool.self, forKey: .hasSoundboardSource) ?? false
+        hasStreamableFlacSource = try c.decodeIfPresent(Bool.self, forKey: .hasStreamableFlacSource) ?? false
+        popularity = try c.decodeIfPresent(RelistenPopularity.self, forKey: .popularity)
     }
 }
 
@@ -268,17 +297,42 @@ public struct RelistenShowWithSources: Codable, Equatable {
     public let venue: RelistenVenue?
     public let tour: RelistenTour?
     public let sources: [RelistenSource]
+    public let avgRating: Double
+    public let hasSoundboardSource: Bool
+    public let hasStreamableFlacSource: Bool
+    public let sourceCount: Int
+    public let popularity: RelistenPopularity?
 
     enum CodingKeys: String, CodingKey {
         case displayDate = "display_date"
         case venue, tour, sources
+        case avgRating = "avg_rating"
+        case hasSoundboardSource = "has_soundboard_source"
+        case hasStreamableFlacSource = "has_streamable_flac_source"
+        case sourceCount = "source_count"
+        case popularity
     }
 
-    public init(displayDate: String, venue: RelistenVenue? = nil, tour: RelistenTour? = nil, sources: [RelistenSource] = []) {
+    public init(
+        displayDate: String,
+        venue: RelistenVenue? = nil,
+        tour: RelistenTour? = nil,
+        sources: [RelistenSource] = [],
+        avgRating: Double = 0.0,
+        hasSoundboardSource: Bool = false,
+        hasStreamableFlacSource: Bool = false,
+        sourceCount: Int = 0,
+        popularity: RelistenPopularity? = nil
+    ) {
         self.displayDate = displayDate
         self.venue = venue
         self.tour = tour
         self.sources = sources
+        self.avgRating = avgRating
+        self.hasSoundboardSource = hasSoundboardSource
+        self.hasStreamableFlacSource = hasStreamableFlacSource
+        self.sourceCount = sourceCount
+        self.popularity = popularity
     }
 
     public init(from decoder: Decoder) throws {
@@ -287,6 +341,11 @@ public struct RelistenShowWithSources: Codable, Equatable {
         venue = try c.decodeIfPresent(RelistenVenue.self, forKey: .venue)
         tour = try c.decodeIfPresent(RelistenTour.self, forKey: .tour)
         sources = try c.decodeIfPresent([RelistenSource].self, forKey: .sources) ?? []
+        avgRating = try c.decodeIfPresent(Double.self, forKey: .avgRating) ?? 0.0
+        hasSoundboardSource = try c.decodeIfPresent(Bool.self, forKey: .hasSoundboardSource) ?? false
+        hasStreamableFlacSource = try c.decodeIfPresent(Bool.self, forKey: .hasStreamableFlacSource) ?? false
+        sourceCount = try c.decodeIfPresent(Int.self, forKey: .sourceCount) ?? sources.count
+        popularity = try c.decodeIfPresent(RelistenPopularity.self, forKey: .popularity)
     }
 }
 
@@ -459,13 +518,23 @@ extension RelistenYear {
 
 extension RelistenShowSummary {
     public func toShowSummary(artist: ArtistRef) -> ShowSummary {
-        ShowSummary(
+        var tags: [Tag] = []
+        if hasSoundboardSource {
+            tags.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
+        }
+        if hasStreamableFlacSource {
+            tags.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
+        }
+        return ShowSummary(
             artist: artist,
             date: displayDate,
             venue: venue?.name,
             location: venue?.location,
             tourName: tour?.name,
-            recordingCount: max(sourceCount, 1)
+            recordingCount: max(sourceCount, 1),
+            rating: avgRating,
+            tags: tags,
+            popularity: popularity
         )
     }
 }
@@ -498,7 +567,7 @@ extension RelistenSource {
 }
 
 extension RelistenSourceTrack {
-    public func toPlayableTrack(artist: ArtistRef, showDate: String, venueName: String?, setName: String) -> PlayableTrack {
+    public func toPlayableTrack(artist: ArtistRef, showDate: String, venueName: String?, setName: String, tags: [Tag] = []) -> PlayableTrack {
         PlayableTrack(
             id: uuid,
             title: title,
@@ -509,7 +578,8 @@ extension RelistenSourceTrack {
             url: mp3Url ?? "",
             showDate: showDate,
             venueName: venueName,
-            flacUrl: flacUrl
+            flacUrl: flacUrl,
+            tags: tags
         )
     }
 }
@@ -524,26 +594,67 @@ extension RelistenShowWithSources {
             return sources.first
         }()
 
+        let chosenRecording = chosen?.toRecordingRef()
+
+        var showTags: [Tag] = []
+        let hasSbd = hasSoundboardSource || sources.contains { $0.isSoundboard }
+        let hasFlac = hasStreamableFlacSource || sources.contains { src in
+            src.sets.contains { set in set.tracks.contains { $0.flacUrl != nil && !$0.flacUrl!.isEmpty } }
+        }
+        let hasMatrix = sources.contains { $0.toRecordingRef().looksLikeMatrix }
+
+        if hasSbd {
+            showTags.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
+        }
+        if hasMatrix {
+            showTags.append(Tag(name: "Matrix", description: "Matrix recording (SBD + AUD)", priority: 8))
+        }
+        if hasFlac {
+            showTags.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
+        }
+
         let tracks: [PlayableTrack] = (chosen?.sets ?? [])
             .sorted { $0.index < $1.index }
             .flatMap { set in
                 set.tracks
                     .filter { !($0.mp3Url ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
-                    .map { $0.toPlayableTrack(artist: artist, showDate: displayDate, venueName: venue?.name, setName: set.name) }
+                    .map { track in
+                        var trackTags: [Tag] = []
+                        if chosenRecording?.isSoundboard == true {
+                            trackTags.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
+                        }
+                        if track.flacUrl != nil && !track.flacUrl!.isEmpty {
+                            trackTags.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
+                        }
+                        return track.toPlayableTrack(
+                            artist: artist,
+                            showDate: displayDate,
+                            venueName: venue?.name,
+                            setName: set.name,
+                            tags: trackTags
+                        )
+                    }
             }
 
+        let summary = ShowSummary(
+            artist: artist,
+            date: displayDate,
+            venue: venue?.name,
+            location: venue?.location,
+            tourName: tour?.name,
+            recordingCount: max(sources.count, 1),
+            rating: avgRating,
+            tags: showTags,
+            popularity: popularity
+        )
+
         return ShowDetail(
-            summary: ShowSummary(
-                artist: artist,
-                date: displayDate,
-                venue: venue?.name,
-                location: venue?.location,
-                tourName: tour?.name,
-                recordingCount: max(sources.count, 1)
-            ),
-            recording: chosen?.toRecordingRef(),
+            summary: summary,
+            recording: chosenRecording,
             alternates: sources.filter { $0.uuid != chosen?.uuid }.map { $0.toRecordingRef() },
-            tracks: tracks
+            tracks: tracks,
+            tags: showTags,
+            popularity: popularity
         )
     }
 }
