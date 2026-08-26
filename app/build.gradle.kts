@@ -21,6 +21,16 @@ val localProperties = Properties().apply {
 }
 val releaseStoreFile = localProperties.getProperty("release.storeFile")
 
+fun gitVersionName(): String {
+    return try {
+        val proc = ProcessBuilder("git", "describe", "--tags", "--abbrev=0").directory(rootDir).start()
+        val out = proc.inputStream.bufferedReader().readText().trim().removePrefix("v")
+        out.ifEmpty { "0.48" }
+    } catch (_: Exception) {
+        "0.48"
+    }
+}
+
 android {
     namespace = "dev.mike.couchtour"
     compileSdk = 36
@@ -33,8 +43,8 @@ android {
         // A workflow_dispatch release build passes -PversionName=$TAG (see
         // build-debug-apk.yml) so BuildConfig.VERSION_NAME reflects the actual release tag
         // (e.g. "v0.23") rather than this static placeholder; local and plain CI push builds
-        // fall back to it.
-        versionName = project.findProperty("versionName") as? String ?: "0.48"
+        // fall back to git tag or 0.48.
+        versionName = project.findProperty("versionName") as? String ?: gitVersionName()
         manifestPlaceholders["appLabel"] = "Couch Tour"
         manifestPlaceholders["appIcon"] = "ic_launcher"
     }
