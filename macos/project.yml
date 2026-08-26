@@ -45,10 +45,8 @@ targets:
     entitlements:
       path: Generated/CouchTour.entitlements
       properties:
-        com.apple.security.app-sandbox: true
+        com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
-        com.apple.security.temporary-exception.apple-events:
-          - com.apple.Terminal
 
   # Side-installable beta, mirroring Android's sideInstall build (D137): a distinct bundle id
   # and display name so it installs alongside the regular app instead of replacing it. The
@@ -86,7 +84,5 @@ targets:
     entitlements:
       path: Generated/CouchTourBeta/CouchTour.entitlements
       properties:
-        com.apple.security.app-sandbox: true
+        com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
-        com.apple.security.temporary-exception.apple-events:
-          - com.apple.Terminal
