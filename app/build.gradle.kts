@@ -21,13 +21,18 @@ val localProperties = Properties().apply {
 }
 val releaseStoreFile = localProperties.getProperty("release.storeFile")
 
-fun gitVersionName(): String {
+fun gitVersionName(isBeta: Boolean): String {
+    val cmd = if (isBeta) {
+        "git tag -l 'v*' | sort -V | tail -n 1"
+    } else {
+        "gh release view --json tagName -q .tagName 2>/dev/null || (git tag -l 'v*' | sort -V | tail -n 1)"
+    }
     return try {
-        val proc = ProcessBuilder("sh", "-c", "git tag -l 'v*' | sort -V | tail -n 1").directory(rootDir).start()
+        val proc = ProcessBuilder("sh", "-c", cmd).directory(rootDir).start()
         val out = proc.inputStream.bufferedReader().readText().trim().removePrefix("v")
-        out.ifEmpty { "0.51" }
+        out.ifEmpty { if (isBeta) "0.51" else "0.50" }
     } catch (_: Exception) {
-        "0.51"
+        if (isBeta) "0.51" else "0.50"
     }
 }
 
@@ -43,8 +48,9 @@ android {
         // A workflow_dispatch release build passes -PversionName=$TAG (see
         // build-debug-apk.yml) so BuildConfig.VERSION_NAME reflects the actual release tag
         // (e.g. "v0.23") rather than this static placeholder; local and plain CI push builds
-        // fall back to git tag or 0.48.
-        versionName = project.findProperty("versionName") as? String ?: gitVersionName()
+        // fall back to git tag or release.
+        val isBeta = project.findProperty("sideInstall") == "true"
+        versionName = project.findProperty("versionName") as? String ?: gitVersionName(isBeta)
         manifestPlaceholders["appLabel"] = "Couch Tour"
         manifestPlaceholders["appIcon"] = "ic_launcher"
     }

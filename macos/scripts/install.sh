@@ -26,8 +26,14 @@ fi
 echo "Regenerating Xcode project..."
 (cd "$macos_dir" && xcodegen generate)
 
-latest_tag=$(git -C "$macos_dir" tag -l 'v*' 2>/dev/null | sort -V | tail -n 1)
-latest_tag="${latest_tag:-$(git -C "$macos_dir" describe --tags --abbrev=0 2>/dev/null || echo "0.51")}"
+latest_prod_tag=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+if [ -z "$latest_prod_tag" ]; then
+    latest_prod_tag=$(gh release list --exclude-pre-releases -L 1 2>/dev/null | awk '{print $1}' || true)
+fi
+if [ -z "$latest_prod_tag" ]; then
+    latest_prod_tag=$(git -C "$macos_dir" tag -l 'v*' 2>/dev/null | sort -V | tail -n 1)
+fi
+latest_tag="${latest_prod_tag:-0.50}"
 raw_version="${1:-${VERSION:-$latest_tag}}"
 version="${raw_version#v}"
 
