@@ -9,6 +9,8 @@ macos_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_name="Couch Tour Beta.app"
 dest="/Applications/$app_name"
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 echo "Quitting any running instance..."
 pkill -f "$app_name/Contents/MacOS/Couch Tour Beta" 2>/dev/null || true
 sleep 1

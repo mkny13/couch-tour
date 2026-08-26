@@ -9,6 +9,8 @@ macos_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_name="Couch Tour.app"
 dest="/Applications/$app_name"
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 echo "Quitting any running instance..."
 pkill -f "$app_name/Contents/MacOS/Couch Tour" 2>/dev/null || true
 sleep 1
@@ -26,14 +28,14 @@ fi
 echo "Regenerating Xcode project..."
 (cd "$macos_dir" && xcodegen generate)
 
-latest_prod_tag=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+latest_prod_tag=$(curl -sL https://api.github.com/repos/mkny13/couch-tour/releases/latest 2>/dev/null | grep '"tag_name":' | head -1 | cut -d '"' -f 4 || true)
 if [ -z "$latest_prod_tag" ]; then
     latest_prod_tag=$(gh release list --exclude-pre-releases -L 1 2>/dev/null | awk '{print $1}' || true)
 fi
 if [ -z "$latest_prod_tag" ]; then
-    latest_prod_tag=$(git -C "$macos_dir" tag -l 'v*' 2>/dev/null | sort -V | tail -n 1)
+    latest_prod_tag="v0.50"
 fi
-latest_tag="${latest_prod_tag:-0.50}"
+latest_tag="${latest_prod_tag}"
 raw_version="${1:-${VERSION:-$latest_tag}}"
 version="${raw_version#v}"
 
