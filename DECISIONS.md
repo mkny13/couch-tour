@@ -2809,4 +2809,24 @@ Brought the macOS client to full feature parity with Android's home dashboard:
 - **Root Navigation Integration (`RootView.swift`, `AppModel.swift`):**
   - Added `.home` ("Home", `house` icon) as the default top destination in `SidebarSection`.
 
+## Iteration 56 — macOS Auto-Updates with Sparkle 2.x & GitHub Release Packaging (#60, D195)
 
+### D195 — Sparkle 2.x Auto-Updates, Appcast Channels, and Ad-Hoc Library Validation
+
+Implemented native background auto-updates and manual update checks for distributed macOS binaries (#60).
+
+- **Sparkle 2.x Framework Integration (`Updater.swift`, `project.yml`):**
+  - Integrated `Sparkle` 2.6.4 Swift Package into `CouchTour` (Production) and `CouchTourBeta` (Beta) schemes.
+  - Wrapped `SPUStandardUpdaterController` in `UpdaterViewModel` (`Updater.swift`) exposing published `canCheckForUpdates` and `automaticallyChecksForUpdates`.
+  - Configured appcast channels and public EdDSA signing keys in `Info.plist`:
+    - Production Feed: `https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml`
+    - Beta Feed: `https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml`
+    - `SUEnableAutomaticChecks: true`
+- **UI Surfaces:**
+  - Added "Check for Updates..." to the macOS application menu (`CommandGroup(after: .appInfo)` in `CouchTourApp.swift`).
+  - Added "Software Updates" section with automatic checks toggle in Settings window (`PlaybackSettingsView.swift`).
+  - Added "Check for Updates..." action in the sidebar footer (`RootView.swift`).
+- **Ad-Hoc Signing & Library Validation:**
+  - Set `com.apple.security.cs.disable-library-validation: true` and deep code-signing (`codesign --force --deep --sign -`) in `install.sh` / `install-beta.sh` so ad-hoc signed local builds load embedded `Sparkle.framework` without dyld signature validation crashes.
+- **Automated GitHub Release Packaging (`macos-release.yml`):**
+  - Added GitHub Actions workflow to build release `.app` bundles, package into `.zip` archives, and upload binaries alongside `appcast.xml` to GitHub Releases.
