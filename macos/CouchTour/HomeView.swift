@@ -508,7 +508,7 @@ struct HomeView: View {
     private var footerSection: some View {
         HStack {
             Spacer()
-            Text("Couch Tour \(Bundle.main.appVersionString)")
+            Text(Bundle.main.appVersionString)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             Spacer()
