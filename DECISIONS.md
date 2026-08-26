@@ -2859,3 +2859,24 @@ Brought full remote casting capabilities to Couch Tour's macOS desktop client, m
 - macOS Swift package tests (`swift test`): 355/355 tests passing (+9 new Cast tests).
 - macOS Xcode project generation (`xcodegen generate`) and app target build (`xcodebuild`): Build succeeded (`CouchTour`).
 
+## Iteration 58 — phish.in Sign-In Fix on macOS Clients (D197)
+
+### D197 — Unauthenticated Login Requests, Email Whitespace Sanitization, and Keychain Memory Fallback
+
+Fixed issues preventing phish.in account login on macOS clients:
+
+- **Unauthenticated Login Requests (`PhishInAPI.swift`):**
+  - `PhishInAPI.send` and `post` now support an `authenticated: Bool` flag (defaulting to `true`).
+  - `PhishInAPI.login` explicitly passes `authenticated: false`, preventing stale or expired `X-Auth-Token` headers from being sent with login credentials, which caused the backend to reject valid logins.
+- **Email Whitespace Sanitization (`AccountView.swift`):**
+  - Trimmed leading/trailing whitespace and newlines from email inputs before sending, matching Android's `Session.login(email.trim(), password)` behavior.
+- **In-Memory Keychain Fallback (`PhishInAuth.swift`):**
+  - Added `memoryJwt` and `memoryUsername` cache/fallback to `PhishInTokenStore`, matching Android's `TokenStore` in `Auth.kt`. If Keychain access encounters signature changes or authorization prompts, the active session is reliably retained in memory for the app's lifetime.
+- **Interactive Home Screen Status (`HomeView.swift`):**
+  - Wrapped "phish.in Account" and "Sync" status cards in `HomeView` with buttons presenting modal sheets for `AccountView` and `SyncView`.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 355/355 tests passing.
+- macOS app builds (`xcodebuild`): `CouchTour` and `CouchTourBeta` clean builds verified.
+
+
