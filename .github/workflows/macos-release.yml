@@ -66,13 +66,51 @@ jobs:
             
           cd build/Build/Products/Release
           ditto -c -k --sequesterRsrc --keepParent "$app_name" "$zip_name"
-          
+
           echo "ZIP_PATH=macos/build/Build/Products/Release/$zip_name" >> $GITHUB_ENV
           echo "ZIP_NAME=$zip_name" >> $GITHUB_ENV
           echo "TAG_NAME=$tag" >> $GITHUB_ENV
+          if [ "$IS_BETA" = "true" ]; then
+            echo "APPCAST_NAME=appcast-beta.xml" >> $GITHUB_ENV
+          else
+            echo "APPCAST_NAME=appcast.xml" >> $GITHUB_ENV
+          fi
 
       - name: Upload zip to Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "$TAG_NAME" "$ZIP_PATH" --clobber
+
+      - name: Sign update and regenerate appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          generate_appcast="macos/build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast"
+          stage="$RUNNER_TEMP/appcast-stage"
+          mkdir -p "$stage"
+          cp "$ZIP_PATH" "$stage/"
+          cp "$APPCAST_NAME" "$stage/" 2>/dev/null || true
+
+          echo "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
+            --ed-key-file - \
+            -o "$stage/$APPCAST_NAME" \
+            --download-url-prefix "https://github.com/mkny13/couch-tour/releases/download/$TAG_NAME/" \
+            "$stage"
+
+          echo "APPCAST_STAGE=$stage" >> $GITHUB_ENV
+
+      - name: Commit updated appcast to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          cp "$APPCAST_STAGE/$APPCAST_NAME" "$APPCAST_NAME"
+          git add "$APPCAST_NAME"
+          if git diff --cached --quiet; then
+            echo "No appcast changes to commit."
+          else
+            git commit -m "Update $APPCAST_NAME for $TAG_NAME"
+            git push origin main
+          fi

@@ -48,7 +48,7 @@ targets:
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
         SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml"
-        SUPublicEDKey: "n+C3drmqPeBN9G7dNDgkGknwMkHW99Y7CIGfXxx44WA="
+        SUPublicEDKey: "yWmYH/MYjiHVgfRTWDz1QQH39t+upIPeK1Dkh8eqcbA="
         SUEnableAutomaticChecks: true
     entitlements:
       path: Generated/CouchTour.entitlements
@@ -77,7 +77,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.mike.couchtour.mac.beta
         PRODUCT_NAME: "Couch Tour Beta"
-        MARKETING_VERSION: "0.54-beta"
+        MARKETING_VERSION: "0.55-beta"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.0"
@@ -93,7 +93,7 @@ targets:
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
         SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml"
-        SUPublicEDKey: "n+C3drmqPeBN9G7dNDgkGknwMkHW99Y7CIGfXxx44WA="
+        SUPublicEDKey: "yWmYH/MYjiHVgfRTWDz1QQH39t+upIPeK1Dkh8eqcbA="
         SUEnableAutomaticChecks: true
     entitlements:
       path: Generated/CouchTourBeta/CouchTour.entitlements

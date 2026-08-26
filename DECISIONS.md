@@ -2879,4 +2879,16 @@ Fixed issues preventing phish.in account login on macOS clients:
 - macOS Swift package tests (`swift test`): 355/355 tests passing.
 - macOS app builds (`xcodebuild`): `CouchTour` and `CouchTourBeta` clean builds verified.
 
+## Iteration 59 — macOS Auto-Update Pipeline Fix: Key Rotation and CI-Automated Appcasts (D198)
+
+### D198 — Sparkle Key Rotation, Automated Signing, and Appcast Generation in CI
+
+Auto-update was silently non-functional since D195 shipped: `appcast.xml`/`appcast-beta.xml` were hand-written once and never updated on later releases, and neither had a `sparkle:edSignature` — Sparkle 2.x refuses any update that doesn't verify against `SUPublicEDKey`, so even a current appcast entry would have been rejected. The original private EdDSA key was never durably saved anywhere and could not be recovered.
+
+- **Key rotation (`macos/project.yml`):** Generated a new EdDSA keypair via Sparkle's `generate_keys` tool; `SUPublicEDKey` updated for both `CouchTour` and `CouchTourBeta` targets. Every existing install (including production betas already in the field) has the old public key baked into its `Info.plist` and can never trust anything signed with the new key — a one-time manual reinstall is required to get back onto the auto-update chain.
+- **CI-automated signing and appcast generation (`macos-release.yml`):** After building and uploading the release zip, a new step runs Sparkle's `generate_appcast` tool (bundled with the SPM package under `macos/build/SourcePackages/artifacts/sparkle/Sparkle/bin/`) against a staging directory containing the new zip and the existing appcast file, signing with the private key from the `SPARKLE_PRIVATE_KEY` repo secret (piped via `--ed-key-file -`, never written to disk). A following step checks out `main` and commits the regenerated `appcast.xml`/`appcast-beta.xml` directly, so the feed `SUFeedURL` points at (raw GitHub content on `main`) always reflects the latest signed release without a manual editing step.
+- **Also fixed in the same pass (`macos-release.yml`):** the workflow's `xcodegen generate` step was producing a `.pbxproj` in `projectFormat: xcode16_0` (xcodegen's new default) that the runner's default Xcode 15.4 couldn't open ("future Xcode project file format (77)") — this had made every prior run of `macos-release.yml` fail before even reaching the signing problem above. Fixed by explicitly selecting the Xcode 16.2 install already present on the `macos-14` runner image.
+
+**Verification:** dispatched `macos-release.yml` for `v0.55-beta` end-to-end — build succeeded, zip uploaded, `appcast-beta.xml` regenerated with a valid `sparkle:edSignature` and committed to `main`.
+
 
