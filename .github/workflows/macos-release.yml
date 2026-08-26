@@ -30,6 +30,9 @@ jobs:
         run: |
           brew install xcodegen
 
+      - name: Select Xcode 16.2
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
       - name: Generate Xcode project
         run: |
           cd macos
