@@ -25,9 +25,13 @@ fi
 echo "Regenerating Xcode project..."
 (cd "$macos_dir" && xcodegen generate)
 
-echo "Building Release..."
+raw_version="${1:-${VERSION:-$(git -C "$macos_dir" describe --tags --abbrev=0 2>/dev/null || echo "0.1")}}"
+version="${raw_version#v}"
+
+echo "Building Release ($version)..."
 xcodebuild -project "$macos_dir/CouchTour.xcodeproj" -scheme CouchTour \
-    -configuration Release -destination 'platform=macOS' build
+    -configuration Release -destination 'platform=macOS' \
+    MARKETING_VERSION="$version" build
 
 # xcodegen gives CouchTour.xcodeproj a fresh identity on every `generate`, which makes Xcode
 # spin up a brand-new DerivedData folder rather than reusing the last one — so stale builds

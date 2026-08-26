@@ -23,9 +23,13 @@ fi
 echo "Regenerating Xcode project..."
 (cd "$macos_dir" && xcodegen generate)
 
-echo "Building Release..."
+raw_version="${1:-${VERSION:-$(git -C "$macos_dir" describe --tags --abbrev=0 2>/dev/null || echo "0.1")}}"
+version="${raw_version#v}-beta"
+
+echo "Building Release ($version)..."
 xcodebuild -project "$macos_dir/CouchTour.xcodeproj" -scheme CouchTourBeta \
-    -configuration Release -destination 'platform=macOS' build
+    -configuration Release -destination 'platform=macOS' \
+    MARKETING_VERSION="$version" build
 
 # DerivedData is keyed off the .xcodeproj name (CouchTour), not the scheme, so both targets'
 # builds land under the same "CouchTour-*" folder — see install.sh's own note on why this is
