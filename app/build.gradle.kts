@@ -34,7 +34,7 @@ android {
         // build-debug-apk.yml) so BuildConfig.VERSION_NAME reflects the actual release tag
         // (e.g. "v0.23") rather than this static placeholder; local and plain CI push builds
         // fall back to it.
-        versionName = project.findProperty("versionName") as? String ?: "1.0"
+        versionName = project.findProperty("versionName") as? String ?: "0.48"
         manifestPlaceholders["appLabel"] = "Couch Tour"
         manifestPlaceholders["appIcon"] = "ic_launcher"
     }
