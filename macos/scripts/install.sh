@@ -52,6 +52,9 @@ if [ ! -d "$built_app" ]; then
     exit 1
 fi
 
+echo "Signing application bundle and embedded frameworks..."
+codesign --force --deep --sign - "$built_app"
+
 echo "Installing to $dest..."
 rm -rf "$dest"
 cp -R "$built_app" "$dest"
