@@ -111,6 +111,12 @@ jobs:
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git checkout main
+            # The build step's xcodebuild run resolves Sparkle into CouchTourKit's own
+            # Package.resolved as a side effect (SPM quirk with a local package sibling to an
+            # external dependency in the same workspace) — that leaves an unstaged, unrelated
+            # change in the working tree, which git rebase refuses to run over. Discard it;
+            # this step only ever means to commit APPCAST_NAME.
+            git checkout -- .
             git rebase origin/main
             cp "$APPCAST_STAGE/$APPCAST_NAME" "$APPCAST_NAME"
             git add "$APPCAST_NAME"
