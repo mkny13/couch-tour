@@ -77,7 +77,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.mike.couchtour.mac.beta
         PRODUCT_NAME: "Couch Tour Beta"
-        MARKETING_VERSION: "0.58-beta"
+        MARKETING_VERSION: "0.59-beta"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.0"
