@@ -75,15 +75,17 @@ private struct CastRoutePickerMenu: View {
             }
 
             // Google Cast Devices
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Google Cast Devices")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fontWeight(.semibold)
                     Spacer()
-                    ProgressView()
-                        .controlSize(.mini)
+                    if player.castDiscovery.devices.isEmpty {
+                        ProgressView()
+                            .controlSize(.mini)
+                    }
                 }
 
                 if player.castDiscovery.devices.isEmpty {
@@ -92,38 +94,48 @@ private struct CastRoutePickerMenu: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 4)
                 } else {
-                    ForEach(player.castDiscovery.devices) { device in
-                        Button {
-                            player.connectCast(to: device)
-                            isPresented = false
-                        } label: {
-                            HStack {
-                                Image(systemName: "tv")
-                                    .foregroundStyle(player.castDeviceName == device.name ? Color.accentColor : Color.secondary)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(device.name)
-                                        .font(.subheadline)
-                                        .foregroundStyle(player.castDeviceName == device.name ? Color.accentColor : Color.primary)
-                                    if let model = device.modelName {
-                                        Text(model)
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(player.castDiscovery.devices) { device in
+                                Button {
+                                    player.connectCast(to: device)
+                                    isPresented = false
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "tv")
+                                            .foregroundStyle(player.castDeviceName == device.name ? Color.accentColor : Color.secondary)
+                                            .frame(width: 16)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(device.name)
+                                                .font(.subheadline)
+                                                .foregroundStyle(player.castDeviceName == device.name ? Color.accentColor : Color.primary)
+                                                .lineLimit(1)
+                                            if let model = device.modelName {
+                                                Text(model)
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        Spacer()
+                                        if player.castDeviceName == device.name {
+                                            Image(systemName: "checkmark")
+                                                .foregroundStyle(Color.accentColor)
+                                                .font(.caption)
+                                        }
                                     }
+                                    .contentShape(Rectangle())
+                                    .padding(.vertical, 5)
+                                    .padding(.horizontal, 2)
                                 }
-                                Spacer()
-                                if player.castDeviceName == device.name {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(Color.accentColor)
-                                        .font(.caption)
-                                }
+                                .buttonStyle(.plain)
                             }
-                            .contentShape(Rectangle())
-                            .padding(.vertical, 4)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .frame(maxHeight: 220)
                 }
             }
+
 
             Divider()
 

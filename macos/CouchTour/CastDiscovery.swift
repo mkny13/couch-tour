@@ -54,19 +54,25 @@ public final class CastDiscovery: ObservableObject {
             var modelName: String?
             var deviceId: String?
 
-            // Parse TXT record metadata
+            // NWTXTRecord exposes fields via getEntry(for:) which returns Entry?, not String?.
+            // Entry conforms to CustomStringConvertible; string interpolation extracts the value.
+            // Cast receivers advertise friendly name in "fn", model in "md", unique id in "id".
             if case let .bonjour(txtRecord) = result.metadata {
-                friendlyName = txtRecord.dictionary["fn"]
-                modelName = txtRecord.dictionary["md"]
-                deviceId = txtRecord.dictionary["id"]
+                if let e = txtRecord.getEntry(for: "fn") { friendlyName = "\(e)" }
+                if let e = txtRecord.getEntry(for: "md") { modelName = "\(e)" }
+                if let e = txtRecord.getEntry(for: "id") { deviceId = "\(e)" }
             }
 
             var host = ""
             var port = 8009
+            var serviceName = ""
 
             switch result.endpoint {
             case let .service(name, _, _, _):
-                if friendlyName == nil || friendlyName?.isEmpty == true {
+                serviceName = name
+                // Use TXT "fn" as the display name; fall back to the raw service name only
+                // when it's absent so users see "Desk" not "Chromecast-4581f47b...".
+                if friendlyName?.isEmpty != false {
                     friendlyName = name
                 }
                 host = "\(name)._googlecast._tcp.local."
@@ -77,7 +83,9 @@ public final class CastDiscovery: ObservableObject {
                 break
             }
 
-            let name = friendlyName ?? "Cast Device"
+            // Parentheses required: ?? has lower precedence than ?: so without them this
+            // becomes (friendlyName ?? serviceName).isEmpty ? "Cast Device" : serviceName.
+            let name = friendlyName ?? (serviceName.isEmpty ? "Cast Device" : serviceName)
             let id = deviceId ?? host
 
             if !host.isEmpty {
