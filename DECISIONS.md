@@ -2893,4 +2893,50 @@ Auto-update was silently non-functional since D195 shipped: `appcast.xml`/`appca
 
 **Verification:** dispatched `macos-release.yml` for `v0.55-beta` end-to-end — build succeeded, zip uploaded, `appcast-beta.xml` regenerated with a valid `sparkle:edSignature` and a real incrementing `sparkle:version`, and committed to `main`.
 
+## Iteration 60 — macOS periodic progress tick fires while paused, clobbering a synced-in advance (D199)
+
+### D199 — `Player`'s `AVQueuePlayer` time observer gates `saveProgress` on `isPlaying`, matching Android
+
+Reported live by Mike: played Halley's Comet (Phish, 2026-07-27) on the Mac, then resumed and
+continued into the next track on Android the next day. Back at the Mac — left open and paused
+on Halley's Comet the whole time, never relaunched — Continue Listening still showed Halley's
+Comet even though Sync reported a successful round trip and a "just now" timestamp on the stale
+row. D172/D173 (the last two sync-staleness bugs) were both already fixed and correctly in
+place — `ContinueListeningView`/`HomeView` do reload on `syncSession.lastSyncedAt`, and a real
+sync failure would have surfaced via `lastError`. This was a third, different bug.
+
+**Root cause: `Player.observePlayer()`'s periodic time observer isn't gated on playback state.**
+`AVQueuePlayer.addPeriodicTimeObserver` keeps invoking its block on schedule even while
+`rate == 0` (paused) — a known AVFoundation behavior, not a bug in Apple's framework. The
+observer called `saveProgress(force: false)` unconditionally on every tick, which reaches
+`ProgressRecorder.saveTick` and — subject only to its 5s internal throttle, not to whether
+anything actually changed — rewrites the local `progress` row for the still-loaded, unmoving
+queue with a fresh `updatedAt = now()`. `ProgressRecorder`'s own doc comment already says the
+intended rule is "write every 5s *while playing*," but nothing enforced that; the periodic
+observer fired regardless.
+
+That stale-but-freshly-timestamped local row is exactly what broke sync: the next round trip's
+`changedSince(lastPushWatermark)` saw it as legitimately changed and pushed it to the server,
+where last-write-wins by `updatedAt` let it silently overwrite Android's genuinely newer
+progress — even though the Mac's own data was actually the *older* state. The sync itself
+worked correctly end to end; it just synced the wrong snapshot outward.
+
+**Android already has the right shape for this.** `PlaybackService.kt`'s equivalent tick
+explicitly checks `if (active.isPlaying) saveNow()` before writing anything on its 5s loop; this
+worktree's job (`desktop-android-parity`) is exactly to find and close gaps like this one where
+macOS diverges from an already-correct Android behavior.
+
+**Fix:** wrap the `saveProgress(force: false)` call inside the periodic time observer in
+`if self.isPlaying { ... }` ([Player.swift](../macos/CouchTour/Player.swift)) — mirroring
+Android's gate. `positionMs` is still updated unconditionally (harmless — it doesn't move while
+paused), only the store write and its throttle-tracked `lastSaveTime` are skipped. All other
+`saveProgress(force: true)` call sites (play/pause toggle, track change, seek, cast handoff)
+are untouched — those are real events and are supposed to write immediately regardless of
+`isPlaying`.
+
+**Testing:** `swift test` — 355/355, unaffected (this bug lived entirely in the app-target
+`Player.swift`, which the SwiftPM package's own tests don't reach). `xcodebuild` succeeds. Not
+independently verified live beyond the build — the actual repro (leave a show loaded-paused
+overnight, advance it on another device, come back) takes real elapsed time to confirm; worth a
+manual check on the next beta.
 
