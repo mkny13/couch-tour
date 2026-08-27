@@ -105,13 +105,23 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git checkout main
-          cp "$APPCAST_STAGE/$APPCAST_NAME" "$APPCAST_NAME"
-          git add "$APPCAST_NAME"
-          if git diff --cached --quiet; then
-            echo "No appcast changes to commit."
-          else
+          # Retry up to 5 times in case a concurrent push (e.g. cut-beta.sh, another
+          # release workflow) lands between our fetch and push, causing a non-fast-forward
+          # rejection. Rebase re-applies our appcast change on top of whatever arrived.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git checkout main
+            git rebase origin/main
+            cp "$APPCAST_STAGE/$APPCAST_NAME" "$APPCAST_NAME"
+            git add "$APPCAST_NAME"
+            if git diff --cached --quiet; then
+              echo "No appcast changes to commit."
+              break
+            fi
             git commit -m "Update $APPCAST_NAME for $TAG_NAME"
-            git push origin main
-          fi
+            if git push origin main; then
+              break
+            fi
+            echo "Push rejected (attempt $attempt/5), rebasing and retrying..."
+            git reset --soft HEAD~1
+          done
