@@ -101,6 +101,16 @@ under a new iteration, update the README's test count if it moved, and open a PR
 > artists) and write the reasoning into DECISIONS.md — Batch C and a future #98 follow-up
 > will both reuse this.
 >
+> **Read `macos/CouchTour/BackButton.swift` before designing the push.** #96 landed shortly
+> before this batch: it adds `BackButtonToolbarItem` / `.navigationBackButton()`, a toolbar
+> back button driven by `@Environment(\.dismiss)` with a ⌘[ shortcut, and applies it to
+> `PeriodsView`, `ShowsView`, `ShowDetailView`, and `LocalPlaylistView` — including the two
+> destinations you'll be pushing. Use that helper rather than adding a second back
+> affordance. It also creates a case worth checking by hand: a view pushed from the player
+> bar onto a section stack the user never drilled into renders a Back button that dismisses
+> to that section's root, which may be a screen they were never on. Confirm that lands
+> somewhere sensible, and if it doesn't, say so in the PR rather than papering over it.
+>
 > Apply the same navigable identity to `NowPlayingInspector`'s header block, which renders
 > the same artist/date/track text inertly today.
 >
