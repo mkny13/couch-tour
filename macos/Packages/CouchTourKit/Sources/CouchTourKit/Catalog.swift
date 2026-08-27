@@ -752,6 +752,14 @@ public enum CatalogError: LocalizedError, Sendable {
     }
 }
 
+/// Restricts the "Surprise Me" draw to favorited artists, so the result is a show the user has
+/// actually expressed interest in rather than any of the ~200+ artist merged catalog (#101,
+/// supersedes D157). Falls back to the full merged list when nothing is favorited yet — the
+/// only way the button stays usable before a first-run user has starred anything.
+public func surpriseMeArtists(favorited: [ArtistRef], merged: [ArtistRef]) -> [ArtistRef] {
+    favorited.isEmpty ? merged : favorited
+}
+
 /// Picks a random show across artists for the "Surprise Me" feature.
 public func pickRandomShow(
     artists: [ArtistRef],

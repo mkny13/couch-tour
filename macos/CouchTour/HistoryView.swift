@@ -13,6 +13,8 @@ struct HistoryView: View {
     @State private var loadState: LoadState = .loading
     @State private var resumeError: String?
     @State private var selectedArtist: String?
+    @State private var navigationTarget: ResumeNavigationTarget?
+    @State private var resolvingRow: String?
 
     var body: some View {
         Group {
@@ -57,14 +59,17 @@ struct HistoryView: View {
                                     // ProgressRow's own third line already covers "last
                                     // played" — shared with Continue Listening, so it's not
                                     // repeated here.
-                                    ProgressRow(row: row)
+                                    ProgressRow(
+                                        row: row,
+                                        isResolvingNavigation: resolvingRow == row.queueKey,
+                                        onOpen: { Task { await openRow(row) } },
+                                        onPlay: { Task { await tapResume(row) } }
+                                    )
                                     Spacer()
                                     Text(status(for: row))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
-                                .contentShape(Rectangle())
-                                .onTapGesture { Task { await tapResume(row) } }
                             }
                         }
                     }
@@ -72,6 +77,12 @@ struct HistoryView: View {
             }
         }
         .navigationTitle("History")
+        .navigationDestination(item: $navigationTarget) { target in
+            switch target {
+            case .show(let show): ShowDetailView(show: show)
+            case .localPlaylist(let playlist): LocalPlaylistView(playlistId: playlist.id)
+            }
+        }
         .task { await load() }
         .onChange(of: player.queueKey) { _, _ in Task { await load() } }
         // Same staleness fix as ContinueListeningView: a background sync writes fresh rows but
@@ -100,6 +111,18 @@ struct HistoryView: View {
         } catch {
             resumeError = "Couldn't resume \(row.title): \(error.localizedDescription)"
         }
+    }
+
+    private func openRow(_ row: PlaybackProgress) async {
+        resolvingRow = row.queueKey
+        do {
+            navigationTarget = try await resolveNavigationTarget(
+                for: row, localPlaylistStore: appModel.localPlaylistStore
+            )
+        } catch {
+            resumeError = "Couldn't open \(row.title): \(error.localizedDescription)"
+        }
+        resolvingRow = nil
     }
 
     private func load() async {

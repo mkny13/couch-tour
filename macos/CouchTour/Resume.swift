@@ -36,6 +36,33 @@ func resolveShowDetail(for progress: PlaybackProgress, localPlaylistStore: Local
     }
 }
 
+/// Where tapping a Continue Listening row's artwork/title should navigate (#98). A local
+/// playlist can't go through `ShowDetailView` — it re-fetches by `artist.backend`/`date`, and a
+/// local playlist's synthetic summary (see `localPlaylistShowDetail` below) has neither — so it
+/// routes to `LocalPlaylistView` instead, the same destination `LocalPlaylistsView` already uses.
+enum ResumeNavigationTarget: Hashable {
+    case show(ShowSummary)
+    case localPlaylist(LocalPlaylist)
+}
+
+/// Resolves a stored `PlaybackProgress` row to where tapping it should navigate. Checks for a
+/// local playlist first — a cheap local `LocalPlaylistStore` read — rather than routing it
+/// through `resolveShowDetail`'s heavier track-resolving `.localPlaylist` branch, which exists
+/// to build a playable queue, not just to identify the target screen.
+func resolveNavigationTarget(
+    for progress: PlaybackProgress, localPlaylistStore: LocalPlaylistStore?
+) async throws -> ResumeNavigationTarget {
+    guard let ref = parseQueueKey(progress.queueKey) else { throw ResumeError.unresumable }
+    if ref.kind == .localPlaylist {
+        guard let localPlaylistStore, let playlist = try? localPlaylistStore.playlist(id: ref.id) else {
+            throw ResumeError.unresumable
+        }
+        return .localPlaylist(playlist)
+    }
+    let detail = try await resolveShowDetail(for: progress, localPlaylistStore: localPlaylistStore)
+    return .show(detail.summary)
+}
+
 /// Resumes at the stored track/position, unless the queue already finished — replaying a
 /// finished queue restarts from the top rather than reopening it a second from the end (D22).
 @MainActor

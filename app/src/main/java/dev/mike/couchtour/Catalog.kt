@@ -329,6 +329,15 @@ internal suspend fun loadArtistsByBackend(): Map<Backend, List<ArtistRef>> {
 }
 
 /**
+ * Restricts the "Surprise me" draw to favorited artists, so the result is a show the user has
+ * actually expressed interest in rather than any of the ~200+ artist merged catalog (#101,
+ * supersedes D157). Falls back to the full merged list when nothing is favorited yet — the
+ * only way the button stays usable before a first-run user has starred anything.
+ */
+internal fun surpriseMeArtists(favorited: List<ArtistRef>, merged: List<ArtistRef>): List<ArtistRef> =
+    favorited.ifEmpty { merged }
+
+/**
  * Picks a random show for the Home screen's "Surprise me" button (#20). Neither backend
  * exposes a random-show endpoint, so this walks the same artist → period → show path the
  * browse screens do: a random artist from the merged list, a random period of that artist,

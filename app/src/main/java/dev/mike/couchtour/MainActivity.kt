@@ -356,7 +356,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
 
         LazyColumn(Modifier.fillMaxSize()) {
-            item { SurpriseMeButton(artists?.getOrNull().orEmpty(), nav) }
+            item { SurpriseMeButton(surpriseMeArtists(favoritedArtists, artists?.getOrNull().orEmpty()), nav) }
 
             if (recent.isNotEmpty()) {
                 item { SectionHeader("Continue listening") }
