@@ -2940,3 +2940,93 @@ independently verified live beyond the build — the actual repro (leave a show 
 overnight, advance it on another device, come back) takes real elapsed time to confirm; worth a
 manual check on the next beta.
 
+## Iteration 61 — macOS Home Screen UX Polish, Batch A (#97, #98, #100, #101, D200)
+
+### D200 — Tour Picker Reload Ordering, Starred-Artist Surprise Me, Continue Listening Split Targets, and a macOS Feedback Launcher
+
+Four independent Home-screen fixes filed from Mike's own testing of macOS beta v0.57-beta
+(2026-08-26), worked as Batch A of the macOS UX polish pass (see
+[prompts/macos-ux-polish-batches.md](../prompts/macos-ux-polish-batches.md)).
+
+- **#100 — Next Stop shelf stale after saving a tour/year (`HomeView.swift`):**
+  `.sheet(item: $tourPickerArtist)` had no `onDismiss:`, so `TourPickerSheet.savePreference()`/
+  `clearPreference()` (both take the identical dismiss-without-reload shape) correctly
+  invalidated `NextStop`'s cache but nothing re-read it — `reloadDiscovery()` only ran on
+  `.task` and on `appModel.favorites.keys` changing, neither of which a tour preference save
+  touches. Fixed by adding `onDismiss: { await reloadProgress(); await reloadDiscovery() }`,
+  in that order — `reloadDiscovery()` reads `tourPreferences` from state, so it has to run
+  *after* `reloadProgress()` has refreshed that state, or it just recomputes the same stale
+  answer. **Android already invalidates correctly** — `MainActivity.kt`'s
+  `nextStopShows = loadOnce(Triple(today, favoritedArtists.keys, preferencesMap))` is keyed on
+  `preferencesMap`, itself `remember`'d off `getAllPreferences().collectAsState()`, a reactive
+  Room `Flow` — any DB write recomposes automatically. Left unchanged.
+- **#101 — "Surprise Me" pulls from starred artists, not the whole catalog (supersedes D157):**
+  Added `surpriseMeArtists(favorited:merged:)` to `Catalog.swift`/`Catalog.kt` — favorited when
+  non-empty, falling back to the full merged catalog otherwise. The fallback (rather than
+  disabling the button) was the deliberate call for the empty case: a first-run user with
+  nothing starred yet would otherwise find Surprise Me permanently dead, which is a worse
+  experience than the novelty-grade global draw D157 originally shipped. Both platforms agree.
+  `pickRandomShow` itself is unchanged — it already took whatever artist list it was handed.
+- **#98 — Continue Listening cards/rows split into two non-overlapping targets:**
+  `ResumeCardView` (`HomeView.swift`) and `ProgressRow` (`ContinueListeningView.swift`, also
+  used by `HistoryView.swift`) previously had exactly one meaning for the whole surface: resume.
+  Split so artwork/title/subtitle open the show page and a separate, much larger Resume button
+  (full-width below the text on the Home card; a `play.circle.fill` icon on sidebar/History
+  rows) resumes. Avoided the click-swallowing nesting the issue warned about (`Button` nested
+  in another `Button`'s or `NavigationLink`'s label loses clicks on macOS) by keeping the two
+  targets as *siblings* — the artwork is its own plain-style `Button`, Resume is a second,
+  separate `Button`, and the title/subtitle block uses `.onTapGesture` rather than a third
+  nested control — never one control inside another's label.
+  - Resolving a stored `PlaybackProgress` row to a navigable target needed a lookup, so added
+    `resolveNavigationTarget(for:localPlaylistStore:)` to `Resume.swift` rather than inventing a
+    second path: it reuses `resolveShowDetail` (the same resolution `resume(_:player:...)`
+    already does) for `.show`/`.recording` rows, taking `.summary` off the resulting
+    `ShowDetail`. Local playlists are the one case that can't reuse that path as-is —
+    `resolveShowDetail`'s `.localPlaylist` branch builds a synthetic `ShowSummary` (backend
+    `.phishin`, id `"local:<uuid>"`, date `"<n> tracks"`) meant for `Player.play(detail:)`, not
+    for `ShowDetailView`, which re-fetches by `artist.backend`/`date` and would call
+    `PhishInAPI.show(date: "<n> tracks")` — a guaranteed-failure request. So
+    `resolveNavigationTarget` checks `QueueRef.kind` first: a `.localPlaylist` row resolves via
+    a cheap local `LocalPlaylistStore.playlist(id:)` read and navigates to `LocalPlaylistView`
+    instead, the same destination `LocalPlaylistsView` already registers.
+  - Pushed via `.navigationDestination(item:)` bound to a `@State private var
+    resumeNavigationTarget: ResumeNavigationTarget?` (an enum over `.show`/`.localPlaylist`) in
+    each of `HomeView`, `ContinueListeningView`, and `HistoryView` — the value isn't known until
+    the async resolve on tap completes, so a static `NavigationLink(value:)` (used elsewhere in
+    these same files for already-known `ShowSummary`s) doesn't apply; the two destination
+    mechanisms coexist without conflict since `ResumeNavigationTarget` is a distinct type from
+    `ShowSummary`.
+  - `HistoryView.swift`'s `ProgressRow(row:)` call site wasn't in this batch's file list but
+    broke the build once `ProgressRow`'s signature changed (Swift reported it as "unable to
+    type-check this expression in reasonable time" — a misleading error the compiler tends to
+    emit for a mismatched SwiftUI-builder call site rather than a clear "missing arguments").
+    Updated it to the same split/resolve pattern rather than leave it broken; History gains the
+    same navigate-vs-resume behavior Continue Listening does, which was already the correct
+    direction for consistency.
+- **#97 — macOS Feedback button:** Quiet `questionmark.bubble` icon button (`FeedbackButton.swift`)
+  next to Surprise Me in `HomeView`'s header — deliberately unobtrusive, `.buttonStyle(.borderless)`,
+  not competing with Surprise Me's prominent styling. Opens
+  `https://github.com/mkny13/couch-tour/issues/new` pre-filled via `NSWorkspace.shared.open`,
+  mirroring Android's `FeedbackButton.kt`. The URL/body construction (`feedbackIssueURL(context:)`)
+  lives in `CouchTourKit/Feedback.swift` as a pure function over a `FeedbackContext` struct so it's
+  unit-testable without touching `Bundle`/`ProcessInfo`/`sysctl` — those live-environment reads stay
+  in the app-target `FeedbackButton.swift`, gathering `ProcessInfo.processInfo.operatingSystemVersionString`
+  for macOS version, `sysctlbyname("hw.model", ...)` for hardware model, `appModel.selection` for
+  current screen, and `#if BETA` for channel. **Uses `Bundle.main.appMarketingVersion` (bare, e.g.
+  `"0.57-beta"`), not `appVersionString`** (which already prefixes the display name, e.g. `"Couch
+  Tour Beta 0.57-beta"`) for both the title and the body's App Version field — using the latter would
+  have reproduced the exact "Couch Tour Couch Tour Beta" duplication this same batch's #98 work
+  fixed in the Home footer a few commits ago. Title follows Android's `Feedback (Couch Tour
+  <version>)` shape exactly so issues sort together.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 361/361 (+6: 2 for `surpriseMeArtists`, 4 for
+  `feedbackIssueURL`).
+- Android unit tests (`testDebugUnitTest`): passing, +2 for `surpriseMeArtists`.
+- macOS Xcode project generation and both app target builds (`CouchTour`, `CouchTourBeta`):
+  succeed.
+- Not independently verified with a live click-through of the running app — this environment's
+  GUI automation couldn't safely drive the built app without operating on Mike's live desktop
+  session (unrelated open windows/other tools) or his real, in-use `progressStore` databases;
+  worth a manual pass on the next beta, particularly the two-target hit-testing on #98's cards.
+

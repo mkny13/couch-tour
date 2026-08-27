@@ -17,6 +17,8 @@ struct HomeView: View {
     @State private var tourPickerArtist: ArtistRef?
     @State private var showAccountSheet = false
     @State private var showSyncSheet = false
+    @State private var resumeNavigationTarget: ResumeNavigationTarget?
+    @State private var resolvingResumeRow: String?
 
     private var mergedArtists: [ArtistRef] {
         mergeArtists(relistenArtists: relistenArtists, favorites: appModel.favorites.keys)
@@ -71,7 +73,21 @@ struct HomeView: View {
         .navigationTitle("Home")
         .navigationDestination(for: ArtistRef.self) { PeriodsView(artist: $0) }
         .navigationDestination(for: ShowSummary.self) { ShowDetailView(show: $0) }
-        .sheet(item: $tourPickerArtist) { artist in
+        .navigationDestination(item: $resumeNavigationTarget) { target in
+            switch target {
+            case .show(let show): ShowDetailView(show: show)
+            case .localPlaylist(let playlist): LocalPlaylistView(playlistId: playlist.id)
+            }
+        }
+        .sheet(item: $tourPickerArtist, onDismiss: {
+            Task {
+                // reloadDiscovery() reads tourPreferences from state, so it must run after
+                // reloadProgress() has refreshed that state — otherwise it just recomputes
+                // the same stale answer TourPickerSheet's save/clear was meant to invalidate.
+                await reloadProgress()
+                await reloadDiscovery()
+            }
+        }) { artist in
             TourPickerSheet(artist: artist)
         }
         .sheet(isPresented: $showAccountSheet) {
@@ -137,6 +153,8 @@ struct HomeView: View {
 
                 Spacer()
 
+                FeedbackButton(currentScreen: appModel.selection ?? .home)
+
                 Button {
                     Task { await surpriseMe() }
                 } label: {
@@ -180,9 +198,12 @@ struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(recent, id: \.queueKey) { item in
-                        ResumeCardView(progress: item) {
-                            Task { await tapResume(item) }
-                        }
+                        ResumeCardView(
+                            progress: item,
+                            isResolvingNavigation: resolvingResumeRow == item.queueKey,
+                            onPlay: { Task { await tapResume(item) } },
+                            onOpen: { Task { await openResumeRow(item) } }
+                        )
                     }
                 }
                 .padding(.vertical, 4)
@@ -522,7 +543,7 @@ struct HomeView: View {
         guard !mergedArtists.isEmpty else { return }
         isFindingSurprise = true
         do {
-            let show = try await pickRandomShow(artists: mergedArtists)
+            let show = try await pickRandomShow(artists: surpriseMeArtists(favorited: favoritedArtists, merged: mergedArtists))
             let detail = try await sourceFor(show.artist.backend).show(
                 artist: show.artist, date: show.date, recordingId: nil
             )
@@ -542,6 +563,18 @@ struct HomeView: View {
         } catch {
             alertMessage = "Couldn't resume \(row.title): \(error.localizedDescription)"
         }
+    }
+
+    private func openResumeRow(_ row: PlaybackProgress) async {
+        resolvingResumeRow = row.queueKey
+        do {
+            resumeNavigationTarget = try await resolveNavigationTarget(
+                for: row, localPlaylistStore: appModel.localPlaylistStore
+            )
+        } catch {
+            alertMessage = "Couldn't open \(row.title): \(error.localizedDescription)"
+        }
+        resolvingResumeRow = nil
     }
 
     private func reloadAll() async {
@@ -602,27 +635,31 @@ struct HomeView: View {
 
 private struct ResumeCardView: View {
     let progress: PlaybackProgress
+    let isResolvingNavigation: Bool
     let onPlay: () -> Void
+    let onOpen: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomTrailing) {
-                ArtworkView(
-                    url: progress.artUrl,
-                    size: 150
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                Button(action: onPlay) {
-                    Image(systemName: "play.fill")
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(.tint, in: Circle())
+            // Artwork/title/subtitle are one target that opens the show; the play button below
+            // is a second, non-overlapping target. A Button nested inside another Button's (or
+            // NavigationLink's) label swallows clicks on macOS, so this uses a plain tap gesture
+            // for navigation rather than wrapping the whole card in a second control — the real
+            // Button for play sits outside its hit area entirely (#98).
+            Button(action: onOpen) {
+                ZStack {
+                    ArtworkView(url: progress.artUrl, size: 150)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    if isResolvingNavigation {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(8)
+                            .background(.black.opacity(0.35), in: Circle())
+                    }
                 }
-                .buttonStyle(.plain)
-                .padding(8)
             }
+            .buttonStyle(.plain)
+            .disabled(isResolvingNavigation)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(progress.artist.isEmpty ? progress.title : "\(progress.artist) · \(progress.title)")
@@ -640,8 +677,19 @@ private struct ResumeCardView: View {
                     .foregroundStyle(.tertiary)
             }
             .frame(width: 150, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onOpen)
+
+            Button(action: onPlay) {
+                Label("Resume", systemImage: "play.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
         }
         .padding(8)
+        .frame(width: 150)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 }

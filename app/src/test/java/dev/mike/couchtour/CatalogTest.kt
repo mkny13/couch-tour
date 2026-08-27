@@ -267,6 +267,22 @@ class CatalogTest {
         assertEquals(listOf(PHISH, bigFav, smallFav, unfavoritedBiggest), merged)
     }
 
+    // ----------------------------------------------------------------- surpriseMeArtists (#101)
+
+    @Test
+    fun `surprise me artists uses favorited when any are starred`() {
+        val a = ArtistRef(Backend.RELISTEN, "a", "A")
+        val b = ArtistRef(Backend.RELISTEN, "b", "B")
+        assertEquals(listOf(a), surpriseMeArtists(favorited = listOf(a), merged = listOf(a, b)))
+    }
+
+    @Test
+    fun `surprise me artists falls back to merged when nothing is favorited`() {
+        val a = ArtistRef(Backend.RELISTEN, "a", "A")
+        val b = ArtistRef(Backend.RELISTEN, "b", "B")
+        assertEquals(listOf(a, b), surpriseMeArtists(favorited = emptyList(), merged = listOf(a, b)))
+    }
+
     // ----------------------------------------------------------------- search
 
     @Test

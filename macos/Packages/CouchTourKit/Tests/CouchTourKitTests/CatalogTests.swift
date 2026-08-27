@@ -248,6 +248,20 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual([PHISH, dead], merged)
     }
 
+    // ---------------------------------------------------------------- surpriseMeArtists (#101)
+
+    func testSurpriseMeArtistsUsesFavoritedWhenAnyAreStarred() {
+        let a = ArtistRef(backend: .relisten, id: "a", name: "A")
+        let b = ArtistRef(backend: .relisten, id: "b", name: "B")
+        XCTAssertEqual([a], surpriseMeArtists(favorited: [a], merged: [a, b]))
+    }
+
+    func testSurpriseMeArtistsFallsBackToMergedWhenNothingIsFavorited() {
+        let a = ArtistRef(backend: .relisten, id: "a", name: "A")
+        let b = ArtistRef(backend: .relisten, id: "b", name: "B")
+        XCTAssertEqual([a, b], surpriseMeArtists(favorited: [], merged: [a, b]))
+    }
+
     // ---------------------------------------------------------------- likes (#58)
 
     func testToPlayableTrackCarriesPhishInsLikeStateThrough() {
