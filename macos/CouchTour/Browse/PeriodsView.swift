@@ -31,6 +31,7 @@ struct PeriodsView: View {
         }
         .navigationTitle(artist.name)
         .navigationDestination(for: PeriodRef.self) { ShowsView(artist: artist, period: $0) }
+        .navigationBackButton()
         .task { await load() }
     }
 

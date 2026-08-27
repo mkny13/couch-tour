@@ -40,6 +40,7 @@ struct ShowsView: View {
         }
         .navigationTitle(period.label)
         .navigationDestination(for: ShowSummary.self) { ShowDetailView(show: $0) }
+        .navigationBackButton()
         .task { await load() }
     }
 
