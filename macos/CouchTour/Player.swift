@@ -349,7 +349,15 @@ final class Player: NSObject, ObservableObject {
         ) { [weak self] time in
             guard let self, !self.isCasting, time.isValid, !time.isIndefinite else { return }
             self.positionMs = Int64(time.seconds * 1000)
-            self.saveProgress(force: false)
+            // AVQueuePlayer keeps firing this observer on its interval even while paused —
+            // without this guard, a show left loaded-but-paused (e.g. overnight) got its local
+            // progress row re-stamped with a fresh updatedAt every ~5s for no real change. The
+            // next sync then saw that row as "changed" and pushed the stale position, clobbering
+            // whatever a second device had actually advanced to (last-write-wins). Mirrors
+            // Android's `if (active.isPlaying) saveNow()` gate in PlaybackService.kt.
+            if self.isPlaying {
+                self.saveProgress(force: false)
+            }
         }
     }
 
