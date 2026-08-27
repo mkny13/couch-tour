@@ -65,6 +65,15 @@ Historical implementation details and architectural choices are logged separatel
 
 ```mermaid
 flowchart LR
+    subgraph Polish ["Phase 2 Batch 4: macOS Desktop UX Polish"]
+        direction TB
+        P1["Batch A — #97 Feedback · #98 Continue Listening · #100 Tour Picker Refresh · #101 Surprise Me"]
+        P2["Batch B — #99 Player Bar Navigation"]
+        P3["Batch C — #102 Universal Design Pass & Sidebar Rethink"]
+        P1 --> P3
+        P2 --> P3
+    end
+
     subgraph NearTerm ["Phase 2: Discovery, Audio Fidelity & Media Power"]
         direction TB
         M1["#65 Offline Downloads"]
@@ -86,8 +95,28 @@ flowchart LR
         L4["#16 YouTube Audio/Video Support"]
     end
 
-    NearTerm --> LongTerm
+    Polish --> NearTerm --> LongTerm
 ```
+
+---
+
+### Phase 2 Batch 4: macOS Desktop UX Polish (v0.57-beta feedback)
+
+Filed from Mike's own testing of macOS beta **v0.57-beta** (2026-08-26). Small, targeted
+interaction fixes first; the broad design restructure last, because it rewrites the files the
+others touch. Batches A and B are independent and can run in parallel worktrees; Batch C is
+gated on both landing.
+
+Working prompts for each batch: [prompts/macos-ux-polish-batches.md](prompts/macos-ux-polish-batches.md).
+
+| Batch | Issue | Feature | Description | Platforms |
+|---|---|---|---|---|
+| **A** | **#97** | **macOS Feedback Launcher** | Feedback button in the Home header opening a pre-filled GitHub issue with version, screen, and OS metadata — macOS parity with Android's #87. | macOS |
+| **A** | **#98** | **Continue Listening Tap Targets** | Artwork and title open the show page; the play button becomes a distinctly larger, separate target that resumes. | macOS |
+| **A** | **#100** | **Tour Picker Refresh (bug)** | Saving a tour/year leaves the Next Couch Tour Stop shelf showing its previous show — `HomeView` never re-reads after the sheet dismisses. | macOS |
+| **A** | **#101** | **"Surprise Me" from Starred Artists** | Draw the random show from favorited artists rather than the full ~200-artist merged catalog (supersedes D157). | Android, macOS |
+| **B** | **#99** | **Player Bar Navigation** | Clicking the track or date in the player bar opens the show; clicking the artist opens the artist — Android parity, via a cross-section navigation route on `AppModel`. | macOS |
+| **C** | **#102** | **Universal Design Pass & Sidebar Rethink** | Affordance clarity, target sizing, non-color-only signals, shared card/section components, VoiceOver and Dynamic Type; plus a proposed replacement for the flat six-item sidebar. | macOS |
 
 ---
 
@@ -104,6 +133,7 @@ Focus on advanced audio streaming, caching infrastructure, and richer catalog ex
 | **#68** | **"Next Stop" Tour Picker for Defunct Artists** | For non-touring bands (e.g. Grateful Dead), allow the user to select a past tour or year to track on "Next Couch Tour Stop". | Android, macOS |
 | **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS |
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS |
+| **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS |
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS |
 | **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS |
 | **#60** | **macOS Auto-Updates (Sparkle)** | Integrate [Sparkle](https://sparkle-project.org) framework with a hosted appcast feed and signing keys for seamless desktop app updates. | macOS |
@@ -119,7 +149,7 @@ Longer-range exploration of new media surfaces and third-party streaming ecosyst
 | **#24** | **Advanced Source Selection & Taper Intelligence** | Side-by-side snippet comparisons across tapers, taper reputation scoring, and user-preferred / avoided taper filters. | Android, macOS |
 | **#86** | **Waveform Scrubber Visualization** | Render phish.in's `waveform_image_url` behind the player scrubber (nice-to-have visual enhancement). | Android, macOS |
 | **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. | Android TV |
-| **#15** | **Spotify Live Releases Support** | In-app playback or listening history integration for officially released live albums on Spotify. | Cross-platform |
+| **#15** | **Spotify/Tidal Live Release Links** | Where a show matches an officially released live album on Spotify or Tidal, surface a simple external link to it (in-app playback isn't feasible). | Cross-platform |
 | **#16** | **YouTube Concert Video / Audio** | Stream concert video from YouTube with a dedicated toggle for audio-only background playback. | Cross-platform |
 
 ---
