@@ -46,9 +46,7 @@ struct ShowDetailView: View {
                 }
             }
         }
-        .navigationTitle(show.date)
         .navigationSubtitle(show.where_)
-        .navigationBackButton()
         .task { await load() }
     }
 

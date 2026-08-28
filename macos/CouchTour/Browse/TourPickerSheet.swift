@@ -18,6 +18,7 @@ struct TourPickerSheet: View {
     @State private var isLoadingPeriods = true
     @State private var isLoadingTours = false
     @State private var errorMessage: String?
+    @State private var isConfirmingClear = false
 
     var body: some View {
         NavigationStack {
@@ -46,7 +47,7 @@ struct TourPickerSheet: View {
                             }
                             Spacer()
                             Button("Clear / Default", role: .destructive) {
-                                clearPreference()
+                                isConfirmingClear = true
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -141,6 +142,19 @@ struct TourPickerSheet: View {
             .task {
                 await initialize()
             }
+            // Marked destructive and, until now, confirming nothing (#102). Clearing throws
+            // away a setting the user had to go looking for a tour to make, and the button
+            // sits an inch from Save.
+            .confirmationDialog(
+                "Clear the Next Stop tour for \(artist.name)?",
+                isPresented: $isConfirmingClear,
+                titleVisibility: .visible
+            ) {
+                Button("Clear", role: .destructive) { clearPreference() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The Next Stop shelf will go back to tracking \(artist.name)'s most recent shows.")
+            }
         }
         .frame(minWidth: 420, minHeight: 380)
     }
@@ -184,8 +198,13 @@ struct TourPickerSheet: View {
                     .filter { !$0.isEmpty && $0 != notPartOfATour }
             ).sorted()
             availableTours = distinctTours
+            errorMessage = nil
         } catch {
+            // Was swallowed, which left "this year has no named tours" and "the request for
+            // this year's shows failed" reading identically — and the second one silently
+            // turns Save into a year-only preference (#102).
             availableTours = []
+            errorMessage = "Couldn't load tours for \(period.label): \(error.localizedDescription)"
         }
         isLoadingTours = false
     }

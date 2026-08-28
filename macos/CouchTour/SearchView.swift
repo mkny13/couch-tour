@@ -1,19 +1,20 @@
 import CouchTourKit
 import SwiftUI
 
-/// Debounced search across every backend, in its own sidebar section (D169) rather than a
-/// toolbar `.searchable` over browse or a ⌘F sheet — a search hit drills into the same
-/// PeriodsView/ShowsView/ShowDetailView destinations browse already has, without disturbing
-/// Artists' own drill-down state. Port of Android's SearchResultsList / searchFor
+/// Debounced search across every backend. Port of Android's SearchResultsList / searchFor
 /// (`MainActivity.kt`).
+///
+/// The results, only — the field itself is now persistent toolbar chrome (RootView.swift),
+/// which supersedes D169's "search is its own sidebar section". D169's real argument was that a
+/// search hit should drill into the same destinations browse uses without disturbing browse's
+/// own stack; with one stack for the window (D203) that's what pushing a `Route` does anyway,
+/// and search stops being a place you have to navigate *to* in order to look something up.
 struct SearchView: View {
-    @State private var query = ""
     @State private var hits: SearchHits?
     @State private var selectedArtistKey: String?
-    @FocusState private var isFocused: Bool
     @EnvironmentObject private var appModel: AppModel
 
-    private var term: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var term: String { appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         Group {
@@ -29,13 +30,6 @@ struct SearchView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle("Search")
-        .searchable(text: $query, prompt: "Artists, songs, venues, dates…")
-        // .searchFocused needs macOS 15; this project's deployment target is 14 (see
-        // project.yml), so the actual focus-on-⌘F behavior is gated inside the modifier —
-        // on 14 the field still gets shown (via appModel.selection = .search), just not
-        // auto-focused.
-        .modifier(FocusOnRequest(appModel: appModel, isFocused: $isFocused))
         // Collapses a burst of keystrokes into one request, the same debounce Android's
         // searchFor (produceState, key1 = term) uses. task(id:) cancels the previous run
         // whenever the trimmed term changes.
@@ -82,14 +76,6 @@ struct SearchView: View {
                 resultsListBody(filtered)
             }
         }
-        .navigationDestination(for: ArtistRef.self) { PeriodsView(artist: $0) }
-        .navigationDestination(for: SliceHit.self) { ShowsView(artist: $0.artist, period: $0.period) }
-        // Not ShowSummary directly: ShowsView (reached via a SliceHit push, above) already
-        // owns that type's destination for its own list, and SwiftUI only supports one
-        // navigationDestination per data type per NavigationStack — a second declaration
-        // here would silently lose one of them. SearchDestination is this stack's own type
-        // for the hits it links to directly (show and track rows).
-        .navigationDestination(for: SearchDestination.self) { ShowDetailView(show: $0.show) }
     }
 
     @ViewBuilder
@@ -98,7 +84,7 @@ struct SearchView: View {
             if !hits.artists.isEmpty {
                 Section("Artists") {
                     ForEach(hits.artists, id: \.self) { artist in
-                        NavigationLink(value: artist) {
+                        NavigationLink(value: Route.artist(artist)) {
                             row(title: artist.name, subtitle: "\(artist.showCount) \(plural(artist.showCount, "show"))")
                         }
                     }
@@ -107,7 +93,7 @@ struct SearchView: View {
             if !hits.shows.isEmpty {
                 Section("Shows") {
                     ForEach(hits.shows, id: \.self) { show in
-                        NavigationLink(value: SearchDestination(show: show)) {
+                        NavigationLink(value: Route.show(show)) {
                             row(title: show.date, subtitle: showSubtitle(show))
                         }
                     }
@@ -118,7 +104,7 @@ struct SearchView: View {
                 if !slices.isEmpty {
                     Section(kind.heading) {
                         ForEach(slices, id: \.self) { slice in
-                            NavigationLink(value: slice) {
+                            NavigationLink(value: Route.period(artist: slice.artist, period: slice.period)) {
                                 row(
                                     title: slice.period.label,
                                     subtitle: "\(slice.artist.name) · \(slice.period.showCount) \(plural(slice.period.showCount, "show"))"
@@ -134,7 +120,7 @@ struct SearchView: View {
             if !openableTracks.isEmpty {
                 Section("Tracks") {
                     ForEach(openableTracks, id: \.id) { track in
-                        NavigationLink(value: SearchDestination(show: showSummary(for: track))) {
+                        NavigationLink(value: Route.show(showSummary(for: track))) {
                             row(
                                 title: track.title,
                                 subtitle: [track.showDate, track.venueName, track.venueLocation].compactMap { $0 }.joined(separator: " · "),
@@ -186,37 +172,5 @@ struct SearchView: View {
     private func failureMessage(_ failed: Set<Backend>) -> String {
         let names = Backend.allCases.filter { failed.contains($0) }.map { $0 == .phishin ? "Phish" : "Relisten" }
         return "Couldn't search " + names.joined(separator: " or ") + "."
-    }
-}
-
-/// This stack's own identity for a show hit search links to directly, so it doesn't share
-/// `ShowSummary`'s `navigationDestination` with `ShowsView` (see the comment above).
-private struct SearchDestination: Hashable {
-    let show: ShowSummary
-}
-
-/// Applies `.searchFocused` only where it's available (macOS 15+); CouchTourApp's ⌘F command
-/// still switches to the Search section either way via `appModel.selection`, this only adds
-/// the auto-focus.
-private struct FocusOnRequest: ViewModifier {
-    let appModel: AppModel
-    var isFocused: FocusState<Bool>.Binding
-
-    func body(content: Content) -> some View {
-        if #available(macOS 15, *) {
-            content
-                .searchFocused(isFocused)
-                .onChange(of: appModel.focusSearchField) { _, shouldFocus in
-                    guard shouldFocus else { return }
-                    isFocused.wrappedValue = true
-                    appModel.focusSearchField = false
-                }
-        } else {
-            content
-                .onChange(of: appModel.focusSearchField) { _, shouldFocus in
-                    guard shouldFocus else { return }
-                    appModel.focusSearchField = false
-                }
-        }
     }
 }

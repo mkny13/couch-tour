@@ -57,13 +57,7 @@ struct MiniPlayerView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             if let track = player.currentTrack {
-                                Text(track.flacUrl?.isEmpty == false ? "FLAC" : "MP3")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .padding(.horizontal, 3)
-                                    .padding(.vertical, 1)
-                                    .background((track.flacUrl?.isEmpty == false ? Color.green : Color.secondary).opacity(0.18))
-                                    .foregroundStyle(track.flacUrl?.isEmpty == false ? Color.green : Color.secondary)
-                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                                StatusPill.codec(isFlac: track.flacUrl?.isEmpty == false)
                             }
                         }
                     }
@@ -85,6 +79,7 @@ struct MiniPlayerView: View {
                     Image(systemName: "backward.fill")
                 }
                 .disabled((player.currentIndex ?? 0) == 0)
+                .accessibilityLabel("Previous track")
 
                 Button {
                     player.togglePlayPause()
@@ -92,6 +87,7 @@ struct MiniPlayerView: View {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title2)
                 }
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
 
                 Button {
                     player.skipToNext()
@@ -99,6 +95,7 @@ struct MiniPlayerView: View {
                     Image(systemName: "forward.fill")
                 }
                 .disabled((player.currentIndex ?? -1) >= player.tracks.count - 1)
+                .accessibilityLabel("Next track")
 
                 scrubber
 
@@ -119,9 +116,11 @@ struct MiniPlayerView: View {
             } label: {
                 Image(systemName: volumeSymbol)
             }
+            .accessibilityLabel(player.volume == 0 ? "Unmute" : "Mute")
 
             Slider(value: $player.volume, in: 0...1)
                 .frame(width: 72)
+                .accessibilityLabel("Volume")
         }
     }
 
@@ -155,6 +154,8 @@ struct MiniPlayerView: View {
                     if !isEditing { dragPositionMs = nil }
                 }
             )
+            .accessibilityLabel("Playback position")
+            .accessibilityValue(fmt(Int64(displayedMs)))
             Text(fmt(duration)).font(.caption).monospacedDigit()
         }
         .frame(minWidth: 240)

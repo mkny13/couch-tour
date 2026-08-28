@@ -1,6 +1,10 @@
 import CouchTourKit
 import SwiftUI
 
+/// The hub. With the sidebar gone (D203) this screen *is* the app's navigation — its tiles are
+/// the only way into Artists, Playlists, and Listening, which is why they carry chevrons now
+/// rather than reading as decoration (#102's first complaint: clickable things that didn't look
+/// clickable, sitting beside non-clickable things that did).
 struct HomeView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
@@ -12,12 +16,14 @@ struct HomeView: View {
     @State private var nextStopShow: ShowSummary?
     @State private var tourPreferences: [ArtistTourPreference] = []
 
+    /// Non-nil when a load *failed*, as opposed to succeeding with nothing in it. These used to
+    /// be swallowed, so a network outage and an empty library rendered identically (#102).
+    @State private var artistsError: String?
+    @State private var progressError: String?
+
     @State private var isFindingSurprise = false
     @State private var alertMessage: String?
     @State private var tourPickerArtist: ArtistRef?
-    @State private var showAccountSheet = false
-    @State private var showSyncSheet = false
-    @State private var resumeNavigationTarget: ResumeNavigationTarget?
     @State private var resolvingResumeRow: String?
 
     private var mergedArtists: [ArtistRef] {
@@ -36,48 +42,33 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // MARK: - Header & Surprise Me
+            VStack(alignment: .leading, spacing: CardMetrics.sectionSpacing) {
                 headerSection
 
-                // MARK: - Continue Listening Shelf
+                if let progressError {
+                    InlineErrorView(message: progressError) { await reloadProgress() }
+                }
+
                 if !recent.isEmpty {
                     continueListeningSection
                 }
 
-                // MARK: - Next Couch Tour Stop
                 nextStopSection
 
-                // MARK: - On This Date Shelf
                 if !onThisDateShows.isEmpty {
                     onThisDateSection
                 }
 
-                // MARK: - Favorite Artists
                 if !favoritedArtists.isEmpty {
                     favoritesSection
                 }
 
-                // MARK: - Library & Quick Links
-                libraryOverviewSection
+                librarySection
 
-                // MARK: - Settings, Account & Sync
                 settingsAndSyncSection
-
-                // MARK: - Version Footer
-                footerSection
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
-        }
-        .navigationTitle("Home")
-        .navigationDestination(for: ArtistRef.self) { PeriodsView(artist: $0) }
-        .navigationDestination(for: ShowSummary.self) { ShowDetailView(show: $0) }
-        .navigationDestination(item: $resumeNavigationTarget) { target in
-            switch target {
-            case .show(let show): ShowDetailView(show: show)
-            case .localPlaylist(let playlist): LocalPlaylistView(playlistId: playlist.id)
-            }
         }
         .sheet(item: $tourPickerArtist, onDismiss: {
             Task {
@@ -89,30 +80,6 @@ struct HomeView: View {
             }
         }) { artist in
             TourPickerSheet(artist: artist)
-        }
-        .sheet(isPresented: $showAccountSheet) {
-            NavigationStack {
-                AccountView(session: appModel.phishInSession)
-                    .navigationTitle("Account")
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showAccountSheet = false }
-                        }
-                    }
-            }
-            .frame(minWidth: 420, minHeight: 280)
-        }
-        .sheet(isPresented: $showSyncSheet) {
-            NavigationStack {
-                SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
-                    .navigationTitle("Sync")
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showSyncSheet = false }
-                        }
-                    }
-            }
-            .frame(minWidth: 420, minHeight: 340)
         }
         .task {
             await reloadAll()
@@ -140,71 +107,58 @@ struct HomeView: View {
     // MARK: - Header & Surprise Me
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Couch Tour")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Text("Your live concert companion")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Button {
-                    Task { await surpriseMe() }
-                } label: {
-                    HStack(spacing: 8) {
-                        if isFindingSurprise {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Finding a show…")
-                        } else {
-                            Image(systemName: "shuffle")
-                            Text("Surprise Me")
-                        }
-                    }
-                    .font(.body.weight(.medium))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(isFindingSurprise || mergedArtists.isEmpty)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Couch Tour")
+                    .font(.title)
+                    .fontWeight(.bold)
+                Text("Your live concert companion")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
+
+            Spacer()
+
+            Button {
+                Task { await surpriseMe() }
+            } label: {
+                HStack(spacing: 8) {
+                    if isFindingSurprise {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Finding a show…")
+                    } else {
+                        Image(systemName: "shuffle")
+                        Text("Surprise Me")
+                    }
+                }
+                .font(.body.weight(.medium))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .disabled(isFindingSurprise || mergedArtists.isEmpty)
         }
     }
 
     // MARK: - Continue Listening Shelf
 
     private var continueListeningSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("Continue Listening", systemImage: "play.circle.fill")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Spacer()
-                Button("See All") {
-                    appModel.selection = .continueListening
-                }
-                .buttonStyle(.link)
-                .font(.caption)
+        Shelf("Continue Listening", systemImage: "play.circle.fill") {
+            NavigationLink(value: Route.listening) {
+                Text("See All")
             }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(recent, id: \.queueKey) { item in
-                        ResumeCardView(
-                            progress: item,
-                            isResolvingNavigation: resolvingResumeRow == item.queueKey,
-                            onPlay: { Task { await tapResume(item) } },
-                            onOpen: { Task { await openResumeRow(item) } }
-                        )
-                    }
-                }
-                .padding(.vertical, 4)
+            .buttonStyle(.link)
+            .font(.caption)
+        } content: {
+            ForEach(recent, id: \.queueKey) { item in
+                ResumeCardView(
+                    progress: item,
+                    isResolvingNavigation: resolvingResumeRow == item.queueKey,
+                    onPlay: { Task { await tapResume(item) } },
+                    onOpen: { Task { await openResumeRow(item) } }
+                )
             }
         }
     }
@@ -214,16 +168,11 @@ struct HomeView: View {
     @ViewBuilder
     private var nextStopSection: some View {
         if let show = nextStopShow {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Next Couch Tour Stop", systemImage: "bookmark.fill")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+            VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
+                SectionHeader("Next Couch Tour Stop", systemImage: "bookmark.fill")
 
                 HStack(spacing: 16) {
-                    ArtworkView(
-                        url: show.artURL,
-                        size: 64
-                    )
+                    ArtworkView(url: show.artURL, size: 64)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(show.date) · \(show.artist.name)")
@@ -243,7 +192,7 @@ struct HomeView: View {
 
                     Spacer()
 
-                    NavigationLink(value: show) {
+                    NavigationLink(value: Route.show(show)) {
                         HStack(spacing: 4) {
                             Image(systemName: "play.fill")
                             Text("Open Show")
@@ -256,14 +205,13 @@ struct HomeView: View {
                         tourPickerArtist = show.artist
                     } label: {
                         Image(systemName: "pencil")
-                            .font(.caption)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .help("Change Tour / Year for \(show.artist.name)")
+                    .accessibilityLabel("Change tour or year for \(show.artist.name)")
                 }
-                .padding(14)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                .cardSurface(padding: 14)
             }
         } else if !favoritedArtists.isEmpty {
             let untouredDefunct = favoritedArtists.filter { artist in
@@ -272,10 +220,8 @@ struct HomeView: View {
             }
 
             if !untouredDefunct.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("Next Couch Tour Stop", systemImage: "bookmark.fill")
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
+                    SectionHeader("Next Couch Tour Stop", systemImage: "bookmark.fill")
 
                     ForEach(untouredDefunct.prefix(2), id: \.key) { artist in
                         HStack {
@@ -294,8 +240,7 @@ struct HomeView: View {
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
-                        .padding(12)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                        .cardSurface()
                     }
                 }
             }
@@ -305,27 +250,16 @@ struct HomeView: View {
     // MARK: - On This Date Shelf
 
     private var onThisDateSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("On This Date", systemImage: "calendar.badge.clock")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Spacer()
-                Text("Anniversary shows")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(onThisDateShows, id: \.date) { show in
-                        NavigationLink(value: show) {
-                            AnniversaryCardView(show: show)
-                        }
-                        .buttonStyle(.plain)
-                    }
+        Shelf("On This Date", systemImage: "calendar.badge.clock") {
+            Text("Anniversary shows")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } content: {
+            ForEach(onThisDateShows, id: \.date) { show in
+                NavigationLink(value: Route.show(show)) {
+                    AnniversaryCardView(show: show)
                 }
-                .padding(.vertical, 4)
+                .buttonStyle(.plain)
             }
         }
     }
@@ -333,17 +267,16 @@ struct HomeView: View {
     // MARK: - Favorites Section
 
     private var favoritesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("Favorite Artists", systemImage: "star.fill")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Spacer()
+        VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
+            SectionHeader("Favorite Artists", systemImage: "star.fill")
+
+            if let artistsError {
+                InlineErrorView(message: artistsError) { await reloadArtists() }
             }
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 300), spacing: 12)], spacing: 12) {
                 ForEach(favoritedArtists, id: \.key) { artist in
-                    NavigationLink(value: artist) {
+                    NavigationLink(value: Route.artist(artist)) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(artist.name)
@@ -363,9 +296,9 @@ struct HomeView: View {
                                     .foregroundStyle(.yellow)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Remove \(artist.name) from favorites")
                         }
-                        .padding(12)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                        .cardSurface()
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
@@ -380,50 +313,46 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Library & Quick Links
+    // MARK: - Your Library
 
-    private var libraryOverviewSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Library & Explore")
-                .font(.title3)
-                .fontWeight(.semibold)
+    /// These three tiles are the navigation the sidebar used to be (D203).
+    private var librarySection: some View {
+        VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
+            SectionHeader("Your library")
+
+            if let artistsError, favoritedArtists.isEmpty {
+                InlineErrorView(message: artistsError) { await reloadArtists() }
+            }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                // Browse Artists
-                Button {
-                    appModel.selection = .artists
-                } label: {
-                    QuickLinkCard(
-                        title: "Browse Artists",
-                        subtitle: "\(mergedArtists.count) artists available",
+                NavigationLink(value: Route.artists) {
+                    NavigationTile(
+                        title: "Artists",
+                        subtitle: artistsError == nil
+                            ? "\(mergedArtists.count) \(plural(mergedArtists.count, "artist")) available"
+                            : "Couldn't load the artist list",
                         icon: "music.mic",
-                        color: .blue
+                        iconColor: .blue
                     )
                 }
                 .buttonStyle(.plain)
 
-                // Playlists
-                Button {
-                    appModel.selection = .playlists
-                } label: {
-                    QuickLinkCard(
+                NavigationLink(value: Route.playlists) {
+                    NavigationTile(
                         title: "Playlists",
                         subtitle: "Local & phish.in mixtapes",
                         icon: "music.note.list",
-                        color: .purple
+                        iconColor: .purple
                     )
                 }
                 .buttonStyle(.plain)
 
-                // History
-                Button {
-                    appModel.selection = .history
-                } label: {
-                    QuickLinkCard(
-                        title: "Listening History",
-                        subtitle: historyCount > 0 ? "\(historyCount) shows played" : "Recent listening",
+                NavigationLink(value: Route.listening) {
+                    NavigationTile(
+                        title: "Listening",
+                        subtitle: listeningSubtitle,
                         icon: "clock.arrow.circlepath",
-                        color: .orange
+                        iconColor: .orange
                     )
                 }
                 .buttonStyle(.plain)
@@ -431,108 +360,77 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Settings, Account & Sync
+    private var listeningSubtitle: String {
+        if progressError != nil { return "Couldn't load your history" }
+        if historyCount == 0 && recent.isEmpty { return "In progress & recently played" }
+        return "\(recent.count) in progress · \(historyCount) played"
+    }
 
+    // MARK: - Settings & Status
+
+    /// Every tile opens the existing ⌘, window at the tab it names. Home used to carry its own
+    /// Account and Sync *sheets* — a second copy of both forms (D197); those are gone, so each
+    /// form now exists in exactly one place (D203).
     private var settingsAndSyncSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Settings & Status")
-                .font(.title3)
-                .fontWeight(.semibold)
-
-            HStack(spacing: 16) {
-                // Account status
-                Button {
-                    showAccountSheet = true
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "person.crop.circle")
-                            .font(.title2)
-                            .foregroundStyle(.tint)
-                        VStack(alignment: .leading, spacing: 2) {
-                            if let username = appModel.phishInSession.username {
-                                Text("Signed in as \(username)")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("phish.in account connected")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("phish.in Account")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("Not signed in · Click to log in")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    .contentShape(Rectangle())
+        VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
+            SectionHeader("Settings & status") {
+                SettingsLink {
+                    Text("Open Settings…")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.link)
+                .font(.caption)
+            }
 
-                // Skip filler toggle
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Skip filler tracks")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("Intros, tuning & banter")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { appModel.playbackSettings.skipFiller },
-                        set: { appModel.playbackSettings.skipFiller = $0 }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                settingsTile(tab: .account) {
+                    NavigationTile(
+                        title: appModel.phishInSession.username ?? "phish.in Account",
+                        subtitle: appModel.phishInSession.username == nil
+                            ? "Not signed in · Click to log in"
+                            : "Signed in to phish.in",
+                        icon: "person.crop.circle",
+                        iconColor: .blue
+                    )
                 }
-                .frame(maxWidth: .infinity)
-                .padding(12)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
 
-                // Sync status
-                Button {
-                    showSyncSheet = true
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.title2)
-                            .foregroundStyle(appModel.syncSession.paired ? .green : .secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Sync")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text(appModel.syncSession.paired ? "Paired" : "Not paired · Click to set up")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+                settingsTile(tab: .sync) {
+                    NavigationTile(
+                        title: "Sync",
+                        subtitle: appModel.syncSession.paired ? "Syncing with your other devices" : "Click to set up",
+                        icon: "arrow.triangle.2.circlepath",
+                        iconColor: appModel.syncSession.paired ? .green : .secondary
+                    ) {
+                        // A pill with its own words, not just a green glyph — paired vs unpaired
+                        // used to be carried by tint alone (#102).
+                        StatusPill.paired(appModel.syncSession.paired)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+
+                settingsTile(tab: .playback) {
+                    NavigationTile(
+                        title: "Playback & updates",
+                        // Where the sidebar's version footer went: the Playback tab already
+                        // shows the version and "Check for Updates…", so rather than moving
+                        // that footer anywhere it simply stopped being duplicated (D203).
+                        subtitle: "\(appModel.playbackSettings.skipFiller ? "Skip filler on" : "Skip filler off") · \(Bundle.main.appVersionString)",
+                        icon: "gearshape",
+                        iconColor: .secondary
+                    )
+                }
             }
         }
     }
 
-    // MARK: - Version Footer
-
-    private var footerSection: some View {
-        HStack {
-            Spacer()
-            Text(Bundle.main.appVersionString)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-            Spacer()
+    /// `SettingsLink` is the sanctioned way to open the ⌘, scene (macOS 14+). It takes no
+    /// action closure, so the tab is set alongside its own tap rather than before it.
+    private func settingsTile<Content: View>(tab: SettingsTab, @ViewBuilder content: () -> Content) -> some View {
+        SettingsLink {
+            content()
         }
-        .padding(.top, 12)
+        .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture().onEnded {
+            appModel.settingsTab = tab
+        })
     }
 
     // MARK: - Actions & Data Loading
@@ -566,9 +464,10 @@ struct HomeView: View {
     private func openResumeRow(_ row: PlaybackProgress) async {
         resolvingResumeRow = row.queueKey
         do {
-            resumeNavigationTarget = try await resolveNavigationTarget(
-                for: row, localPlaylistStore: appModel.localPlaylistStore
-            )
+            switch try await resolveNavigationTarget(for: row, localPlaylistStore: appModel.localPlaylistStore) {
+            case .show(let show): appModel.path.append(.show(show))
+            case .localPlaylist(let playlist): appModel.path.append(.localPlaylist(playlist))
+            }
         } catch {
             alertMessage = "Couldn't open \(row.title): \(error.localizedDescription)"
         }
@@ -584,19 +483,24 @@ struct HomeView: View {
     private func reloadArtists() async {
         do {
             relistenArtists = try await RelistenCatalogSource.shared.artists()
+            artistsError = nil
         } catch {
-            // Keep empty on error
+            artistsError = "Couldn't load artists: \(error.localizedDescription)"
         }
     }
 
     private func reloadProgress() async {
-        guard let store = appModel.progressStore else { return }
+        guard let store = appModel.progressStore else {
+            progressError = appModel.progressStoreError
+            return
+        }
         do {
             recent = try store.inProgress()
             historyCount = try store.history().count
             tourPreferences = try store.getAllTourPreferences()
+            progressError = nil
         } catch {
-            // Drop on error
+            progressError = "Couldn't load your listening history: \(error.localizedDescription)"
         }
     }
 
@@ -637,6 +541,10 @@ private struct ResumeCardView: View {
     let onPlay: () -> Void
     let onOpen: () -> Void
 
+    /// Scales with the system text size so the title and track name below still fit when the
+    /// user turns text up — a fixed 150pt frame just clipped them (#102).
+    @ScaledMetric private var width: CGFloat = 150
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Artwork/title/subtitle are one target that opens the show; the play button below
@@ -647,7 +555,7 @@ private struct ResumeCardView: View {
             Button(action: onOpen) {
                 ZStack {
                     ArtworkView(url: progress.artUrl, size: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .clipShape(RoundedRectangle(cornerRadius: CardMetrics.cornerRadius))
                     if isResolvingNavigation {
                         ProgressView()
                             .controlSize(.small)
@@ -658,6 +566,7 @@ private struct ResumeCardView: View {
             }
             .buttonStyle(.plain)
             .disabled(isResolvingNavigation)
+            .accessibilityLabel("Open \(progress.title)")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(progress.artist.isEmpty ? progress.title : "\(progress.artist) · \(progress.title)")
@@ -674,7 +583,7 @@ private struct ResumeCardView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
-            .frame(width: 150, alignment: .leading)
+            .frame(width: width, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture(perform: onOpen)
 
@@ -686,22 +595,20 @@ private struct ResumeCardView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
         }
-        .padding(8)
-        .frame(width: 150)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+        .frame(width: width)
+        .cardSurface(padding: 8)
     }
 }
 
 private struct AnniversaryCardView: View {
     let show: ShowSummary
 
+    @ScaledMetric private var width: CGFloat = 140
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ArtworkView(
-                url: show.artURL,
-                size: 140
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            ArtworkView(url: show.artURL, size: 140)
+                .clipShape(RoundedRectangle(cornerRadius: CardMetrics.cornerRadius))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(show.date)
@@ -721,40 +628,8 @@ private struct AnniversaryCardView: View {
                         .lineLimit(1)
                 }
             }
-            .frame(width: 140, alignment: .leading)
+            .frame(width: width, alignment: .leading)
         }
-        .padding(8)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
-    }
-}
-
-private struct QuickLinkCard: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(color)
-                .frame(width: 32)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(12)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .cardSurface(padding: 8)
     }
 }

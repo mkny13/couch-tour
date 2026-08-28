@@ -2,9 +2,18 @@ import AppKit
 import CouchTourKit
 import Foundation
 
+/// Which form ⌘, shows. Home's Settings & status tiles each name one (D203) — the duplicate
+/// Account and Sync sheets Home used to carry are gone, so this is how a tile still lands
+/// somewhere specific.
+enum SettingsTab: Hashable {
+    case playback
+    case account
+    case sync
+}
+
 /// Holds the one `ProgressStore` for the app's lifetime. A failure to open the on-disk
 /// database is surfaced rather than crashing the app outright — the browse and playback
-/// screens don't depend on it, only Continue Listening and History do.
+/// screens don't depend on it, only Listening does.
 @MainActor
 final class AppModel: ObservableObject {
     let progressStore: ProgressStore?
@@ -32,21 +41,25 @@ final class AppModel: ObservableObject {
     /// Whether the Now Playing inspector is open. Lives here, not as local `@State` in
     /// RootView, because CouchTourApp's View-menu toggle needs to reach it too.
     @Published var showNowPlaying = false
-    /// The sidebar's current section. Lives here rather than as `@State` in RootView for the
-    /// same reason `showNowPlaying` does — CouchTourApp's ⌘F command switches to Search from
-    /// outside RootView.
-    @Published var selection: SidebarSection? = .home
-    /// Set true to ask SearchView to focus its search field, then cleared by SearchView once
-    /// it does — a one-shot signal rather than persistent state, so it doesn't fight the
-    /// field's own focus once the user starts typing.
+    /// The window's one navigation path (D203). Empty is Home. Lives here rather than as
+    /// `@State` in RootView for the same reason `showNowPlaying` does — the menu bar's ⌘1–⌘4
+    /// and the player bar both move the window from outside RootView.
+    ///
+    /// A typed `[Route]` rather than a `NavigationPath` because the toolbar breadcrumb has to
+    /// read the trail back out, and `NavigationPath` is type-erased.
+    @Published var path: [Route] = []
+    /// The persistent toolbar search field's text. Shared rather than owned by SearchView
+    /// because the field is now chrome that outlives the results screen it pushes.
+    @Published var searchQuery = ""
+    /// Set true to ask the toolbar's search field to take focus, then cleared once it does — a
+    /// one-shot rather than persistent state, so it doesn't fight the field's own focus once
+    /// the user starts typing. Still needed with the sidebar gone: a `Commands` scene can't
+    /// reach a `@FocusState` directly. What it no longer needs is the section hop ⌘F used to
+    /// take through `selection` (D169).
     @Published var focusSearchField = false
-    /// A destination queued for the Artists section to push, from the player bar or Now
-    /// Playing inspector — both sit outside any `NavigationStack` (RootView.swift), so this
-    /// is how a click there reaches one. One-shot, same as `focusSearchField`: ArtistsView
-    /// consumes it into its own `NavigationPath` and clears it here, so a later visit to
-    /// Artists doesn't re-push a stale destination. Artists is always the target — see
-    /// DECISIONS.md for why.
-    @Published var pendingArtistsDestination: PlayerBarDestination?
+    /// Which tab ⌘, opens on. Home's Settings & status tiles set this before opening the
+    /// window, so a tile lands on the form it names.
+    @Published var settingsTab: SettingsTab = .playback
 
     init() {
         do {
@@ -76,11 +89,27 @@ final class AppModel: ObservableObject {
         updater.checkForUpdates()
     }
 
-    /// Switches to Artists and queues `destination` for it to push. See
-    /// `pendingArtistsDestination` for why Artists is always the target.
+    /// Sends the window to a destination clicked in the player bar or the Now Playing
+    /// inspector, both of which sit outside the `NavigationStack`.
+    ///
+    /// Replaces the path rather than appending to it, so the click always lands on exactly the
+    /// destination named — not on top of whatever the user had already drilled into (D202's
+    /// reasoning, which survives the sidebar's removal intact). `routes(for:)` supplies the
+    /// levels above it so Back walks up through them.
     func navigate(to destination: PlayerBarDestination) {
-        pendingArtistsDestination = destination
-        selection = .artists
+        path = routes(for: destination)
+    }
+
+    /// Jumps to a top-level destination — the ⌘1–⌘4 menu items, and Home's own tiles. Same
+    /// replace-don't-append rule as `navigate(to:)`.
+    func jump(to route: Route?) {
+        path = route.map { [$0] } ?? []
+    }
+
+    /// Truncates the path to `count` levels, which is what clicking a breadcrumb does.
+    func popTo(depth count: Int) {
+        guard count < path.count else { return }
+        path = Array(path.prefix(count))
     }
 
     static func launchUpdateScript() {

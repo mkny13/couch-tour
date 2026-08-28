@@ -3142,3 +3142,156 @@ text inertly.
   live pass is what caught the `onAppear`/`onChange` bug above — it would not have been caught
   by `swift test` or a build-only check.
 
+
+## Iteration 64 — Batch C2: the macOS sidebar comes out (D203)
+
+### D203 — No sidebar: Home is the hub, one `NavigationStack`, a breadcrumb, and search as chrome (#102)
+
+The macOS client grew screen by screen and it showed (#102). Two problems, one pass.
+
+**The sidebar is gone entirely** — not trimmed, not replaced with a tab strip. C1 mocked a tab
+strip up and Mike rejected it as the same menu-of-destinations in a smaller box. The argument
+against the sidebar was never that six items is too many; it's that four of the six were *also*
+links on the first one. Home already carried a Continue Listening shelf with "See All", quick
+links to Artists/Playlists/History, and account/sync cards. A list of destinations beside a
+screen that already lists the same destinations is chrome earning nothing.
+
+So Home's quick-link tiles stop being decorative and become the navigation, which is what the
+chevrons are for. That also answers #102's first complaint directly: Home's clickable cards were
+`Button`s styled `.plain` over the same grey rectangle as the non-clickable "Skip filler tracks"
+card sitting between them, so nothing about a card said whether clicking it would do anything.
+
+**One `NavigationStack` for the window, not six.** Six existed to keep drill-down state from
+leaking between sidebar sections; with no sections there is nothing to leak between. The path is
+a typed `[Route]` (`CouchTourKit/Navigation.swift`) rather than a `NavigationPath`, because the
+breadcrumb has to read the trail back out and `NavigationPath` is type-erased. `Route` lives in
+the package for the same reason `PlayerBarDestination` does — it's a pure model with no SwiftUI
+in it, and being there is what makes it testable. The design-system views this batch also added
+are UI and stayed in the app target.
+
+Two things fell out of that consolidation that weren't the goal but are worth naming:
+
+- **Nine `navigationDestination(for:)` declarations became one.** Several declared the same type
+  from different screens.
+- **`SearchView`'s private `SearchDestination` wrapper is gone.** It existed only because SwiftUI
+  allows one destination per data type per stack, so pushing a `ShowSummary` from both `ShowsView`
+  and search required one of them to disguise it. With a single enum there is nothing to disguise.
+
+**A breadcrumb does the orientation job the sidebar's selected row used to do, and does it
+better.** A highlighted "Artists" row said the same thing whether you were looking at the artist
+list or four levels into a show; *Couch Tour › Grateful Dead › 1977* says where you actually are.
+Every crumb but the leaf truncates the path to that level, so it's a way back up as well.
+
+**Search is a persistent toolbar field, superseding D169.** D169's real argument was that a
+search hit should drill into the same destinations browse already has without disturbing browse's
+own stack — that survives, and pushing a `Route` is how. What doesn't survive is search being a
+*place you navigate to* in order to look something up, which is backwards for macOS. This also
+deletes the thing that was always a symptom: ⌘F used to set `selection = .search` and then ask
+`SearchView` to focus its field, and the focus half only worked on macOS 15 because
+`.searchFocused` has that floor while this app's deployment target is 14.0. A plain `TextField`
+with `@FocusState` has no such floor, so ⌘F focuses the field directly. Typing three characters
+pushes the results; clearing the field pops them, but only when results are the *top* of the
+path, so a search made before opening a hit doesn't yank the user back out of it.
+
+**Continue Listening and History merged into one "Listening" screen, superseding D171's
+placement.** They were two sections over the same table differing only in which rows they
+selected, and once Home grew its own Continue Listening shelf (#98) one of them was mostly a
+second copy of that shelf. D171's two substantive choices both survive: flat and newest-first
+rather than grouped or drilled into, with an artist filter over the full history. D171's *other*
+decision — that Sync belongs in a real Settings scene — is reinforced here, not reversed.
+
+**Settings stays exactly as it is, and Home's duplicate sheets are deleted (superseding D197).**
+Home carried its own Account and Sync sheets, a second copy of both forms; the ⌘, scene's tabs
+are now the only copy, and Home's Settings & status tiles open that window at the tab they name
+via `SettingsLink` plus a `settingsTab` binding on the `TabView`. A popover was considered and
+dropped. The sidebar's version string and "Check for Updates…" simply stopped being duplicated
+rather than moving anywhere — the Playback tab already showed both.
+
+**⌘1–⌘4 stay, as menu-bar items.** Invisible chrome costs nothing — the objection was to a
+*visible* list of destinations — and they cover the one real regression, which is that a
+cross-section jump now routes through Home.
+
+#### What this simplifies in D202
+
+Batch B (#112, D202) had just added `PlayerBarDestination` and a one-shot
+`pendingArtistsDestination` that set `selection = .artists` and handed that section's stack a
+value to push. With no sections and one stack that collapses into a plain path assignment.
+`PlayerBarDestination` stays (it's the right vocabulary for "what did the player bar mean", and
+it's unit-tested); the section hop, `ArtistsView`'s own `NavigationStack`/`NavigationPath`, and
+the `onAppear`-plus-`onChange` consumption dance D202 needed all go.
+
+D202's actual insight survives and gets cheaper: **replace the path, don't append to it**, so a
+player-bar click lands on exactly the destination named rather than on top of whatever the user
+had browsed to. `routes(for:)` now also synthesizes the levels *above* the destination
+(`[.artists, .artist(x), .show(y)]`), so Back walks up through them and the breadcrumb reads as
+a real path rather than a lone leaf.
+
+`SidebarSection` disappeared with the sidebar, and `FeedbackButton` took one as its
+`currentScreen`. It now takes the breadcrumb's leaf as a `String` — "1997-11-17" or
+"Grateful Dead" tells you far more about where a report came from than "Artists" ever did.
+
+#### One thing the launch caught that the build didn't
+
+Every screen set its own `.navigationTitle`, which with a breadcrumb at `.navigation` placement
+renders *beside* it and says the same thing twice — the titlebar read "Couch Tour" then "Home".
+The per-screen titles came off and the root sets `.navigationTitle("Couch Tour")` once, so the
+window still has a name for the Window menu and Mission Control while the breadcrumb carries
+the location. This is only visible in a running window; it compiles fine either way.
+
+### D204 — Shared card, header, shelf, tile, pill, and inline error, in the app target (#102)
+
+#102 asked for shared building blocks "rather than fixing each site in place", and the reason is
+worth recording: the inconsistency it catalogued — corner radii of 8 and 10, fill opacities of
+0.06 and 0.08, and three different section-header treatments inside a single screen — wasn't
+carelessness. There was nowhere to put the decision, so every shelf that re-implemented a card
+inline picked again. A per-site fix pass would have re-created the drift on the next screen.
+
+`macos/CouchTour/DesignSystem/` holds `CardMetrics` + `.cardSurface()`, `SectionHeader`, `Shelf`,
+`NavigationTile`, `StatusPill`, and `InlineErrorView`. Deliberately *not* in `CouchTourKit`,
+which is UI-free by design and stays that way.
+
+`StatusPill` is the one carrying real accessibility weight. #102 flagged two states carried by
+colour alone — sync paired (green vs. secondary tint) and the FLAC/MP3 badge (green vs. grey) —
+and both now read as glyph plus words. Colour stays; it's a real signal for anyone who can see
+it. It just isn't the *only* one any more, which is what makes the state survive Increase
+Contrast, greyscale, and VoiceOver. It also replaced two hand-rolled badges that had hardcoded
+`.font(.system(size: 9))` and `size: 10` — below a comfortable reading size and ignoring the
+text-size setting outright.
+
+`InlineErrorView` exists because `ErrorView` fills the window. That's right when the whole screen
+is the failed thing and wrong on Home, where one shelf failing shouldn't blank out the other
+five. Both make the same point, which is #102's actual complaint: "no data" and "the request
+failed" must not render identically. Four paths were swallowing errors into empty state and now
+don't — `HomeView.reloadArtists` and `reloadProgress`, `TourPickerSheet.loadTours`, and the
+Listening load. `loadTours` was the worst of them: a failed request left the tour picker looking
+like "this year has no named tours", which silently turns Save into a year-only preference.
+
+Also in this pass: `accessibilityLabel`s on every icon-only control (three transport buttons,
+mute, both sliders, the tour-picker pencil, the favourite stars, the resume buttons); a
+confirmation on the tour picker's `Clear / Default`, which was marked `role: .destructive` and
+confirmed nothing; and `@ScaledMetric` on `ArtworkView` and the two Home card widths.
+
+**On "Dynamic Type."** #102's wording asks for it. Dynamic Type is an iOS concept macOS doesn't
+have, so taking the wording literally would have meant building nothing. The actionable macOS
+version is what was built: semantic font styles instead of hardcoded point sizes, and
+`@ScaledMetric` instead of fixed frames, both of which respond to the Accessibility text-size
+setting.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 370/370, up from 364 — six for `Route`'s crumb
+  titles, `breadcrumbTrail`, `routes(for:)`, and route identity, all in `NavigationTests.swift`.
+- macOS Xcode project generation and app target build (`CouchTour`): succeeds, no new warnings.
+  (`Player.swift`'s six pre-existing warnings are untouched and unrelated.)
+- Launched the installed app and confirmed the restructure renders: no sidebar, back chevron and
+  breadcrumb in the toolbar, the persistent search field, feedback and Now Playing buttons, the
+  Continue Listening shelf, and the "Your library" section. The duplicated-title bug above was
+  found this way and fixed.
+- **The interactive half of the pass did not happen and is still owed** — ⌘F from a cold launch,
+  ⌘[ popping from a player-bar destination, the Settings tiles landing on the right tab, ⌘1–⌘4,
+  VoiceOver over the transport and tour picker, Increase Contrast in both appearances, and the
+  text-size setting at a couple of steps. Every ad-hoc reinstall invalidates the keychain ACL, so
+  the app puts up a login-keychain password prompt on launch and again on every activation; it's
+  app-modal, and clearing it needs Mike's password ("Always Allow"), which is not something to
+  automate. This is a local-signing artifact, unrelated to this batch, and it walled off GUI
+  automation for the session. Worth knowing for any future macOS batch whose verification is
+  interactive: answer that prompt once by hand before starting.

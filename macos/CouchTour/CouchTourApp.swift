@@ -41,13 +41,30 @@ struct CouchTourApp: App {
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
 
-                // Switches to the Search section and focuses its field in one step —
-                // AppModel is the only thing both this scene and SearchView can reach.
+                // Focuses the toolbar's search field. With the sidebar gone the field is
+                // always on screen, so this no longer has to navigate anywhere first — it
+                // just asks for focus (RootView consumes the flag; `Commands` can't reach a
+                // `@FocusState` directly).
                 Button("Find") {
-                    appModel.selection = .search
                     appModel.focusSearchField = true
                 }
                 .keyboardShortcut("f", modifiers: .command)
+            }
+
+            // The one thing a visible list of destinations was actually good for: jumping
+            // straight across the app. Now invisible chrome, which costs nothing, and it
+            // covers the only real regression from removing the sidebar — a cross-section
+            // jump otherwise routes through Home (D203).
+            CommandGroup(after: .toolbar) {
+                Divider()
+                Button("Home") { appModel.jump(to: nil) }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("Artists") { appModel.jump(to: .artists) }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button("Listening") { appModel.jump(to: .listening) }
+                    .keyboardShortcut("3", modifiers: .command)
+                Button("Playlists") { appModel.jump(to: .playlists) }
+                    .keyboardShortcut("4", modifiers: .command)
             }
 
             CommandMenu("Playback") {
@@ -96,14 +113,21 @@ struct CouchTourApp: App {
         // surface the app has, so it moved here rather than duplicating the form in both
         // places (D171). Account (#57) joined it as a second tab rather than a third sidebar
         // section or its own window, same reasoning. Playback settings (#49) forms the third tab.
+        //
+        // The selection binding is what lets Home's Settings & status tiles land on the form
+        // they name (D203): each tile sets `settingsTab` and then opens this window, replacing
+        // the duplicate Account and Sync sheets Home used to carry (superseding D197).
         Settings {
-            TabView {
+            TabView(selection: $appModel.settingsTab) {
                 PlaybackSettingsView(settings: appModel.playbackSettings, updater: appModel.updater)
                     .tabItem { Label("Playback", systemImage: "play.circle") }
+                    .tag(SettingsTab.playback)
                 AccountView(session: appModel.phishInSession)
                     .tabItem { Label("Account", systemImage: "person.circle") }
+                    .tag(SettingsTab.account)
                 SyncView(syncSession: appModel.syncSession, sync: { appModel.syncNow() })
                     .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+                    .tag(SettingsTab.sync)
             }
             .frame(width: 450)
         }

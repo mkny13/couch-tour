@@ -17,7 +17,7 @@ struct ShowsView: View {
                 ErrorView(message: message) { await load() }
             case .loaded:
                 List(shows, id: \.self) { show in
-                    NavigationLink(value: show) {
+                    NavigationLink(value: Route.show(show)) {
                         VStack(alignment: .leading) {
                             HStack {
                                 Text(show.date)
@@ -38,9 +38,6 @@ struct ShowsView: View {
                 }
             }
         }
-        .navigationTitle(period.label)
-        .navigationDestination(for: ShowSummary.self) { ShowDetailView(show: $0) }
-        .navigationBackButton()
         .task { await load() }
     }
 
