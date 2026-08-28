@@ -3,15 +3,16 @@
 Working prompts for **Phase 2 Batch 4** in [ROADMAP.md](../ROADMAP.md), filed from Mike's
 testing of macOS beta **v0.57-beta** on 2026-08-26.
 
-**Sequencing.** Batches A and B are independent — they touch different files and can run in
-parallel worktrees. Batch C rewrites the files both of them edit, so it starts only after A
-and B have merged.
+**Sequencing.** A and B ran in parallel worktrees and have both merged; C was gated on them
+because it rewrites the files they edit. C1 (proposal) is done and Mike chose a direction, so
+**C2 is the only remaining work** — its prompt is at the bottom of this file. The A and B
+prompts below are kept as the record of what was asked for.
 
-| Batch | Issues | Primary files | Runs |
-|---|---|---|---|
-| A | [#97](https://github.com/mkny13/couch-tour/issues/97), [#98](https://github.com/mkny13/couch-tour/issues/98), [#100](https://github.com/mkny13/couch-tour/issues/100), [#101](https://github.com/mkny13/couch-tour/issues/101) | `macos/CouchTour/HomeView.swift`, `ContinueListeningView.swift`, `Browse/TourPickerSheet.swift`, `app/src/main/java/dev/mike/couchtour/MainActivity.kt` | in parallel with B |
-| B | [#99](https://github.com/mkny13/couch-tour/issues/99) | `macos/CouchTour/MiniPlayerView.swift`, `NowPlayingInspector.swift`, `AppModel.swift`, `RootView.swift` | in parallel with A |
-| C | [#102](https://github.com/mkny13/couch-tour/issues/102) | `macos/CouchTour/RootView.swift`, `HomeView.swift`, and most other views | after A and B merge |
+| Batch | Issues | Status |
+|---|---|---|
+| A | [#97](https://github.com/mkny13/couch-tour/issues/97), [#98](https://github.com/mkny13/couch-tour/issues/98), [#100](https://github.com/mkny13/couch-tour/issues/100), [#101](https://github.com/mkny13/couch-tour/issues/101) | **Merged** — #107 (D200), refined by #110 (D201) |
+| B | [#99](https://github.com/mkny13/couch-tour/issues/99) | **Merged** — #112 (D202) |
+| C | [#102](https://github.com/mkny13/couch-tour/issues/102) | C1 done, direction chosen. **C2 is ready to run.** |
 
 Every batch: run `cd macos/Packages/CouchTourKit && swift test` plus a
 `xcodegen generate && xcodebuild … build` of the app target, log the work in `DECISIONS.md`
@@ -121,44 +122,82 @@ under a new iteration, update the README's test count if it moved, and open a PR
 
 ---
 
-## Batch C — Universal design pass and sidebar rethink
+## Batch C — No sidebar, plus the universal design pass
 
-> **Do not start until #97, #98, #99, #100, and #101 have merged** — this batch rewrites the
-> files all of them touch. Confirm with `gh issue view` before beginning.
->
-> Work in a fresh worktree off an up-to-date `main`. This batch addresses #102: a design pass
-> over the macOS client for universal design principles, plus a rethink of the sidebar. Read
-> `gh issue view 102` in full first — it enumerates the specific problems already visible in
-> the code, so don't spend a discovery pass re-finding them.
->
-> **Split this into two deliverables, and stop between them.**
->
-> **C1 — Proposal, no code.** Write a short design proposal covering:
->
-> - the sidebar structure you'd replace the flat six-item list with, and why — including
->   what happens to Search (currently a navigation destination, which is why ⌘F has to route
->   through `AppModel.selection` + `focusSearchField`), what happens to Continue Listening as
->   a top-level peer once #98 makes Home's shelf fully navigable, and whether account/sync
->   move out of Home's cards and into the same place as Settings
-> - the shared components you'd introduce (card, section header, shelf) and the token set —
->   radii, background treatments, type ramp — they'd standardize on, since the current
->   inconsistency is a direct result of every shelf re-implementing its own container
-> - which universal-design heuristics drive which change, and any place a heuristic conflicts
->   with an existing convention in this app, called out rather than silently resolved
->
-> Publish it as an artifact and stop there. Mike has said the sidebar is his call, not a
-> unilateral one — do not restructure it before he responds.
->
-> **C2 — Implementation, after Mike approves a direction.** Build the shared components
-> first, then migrate the screens onto them; a per-site fix pass will just re-create the
-> inconsistency. Alongside the structural work, close out the accessibility items #102 lists:
-> `accessibilityLabel`s on every icon-only control (the tour-picker pencil, mute, transport
-> buttons), non-color-only signals for sync-paired and FLAC/MP3 state, Dynamic Type behaviour
-> for the hardcoded `.caption2` text and fixed artwork frames, and real error states in the
-> four places that currently swallow failures into empty state (`reloadArtists`,
-> `reloadProgress`, `loadTours`, and `ContinueListeningView`'s load path) — "no data" and
-> "the request failed" must not look identical.
->
-> Verify against VoiceOver, Increase Contrast, and Reduce Motion on a real launch of the app,
-> not just a build. Log the whole pass in DECISIONS.md, noting which earlier UI decisions
-> (D166, D167, D171) it supersedes.
+C1 ran and Mike picked a direction. **Visual spec:**
+<https://claude.ai/code/artifact/73b5bde4-8953-43c6-aed7-ccbade364e0e> — read it before starting;
+it is the source of truth for layout, and this prompt is the source of truth for scope.
+
+### The direction, settled
+
+The sidebar is **removed entirely** — not trimmed, not replaced with a tab strip. A tab strip was
+mocked up and rejected for being the same menu-of-destinations in a smaller box. What replaces it:
+
+- **Home is the hub.** Its existing "Library & Explore" quick-link tiles stop being decorative and
+  become the app's navigation. Give them chevrons so they read as the entry points they now are.
+- **One `NavigationStack` for the window**, not six. You drill in from Home and pop with ⌘[ —
+  the shortcut `BackButton.swift` already provides.
+- **A breadcrumb in the toolbar** does the orientation job the sidebar's selected row used to do,
+  and does it better: it shows the path, not just the destination.
+- **Search is a persistent toolbar field.** ⌘F focuses it directly. This deletes the
+  `selection` + `focusSearchField` hop *and* the macOS 15 `.searchFocused` gate that made ⌘F a
+  no-op on the 14.0 deployment target.
+- **Continue Listening and History merge** into one "Listening" destination, reached from its tile.
+- **Settings stays exactly as it is** — the existing ⌘, `Settings` scene with its Playback,
+  Account, and Sync tabs. No popover; that was considered and dropped. Home keeps its
+  "Settings & status" tile section, and every tile plus the section header opens that window at
+  the matching tab. Delete `HomeView`'s duplicate Account and Sync **sheets** — those forms must
+  exist in exactly one place.
+- **The version footer and "Check for Updates…"** move off the sidebar's bottom edge. The Settings
+  Playback tab already shows both, so they stop being duplicated rather than moving anywhere.
+- **⌘1–⌘4 stay as menu-bar items** jumping to Home, Artists, Listening, and Playlists. Invisible
+  chrome costs nothing, and they cover the one real regression: a cross-section jump now routes
+  through Home.
+
+### Two things that will bite
+
+**Batch B's routing collapses into this.** #112 (D202) added `PlayerBarDestination` and
+`AppModel.navigate(to:)` — a one-shot `pendingArtistsDestination` that switches `selection` to
+Artists and hands that section's stack a value to push. With no sections and one stack, that
+becomes a plain push onto the single path. Simplify it; don't build around it. `PlayerBarDestination`
+itself stays useful and is unit-tested in `CouchTourKit` — keep the type, drop the section hop.
+
+**`SidebarSection` disappears with the sidebar,** and `FeedbackButton` takes one as its
+`currentScreen` parameter. It needs a replacement screen identifier. The breadcrumb's leaf is the
+natural source and is better feedback metadata than a section name ever was.
+
+### Scope
+
+Alongside the structural work, close out the accessibility items in #102. Build the shared
+components first — a card, a section header, a shelf — then migrate screens onto them; a
+per-site fix pass just re-creates the drift, since the absence of a shared component is what
+caused it. They belong in `macos/CouchTour/DesignSystem/`, not in `CouchTourKit`, which is
+deliberately UI-free.
+
+- `accessibilityLabel`s on every icon-only control — the tour-picker pencil, mute, all three
+  transport buttons.
+- Non-colour-only signals for sync-paired and FLAC/MP3 state. The spec draws these as a
+  "✓ Paired" pill and a glyph-plus-label codec badge.
+- Real error states in the four load paths that currently discard the error into empty state:
+  `reloadArtists`, `reloadProgress`, `loadTours`, and `ContinueListeningView`'s load. "No data"
+  and "the request failed" must not render identically. `ErrorView` already exists and is used
+  correctly elsewhere.
+- A confirmation on the tour picker's `Clear / Default`, which is marked destructive and confirms
+  nothing.
+- **Text scaling, correctly framed.** #102's wording says "Dynamic Type," which is an iOS concept
+  this doesn't have. The actionable macOS version: replace hardcoded sizes like the FLAC badge's
+  `.font(.system(size: 9, weight: .bold))` with semantic styles, and fixed artwork frames with
+  `ScaledMetric`. Work from this, not from the issue's wording.
+
+### Verification
+
+A real launch, not just a build: VoiceOver over the transport and tour picker, Increase Contrast
+in both appearances, and the Accessibility text-size setting at a couple of steps. Confirm ⌘[ pops
+correctly from a destination reached via the player bar, and that ⌘F focuses the field from a
+cold launch.
+
+Log the pass in DECISIONS.md. It supersedes **D169** (Search as its own sidebar section — the
+stack-isolation reasoning survives, the section doesn't), **D171** (History as its own flat screen,
+and the Settings-scene placement, which this reinforces rather than reverses), **D197** (Home's
+duplicate Account/Sync sheets), and simplifies **D202** (Batch B's cross-section route). Update the
+README's test count if it moves.
