@@ -82,6 +82,9 @@ struct RootView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
+                        FeedbackButton(currentScreen: appModel.selection ?? .home)
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         Button {
                             appModel.showNowPlaying.toggle()
                         } label: {

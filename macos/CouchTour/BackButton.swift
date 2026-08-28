@@ -21,9 +21,13 @@ struct BackButtonToolbarItem: ToolbarContent {
 
 extension View {
     /// Attaches the standard navigation back button with ⌘[ shortcut to the toolbar.
+    /// `navigationBarBackButtonHidden` suppresses macOS's own automatic back button, which
+    /// `NavigationStack` renders whenever there's navigation history — without it, this
+    /// showed up alongside the custom one as two back chevrons on every drilled-down view.
     func navigationBackButton() -> some View {
-        toolbar {
-            BackButtonToolbarItem()
-        }
+        navigationBarBackButtonHidden(true)
+            .toolbar {
+                BackButtonToolbarItem()
+            }
     }
 }
