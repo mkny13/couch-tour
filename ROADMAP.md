@@ -69,7 +69,7 @@ flowchart LR
         direction TB
         P1["Batch A — #97 Feedback · #98 Continue Listening · #100 Tour Picker Refresh · #101 Surprise Me"]
         P2["Batch B — #99 Player Bar Navigation"]
-        P3["Batch C — #102 Universal Design Pass & Sidebar Rethink"]
+        P3["Batch C — #102 Sidebar Removal & Design Pass"]
         P1 --> P3
         P2 --> P3
     end
@@ -109,6 +109,10 @@ gated on both landing.
 
 Working prompts for each batch: [prompts/macos-ux-polish-batches.md](prompts/macos-ux-polish-batches.md).
 
+**Status:** Batches A (#107, D200; #110, D201) and B (#112, D202) have merged. Batch C's design
+step is done and the direction is chosen — the sidebar comes out entirely; implementation (C2)
+is the remaining work.
+
 | Batch | Issue | Feature | Description | Platforms |
 |---|---|---|---|---|
 | **A** | **#97** | **macOS Feedback Launcher** | Feedback button in the Home header opening a pre-filled GitHub issue with version, screen, and OS metadata — macOS parity with Android's #87. | macOS |
@@ -116,7 +120,7 @@ Working prompts for each batch: [prompts/macos-ux-polish-batches.md](prompts/mac
 | **A** | **#100** | **Tour Picker Refresh (bug)** | Saving a tour/year leaves the Next Couch Tour Stop shelf showing its previous show — `HomeView` never re-reads after the sheet dismisses. | macOS |
 | **A** | **#101** | **"Surprise Me" from Starred Artists** | Draw the random show from favorited artists rather than the full ~200-artist merged catalog (supersedes D157). | Android, macOS |
 | **B** | **#99** | **Player Bar Navigation** | Clicking the track or date in the player bar opens the show; clicking the artist opens the artist — Android parity, via a cross-section navigation route on `AppModel`. | macOS |
-| **C** | **#102** | **Universal Design Pass & Sidebar Rethink** | Affordance clarity, target sizing, non-color-only signals, shared card/section components, VoiceOver and Dynamic Type; plus a proposed replacement for the flat six-item sidebar. | macOS |
+| **C** | **#102** | **Sidebar Removal & Universal Design Pass** | Delete the sidebar outright: Home becomes the hub, one NavigationStack with breadcrumb + ⌘[ back, search as a persistent toolbar field, Continue Listening merged with History, settings routed to the existing ⌘, window. Plus shared card/section components, non-color-only status, VoiceOver labels, and real error states. | macOS |
 
 ---
 
