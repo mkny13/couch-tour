@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MiniPlayerView: View {
     @EnvironmentObject private var player: Player
+    @EnvironmentObject private var appModel: AppModel
     /// Non-nil only while the user is actively dragging the scrubber — see `scrubber`.
     @State private var dragPositionMs: Double?
 
@@ -21,15 +22,40 @@ struct MiniPlayerView: View {
                 ArtworkView(url: player.artURL)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(player.currentTrack?.title ?? "—")
-                        .font(.headline)
-                        .lineLimit(1)
+                    if let show = player.show {
+                        Button {
+                            appModel.navigate(to: .show(show))
+                        } label: {
+                            Text(player.currentTrack?.title ?? "—")
+                                .font(.headline)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text(player.currentTrack?.title ?? "—")
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
                     if let show = player.show {
                         HStack(spacing: 4) {
-                            Text("\(show.artist.name) · \(show.date)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            HStack(spacing: 4) {
+                                Button {
+                                    appModel.navigate(to: .artist(show.artist))
+                                } label: {
+                                    Text(show.artist.name)
+                                }
+                                .buttonStyle(.plain)
+                                Text("·")
+                                Button {
+                                    appModel.navigate(to: .show(show))
+                                } label: {
+                                    Text(show.date)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                             if let track = player.currentTrack {
                                 Text(track.flacUrl?.isEmpty == false ? "FLAC" : "MP3")
                                     .font(.system(size: 9, weight: .bold))

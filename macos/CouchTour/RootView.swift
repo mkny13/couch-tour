@@ -69,7 +69,10 @@ struct RootView: View {
                     case .home:
                         NavigationStack { HomeView() }
                     case .artists:
-                        NavigationStack { ArtistsView() }
+                        // ArtistsView owns its own NavigationStack (unlike every other case
+                        // here) so it has an explicit NavigationPath to push a queued
+                        // AppModel.pendingArtistsDestination onto — see ArtistsView.swift.
+                        ArtistsView()
                     case .search:
                         NavigationStack { SearchView() }
                     case .continueListening:

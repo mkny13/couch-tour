@@ -322,5 +322,29 @@ final class CatalogTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+
+    // ---------------------------------------------------------------- player bar navigation (#99)
+
+    /// AppModel.navigate(to:) pushes these onto a NavigationPath, which dedupes/diffs by
+    /// Hashable identity — so a `.show`/`.artist` destination for a different show or artist
+    /// must not collide with one for another.
+    func testPlayerBarDestinationDistinguishesShows() {
+        let show1 = ShowSummary(artist: dead, date: "1997-11-17")
+        let show2 = ShowSummary(artist: dead, date: "1997-11-16")
+        XCTAssertEqual(PlayerBarDestination.show(show1), .show(show1))
+        XCTAssertNotEqual(PlayerBarDestination.show(show1), .show(show2))
+    }
+
+    func testPlayerBarDestinationDistinguishesArtists() {
+        XCTAssertEqual(PlayerBarDestination.artist(dead), .artist(dead))
+        XCTAssertNotEqual(PlayerBarDestination.artist(dead), .artist(wsp))
+    }
+
+    /// A show and its own artist must never compare equal — the two destinations return the
+    /// browsing hierarchy to different depths (show detail vs. the artist's periods list).
+    func testPlayerBarDestinationShowAndItsArtistAreDistinct() {
+        let show = ShowSummary(artist: dead, date: "1997-11-17")
+        XCTAssertNotEqual(PlayerBarDestination.show(show), .artist(show.artist))
+    }
 }
 
