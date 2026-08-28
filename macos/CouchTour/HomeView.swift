@@ -153,8 +153,6 @@ struct HomeView: View {
 
                 Spacer()
 
-                FeedbackButton(currentScreen: appModel.selection ?? .home)
-
                 Button {
                     Task { await surpriseMe() }
                 } label: {

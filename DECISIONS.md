@@ -3030,3 +3030,41 @@ Four independent Home-screen fixes filed from Mike's own testing of macOS beta v
   session (unrelated open windows/other tools) or his real, in-use `progressStore` databases;
   worth a manual pass on the next beta, particularly the two-target hit-testing on #98's cards.
 
+## Iteration 62 — Batch A Manual-Test Follow-Ups: Doubled Back Buttons and a Global Feedback Button (D201)
+
+### D201 — `navigationBarBackButtonHidden` for the Pre-Existing Double Back Button, Feedback Button Moved to `RootView`'s Global Toolbar
+
+Two fixes from Mike's manual test pass on D200's beta (v0.59-beta/v0.60):
+
+- **Doubled back buttons on every drilled-down view (`ShowDetailView`, `PeriodsView`,
+  `ShowsView`, `LocalPlaylistView`):** pre-existing since #96 (`BackButtonToolbarItem`,
+  `cb824b6`), not introduced by this batch — it just went unnoticed until #98 opened a brand
+  new push path (History → Show Detail) that made it visible for the first time. Root cause:
+  macOS's `NavigationStack` renders its own automatic back chevron once there's navigation
+  history, and `#96`'s custom `BackButtonToolbarItem` (`.navigation` placement, `⌘[` shortcut)
+  never suppressed it — a well-documented SwiftUI gap (Apple Developer Forums' "Duplicate back
+  buttons" thread describes exactly this). Root screens (Home, Artists, etc.) correctly show
+  neither button — there's no navigation history yet — which is why Mike also observed "pages
+  like Artists have none": expected, not a second bug. Fixed once, at the source: `.
+  navigationBackButton()` (`BackButton.swift`) now chains `.navigationBarBackButtonHidden(true)`
+  before adding the custom toolbar item, so every one of the four call sites is fixed without
+  touching them individually.
+- **Feedback button, moved from `HomeView`'s header to `RootView`'s persistent toolbar:** Mike
+  wanted it reachable from every screen, not just Home. `RootView.swift`'s `detail:` pane
+  already has a `.toolbar` on the outer `Group` wrapping the per-section `switch` — the same
+  toolbar the "Now Playing" button lives in, applied once and persisting across every sidebar
+  section rather than being redeclared per-section. Added `FeedbackButton` there as a sibling
+  `ToolbarItem`, removed it from `HomeView`'s `headerSection`. `currentScreen: appModel.selection
+  ?? .home` is now sourced from `RootView` directly, which if anything makes the "Screen" field
+  in the filed issue's body more accurate than before — it now reflects whatever section is
+  actually on screen when the button is pressed, not just Home.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 361/361, unaffected — both fixes are app-target-only
+  (`BackButton.swift`, `RootView.swift`, `HomeView.swift`).
+- macOS Xcode project generation and both app target builds (`CouchTour`, `CouchTourBeta`):
+  succeed.
+- Not independently verified live — same GUI-automation constraint as D200; worth confirming on
+  the next beta that exactly one back chevron shows on drilled-down views and that Feedback is
+  reachable and reports the correct current screen from a non-Home section.
+
