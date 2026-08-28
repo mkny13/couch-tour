@@ -7,6 +7,12 @@ struct ArtworkView: View {
     let url: String?
     var size: CGFloat = 36
 
+    /// Artwork grows with the system text size, so a card whose labels got bigger doesn't end
+    /// up with a thumbnail that looks stranded beside them (#102). `@ScaledMetric` needs a
+    /// literal default, so `size` is applied as a ratio against it.
+    @ScaledMetric private var scaleReference: CGFloat = 100
+    private var scaledSize: CGFloat { size * (scaleReference / 100) }
+
     var body: some View {
         Group {
             if let url, let imageURL = URL(string: url) {
@@ -22,17 +28,20 @@ struct ArtworkView: View {
                 placeholder
             }
         }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size / 8))
+        .frame(width: scaledSize, height: scaledSize)
+        .clipShape(RoundedRectangle(cornerRadius: scaledSize / 8))
+        // The show/track identity beside every one of these already names it; announcing
+        // "image" too would just add noise to every VoiceOver pass.
+        .accessibilityHidden(true)
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: size / 8)
+        RoundedRectangle(cornerRadius: scaledSize / 8)
             .fill(.quaternary)
             .overlay {
                 Image(systemName: "music.note")
                     .foregroundStyle(.secondary)
-                    .font(.system(size: size / 2.5))
+                    .font(.system(size: scaledSize / 2.5))
             }
     }
 }

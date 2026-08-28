@@ -16,7 +16,7 @@ struct PeriodsView: View {
                 ErrorView(message: message) { await load() }
             case .loaded:
                 List(periods, id: \.self) { period in
-                    NavigationLink(value: period) {
+                    NavigationLink(value: Route.period(artist: artist, period: period)) {
                         VStack(alignment: .leading) {
                             Text(period.label)
                             if period.showCount > 0 {
@@ -29,9 +29,6 @@ struct PeriodsView: View {
                 }
             }
         }
-        .navigationTitle(artist.name)
-        .navigationDestination(for: PeriodRef.self) { ShowsView(artist: artist, period: $0) }
-        .navigationBackButton()
         .task { await load() }
     }
 

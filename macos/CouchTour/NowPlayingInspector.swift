@@ -73,7 +73,7 @@ struct NowPlayingInspector: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         if let track = player.currentTrack {
-                            qualityBadge(track.flacUrl?.isEmpty == false ? "FLAC" : "MP3", color: track.flacUrl?.isEmpty == false ? .green : .secondary)
+                            StatusPill.codec(isFlac: track.flacUrl?.isEmpty == false)
                         }
                     }
                     if !show.where_.isEmpty {
@@ -190,12 +190,3 @@ struct NextTourStopPromptBanner: View {
     }
 }
 
-private func qualityBadge(_ text: String, color: Color) -> some View {
-    Text(text)
-        .font(.system(size: 10, weight: .bold))
-        .padding(.horizontal, 4)
-        .padding(.vertical, 1)
-        .background(color.opacity(0.18))
-        .foregroundStyle(color)
-        .clipShape(RoundedRectangle(cornerRadius: 3))
-}

@@ -21,7 +21,7 @@ struct LocalPlaylistsView: View {
                 )
             } else {
                 List(playlists, id: \.id) { playlist in
-                    NavigationLink(value: playlist) {
+                    NavigationLink(value: Route.localPlaylist(playlist)) {
                         VStack(alignment: .leading) {
                             Text(playlist.name)
                             Text("\(playlist.trackCount) \(plural(playlist.trackCount, "track"))")
@@ -32,8 +32,6 @@ struct LocalPlaylistsView: View {
                 }
             }
         }
-        .navigationTitle("Playlists")
-        .navigationDestination(for: LocalPlaylist.self) { LocalPlaylistView(playlistId: $0.id) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

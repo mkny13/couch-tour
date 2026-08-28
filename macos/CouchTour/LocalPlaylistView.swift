@@ -87,8 +87,6 @@ struct LocalPlaylistView: View {
                 }
             }
         }
-        .navigationTitle(playlist?.name ?? "Playlist")
-        .navigationBackButton()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
