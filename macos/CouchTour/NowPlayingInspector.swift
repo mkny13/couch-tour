@@ -8,6 +8,7 @@ import SwiftUI
 /// redundant chrome a few points away.
 struct NowPlayingInspector: View {
     @EnvironmentObject private var player: Player
+    @EnvironmentObject private var appModel: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -45,13 +46,32 @@ struct NowPlayingInspector: View {
             VStack(spacing: 10) {
                 ArtworkView(url: player.artURL, size: 160)
                 VStack(spacing: 2) {
-                    Text(player.currentTrack?.title ?? "—")
-                        .font(.headline)
-                        .multilineTextAlignment(.center)
+                    Button {
+                        appModel.navigate(to: .show(show))
+                    } label: {
+                        Text(player.currentTrack?.title ?? "—")
+                            .font(.headline)
+                            .multilineTextAlignment(.center)
+                    }
+                    .buttonStyle(.plain)
                     HStack(spacing: 6) {
-                        Text("\(show.artist.name) · \(show.date)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            Button {
+                                appModel.navigate(to: .artist(show.artist))
+                            } label: {
+                                Text(show.artist.name)
+                            }
+                            .buttonStyle(.plain)
+                            Text("·")
+                            Button {
+                                appModel.navigate(to: .show(show))
+                            } label: {
+                                Text(show.date)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         if let track = player.currentTrack {
                             qualityBadge(track.flacUrl?.isEmpty == false ? "FLAC" : "MP3", color: track.flacUrl?.isEmpty == false ? .green : .secondary)
                         }

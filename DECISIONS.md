@@ -3068,3 +3068,77 @@ Two fixes from Mike's manual test pass on D200's beta (v0.59-beta/v0.60):
   the next beta that exactly one back chevron shows on drilled-down views and that Feedback is
   reachable and reports the correct current screen from a non-Home section.
 
+## Iteration 63 — Batch B: Player Bar Navigation (D202)
+
+### D202 — Cross-Section Navigation Route on `AppModel`, Landing on Artists (#99)
+
+`MiniPlayerView` and `NowPlayingInspector` rendered the track title, date, and artist name as
+inert text (#99), unlike Android's `NowPlaying.kt`, which makes the same identity block
+navigable. The wrinkle: `MiniPlayerView` sits in `RootView`'s outer `VStack`, outside the
+`NavigationSplitView` entirely, so it has no `NavigationStack` of its own to push onto, and
+each sidebar section deliberately gets a *fresh* `NavigationStack` (`RootView.swift`) so
+drill-down state doesn't leak between sections. A click there has to reach across sections.
+
+**Artists receives the push, for both a show and an artist.** It's the only section whose
+existing push chain already resolves to both destinations: `ArtistsView` →
+(`ArtistRef`) → `PeriodsView` → (`PeriodRef`) → `ShowsView` → (`ShowSummary`) →
+`ShowDetailView`. Landing an artist click on `PeriodsView` and a show click on `ShowDetailView`
+needed no new screen, just a way to jump straight there. `#98` and any future player-bar-style
+entry point should reuse this same route rather than inventing a second one.
+
+**Mechanism: `AppModel.pendingArtistsDestination` (`PlayerBarDestination`, `.show`/`.artist`,
+defined in `CouchTourKit/Catalog.swift` since it's just `ShowSummary`/`ArtistRef` payloads —
+no SwiftUI), set alongside `selection = .artists` by `AppModel.navigate(to:)`.** Follows the
+one-shot pattern `focusSearchField` already established: the receiving view consumes the value
+and clears it, so a later visit to Artists doesn't re-push a stale destination. Deliberately
+the *only* mechanism — no second pending-navigation concept alongside `selection` /
+`showNowPlaying` / `focusSearchField`.
+
+**`ArtistsView` now owns its `NavigationStack` and an explicit `NavigationPath`** (moved out of
+`RootView`'s `NavigationStack { ArtistsView() }` wrapping, which had no path to push onto) so it
+has somewhere to push the pending destination. Still gets a fresh instance whenever the sidebar
+switches away from and back to Artists — that property came from the *enclosing* `switch`
+discarding and recreating the whole subtree, not from where the `NavigationStack` literally
+sits, so moving it inside doesn't undo RootView's isolation.
+
+**Consuming the pending destination *replaces* the path (`NavigationPath([show])`), rather than
+appending to whatever the user had already drilled into.** This was the answer to the case the
+issue flagged as worth checking by hand: a view pushed from the player bar onto a section stack
+the user never drilled into renders a Back button (`#96`'s `BackButtonToolbarItem`) that
+dismisses to that section's root — which, with append, could have been some unrelated
+Periods/Shows list left over from earlier browsing. With replace, the pushed destination is
+always the *only* entry on the path, so Back always pops to the Artists list itself — the one
+screen guaranteed to make sense regardless of whether the user ever browsed here. Confirmed by
+hand (see Testing below): it does land somewhere sensible.
+
+**Bug caught only by manual testing, not by the type system:** `ArtistsView`'s
+`.onChange(of: appModel.pendingArtistsDestination)` alone silently no-ops on the exact path this
+feature exists for. `AppModel.navigate(to:)` sets `pendingArtistsDestination` *and*
+`selection = .artists` in the same call — which, when the player bar is clicked from any other
+section, mounts `ArtistsView` (and its `onChange` modifier) for the first time with the
+destination already set. `onChange` only fires on a transition it *observes while attached*; a
+modifier that starts existing with a non-nil value was never attached in time to see the nil →
+value edge, so it never fires. Fixed by also consuming the pending destination from `.onAppear`
+(`onChange` still does the work for a second player-bar click while already on Artists, where
+the view was already mounted and does observe the transition). Worth remembering for any future
+one-shot AppModel signal consumed by a view that might be mounting for the first time at the
+same moment the signal is set.
+
+Same navigable identity applied to `NowPlayingInspector`'s header block, which rendered the same
+text inertly.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 364/364 (+3, `PlayerBarDestination` equality/
+  hashability in `CatalogTests.swift` — a `NavigationPath` push relies on that to distinguish
+  shows and artists correctly).
+- macOS Xcode project generation and app target build (`CouchTour`): succeeds.
+- Verified live, end to end, via `screencapture -l<windowID>` (isolates the app's own window
+  from other on-screen apps/tools) plus `System Events` accessibility actions: started a Grateful
+  Dead show, browsed to an unrelated section (Playlists, then separately History), clicked the
+  date/title/artist in the player bar from there, and confirmed landing on the right show or
+  artist page each time with no stale browsed-to stack underneath. Clicked Back from a
+  player-bar-pushed show and confirmed it lands on the Artists list, not a screen the user never
+  visited. Also verified the same three clicks from the Now Playing inspector's header. This
+  live pass is what caught the `onAppear`/`onChange` bug above — it would not have been caught
+  by `swift test` or a build-only check.
+

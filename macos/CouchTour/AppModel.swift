@@ -40,6 +40,13 @@ final class AppModel: ObservableObject {
     /// it does — a one-shot signal rather than persistent state, so it doesn't fight the
     /// field's own focus once the user starts typing.
     @Published var focusSearchField = false
+    /// A destination queued for the Artists section to push, from the player bar or Now
+    /// Playing inspector — both sit outside any `NavigationStack` (RootView.swift), so this
+    /// is how a click there reaches one. One-shot, same as `focusSearchField`: ArtistsView
+    /// consumes it into its own `NavigationPath` and clears it here, so a later visit to
+    /// Artists doesn't re-push a stale destination. Artists is always the target — see
+    /// DECISIONS.md for why.
+    @Published var pendingArtistsDestination: PlayerBarDestination?
 
     init() {
         do {
@@ -67,6 +74,13 @@ final class AppModel: ObservableObject {
 
     func checkForUpdates() {
         updater.checkForUpdates()
+    }
+
+    /// Switches to Artists and queues `destination` for it to push. See
+    /// `pendingArtistsDestination` for why Artists is always the target.
+    func navigate(to destination: PlayerBarDestination) {
+        pendingArtistsDestination = destination
+        selection = .artists
     }
 
     static func launchUpdateScript() {

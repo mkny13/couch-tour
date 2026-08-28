@@ -336,6 +336,15 @@ public struct ShowSummary: Hashable, Sendable {
     public var hotScore30d: Double { popularity?.hotScore30d ?? 0.0 }
 }
 
+/// Where a click on the player bar's (or Now Playing inspector's) identity block should land.
+/// Both macOS surfaces render the same track/date/artist text outside of any browse
+/// `NavigationStack` (#99), so `AppModel.navigate(to:)` uses this to tell the Artists section
+/// what to push.
+public enum PlayerBarDestination: Hashable, Sendable {
+    case show(ShowSummary)
+    case artist(ArtistRef)
+}
+
 /// One tape of one show.
 ///
 /// This is the concept phish.in doesn't have. Relisten carries around nine recordings of an
