@@ -1,9 +1,10 @@
 # Phase 2 — Batch Plan
 
-Produced by [phase-2-plan.md](phase-2-plan.md)'s planning pass on 2026-08-31. **This is a plan
-for Mike to review, not a set of working prompts yet** — once he picks a direction, a following
-session turns the approved batches into prompts, the same way Batch C1's chosen direction became
-Batch C2's prompt in [macos-ux-polish-batches.md](macos-ux-polish-batches.md).
+Produced by [phase-2-plan.md](phase-2-plan.md)'s planning pass on 2026-08-31, and **approved by
+Mike the same day** — see "Decisions taken" at the bottom, which the batches above already
+reflect. This is still a plan, not a set of working prompts: the next step is turning these
+batches into prompts, the same way Batch C1's chosen direction became Batch C2's prompt in
+[macos-ux-polish-batches.md](macos-ux-polish-batches.md).
 
 Baseline at the time of writing: `main` @ `5e6ad7b`, Android **463 tests / 0 failures**, macOS
 **370 tests / 0 failures**, no open PRs, no stale branches.
@@ -77,12 +78,13 @@ built on already-written and already-tested logic. It is mostly view code.
 ```
 Batch 0 (docs/closeout, no code) ── can run immediately, gates nothing
                         │
-        ┌───────────────┼───────────────┬──────────────────┐
-        ▼               ▼               ▼                  ▼
-   Batch 1          Batch 2A        Batch 4            Batch 3
-   macOS wiring     Android         #61 cache          #115 macOS
-   #67 #21 #62      #91 #116 #90    (API layer)        context menu
-   (macOS views)    (MainActivity)                     (tiny)
+        ┌───────────────┼───────────────────┐
+        ▼               ▼                   ▼
+   Batch 1          Batch 2A            Batch 4
+   macOS wiring     Android             #61 cache
+   #67 #21 #62      #91 #116 #90        (API layer)
+   + #115           (MainActivity)
+   (macOS views)
         │               │
         └───────┬───────┘
                 ▼
@@ -90,11 +92,11 @@ Batch 0 (docs/closeout, no code) ── can run immediately, gates nothing
             macOS parity for #91/#116/#90
                 │
                 ▼
-   ┌────────────┴────────────┐
-   ▼                         ▼
-Batch 5                   Batch 6
-#18 volume leveling       #65 offline downloads
-(needs a design pass)     (largest; own phase)
+            Batch 6
+            #65 offline downloads
+            (largest; own phase)
+
+deferred out of the phase: #18 volume leveling
 ```
 
 ### Batch 0 — Audit closeout *(no application code)*
@@ -124,10 +126,14 @@ The highest-payoff batch. All logic exists and is tested; this is view work.
   `filterShowsByTag` / `filterTracksByTag`. Android's shape: an "All" entry plus the distinct
   tags present in the current results, cleared when the tag leaves the result set.
 - **#62** — `ArtworkView.swift` renders the procedural palette instead of the `music.note`
-  placeholder when `url` is nil or the load fails. Android's `ProceduralShowArtwork` draws a
-  full cassette; matching that pixel-for-pixel is **not** required — deciding how far to go is
-  part of the batch. `ArtworkView` needs a seed, which means threading artist/date through its
-  call sites; keep `@ScaledMetric` and `accessibilityHidden(true)` as they are.
+  placeholder when `url` is nil or the load fails. **Decided: a seeded gradient plus the artist
+  monogram — not Android's full cassette.** `CouchTourKit`'s `ShowArtworkGenerator` already
+  supplies everything needed: `palette(forArtist:date:)` (`Artwork.swift:52`),
+  `monogram(for:)` (`:211`), and `dateBadge(from:)` (`:263`). So this is a gradient fill plus a
+  `Text` overlay, not a `Canvas` port — the whole generator surface is written and tested, just
+  uncalled. `ArtworkView` needs a seed, which means threading
+  artist/date through its call sites; keep `@ScaledMetric` and `accessibilityHidden(true)` as
+  they are. Revisit if it reads thin at 150pt on the Continue Listening cards.
 
 **Watch for:** `ShowsView` currently has no `@State` for filters at all, and its `load()` resets
 `loadState` wholesale — sort/filter must be view-state applied to loaded results, not a refetch.
@@ -176,9 +182,12 @@ complete a row on the desktop. Android has exactly this as a long-press `Dropdow
 same file — the favorited-artist card at `HomeView.swift:304` uses `.contextMenu`.
 
 Apply to both `ResumeCardView` and `ListeningView`'s rows so the shelf and the full screen agree
-(the D200/#98 split already established that pairing). Small enough to fold into Batch 1 if Mike
-would rather have one macOS worktree than two; called out separately because it's independent
-and touches a different part of `HomeView.swift`.
+(the D200/#98 split already established that pairing).
+
+**Decided: this runs inside Batch 1's worktree, not its own.** The `.contextMenu` pattern already
+exists 200 lines up the same file, and a third parallel worktree for one small macOS fix isn't
+worth the coordination. It stays a separate section here because it's an independent change with
+its own issue and should be a distinct commit.
 
 ### Batch 4 — Multi-level catalog cache (#61) *(both platforms, API layer)*
 
@@ -197,21 +206,28 @@ CLAUDE.md is strict here); TTL and invalidation, including how it interacts with
 ~200-artist catalog. **Recommend in-memory with a TTL first** — it is reversible, needs no
 migration, and O4's original reasoning still holds.
 
-### Batch 5 — Volume leveling (#18) *(design pass first)*
+### ~~Batch 5~~ — Volume leveling (#18) — **deferred out of Phase 2**
 
-**This is the one item that should not go straight to an implementation prompt.** It sounds small
-and isn't. There is no gain/loudness infrastructure on either platform today: Android sets
-`AudioAttributes` and a flat `player.volume` (`PlaybackService.kt:124,142,149`) with no
-`AudioProcessor` chain; macOS keeps a persisted app-level `volume` (`Player.swift:37`) and no
+**Decided 2026-08-31: #18 is deferred out of Phase 2 entirely** and revisited after downloads
+(#65). The reasoning below is kept because it's the research this pass did and it should not have
+to be redone when #18 comes back.
+
+A useful consequence: the playback-pipeline collision this plan flagged between #18 and #65 is
+now moot, so **#65 no longer has to sequence around it** and owns `MediaItems.kt` / `Player.swift`
+alone.
+
+It sounds small and isn't. There is no gain/loudness infrastructure on either platform
+today: Android sets `AudioAttributes` and a flat `player.volume`
+(`PlaybackService.kt:124,142,149`) with no `AudioProcessor` chain; macOS keeps a persisted app-level `volume` (`Player.swift:37`) and no
 `AVAudioMix`.
 
 The hard part is *where the loudness number comes from*. Neither phish.in nor Relisten/archive.org
 serves reliable ReplayGain tags, so the options are real analysis (decode-ahead loudness
 measurement, expensive on mobile), a platform normalizer (Android `LoudnessEnhancer` /
 `DynamicsProcessing`; AVFoundation has no direct equivalent), or a per-source manual trim the
-user sets. These differ enormously in cost and quality. **Recommend a C1-style design pass**
-producing a recommendation Mike picks from, then an implementation prompt — exactly the two-step
-that worked for #102.
+user sets. These differ enormously in cost and quality — which is why this was never a
+single-prompt batch. When it returns, it should open with a C1-style design pass producing a
+recommendation Mike picks from, then an implementation prompt: the two-step that worked for #102.
 
 Note also the issue's own framing: source/show-level matching, explicitly *not* per-track
 normalization.
@@ -228,8 +244,9 @@ Two traps worth naming now:
 1. **Cast interaction.** A local file cannot be streamed to a Cast receiver — the same class of
    problem D187 solved for FLAC by rewriting the URL at the `CastItemConverter` boundary. Whatever
    #65 does must keep casting working by falling back to the remote URL.
-2. **`MediaItems.kt` / `Player.swift` overlap with Batch 5.** Both change how a playable URL
-   becomes a player item. Do not run #65 and #18 in parallel worktrees.
+2. **`MediaItems.kt` / `Player.swift` ownership.** #65 changes how a playable URL becomes a
+   player item. With #18 deferred out of the phase, nothing else contends for these files — but
+   if #18 is ever revived alongside it, they must not run in parallel worktrees.
 
 Recommend sequencing this **last** and giving it its own multi-batch plan rather than a single
 prompt.
@@ -246,35 +263,48 @@ Repo history is Android-first, then a macOS parity pass referencing the Android 
 decisions are made and recorded. Batch 1 is a pure catch-up pass, and Android's implementation is
 the spec.
 
-Batches 4, 5, and 6 are both-platform from the start because their seams (`MusicSource`, the
-player, the download store) have to agree across clients or they diverge in ways that are painful
-to reconcile later.
+Batches 4 and 6 are both-platform from the start because their seams (`MusicSource`, the
+download store) have to agree across clients or they diverge in ways that are painful to
+reconcile later.
 
 ---
 
 ## Recommended running order
 
-1. **Batch 0** — closeout and doc corrections. Free, and fixes the map.
-2. **Batch 1 (macOS) ∥ Batch 2A (Android) ∥ Batch 4 (#61)** — three parallel worktrees, no file
-   overlap. Batch 3 (#115) folds into Batch 1's worktree if you want only two.
+1. **Batch 0** — closeout and doc corrections. Free, and fixes the map. Now also carries the
+   #18 deferral into ROADMAP.md.
+2. **Batch 1 (macOS, including #115) ∥ Batch 2A (Android) ∥ Batch 4 (#61)** — three parallel
+   worktrees, no file overlap.
 3. **Batch 2B** — macOS parity, after 1 and 2A land.
-4. **Cut a beta** — per CLAUDE.md, at the end of the batch. Batches 1–3 are almost all macOS view
-   work, which only real use will validate.
-5. **Batch 5 design pass (#18)**, then its implementation prompt.
-6. **Batch 6 (#65)** — its own phase.
+4. **Cut a beta** — per CLAUDE.md, at the end of the batch. Batches 1–2B are almost all macOS
+   view work, which only real use will validate.
+5. **Batch 6 (#65)** — its own phase, and with #18 deferred it owns the playback pipeline
+   uncontended.
 
 ---
 
-## Things Mike should decide
+## Decisions taken (Mike, 2026-08-31)
 
-1. **Does Batch 1's framing land?** It reframes "#67/#21/#62 are shipped" as "#67/#21/#62 are
-   half-shipped." That is the audit's main claim and everything downstream rests on it.
-2. **How far should macOS artwork (#62) go** — full cassette parity with Android's
-   `ProceduralShowArtwork`, or a simpler seeded gradient with a monogram?
-3. **#115, #116, #90 aren't in the ROADMAP's Phase 2 table.** This plan folds them in because
-   they're small and share surfaces with #91. Reasonable, or keep the phase to its original nine?
-4. **#18 as a design pass** rather than an implementation batch — agreed?
-5. **Batch 3 (#115) as its own worktree, or folded into Batch 1?**
+All five open questions are answered; the batches above already reflect them.
+
+1. **The half-shipped framing stands.** Batch 1 is planned as written — #67/#21/#62 are
+   Android-complete and macOS-pending, and wiring the existing tested models into the macOS UI
+   is the phase's highest-value work.
+2. **macOS artwork (#62): seeded gradient plus artist monogram**, not full cassette parity with
+   Android. `ShowArtworkGenerator` already supplies the palette, monogram, and date badge.
+3. **#115, #116, and #90 fold into Phase 2.** #116/#90/#91 are one "sort/filter a long list"
+   batch; #115 rides along in Batch 1's macOS worktree.
+4. **#18 (volume leveling) is deferred out of Phase 2**, to be revisited after #65. This was the
+   one answer that went against the recommendation in this plan's first draft — the
+   recommendation was a design pass inside the phase. Deferring is defensible on the same
+   evidence: the loudness-source question is genuinely unsolved, and #18 was the only item whose
+   scope couldn't be pinned down without further research. It also frees the playback pipeline
+   for #65.
+5. **#115 runs inside Batch 1's worktree**, as its own commit rather than its own worktree.
+
+**What Batch 0 now owes ROADMAP.md**, on top of the closeout already listed: move #18 out of the
+Phase 2 table into a later phase, with a line recording that the deferral was deliberate and why,
+so it doesn't read as an oversight.
 
 ---
 
