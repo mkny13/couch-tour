@@ -162,6 +162,70 @@ migration is never the right answer here. Add a `MIGRATION_n_n+1`, register it i
   tradeoffs and surprises — match that when adding to it.
 - **The README states a unit-test count.** It goes stale; update it when adding or removing
   tests.
+- **Anything that can only be confirmed by a human using the app goes in [UAT.md](UAT.md)**,
+  not buried in a DECISIONS entry's testing section where it is never seen again. Add items as
+  you finish a batch. Mike checks them off in the local UAT board (`scripts/uat-server.py`),
+  and an item he marks **needs work** is a real bug report addressed to whoever picks it up
+  next — read `UAT.md` before starting work on a feature you might be re-touching.
+
+## Working under the Cline Kanban board
+
+The Kanban board (`http://127.0.0.1:3484`, one project per repo) is the primary development
+plane. It creates a **worktree per task** under `~/.cline/worktrees/<hash>/phish-in-app` and
+starts `claude --permission-mode auto` inside it. These rules take precedence over the generic
+worktree advice above whenever a `~/.cline/worktrees/` path is your working directory.
+
+**The board owns the worktree; you own the branch.**
+
+- **Never** run `git worktree add` or `git worktree remove` — not on your own worktree, not on
+  another task's. The board created yours and will clean it up. Removing it mid-task strands the
+  card and hides your work (this happened once already; see D208).
+- Your worktree starts on a **detached HEAD**. That is normal, not a problem to fix — but do not
+  commit and stop there, because a detached-HEAD commit is unreachable from any branch and
+  invisible to everyone. `git checkout -b <descriptive-branch>` first.
+- **Own git end-to-end**: branch, commit, push, open a PR, wait for CI
+  ([scripts/ci-wait.sh](scripts/ci-wait.sh)), self-review the diff, merge with
+  `--delete-branch`. This is the same autonomous loop as "Working through open issues" above.
+  Leave the board's own **Automatically → Make commit / Make PR** setting **off** — with it on,
+  you and the board both try to open a PR for the same work.
+- **End your final message with a status line** so the card's summary states the outcome
+  unambiguously — the board's column does not track whether you merged:
+  `STATUS: MERGED #124` / `STATUS: PR-OPEN #124` / `STATUS: BLOCKED <one-line reason>`.
+
+**Decision IDs are a shared mutable resource.** Parallel tasks each branch from `main` and each
+compute "the next `Dnnn`" from what they see there, so two tasks routinely pick the same number —
+this is a real collision git cannot detect, because both sides are appends to different regions
+of `DECISIONS.md` (D208 records how this bit us). So:
+
+- Write the `DECISIONS.md` entry as your **last** commit, and immediately before writing it run
+  `git fetch origin && git show origin/main:DECISIONS.md | grep -c '^### D'` to allocate the
+  number against `main` *as it is at merge time*, not as it was when you branched.
+- If you still collide at merge, **renumber your own entry** (the later-merging one) and never
+  edit the other batch's content.
+
+**Fresh worktrees are missing machine-local files.** `local.properties` is gitignored, so Gradle
+fails with "SDK location not found" until you recreate it:
+
+```
+echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
+```
+
+**Two macOS build hazards specific to worktrees — read these before trusting any macOS result:**
+
+- **`macos/CouchTour.xcodeproj` may be a symlink into the main checkout** (D206). If it is,
+  `xcodebuild` compiles *that* checkout's sources while reporting success, so your edits are
+  never tested. Check with `ls -la macos/ | grep xcodeproj` and remove the symlink before
+  running `xcodegen generate`.
+- **`xcodebuild` may resolve the local `CouchTourKit` package from the main checkout's path
+  rather than your worktree's copy** (D207, confirmed by deliberately breaking a file and
+  watching the build still succeed; clearing `DerivedData` did not fix it). If a batch's
+  correctness rests on an app-target build, verify the build actually sees your changes — break
+  something on purpose and confirm it fails — before reporting success.
+
+`swift test` on the package is unaffected by both and remains trustworthy. But note it covers
+`CouchTourKit` **only**: the app target is not in the package and not built by
+`macos-tests.yml`, so a green `swift test` is never evidence that macOS UI is reachable (D208).
+macOS UI work needs a real click-through — which is what [UAT.md](UAT.md) tracks.
 
 ## Working through open issues
 
@@ -176,7 +240,10 @@ autonomous by default, not a proposal he approves each time:
   genuinely risky or ambiguous, not merely "could be nicer." [scripts/ci-wait.sh](scripts/ci-wait.sh)
   `<pr-number>` replaces the manual poll-then-diagnose loop — it blocks until checks finish and,
   on a failure, pulls the failing job's log tail in the same call.
-- **Clean up your own worktree and branch immediately after your PR merges** — `git worktree
+- **Clean up your own worktree and branch immediately after your PR merges — but only a
+  worktree you created yourself.** If you are running under the Kanban board, the board owns
+  the worktree and removing it corrupts the card; see "Working under the Cline Kanban board"
+  below, which takes precedence over this bullet. Otherwise: `git worktree
   remove` on the worktree you were using (if any) and delete the branch, both locally and on
   the remote (`gh pr merge --delete-branch` handles the remote side in one step). This is what
   actually keeps `.claude/worktrees/` and the branch list usable; skipping it is exactly how 4
