@@ -30,3 +30,7 @@ sync/.dev.vars
 .agents/
 .wip/
 
+
+# Python bytecode (scripts/uat-server.py)
+__pycache__/
+*.pyc

@@ -3567,3 +3567,56 @@ those collisions were resolved by renumbering the later-merging entry (D206→D2
 editing the content of either. Worth keeping in mind for any future sprint run as several parallel
 agents against one shared docs file: decision numbering is a shared mutable resource, and only the
 merge order — not the branch/authoring order — determines who actually gets which number.
+
+## Iteration 69 — Kanban as the primary development plane, and a UAT board (D209)
+
+### D209 — Board-owned worktrees, merge-time decision IDs, and `UAT.md` as the home for manual verification
+
+Development now runs through the Cline Kanban board (`http://127.0.0.1:3484`) rather than
+hand-made worktrees. The board creates a worktree per task under `~/.cline/worktrees/` and starts
+`claude --permission-mode auto` in it. That collided with instructions written for the old model,
+and the first sprint through it (Batches 0/1/2A/4) surfaced exactly how:
+
+- **Batch 0's work was nearly lost.** Its orchestration prompt said not to create a branch, on the
+  assumption the board's auto-PR would handle git. Nothing did, and the commit sat on a detached
+  HEAD, unreachable from any branch, until rescued in `#124`. The other three batches ignored that
+  instruction, followed CLAUDE.md's own autonomous loop, and merged fine.
+- **Two batches picked the same decision number.** Batches 1 and 4 each computed "next `Dnnn`"
+  from `main` at branch time and both landed as D206 — a real duplicate that git cannot detect,
+  since the two entries are appends to different regions of the same file (see D208).
+
+The rules that resolve this are in CLAUDE.md under "Working under the Cline Kanban board", and the
+shape of them is: **the board owns the worktree, the agent owns the branch.** Never
+`git worktree add`/`remove` under the board; always `git checkout -b` off the detached HEAD before
+committing; own git through to a merged PR rather than depending on board automation that has been
+observed to silently no-op; end with a `STATUS:` line, because the board's column tracks whether an
+agent finished, not whether anything merged. Decision IDs are allocated against `origin/main` at
+merge time, not branch time, and a collision is resolved by renumbering the later-merging entry —
+never by editing the other batch's content.
+
+**`UAT.md` and `scripts/uat-server.py`.** Manual verification kept being recorded in a DECISIONS
+entry's testing section — which is write-only in practice. D204's owed click-through went unread
+until D206's batch re-derived it, and D206 then added an identical note of its own. Meanwhile the
+gap is the single biggest correctness risk in this repo: Android's suite is Robolectric/MockWebServer
+and `swift test` covers `CouchTourKit` only, never the macOS app target, which is precisely how
+D191–D193 marked three features shipped while no macOS view called them (D208).
+
+So outstanding manual checks live in `UAT.md` — git-tracked, so it is visible to Claude and to any
+Kanban task — and `scripts/uat-server.py` serves a local three-state board (untested / works /
+needs work) that writes straight back to that file. Stdlib only, no dependencies, no build step;
+it is deliberately a flat markdown file rather than a database so the state diffs, reviews, and
+merges like everything else here. An item marked **needs work** carries a note and is treated as a
+bug report addressed to whoever next touches that feature.
+
+**Two macOS worktree build hazards are also now documented in CLAUDE.md**, both found the hard way
+during this sprint and both capable of making a green macOS build meaningless: a `.xcodeproj` that
+is a symlink into the main checkout (D206), and `xcodebuild` resolving the local `CouchTourKit`
+package from the main checkout's path rather than the worktree's own copy (D207, confirmed by
+deliberately breaking a file and watching the build still succeed).
+
+**Testing:** no application code changed. `scripts/uat-server.py`'s parse/write round-trip was
+exercised directly — status transitions in both directions, note attach/detach when leaving the
+"needs work" state, unknown-id rejection, and item-count preservation — then end-to-end over HTTP
+against all four endpoints and through the rendered page, which caught a real bug: hyphenated
+element ids (`c-pend`) never become JS globals, so the first render threw `ReferenceError` and the
+board showed zero items despite a 200 response and correct JSON.
