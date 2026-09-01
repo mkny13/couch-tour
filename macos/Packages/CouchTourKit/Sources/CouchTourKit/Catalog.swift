@@ -669,6 +669,11 @@ public func mergeArtists(relistenArtists: [ArtistRef], favorites: Set<String>) -
 /// Adapts `PhishInAPI` to the seam. Deliberately thin: it reuses the client untouched,
 /// including the period/year-range branch and the audio filtering, so nothing about the Phish
 /// path changes and its tests pin the exact same traps DECISIONS.md already paid for.
+///
+/// A `struct` rather than an actor like `RelistenCatalogSource`, so a shared cache (#61) can't
+/// live on `self` — `sourceFor` builds a fresh `PhishInSource()` on every call, and any
+/// per-instance state would be discarded with it. `PhishInCatalogCache.shared` is the actor
+/// that actually holds the state; this struct just delegates to it.
 public struct PhishInSource: MusicSource {
     public let backend = Backend.phishin
 
@@ -677,19 +682,49 @@ public struct PhishInSource: MusicSource {
     public func artists() async throws -> [ArtistRef] { [PHISH] }
 
     public func periods(artist: ArtistRef) async throws -> [PeriodRef] {
-        try await PhishInAPI.years().map { $0.toPeriodRef() }
+        if let cached = await PhishInCatalogCache.shared.periods.get(PhishInCatalogCache.periodsKey) { return cached }
+        let periods = try await PhishInAPI.years().map { $0.toPeriodRef() }
+        await PhishInCatalogCache.shared.periods.put(PhishInCatalogCache.periodsKey, periods)
+        return periods
     }
 
     public func shows(artist: ArtistRef, period: PeriodRef) async throws -> [ShowSummary] {
-        try await PhishInAPI.showsForPeriod(period.id).map { $0.toShowSummary() }
+        if let cached = await PhishInCatalogCache.shared.shows.get(period.id) { return cached }
+        let shows = try await PhishInAPI.showsForPeriod(period.id).map { $0.toShowSummary() }
+        await PhishInCatalogCache.shared.shows.put(period.id, shows)
+        return shows
     }
 
     public func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
-        try await PhishInAPI.show(date).toShowDetail()
+        if let cached = await PhishInCatalogCache.shared.showDetail.get(date) { return cached }
+        let detail = try await PhishInAPI.show(date).toShowDetail()
+        await PhishInCatalogCache.shared.showDetail.put(date, detail)
+        return detail
     }
 
     public func search(term: String) async throws -> SearchHits {
         try await PhishInAPI.search(term).toSearchHits()
+    }
+}
+
+/// The shared cache state `PhishInSource` delegates to (#61) — see its doc comment for why a
+/// stateless struct needs a separate holder. `periodsKey` is a constant because phish.in's
+/// "artist list" is the single `PHISH` constant, so there's only ever one periods list to
+/// cache; a `TTLCache` is still the right shape for it so `resetCache` and the TTL logic
+/// aren't duplicated.
+actor PhishInCatalogCache {
+    static let shared = PhishInCatalogCache()
+    static let periodsKey = "phish"
+
+    let periods = TTLCache<String, [PeriodRef]>(ttl: catalogCacheTTL, maxEntries: 1)
+    let shows = TTLCache<String, [ShowSummary]>(ttl: catalogCacheTTL, maxEntries: 60)
+    let showDetail = TTLCache<String, ShowDetail>(ttl: catalogCacheTTL, maxEntries: 200)
+
+    /// Test-only hook: clears every cache in one call, the way `RelistenCatalogSource.resetCache()` does.
+    func resetCache() async {
+        await periods.clear()
+        await shows.clear()
+        await showDetail.clear()
     }
 }
 
