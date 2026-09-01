@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -736,15 +735,79 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
 fun ArtistsScreen(nav: NavHostController) {
     val rawArtists = loadOnce { loadArtistsByBackend() }
     val favoriteKeys by Favorites.keys.collectAsState()
-    val artists = remember(rawArtists.value, favoriteKeys) {
-        rawArtists.value?.map { mergeArtists(it, favoriteKeys) }
+    val groups = remember(rawArtists.value, favoriteKeys) {
+        rawArtists.value?.map { groupArtistsForBrowse(it, favoriteKeys) }
     }
+    var sortMode by rememberSaveable { mutableStateOf(ArtistSortMode.POPULAR) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize()) {
         Header("Artists", nav)
-        Loaded(artists) { list ->
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            placeholder = { Text("Filter artists…") },
+            leadingIcon = { Icon(Icons.Default.Search, null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear") }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(ArtistSortMode.entries, key = { it.name }) { mode ->
+                FilterChip(
+                    selected = sortMode == mode,
+                    onClick = { sortMode = mode },
+                    label = { Text(mode.label) },
+                )
+            }
+        }
+        Loaded(groups) { g ->
+            val phishMatches = g.phish?.takeIf { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+            val favorited = g.favorited.filterByName(query).sortedByMode(sortMode)
+            val others = g.others.filterByName(query).sortedByMode(sortMode)
+
+            if (phishMatches == null && favorited.isEmpty() && others.isEmpty()) {
+                Text(
+                    "No artists match \"$query\".",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+                return@Loaded
+            }
+
             LazyColumn {
-                items(list, key = { "${it.backend.id}-${it.id}" }) { artist ->
+                phishMatches?.let { phish ->
+                    item(key = "${phish.backend.id}-${phish.id}") {
+                        RowItem(
+                            title = phish.name,
+                            subtitle = "${phish.showCount} ${plural(phish.showCount, "show")}",
+                            artUrl = null,
+                            trailingContent = { FavoriteButton(phish) },
+                            onClick = { nav.navigate("artist/${phish.backend.id}/${phish.id}") }
+                        )
+                    }
+                }
+                if (favorited.isNotEmpty()) {
+                    item { SectionHeader("Favorites") }
+                    items(favorited, key = { "fav-${it.backend.id}-${it.id}" }) { artist ->
+                        RowItem(
+                            title = artist.name,
+                            subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                            artUrl = null,
+                            trailingContent = { FavoriteButton(artist) },
+                            onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                        )
+                    }
+                    item { SectionHeader("Artists") }
+                }
+                items(others, key = { "${it.backend.id}-${it.id}" }) { artist ->
                     RowItem(
                         title = artist.name,
                         subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
@@ -1474,6 +1537,8 @@ private fun SearchResultsList(
     }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTag by rememberSaveable { mutableStateOf<String?>("All") }
+    var sortMode by rememberSaveable { mutableStateOf(SearchSortMode.RELEVANCE) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
     val artistsPresent = results.artistsPresent
     // Selection survives to a different query only by accident of key reuse — clear it once
     // the artist it named is no longer among the hits.
@@ -1545,6 +1610,30 @@ private fun SearchResultsList(
             Spacer(Modifier.height(4.dp))
         }
 
+        // A third stacked chip row here would be too much chrome on top of the artist and
+        // tag rows above, so this is one compact line rather than a LazyRow of its own (#91).
+        if (r.shows.isNotEmpty() || r.tracks.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Box {
+                    TextButton(onClick = { sortMenuOpen = true }) {
+                        Text("Sort: ${sortMode.label}")
+                        Icon(Icons.Default.KeyboardArrowDown, null)
+                    }
+                    DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                        SearchSortMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text(mode.label) },
+                                onClick = { sortMode = mode; sortMenuOpen = false },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         if (r.isEmpty) {
             val message = if (results.failed.isNotEmpty()) {
                 "Couldn't search " + results.failed.joinToString(" or ") {
@@ -1571,7 +1660,7 @@ private fun SearchResultsList(
             }
             if (r.shows.isNotEmpty()) {
                 item { SectionHeader("Shows") }
-                items(r.shows, key = { "show-${it.artist.backend.id}-${it.artist.id}-${it.date}" }) { show ->
+                items(r.shows.sortedByMode(sortMode), key = { "show-${it.artist.backend.id}-${it.artist.id}-${it.date}" }) { show ->
                     RowItem(
                         title = show.date,
                         subtitle = listOfNotNull(
@@ -1614,7 +1703,7 @@ private fun SearchResultsList(
             }
             if (r.tracks.isNotEmpty()) {
                 item { SectionHeader("Tracks") }
-                items(r.tracks, key = { "track-${it.id}" }) { track ->
+                items(r.tracks.sortedByMode(sortMode), key = { "track-${it.id}" }) { track ->
                     RowItem(
                         title = track.title,
                         subtitle = listOfNotNull(
@@ -1959,11 +2048,13 @@ private fun PlaylistRow(playlist: Playlist, nav: NavHostController) {
 fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
     val data = loadOnce(slug) { PhishInApi.playlist(slug) }
     val saved = loadOnce(slug) { vm.progressFor(playlistQueueKey(slug)) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize()) {
         Header("Playlist", nav)
         Loaded(data.value) { pl ->
             val entries = pl.entries.filter { it.track.playable }
+            val filtered = entries.filterByTitleIndexed(query)
             val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
             LazyColumn {
                 item {
@@ -1989,6 +2080,23 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
                         LikeButton(Likable.Playlist, pl.id, pl.likedByUser, pl.likesCount)
                     }
                 }
+                if (entries.size > 1) {
+                    item {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            singleLine = true,
+                            placeholder = { Text("Search this playlist…") },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = {
+                                if (query.isNotEmpty()) {
+                                    IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear") }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
+                }
                 if (progress != null) {
                     item {
                         ResumeBanner(progress) {
@@ -1996,7 +2104,16 @@ fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
                         }
                     }
                 }
-                itemsIndexed(entries, key = { _, e -> "e-${e.position}-${e.track.id}" }) { i, e ->
+                if (filtered.isEmpty()) {
+                    item {
+                        Text(
+                            "No tracks match \"$query\".",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
+                items(filtered, key = { (_, e) -> "e-${e.position}-${e.track.id}" }) { (i, e) ->
                     RowItem(
                         title = e.track.title,
                         subtitle = listOfNotNull(
@@ -2080,12 +2197,19 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
     val saved = loadOnce(id) { vm.progressFor(localPlaylistQueueKey(id)) }
     val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
     var renaming by remember { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    // Reordering writes positions computed against `tracks`' full indices — doing that while
+    // a filter narrows what's on screen would scramble the playlist (#90), so reordering is
+    // simply unavailable until the filter is cleared, rather than silently acting on the
+    // wrong rows or clearing the user's search out from under them.
+    val reorderable = query.isBlank()
 
     Column(Modifier.fillMaxSize()) {
         Header(playlist?.name ?: "Playlist", nav)
         if (playlist == null) {
             Loading()
         } else {
+            val filtered = tracks.filterByTitleIndexed(query)
             LazyColumn {
                 item {
                     Row(
@@ -2106,6 +2230,23 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
                         }
                     }
                 }
+                if (tracks.size > 1) {
+                    item {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            singleLine = true,
+                            placeholder = { Text("Search this playlist…") },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = {
+                                if (query.isNotEmpty()) {
+                                    IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear") }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
+                }
                 if (progress != null) {
                     item {
                         ResumeBanner(progress) {
@@ -2121,8 +2262,16 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
                             modifier = Modifier.padding(16.dp),
                         )
                     }
+                } else if (filtered.isEmpty()) {
+                    item {
+                        Text(
+                            "No tracks match \"$query\".",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
                 } else {
-                    itemsIndexed(tracks, key = { _, t -> t.rowId }) { i, t ->
+                    items(filtered, key = { (_, t) -> t.rowId }) { (i, t) ->
                         RowItem(
                             title = t.title,
                             subtitle = listOfNotNull(t.showDate, t.venueName).joinToString(" · "),
@@ -2131,23 +2280,23 @@ fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController)
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(
-                                        enabled = i > 0,
+                                        enabled = reorderable && i > 0,
                                         onClick = { vm.moveLocalPlaylistTrack(id, tracks, i, i - 1) },
                                     ) {
                                         Icon(
                                             Icons.Default.KeyboardArrowUp,
                                             "Move up",
-                                            tint = if (i > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                            tint = if (reorderable && i > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                                         )
                                     }
                                     IconButton(
-                                        enabled = i < tracks.lastIndex,
+                                        enabled = reorderable && i < tracks.lastIndex,
                                         onClick = { vm.moveLocalPlaylistTrack(id, tracks, i, i + 1) },
                                     ) {
                                         Icon(
                                             Icons.Default.KeyboardArrowDown,
                                             "Move down",
-                                            tint = if (i < tracks.lastIndex) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                            tint = if (reorderable && i < tracks.lastIndex) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                                         )
                                     }
                                     IconButton(onClick = { vm.removeFromLocalPlaylist(t.rowId, id) }) {
