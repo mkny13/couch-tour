@@ -3295,3 +3295,83 @@ setting.
   automate. This is a local-signing artifact, unrelated to this batch, and it walled off GUI
   automation for the session. Worth knowing for any future macOS batch whose verification is
   interactive: answer that prompt once by hand before starting.
+
+### D205 — Wire #67/#21/#62 into the macOS UI, plus #115's context menu
+
+Phase 2's audit (`phase-2-batches.md`, 2026-08-31) found that D191/D192/D193 had each claimed
+macOS UI shipped for tags, sort, and artwork when only the `CouchTourKit` model and its tests
+had — see the superseding note added just above this entry for the full story. This batch is the
+actual wiring, plus #115 riding along in the same worktree per that plan's decision.
+
+**#21 — sort.** `ShowsView.swift` gets a toolbar `Picker` over `ShowSortOption`, not Android's
+chip row. Android's `FilterChip` row is that platform's idiom for a small, always-visible choice;
+this app's own macOS screens already reach for a menu-style `Picker` for exactly this kind of
+inline filter (`SearchView`'s artist picker, `ListeningView`'s scope and artist pickers), so a
+second visual language for the same kind of decision would read as inconsistent rather than
+native. Sort is applied to `shows` already held in view state — `load()` still only resets
+`loadState`, never re-fetches on a sort or filter change.
+
+**#67 — tags.** `ShowsView.swift` and `SearchView.swift` both build their available-tag list the
+way `MainActivity.kt:837-846`/`:1484-1502` do: the tags actually present in the current results,
+deduped case-insensitively, sorted by `priority` descending then name, "All" prefixed, and the
+picker only rendered once there's a real tag to filter by. A selected tag that drops out of the
+result set (a new search, narrowing to a different artist, a different period) falls back to
+"All" rather than rendering nothing, matching the existing accident-of-key-reuse handling
+`SearchView`'s artist picker already had. In `SearchView`, picking a real tag also empties the
+Artists and Song/Venue-slice sections rather than leaving them showing untagged, unrelated hits —
+Android's search screen does the same (`rArtist.copy(artists = emptyList(), slices = emptyList()
+...)`).
+
+**#62 — artwork.** `ArtworkView` gains two optional parameters, `artist` and `date`, threaded
+through its five call sites (`HomeView`'s Next Stop, Continue Listening, and On This Date cards;
+`MiniPlayerView`; `NowPlayingInspector`) from whatever each already had in scope — `ShowSummary`
+for the first and last, `PlaybackProgress.artist` for Continue Listening (no real date there, so
+`date` stays nil and `ShowArtworkGenerator.dateBadge` falls back to "LIVE", which reads fine for
+an in-progress card), and `player.show` for the two player surfaces. The placeholder is a
+`LinearGradient` from `palette.primaryColor` to `palette.backgroundColor` with the artist
+monogram overlaid, plus the date badge once the artwork is drawn large enough (`scaledSize >=
+60`) for a second line to read as information rather than noise — the mini player's default
+36pt skips it. This is the gradient-plus-monogram shape decided in the batch plan, not a port of
+Android's `Canvas` cassette; `ShowArtworkGenerator.palette`/`monogram`/`dateBadge` were already
+written and tested and needed no changes.
+
+**#115 — Continue Listening context menu.** `ResumeCardView` (Home) and each row in
+`ListeningView`'s list get a `.contextMenu` — Open / Mark Completed / Remove from List, matching
+Android's long-press menu (`MainActivity.kt:2377-2407`). Both call straight through to
+`ProgressStore.markFinished(key:)` and `.dismiss(key:)`, which already existed and needed no
+changes, then reload their own list state so the row's disappearance from "Continue Listening"
+(or its "completed"/"removed" status in History) is immediate.
+
+**Why CI didn't catch the original gap, and still can't catch this one.** `macos-tests.yml`
+triggers only on `macos/Packages/CouchTourKit/**`; every change in this batch is in
+`macos/CouchTour/**` (the app target), so this PR runs no macOS CI at all. The only checks that
+ran are Android's (irrelevant here) and whatever `swift test` this batch ran locally, which
+exercises the unchanged `CouchTourKit` helpers, not the views calling them. Same gap D191-D193
+fell into; still open after this batch, since closing it would mean building the app target in
+CI, which needs local ad-hoc signing this repo doesn't have configured for a CI runner.
+
+**A worktree-local landmine, unrelated to the code above but worth recording:** this worktree's
+`macos/CouchTour.xcodeproj` (gitignored, generated — D103) was found as a **symlink** into the
+original checkout's copy (`/Volumes/.../phish-in-app/macos/CouchTour.xcodeproj`, via
+`.git/info/exclude`), left over from however this worktree was provisioned. `xcodegen generate`
+happily followed it and wrote a real project file at the *original* checkout's path, so
+`xcodebuild` was compiling and linking that checkout's sources — not this worktree's edits —
+until the symlink was deleted and `xcodegen generate` re-run to produce a real, worktree-local
+project file. A build that "succeeds" against a symlinked project proves nothing about the
+worktree it was run from; worth checking `ls -la macos/CouchTour.xcodeproj` for a `->` before
+trusting any macOS build/test result in a fresh worktree.
+
+**Testing:**
+- `swift test`: 369/369 (`CouchTourKit`'s own suite, unchanged by this batch — see D204's count,
+  now 369 after `#120` removed `TrackedTourStore`'s duplicate migration).
+- `xcodegen generate` + `xcodebuild … build` (Debug): succeeds, no new warnings, from a real
+  worktree-local project (see the symlink note above).
+- `macos/scripts/install.sh` (Release): succeeds; installed to `/Applications/Couch Tour.app`,
+  confirmed via `strings` that the binary carries this batch's new UI strings.
+- **The interactive click-through this batch's own verification section calls for — sorting a
+  year's shows, filtering by tag, looking at artwork-less Relisten shows, right-clicking a
+  Continue Listening card — did not happen.** The keychain prompt this file already warned about
+  wasn't even reached: the machine's display session was locked for the whole batch, so
+  `screencapture`/`osascript` GUI scripting couldn't reach the screen either. The app is built,
+  installed, and waiting; the actual click-through is still owed and needs Mike at the machine,
+  same as D204's before it.

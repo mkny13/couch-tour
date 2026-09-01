@@ -12,6 +12,7 @@ import SwiftUI
 struct SearchView: View {
     @State private var hits: SearchHits?
     @State private var selectedArtistKey: String?
+    @State private var selectedTag: String = "All"
     @EnvironmentObject private var appModel: AppModel
 
     private var term: String { appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -51,7 +52,14 @@ struct SearchView: View {
         // Becomes nil (falling back to "everything") once the artist it named is no longer
         // among the hits — the same accident-of-key-reuse behavior Android's chip row has.
         let selectedArtist = artistsPresent.first { key(for: $0) == selectedArtistKey }
-        let filtered = hits.filteredTo(selectedArtist)
+        let filteredByArtist = hits.filteredTo(selectedArtist)
+
+        let availableTags = tagOptions(for: filteredByArtist)
+        // Same fallback as the artist picker above: a tag that's dropped out of the results
+        // (a new search, or narrowing to an artist that doesn't carry it) reverts to "All"
+        // rather than rendering nothing.
+        let effectiveTag = availableTags.contains(selectedTag) ? selectedTag : "All"
+        let filtered = filterByTag(filteredByArtist, tagName: effectiveTag)
 
         VStack(spacing: 0) {
             if artistsPresent.count > 1 {
@@ -59,6 +67,17 @@ struct SearchView: View {
                     Text("All").tag(String?.none)
                     ForEach(artistsPresent, id: \.self) { artist in
                         Text(artist.name).tag(String?.some(key(for: artist)))
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .padding([.horizontal, .top])
+            }
+
+            if availableTags.count > 1 {
+                Picker("Tag", selection: Binding(get: { effectiveTag }, set: { selectedTag = $0 })) {
+                    ForEach(availableTags, id: \.self) { tag in
+                        Text(tag).tag(tag)
                     }
                 }
                 .pickerStyle(.menu)
@@ -76,6 +95,35 @@ struct SearchView: View {
                 resultsListBody(filtered)
             }
         }
+    }
+
+    /// The union of tags on the shows and tracks currently in view, sorted by priority
+    /// descending then name, "All" prefixed — Android's shape (`MainActivity.kt:1484-1502`).
+    private func tagOptions(for hits: SearchHits) -> [String] {
+        var seen: [String: Tag] = [:]
+        for tag in hits.shows.flatMap(\.tags) + hits.tracks.flatMap(\.tags) {
+            seen[tag.name.lowercased()] = tag
+        }
+        let names = seen.values
+            .sorted { lhs, rhs in
+                lhs.priority != rhs.priority ? lhs.priority > rhs.priority : lhs.name < rhs.name
+            }
+            .map(\.name)
+        return names.isEmpty ? [] : ["All"] + names
+    }
+
+    /// Matches Android's search tag filter: artists and song/venue slices aren't tagged at all,
+    /// so picking a real tag narrows to shows and tracks only rather than leaving unrelated
+    /// sections showing.
+    private func filterByTag(_ hits: SearchHits, tagName: String) -> SearchHits {
+        guard tagName.caseInsensitiveCompare("All") != .orderedSame else { return hits }
+        return SearchHits(
+            shows: hits.shows.filterByTag(tagName),
+            tracks: hits.tracks.filter { track in
+                track.tags.contains { $0.name.caseInsensitiveCompare(tagName) == .orderedSame }
+            },
+            failed: hits.failed
+        )
     }
 
     @ViewBuilder

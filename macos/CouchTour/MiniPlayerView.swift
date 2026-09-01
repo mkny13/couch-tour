@@ -19,7 +19,7 @@ struct MiniPlayerView: View {
             }
 
             HStack(spacing: 16) {
-                ArtworkView(url: player.artURL)
+                ArtworkView(url: player.artURL, artist: player.show?.artist.name, date: player.show?.date)
 
                 VStack(alignment: .leading, spacing: 2) {
                     if let show = player.show {

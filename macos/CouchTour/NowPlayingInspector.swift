@@ -44,7 +44,7 @@ struct NowPlayingInspector: View {
     private func content(show: ShowSummary) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(spacing: 10) {
-                ArtworkView(url: player.artURL, size: 160)
+                ArtworkView(url: player.artURL, artist: show.artist.name, date: show.date, size: 160)
                 VStack(spacing: 2) {
                     Button {
                         appModel.navigate(to: .show(show))

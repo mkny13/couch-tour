@@ -157,7 +157,9 @@ struct HomeView: View {
                     progress: item,
                     isResolvingNavigation: resolvingResumeRow == item.queueKey,
                     onPlay: { Task { await tapResume(item) } },
-                    onOpen: { Task { await openResumeRow(item) } }
+                    onOpen: { Task { await openResumeRow(item) } },
+                    onMarkCompleted: { Task { await markResumeRowCompleted(item) } },
+                    onRemove: { Task { await removeResumeRow(item) } }
                 )
             }
         }
@@ -172,7 +174,7 @@ struct HomeView: View {
                 SectionHeader("Next Couch Tour Stop", systemImage: "bookmark.fill")
 
                 HStack(spacing: 16) {
-                    ArtworkView(url: show.artURL, size: 64)
+                    ArtworkView(url: show.artURL, artist: show.artist.name, date: show.date, size: 64)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(show.date) · \(show.artist.name)")
@@ -474,6 +476,29 @@ struct HomeView: View {
         resolvingResumeRow = nil
     }
 
+    // #115 — the same open/mark completed/remove trio as Android's long-press menu
+    // (`MainActivity.kt:2377-2407`), applied here and in `ListeningView` so the Home shelf and
+    // the full screen agree (D200/#98).
+    private func markResumeRowCompleted(_ row: PlaybackProgress) async {
+        guard let store = appModel.progressStore else { return }
+        do {
+            try store.markFinished(key: row.queueKey)
+            await reloadProgress()
+        } catch {
+            alertMessage = "Couldn't update \(row.title): \(error.localizedDescription)"
+        }
+    }
+
+    private func removeResumeRow(_ row: PlaybackProgress) async {
+        guard let store = appModel.progressStore else { return }
+        do {
+            try store.dismiss(key: row.queueKey)
+            await reloadProgress()
+        } catch {
+            alertMessage = "Couldn't remove \(row.title): \(error.localizedDescription)"
+        }
+    }
+
     private func reloadAll() async {
         await reloadArtists()
         await reloadProgress()
@@ -540,6 +565,8 @@ private struct ResumeCardView: View {
     let isResolvingNavigation: Bool
     let onPlay: () -> Void
     let onOpen: () -> Void
+    let onMarkCompleted: () -> Void
+    let onRemove: () -> Void
 
     /// Scales with the system text size so the title and track name below still fit when the
     /// user turns text up — a fixed 150pt frame just clipped them (#102).
@@ -554,7 +581,10 @@ private struct ResumeCardView: View {
             // Button for play sits outside its hit area entirely (#98).
             Button(action: onOpen) {
                 ZStack {
-                    ArtworkView(url: progress.artUrl, size: 150)
+                    // `PlaybackProgress` has no separate date field — `date: nil` here just
+                    // means the badge reads "LIVE" instead of a specific show date, which is a
+                    // fine placeholder for "something's in progress."
+                    ArtworkView(url: progress.artUrl, artist: progress.artist, size: 150)
                         .clipShape(RoundedRectangle(cornerRadius: CardMetrics.cornerRadius))
                     if isResolvingNavigation {
                         ProgressView()
@@ -597,6 +627,17 @@ private struct ResumeCardView: View {
         }
         .frame(width: width)
         .cardSurface(padding: 8)
+        .contextMenu {
+            Button(action: onOpen) {
+                Label("Open", systemImage: "arrow.up.forward.app")
+            }
+            Button(action: onMarkCompleted) {
+                Label("Mark Completed", systemImage: "checkmark.circle")
+            }
+            Button(role: .destructive, action: onRemove) {
+                Label("Remove from List", systemImage: "trash")
+            }
+        }
     }
 }
 
@@ -607,7 +648,7 @@ private struct AnniversaryCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ArtworkView(url: show.artURL, size: 140)
+            ArtworkView(url: show.artURL, artist: show.artist.name, date: show.date, size: 140)
                 .clipShape(RoundedRectangle(cornerRadius: CardMetrics.cornerRadius))
 
             VStack(alignment: .leading, spacing: 2) {
