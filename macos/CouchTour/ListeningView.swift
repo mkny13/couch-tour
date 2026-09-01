@@ -116,6 +116,25 @@ struct ListeningView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    // Same open/mark completed/remove trio as Home's Continue Listening shelf
+                    // (#115), so the two surfaces agree (D200/#98).
+                    .contextMenu {
+                        Button {
+                            Task { await openRow(row) }
+                        } label: {
+                            Label(isPlaylist(row) ? "Open Playlist" : "Open Show", systemImage: "arrow.up.forward.app")
+                        }
+                        Button {
+                            Task { await markCompleted(row) }
+                        } label: {
+                            Label("Mark Completed", systemImage: "checkmark.circle")
+                        }
+                        Button(role: .destructive) {
+                            Task { await remove(row) }
+                        } label: {
+                            Label("Remove from List", systemImage: "trash")
+                        }
+                    }
                 }
             }
         }
@@ -158,6 +177,33 @@ struct ListeningView: View {
             resumeError = "Couldn't open \(row.title): \(error.localizedDescription)"
         }
         resolvingRow = nil
+    }
+
+    private func isPlaylist(_ row: PlaybackProgress) -> Bool {
+        switch parseQueueKey(row.queueKey)?.kind {
+        case .playlist, .localPlaylist: return true
+        default: return false
+        }
+    }
+
+    private func markCompleted(_ row: PlaybackProgress) async {
+        guard let store = appModel.progressStore else { return }
+        do {
+            try store.markFinished(key: row.queueKey)
+            await load()
+        } catch {
+            resumeError = "Couldn't update \(row.title): \(error.localizedDescription)"
+        }
+    }
+
+    private func remove(_ row: PlaybackProgress) async {
+        guard let store = appModel.progressStore else { return }
+        do {
+            try store.dismiss(key: row.queueKey)
+            await load()
+        } catch {
+            resumeError = "Couldn't remove \(row.title): \(error.localizedDescription)"
+        }
     }
 
     /// Both scopes come from one pass, so switching between them is instant and they can't
