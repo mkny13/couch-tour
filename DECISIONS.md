@@ -3302,7 +3302,7 @@ setting.
 
 Phase 2's audit (`phase-2-batches.md`, 2026-08-31) found that D191/D192/D193 had each claimed
 macOS UI shipped for tags, sort, and artwork when only the `CouchTourKit` model and its tests
-had — see the superseding note added just above this entry for the full story. This batch is the
+had — see D208, which supersedes them on macOS only, for the full story. This batch is the
 actual wiring, plus #115 riding along in the same worktree per that plan's decision.
 
 **#21 — sort.** `ShowsView.swift` gets a toolbar `Picker` over `ShowSortOption`, not Android's
@@ -3433,9 +3433,9 @@ reason `filterByTag`'s two overloads already carried one. `filterByTitleIndexed`
   covering sort/filter/grouping correctness and the empty/no-match cases for all three features).
 - Not done: macOS (out of scope — Batch 2B) and a manual on-device pass of the new Android UI.
 
-## Iteration 66 — Multi-Level Catalog Cache, Android and macOS (#61, D206)
+## Iteration 67 — Multi-Level Catalog Cache, Android and macOS (#61, D207)
 
-### D206 — In-memory TTL cache for periods, shows, and show detail on both platforms (#61)
+### D207 — In-memory TTL cache for periods, shows, and show detail on both platforms (#61)
 
 O4 (`MULTI-ARTIST-PLAN.md`) deliberately cut catalog caching down to one `@Volatile`/actor-private
 artist list — "a real catalog cache stays out of scope." Everything below the artist list —
@@ -3521,3 +3521,49 @@ process-lifetime singleton under macOS's shared `MockServer`.
   an app-target build from inside a worktree rather than the primary checkout.
 - No UI changed and the `MusicSource` interface's shape is untouched, matching the batch's scope:
   this stays invisible behind the seam that made it parallelizable with Batches 1 and 2A.
+
+## Iteration 68 — Phase 2 Audit Closeout: Correcting D191–D193's macOS Claim (#67, #21, #62, D208)
+
+### D208 — D191, D192, and D193 overstated macOS status; only the Android UI and the `CouchTourKit` model shipped (supersedes D191, D192, D193 on macOS only)
+
+A 2026-08-31 audit ahead of Phase 2 planning ([prompts/phase-2-batches.md](prompts/phase-2-batches.md))
+found that D191 (#67 tags), D192 (#21 momentum sort), and D193 (#62 procedural artwork) each state
+or imply that macOS UI shipped alongside Android. It did not, for any of the three, as of that
+audit:
+
+- **#67 (tags):** `filterShowsByTag` / `filterTracksByTag` / `filterByTag` existed and were tested
+  in `Catalog.swift`, but `grep -rn "Tag" macos/CouchTour` returned nothing — no macOS view read
+  them.
+- **#21 (momentum sort):** `ShowSortOption` and `sortShows(_:by:)` existed and were tested in
+  `Catalog.swift`, but `ShowsView.swift` was a plain unsorted `List` with no sort `@State` at all.
+- **#62 (artwork):** `ShowArtworkGenerator` (palette, monogram, date badge) existed and was tested
+  in `Artwork.swift`, but `ArtworkView.swift` still drew a bare `music.note` placeholder and never
+  called it.
+
+Android was unaffected by this correction — its chip-row sort control, tag filter, and cassette
+artwork for these three issues were real, in `MainActivity.kt`, and D191–D193's Android claims
+stand. Only the macOS half of each entry was wrong, which is why this supersedes them on macOS
+only rather than retracting them outright. The actual macOS wiring landed as D206, above this
+entry despite the later decision number — DECISIONS.md orders by when an entry merged to `main`,
+not by when the underlying work was done, and this audit was written before D206's wiring batch
+but merged after it (and after D207 too, which is why D206 isn't immediately adjacent).
+
+**Why CI never caught it — worth having on the record:** `swift test`
+(`macos/Packages/CouchTourKit`) covers the `CouchTourKit` package only. The app target
+(`macos/CouchTour`) isn't part of that package and isn't built by `macos-tests.yml`, so a tested
+pure function that no screen calls is fully green regardless. `TagTests.testShowSummarySortedByOption`
+passed at the time of the audit against a sort no macOS user could reach. **A green `swift test` is
+not evidence a macOS feature is reachable** — macOS UI work needs an install-and-click pass
+(`macos/scripts/install.sh`), same as any other platform's manual verification, and a passing
+package build should not be read as that pass having happened.
+
+**Process note.** This entry documents an audit written 2026-08-31, but its own commit was
+stranded on a detached-HEAD worktree by an orchestration misconfiguration and didn't reach `main`
+until other Phase 2 batches (D205, D206, D207) had already landed — including D206, which this
+entry supersedes and which itself refers forward to this one. Four parallel worktrees, each
+computing "next available iteration/decision number" from `main` at branch time rather than at
+merge time, is also why D205 and D206 were each independently claimed by two different batches;
+those collisions were resolved by renumbering the later-merging entry (D206→D207) rather than
+editing the content of either. Worth keeping in mind for any future sprint run as several parallel
+agents against one shared docs file: decision numbering is a shared mutable resource, and only the
+merge order — not the branch/authoring order — determines who actually gets which number.
