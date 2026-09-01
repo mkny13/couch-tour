@@ -49,6 +49,17 @@ Unit-tested (473 passing) but never run on a device.
 - [ ] `uat-012` **In-playlist search — phish.in playlist** (Android) — Open a public playlist, use the new search field, confirm it filters that playlist's tracks.
 - [ ] `uat-013` **In-playlist search — local playlist, and reorder interlock** (Android) — Open a local mixtape, filter it, and confirm drag-to-reorder is disabled while a filter is active. **This is the one worth testing hardest** — reordering a filtered list would silently scramble the real track order.
 
+## Batch 2B — macOS list sort and filter (#91/#116/#90, D210)
+
+macOS parity for Batch 2A. Unit-tested (400 passing) but, like Batch 1, never clicked — the same
+locked display session blocked it, and `osascript` additionally lacked Accessibility permission.
+
+- [ ] `uat-021` **Artists sort toggle** (macOS) — Artists screen. Toggle Popular ↔ A–Z. Order changes, Favorites stay in their own section, and an artist appears in Favorites *or* the main list but not confusingly duplicated.
+- [ ] `uat-022` **Artists filter field** (macOS) — Type a partial band name; list narrows, including favorited artists. Clearing restores everything; a no-match query shows a sensible empty state.
+- [ ] `uat-023` **Search result sort** (macOS) — Switch between Relevance / Newest / Oldest / Most liked. Under "Most liked", Relisten hits (no like count) settle after phish.in hits rather than scattering.
+- [ ] `uat-024` **Local playlist search + reorder interlock** (macOS) — Filter a local playlist and confirm drag-to-reorder is disabled while the filter is active. Same scrambling hazard as `uat-013` on Android — worth testing hard.
+- [ ] `uat-025` **Android/macOS agreement** (both) — Sort the same artist list both ways on phone and Mac. Same ordering under the same option; this is a parity batch, so a divergence is the bug.
+
 ## Batch 4 — catalog cache (#61, D207)
 
 Behaviour change with no UI, so the only real check is that nothing went stale or stuck.
