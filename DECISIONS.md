@@ -3296,7 +3296,9 @@ setting.
   automation for the session. Worth knowing for any future macOS batch whose verification is
   interactive: answer that prompt once by hand before starting.
 
-### D205 — Wire #67/#21/#62 into the macOS UI, plus #115's context menu
+## Iteration 66 — macOS: wire #67/#21/#62 into the UI, plus #115 (D206)
+
+### D206 — Wire #67/#21/#62 into the macOS UI, plus #115's context menu
 
 Phase 2's audit (`phase-2-batches.md`, 2026-08-31) found that D191/D192/D193 had each claimed
 macOS UI shipped for tags, sort, and artwork when only the `CouchTourKit` model and its tests
@@ -3375,3 +3377,58 @@ trusting any macOS build/test result in a fresh worktree.
   `screencapture`/`osascript` GUI scripting couldn't reach the screen either. The app is built,
   installed, and waiting; the actual click-through is still owed and needs Mike at the machine,
   same as D204's before it.
+
+## Iteration 65 — List Sort and Filter, Android (#91, #116, #90, D205)
+
+### D205 — Artist List Sort/Filter, Search Result Sort, and In-Playlist Search (Android only)
+
+Phase 2's Batch 2A ([phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md)): three
+Feedback-filed issues that are one shape of request — reorder or narrow a long list — landed
+together as Android-only groundwork macOS's Batch 2B will port. Every helper is a pure function
+in `Catalog.kt`, matching the file's existing `sortedByMode`/`filterByTag` pattern, so the
+sorting/filtering logic itself is unit-tested rather than only reachable by a manual pass — the
+same gap D191-D193 documented for the macOS side (see Batch 0's audit and its superseding entry).
+
+- **#116 — Artists list.** `ArtistsScreen` gained a Popular/A–Z sort (`ArtistSortMode`) and a
+  name filter (`filterByName`). Phish stays pinned outside either section — its position-1 slot
+  predates favoriting (D157) and isn't earned by being liked, so neither the new sort nor the
+  filter displaces it as long as its name still matches. `mergeArtists` was refactored to build
+  on a new `groupArtistsForBrowse` (phish / favorited / everyone-else, as a typed `ArtistGroups`
+  rather than a flattened list) so the screen can render Favorites as its own pinned section,
+  sorted and filtered independently, without duplicating the dedup logic `mergeArtists` already
+  had tests for. An empty filter result renders `No artists match "<query>".` rather than a blank
+  screen.
+- **#91 — search result sort.** `SearchResultsList` already stacks an artist chip row and a tag
+  chip row; a third `LazyRow` would be too much chrome, so the new `SearchSortMode` (Relevance /
+  Newest / Oldest / Most liked) is one compact `TextButton` + `DropdownMenu` line instead. Sort
+  applies to both the Shows and Tracks sections (not Artists/Venues/Songs/Playlists, which have
+  no date or like count to sort by). "Most liked" needed `ShowSummary` to carry phish.in's
+  `likes_count` at all — it didn't before, since the field only ever mattered per-period via
+  `POPULAR_PERIOD_ID`'s server-side query. It's now on `ShowSummary` itself (default `0`,
+  populated from `Show.likesCount` in `toShowSummary()`), which is what lets Relisten hits settle
+  after every phish.in hit under that sort with no special-cased branch: Relisten never sets it,
+  so it defaults to 0 and sorts last.
+- **#90 — search within a playlist.** Both `PlaylistScreen` (phish.in, read-only) and
+  `LocalPlaylistScreen` (local, reorderable) gained a search field over their track list. The
+  trap flagged in the batch prompt was real: the existing `TextField`s in the macOS playlist
+  views are rename inputs, not search, so Batch 2B can't reuse them as a starting point either.
+  `filterByTitleIndexed` returns matches paired with their index in the *unfiltered* list,
+  because both playback (`vm.playPlaylist`/`vm.playLocalPlaylist`) and, for the local playlist,
+  reordering (`vm.moveLocalPlaylistTrack`) key off that original position — a filtered list's own
+  position would start the wrong track or write positions computed against a subset.
+  **Reordering is disabled while a filter is active** (the up/down arrows grey out) rather than
+  clearing the filter when reorder starts — D184's drag targets already read `tracks`, the full
+  list, by index, and disabling is one boolean versus adding filter-clearing side effects to
+  every reorder callback.
+
+Three `sortedByMode` overloads now exist on `List<ShowSummary>` (`ShowSortMode`, pre-existing,
+and the new `SearchSortMode`) plus one on `List<Track>` and one on `List<ArtistRef>`. The two
+`SearchSortMode` overloads needed `@JvmName` (`sortedShowsForSearch`/`sortedTracksForSearch`) —
+same value-parameter type on two different receivers erases to the same JVM signature, the same
+reason `filterByTag`'s two overloads already carried one. `filterByTitleIndexed`'s two overloads
+(`PlaylistEntry`, `LocalPlaylistTrackEntity`) needed the same treatment for the same reason.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 473/473 passing (463 baseline + 10 new,
+  covering sort/filter/grouping correctness and the empty/no-match cases for all three features).
+- Not done: macOS (out of scope — Batch 2B) and a manual on-device pass of the new Android UI.

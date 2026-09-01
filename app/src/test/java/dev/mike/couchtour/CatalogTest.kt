@@ -504,4 +504,136 @@ class CatalogTest {
         assertEquals(tag.color, tagBack.color)
         assertEquals(tag.priority, tagBack.priority)
     }
+
+    // ------------------------------------------------------- search sort (#91)
+
+    @Test
+    fun `a phish-in show carries its likes count into ShowSummary`() {
+        assertEquals(0, show().toShowSummary().likesCount)
+        assertEquals(42, show().copy(likesCount = 42).toShowSummary().likesCount)
+    }
+
+    @Test
+    fun `search sort orders shows by date both directions`() {
+        val s1 = ShowSummary(artist = dead, date = "1977-05-07")
+        val s2 = ShowSummary(artist = dead, date = "1977-05-09")
+        val s3 = ShowSummary(artist = dead, date = "1977-05-08")
+        val list = listOf(s1, s2, s3)
+
+        assertEquals(listOf("1977-05-07", "1977-05-08", "1977-05-09"), list.sortedByMode(SearchSortMode.DATE_ASC).map { it.date })
+        assertEquals(listOf("1977-05-09", "1977-05-08", "1977-05-07"), list.sortedByMode(SearchSortMode.DATE_DESC).map { it.date })
+        assertEquals(list, list.sortedByMode(SearchSortMode.RELEVANCE))
+    }
+
+    @Test
+    fun `search sort by most liked settles Relisten shows after every phish-in hit`() {
+        // Relisten shows carry no likesCount of their own and default to 0, so under a
+        // descending sort by likes they fall in after any phish-in show with a nonzero
+        // count — no explicit branch needed for the mixed-backend case.
+        val relistenShow = ShowSummary(artist = dead, date = "1977-05-08", likesCount = 0)
+        val phishLow = show(date = "1997-11-17").copy(likesCount = 3).toShowSummary()
+        val phishHigh = show(date = "1997-11-22").copy(likesCount = 50).toShowSummary()
+        val list = listOf(relistenShow, phishLow, phishHigh)
+
+        assertEquals(
+            listOf("1997-11-22", "1997-11-17", "1977-05-08"),
+            list.sortedByMode(SearchSortMode.MOST_LIKED).map { it.date },
+        )
+    }
+
+    @Test
+    fun `search sort orders tracks by date and likes`() {
+        val t1 = track(id = 1, title = "A", showDate = "1997-11-17").copy(likesCount = 3)
+        val t2 = track(id = 2, title = "B", showDate = "1997-11-22").copy(likesCount = 50)
+        val t3 = track(id = 3, title = "C", showDate = "1997-11-20").copy(likesCount = 1)
+        val list = listOf(t1, t2, t3)
+
+        assertEquals(listOf("A", "C", "B"), list.sortedByMode(SearchSortMode.DATE_ASC).map { it.title })
+        assertEquals(listOf("B", "C", "A"), list.sortedByMode(SearchSortMode.DATE_DESC).map { it.title })
+        assertEquals(listOf("B", "A", "C"), list.sortedByMode(SearchSortMode.MOST_LIKED).map { it.title })
+    }
+
+    // ---------------------------------------------------- artist sort & filter (#116)
+
+    @Test
+    fun `artist sort orders by show count or alphabetically`() {
+        val goose = ArtistRef(Backend.RELISTEN, "goose", "Goose", showCount = 412)
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val wsp = ArtistRef(Backend.RELISTEN, "wsp", "Widespread Panic", showCount = 3000)
+        val list = listOf(goose, dead, wsp)
+
+        assertEquals(listOf(wsp, dead, goose), list.sortedByMode(ArtistSortMode.POPULAR))
+        assertEquals(listOf(goose, dead, wsp), list.sortedByMode(ArtistSortMode.ALPHABETICAL))
+    }
+
+    @Test
+    fun `artist filter matches name case-insensitively and returns all for a blank query`() {
+        val goose = ArtistRef(Backend.RELISTEN, "goose", "Goose")
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val list = listOf(goose, dead)
+
+        assertEquals(listOf(goose), list.filterByName("goo"))
+        assertEquals(listOf(dead), list.filterByName("DEAD"))
+        assertEquals(list, list.filterByName(""))
+        assertEquals(list, list.filterByName("   "))
+        assertTrue(list.filterByName("phish").isEmpty())
+    }
+
+    @Test
+    fun `groupArtistsForBrowse splits phish, favorited, and everyone else the same way mergeArtists does`() {
+        val goose = ArtistRef(Backend.RELISTEN, "goose", "Goose", showCount = 412)
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", showCount = 2189)
+        val groups = groupArtistsForBrowse(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(goose, dead)),
+            favorites = setOf(goose.key),
+        )
+        assertEquals(PHISH, groups.phish)
+        assertEquals(listOf(goose), groups.favorited)
+        assertEquals(listOf(dead), groups.others)
+    }
+
+    @Test
+    fun `groupArtistsForBrowse drops relisten's own separate phish archive, same as mergeArtists`() {
+        val relistenPhish = ArtistRef(Backend.RELISTEN, "phish", "Phish", showCount = 1884)
+        val groups = groupArtistsForBrowse(
+            mapOf(Backend.PHISHIN to listOf(PHISH), Backend.RELISTEN to listOf(relistenPhish))
+        )
+        assertEquals(PHISH, groups.phish)
+        assertTrue(groups.favorited.isEmpty())
+        assertTrue(groups.others.isEmpty())
+    }
+
+    // ---------------------------------------------------- playlist search (#90)
+
+    @Test
+    fun `filterByTitleIndexed matches playlist entries by track title and keeps the original index`() {
+        val e0 = PlaylistEntry(track = Track(id = 1, title = "Tweezer"))
+        val e1 = PlaylistEntry(track = Track(id = 2, title = "Destiny Unbound"))
+        val e2 = PlaylistEntry(track = Track(id = 3, title = "Tweezer Reprise"))
+        val entries = listOf(e0, e1, e2)
+
+        val matches = entries.filterByTitleIndexed("tweezer")
+        assertEquals(listOf(0, 2), matches.map { it.index })
+        assertEquals(listOf("Tweezer", "Tweezer Reprise"), matches.map { it.value.track.title })
+        assertEquals(3, entries.filterByTitleIndexed("").size)
+        assertEquals(3, entries.filterByTitleIndexed("   ").size)
+        assertTrue(entries.filterByTitleIndexed("nonexistent").isEmpty())
+    }
+
+    @Test
+    fun `filterByTitleIndexed matches local playlist tracks by title and keeps the original index`() {
+        val t0 = LocalPlaylistTrackEntity(
+            playlistId = "p", position = 0, backend = "phishin", trackId = "1",
+            showDate = "1997-11-17", title = "Tweezer",
+        )
+        val t1 = LocalPlaylistTrackEntity(
+            playlistId = "p", position = 1, backend = "phishin", trackId = "2",
+            showDate = "1997-11-17", title = "Destiny Unbound",
+        )
+        val tracks = listOf(t0, t1)
+
+        val matches = tracks.filterByTitleIndexed("destiny")
+        assertEquals(listOf(1), matches.map { it.index })
+        assertEquals(listOf("Destiny Unbound"), matches.map { it.value.title })
+    }
 }
