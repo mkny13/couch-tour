@@ -109,19 +109,27 @@ final class LocalPlaylistStoreTests: XCTestCase {
 final class ResolveLocalPlaylistTracksTests: XCTestCase {
     private var server: MockServer!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         server = MockServer()
         server.start()
         PhishInAPI.baseURL = URL(string: "https://mock.test/api/v2")!
         RelistenAPI.baseURL = URL(string: "https://mock.test/api")!
+        // resolveLocalPlaylistTracks resolves shows through sourceFor(_:), which hands back
+        // the process-wide RelistenCatalogSource.shared/PhishInCatalogCache.shared (#61) —
+        // without a reset here, a show cached by an earlier test with the same artist/date
+        // would silently serve stale data instead of hitting this test's own mock server.
+        await PhishInCatalogCache.shared.resetCache()
+        await RelistenCatalogSource.shared.resetCache()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         server.shutdown()
         PhishInAPI.baseURL = URL(string: "https://phish.in/api/v2")!
         RelistenAPI.baseURL = URL(string: "https://api.relisten.net/api")!
-        super.tearDown()
+        await PhishInCatalogCache.shared.resetCache()
+        await RelistenCatalogSource.shared.resetCache()
+        try await super.tearDown()
     }
 
     func testResolvesPhishInTracksFetchingTheShowOnce() async throws {

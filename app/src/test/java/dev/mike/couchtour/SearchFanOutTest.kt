@@ -26,7 +26,7 @@ class SearchFanOutTest {
         relistenServer = MockWebServer().apply { start() }
         PhishInApi.baseUrl = phishInServer.url("/api/v2")
         RelistenApi.baseUrl = relistenServer.url("/api")
-        RelistenCatalogSource.cachedArtists = null
+        RelistenCatalogSource.resetCache()
     }
 
     @After
@@ -35,7 +35,7 @@ class SearchFanOutTest {
         relistenServer.shutdown()
         PhishInApi.baseUrl = "https://phish.in/api/v2".toHttpUrl()
         RelistenApi.baseUrl = "https://api.relisten.net/api".toHttpUrl()
-        RelistenCatalogSource.cachedArtists = null
+        RelistenCatalogSource.resetCache()
     }
 
     private fun emptyRelistenBody() = """{"Artists":[],"Shows":[],"Songs":[],"Venues":[]}"""

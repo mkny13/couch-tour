@@ -3432,3 +3432,92 @@ reason `filterByTag`'s two overloads already carried one. `filterByTitleIndexed`
 - Android unit tests (`./gradlew testDebugUnitTest`): 473/473 passing (463 baseline + 10 new,
   covering sort/filter/grouping correctness and the empty/no-match cases for all three features).
 - Not done: macOS (out of scope — Batch 2B) and a manual on-device pass of the new Android UI.
+
+## Iteration 66 — Multi-Level Catalog Cache, Android and macOS (#61, D206)
+
+### D206 — In-memory TTL cache for periods, shows, and show detail on both platforms (#61)
+
+O4 (`MULTI-ARTIST-PLAN.md`) deliberately cut catalog caching down to one `@Volatile`/actor-private
+artist list — "a real catalog cache stays out of scope." Everything below the artist list —
+periods (years), a period's shows, and show detail — re-fetched on every screen entry, including
+plain back-navigation. This batch revisits that scope cut, per Batch 4 of
+[phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md).
+
+**In-memory, not on-disk.** On-disk would mean a real Room migration on Android and a GRDB
+migration on macOS for a table holding nothing but re-derivable network responses — exactly the
+kind of state CLAUDE.md's Room-migration section is strict about, and unlike `progress`, catalog
+data isn't the thing the app exists to never lose. An in-memory cache meets the goal (kill the
+extra round trips on ordinary back-navigation within a session) without any of that, and it's
+trivially reversible if it turns out not to be worth keeping.
+
+**Shape:** a generic TTL-and-LRU cache — `TtlCache<K, V>` (`CatalogCache.kt`) and the actor
+`TTLCache<Key, Value>` (`CatalogCache.swift`) — shared by both `MusicSource` implementations on
+each platform. A 15-minute TTL (`CATALOG_CACHE_TTL_MS` / `catalogCacheTTL`) is long enough that
+browsing back and forth within one sitting costs no network call, short enough that a show's
+rating, popularity, or tags don't go stale for the length of a whole sitting. Past `maxEntries`
+the least-recently-used entry is evicted (`LinkedHashMap(accessOrder = true)` on Android, an
+explicit access-order list on macOS) rather than growing without bound — the memory ceiling for a
+~200-artist catalog: periods capped at 250 entries (roughly one per artist), shows at 400, show
+detail at 200, tuned generously rather than measured, since a bounded cache turning into extra
+network calls on eviction is a performance regression, not a correctness one.
+
+**Wired into every `MusicSource` implementation:**
+- `RelistenCatalogSource` (Android `Relisten.kt`, macOS `RelistenAPI.swift`) gets `periodsCache`,
+  `showsCache`, and `showDetailCache`, plus a TTL added to the existing artist-list cache — it
+  never expired before this, which was fine when its only caller was one back button but is a
+  correctness gap on its own next to caches that do expire.
+- `PhishInSource` needed the cache to live somewhere shared explicitly: on Android it's already a
+  singleton `object`, but on macOS it's a `struct` `sourceFor` recreates on every call, so its
+  cache lives on a separate actor singleton (`PhishInCatalogCache.shared`) that the struct
+  delegates to rather than on `self`.
+- `Catalog.kt`'s `loadArtistsByBackend` (the Home screen's artist list) now sums show counts off
+  `PhishInSource.periods(PHISH)` instead of a second, uncached `PhishInApi.years()` call — the
+  synthetic "Popular" period contributes 0 to that sum, so the total is unchanged, but the Home
+  screen and the period picker now share one cached years fetch instead of paying for it twice.
+
+**Cache-key correctness across backends.** phish.in periods can be a range ("1983-1987"); Relisten
+periods are year uuids. Both key off `ArtistRef.key`, which already embeds the backend
+(`"phishin:phish"` vs `"relisten:grateful-dead"`), so there's no way a same-shaped id from the two
+backends collides in one shared map even though periods/shows/show-detail all use one cache
+instance per source rather than one per backend.
+
+**Interaction with `NextStop.cacheKey`, which already invalidates on tour-preference changes
+(D190), is none, by design.** `NextStop`'s own cache is keyed on favorites/date/tour-preferences
+and still invalidates exactly as before — it calls through `MusicSource.periods`/`.shows`, which
+this batch's cache sits underneath. A tour-preference change still busts `NextStop`'s cache and
+re-derives an answer; that re-derivation can now be served from the periods/shows cache instead of
+the network, which is strictly a speed-up, not a change in what invalidates when.
+
+**Test hooks preserved.** `RelistenCatalogSource.cachedArtists` stays exactly as before (same
+type, same direct-null-assignment reset some tests already used) so no existing test broke; both
+sources also gained a one-call `resetCache()` (`PhishInCatalogCache.shared.resetCache()` on
+macOS, since the cache doesn't live on the struct) mirroring the shape `RelistenCatalogSource`'s
+`resetCache()` already had on macOS. Any test file that exercises a real `MusicSource` against a
+mock server now resets these caches in `setUp`/`tearDown` — including two files this batch didn't
+otherwise touch, `LocalPlaylistResolveTest.kt`/`LocalPlaylistTests.swift`'s
+`ResolveLocalPlaylistTracksTests`, which resolve shows through the same shared singletons and
+would otherwise silently serve one test's mock response to a later test using the same
+artist/date. The macOS instance was caught by an actual test failure during this batch's own
+verification, not by inspection — worth remembering for any future cache added to a
+process-lifetime singleton under macOS's shared `MockServer`.
+
+**Testing:**
+- Android (`./gradlew testDebugUnitTest`): 488/488 passing after merging with Batch 2A's D205 —
+  463 baseline + 10 (D205) + 15 new here (`CatalogCacheTest.kt`): `TtlCacheTest` covers hit, miss,
+  expiry at and just under the TTL boundary, `clear`, and LRU eviction against an injected clock;
+  `CatalogCacheHitTest` covers a second call being served from cache, per-artist/per-period
+  keying, and `resetCache()` forcing a real re-fetch, against both `PhishInSource` and
+  `RelistenCatalogSource`.
+- macOS (`swift test`): 384/384 passing, up from 369 (`CatalogCacheTests.swift`,
+  `TTLCacheTests`/`CatalogCacheHitTests`) — the same coverage, ported. Unaffected by D205, which
+  was Android-only.
+- macOS app target (`xcodegen generate` + `xcodebuild`): build reported success, but **this
+  worktree's `xcodebuild` resolves the local `CouchTourKit` package from the main checkout's path
+  (`/Volumes/ExtSSD160/scripts/phish-in-app`) rather than this worktree's own copy** — confirmed
+  by deliberately breaking this worktree's `CatalogCache.swift` with a syntax error and watching
+  the app build succeed anyway. Clearing `DerivedData` didn't fix it. This batch touches no
+  app-target file, so the risk is low, but the app-target build above did not actually verify
+  this diff and shouldn't be read as having done so. Worth knowing for any future batch relying on
+  an app-target build from inside a worktree rather than the primary checkout.
+- No UI changed and the `MusicSource` interface's shape is untouched, matching the batch's scope:
+  this stays invisible behind the seam that made it parallelizable with Batches 1 and 2A.

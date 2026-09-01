@@ -405,7 +405,11 @@ internal fun groupArtistsForBrowse(
  * callers recompose on, not something to fetch once and cache alongside the network data.
  */
 internal suspend fun loadArtistsByBackend(): Map<Backend, List<ArtistRef>> {
-    val phishShows = runCatching { PhishInApi.years().sumOf { it.showsWithAudioCount } }
+    // Routed through PhishInSource.periods() (#61) rather than PhishInApi.years() directly,
+    // so the Home screen's artist list shares the same cached years fetch ShowsScreen's
+    // period picker uses instead of a second, uncached round trip for the same data. The
+    // synthetic "Popular" period contributes 0 to the sum, so this totals the same as before.
+    val phishShows = runCatching { PhishInSource.periods(PHISH).sumOf { it.showCount } }
     val relistenArtists = runCatching { RelistenCatalogSource.artists() }
     if (phishShows.isFailure && relistenArtists.isFailure) {
         throw relistenArtists.exceptionOrNull() ?: phishShows.exceptionOrNull()!!
@@ -547,19 +551,43 @@ const val POPULAR_PERIOD_SUBTITLE = "Top rated by likes"
 object PhishInSource : MusicSource {
     override val backend = Backend.PHISHIN
 
+    // Periods, shows, and show detail (#61) — O4's deliberate scope cut on everything below
+    // the artist list, which needed no cache of its own here since phish.in's "artist list"
+    // is the [PHISH] constant. [periodsCache] only ever holds the one key below; a TtlCache
+    // is still the right shape for it so [resetCache] and the TTL logic aren't duplicated.
+    private const val PERIODS_KEY = "phish"
+    internal val periodsCache = TtlCache<String, List<PeriodRef>>(CATALOG_CACHE_TTL_MS, maxEntries = 1)
+    internal val showsCache = TtlCache<String, List<ShowSummary>>(CATALOG_CACHE_TTL_MS, maxEntries = 60)
+    internal val showDetailCache = TtlCache<String, ShowDetail>(CATALOG_CACHE_TTL_MS, maxEntries = 200)
+
     override suspend fun artists() = listOf(PHISH)
 
     override suspend fun periods(artist: ArtistRef): List<PeriodRef> =
-        listOf(PeriodRef(POPULAR_PERIOD_ID, POPULAR_PERIOD_LABEL)) + PhishInApi.years().map { it.toPeriodRef() }
+        periodsCache.get(PERIODS_KEY)
+            ?: (listOf(PeriodRef(POPULAR_PERIOD_ID, POPULAR_PERIOD_LABEL)) + PhishInApi.years().map { it.toPeriodRef() })
+                .also { periodsCache.put(PERIODS_KEY, it) }
 
-    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> =
-        if (period.id == POPULAR_PERIOD_ID) PhishInApi.popularShows().map { it.toShowSummary() }
-        else PhishInApi.showsForPeriod(period.id).map { it.toShowSummary() }
+    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+        showsCache.get(period.id)?.let { return it }
+        val shows = if (period.id == POPULAR_PERIOD_ID) PhishInApi.popularShows().map { it.toShowSummary() }
+            else PhishInApi.showsForPeriod(period.id).map { it.toShowSummary() }
+        showsCache.put(period.id, shows)
+        return shows
+    }
 
-    override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) =
-        PhishInApi.show(date).toShowDetail()
+    override suspend fun show(artist: ArtistRef, date: String, recordingId: String?): ShowDetail {
+        showDetailCache.get(date)?.let { return it }
+        return PhishInApi.show(date).toShowDetail().also { showDetailCache.put(date, it) }
+    }
 
     override suspend fun search(term: String) = PhishInApi.search(term).toSearchHits()
+
+    /** Test-only hook: clears every cache above in one call, the way [RelistenCatalogSource] does. */
+    internal fun resetCache() {
+        periodsCache.clear()
+        showsCache.clear()
+        showDetailCache.clear()
+    }
 }
 
 internal fun Period.toPeriodRef() =
