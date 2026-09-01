@@ -106,6 +106,38 @@ final class LocalPlaylistStoreTests: XCTestCase {
     }
 }
 
+/// #90's search-within-a-playlist helper. Port of `Catalog.kt`'s
+/// `filterByTitleIndexed`-on-`LocalPlaylistTrackEntity` tests.
+final class FilterByTitleIndexedTests: XCTestCase {
+    private func track(_ title: String) -> LocalPlaylistTrack {
+        LocalPlaylistTrack(playlistId: "p", backend: "phishin", trackId: title, showDate: "1997-11-17", title: title, durationMs: 1_000)
+    }
+
+    func testAnEmptyQueryReturnsEveryTrackWithItsOriginalIndex() {
+        let tracks = [track("Tweezer"), track("Reba"), track("Weekapaug Groove")]
+        let result = filterByTitleIndexed(tracks, query: "")
+        XCTAssertEqual([0, 1, 2], result.map(\.offset))
+        XCTAssertEqual(["Tweezer", "Reba", "Weekapaug Groove"], result.map(\.element.title))
+    }
+
+    func testMatchingKeepsTheOriginalIndexNotTheFilteredPosition() {
+        let tracks = [track("Tweezer"), track("Reba"), track("Weekapaug Groove")]
+        let result = tracks.filterByTitleIndexed("weeka")
+        XCTAssertEqual([2], result.map(\.offset))
+        XCTAssertEqual(["Weekapaug Groove"], result.map(\.element.title))
+    }
+
+    func testMatchingIsCaseInsensitiveAndTrimsWhitespace() {
+        let tracks = [track("Tweezer"), track("Reba")]
+        XCTAssertEqual(["Tweezer"], tracks.filterByTitleIndexed("  TWEEZ  ").map(\.element.title))
+    }
+
+    func testNoMatchesReturnsAnEmptyArrayRatherThanEverything() {
+        let tracks = [track("Tweezer"), track("Reba")]
+        XCTAssertTrue(tracks.filterByTitleIndexed("bathtub gin").isEmpty)
+    }
+}
+
 final class ResolveLocalPlaylistTracksTests: XCTestCase {
     private var server: MockServer!
 

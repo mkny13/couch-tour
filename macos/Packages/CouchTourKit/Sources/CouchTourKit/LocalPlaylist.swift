@@ -262,3 +262,21 @@ public func resolveLocalPlaylistTracks(_ rows: [LocalPlaylistTrack]) async -> [P
         detailsByKey[key(for: row)]?.tracks.first { $0.id == row.trackId }
     }
 }
+
+/// Search within a local playlist (#90). Returns matches paired with their index in the
+/// original, unfiltered `tracks` array — both playback and reordering (`.onMove`,
+/// `moveUp`/`moveDown` in `LocalPlaylistView`) key off that original position, so the index
+/// has to survive filtering intact rather than being recomputed from the filtered list's own
+/// position. Port of `Catalog.kt`'s `filterByTitleIndexed`.
+public func filterByTitleIndexed(_ tracks: [LocalPlaylistTrack], query: String) -> [(offset: Int, element: LocalPlaylistTrack)] {
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    return tracks.enumerated().filter { _, track in
+        trimmed.isEmpty || track.title.range(of: trimmed, options: .caseInsensitive) != nil
+    }
+}
+
+extension Array where Element == LocalPlaylistTrack {
+    public func filterByTitleIndexed(_ query: String) -> [(offset: Int, element: LocalPlaylistTrack)] {
+        CouchTourKit.filterByTitleIndexed(self, query: query)
+    }
+}

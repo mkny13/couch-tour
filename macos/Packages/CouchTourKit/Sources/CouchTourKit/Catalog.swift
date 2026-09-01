@@ -284,6 +284,66 @@ extension Array where Element == PlayableTrack {
     }
 }
 
+/// Search results' sort control (#91). `.relevance` is the order the backends already
+/// returned (exact show first, etc.) — it exists so a sort menu can offer "clear the sort"
+/// rather than forcing one of the other three at all times. Port of `Catalog.kt`'s
+/// `SearchSortMode`.
+public enum SearchSortMode: String, CaseIterable, Identifiable, Sendable {
+    case relevance
+    case dateDesc
+    case dateAsc
+    case mostLiked
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .relevance: return "Relevance"
+        case .dateDesc: return "Newest"
+        case .dateAsc: return "Oldest"
+        case .mostLiked: return "Most liked"
+        }
+    }
+}
+
+extension Array where Element == ShowSummary {
+    /// Named `sortedForSearch` rather than overloading `sorted(by:)` a second time — with
+    /// `ShowSortOption` also carrying a `.dateAsc` case, `.dateAsc` shorthand at a call site
+    /// becomes ambiguous between the two enums otherwise (Swift picks the overload by argument
+    /// type, but can't do that until the shorthand itself resolves). Same shape as `Catalog.kt`
+    /// needing `@JvmName` for the same two-enums-one-case-name collision.
+    ///
+    /// Relisten shows default `likesCount` to 0 (see `ShowSummary`), so they settle after
+    /// every phish.in hit under `.mostLiked` with no branch needed for the mixed-backend case.
+    public func sortedForSearch(by mode: SearchSortMode) -> [ShowSummary] {
+        switch mode {
+        case .relevance: return self
+        case .dateDesc: return sorted { $0.date > $1.date }
+        case .dateAsc: return sorted { $0.date < $1.date }
+        case .mostLiked:
+            return sorted { lhs, rhs in
+                lhs.likesCount != rhs.likesCount ? lhs.likesCount > rhs.likesCount : lhs.date > rhs.date
+            }
+        }
+    }
+}
+
+extension Array where Element == Track {
+    public func sortedForSearch(by mode: SearchSortMode) -> [Track] {
+        switch mode {
+        case .relevance: return self
+        case .dateDesc: return sorted { ($0.showDate ?? "") > ($1.showDate ?? "") }
+        case .dateAsc: return sorted { ($0.showDate ?? "") < ($1.showDate ?? "") }
+        case .mostLiked:
+            return sorted { lhs, rhs in
+                lhs.likesCount != rhs.likesCount
+                    ? lhs.likesCount > rhs.likesCount
+                    : (lhs.showDate ?? "") > (rhs.showDate ?? "")
+            }
+        }
+    }
+}
+
 public struct ShowSummary: Hashable, Sendable {
     public let artist: ArtistRef
     public let date: String
@@ -297,6 +357,10 @@ public struct ShowSummary: Hashable, Sendable {
     public let rating: Double
     public let tags: [Tag]
     public let popularity: RelistenPopularity?
+    /// phish.in's `Show.likesCount` (#91's search sort) — Relisten has no equivalent and
+    /// leaves this at the default 0, which is what lets `SearchSortMode.mostLiked` sort
+    /// Relisten hits after every phish.in one with no special-cased branch.
+    public let likesCount: Int
 
     public init(
         artist: ArtistRef,
@@ -309,7 +373,8 @@ public struct ShowSummary: Hashable, Sendable {
         recordingCount: Int = 1,
         rating: Double = 0.0,
         tags: [Tag] = [],
-        popularity: RelistenPopularity? = nil
+        popularity: RelistenPopularity? = nil,
+        likesCount: Int = 0
     ) {
         self.artist = artist
         self.date = date
@@ -322,6 +387,7 @@ public struct ShowSummary: Hashable, Sendable {
         self.rating = rating
         self.tags = tags
         self.popularity = popularity
+        self.likesCount = likesCount
     }
 
     /// "McNichols Arena · Denver, CO"
@@ -653,17 +719,69 @@ public let PHISH = ArtistRef(backend: .phishin, id: "phish", name: "Phish")
 /// copy is dropped rather than shown as a second, confusing "Phish". Port of `Catalog.kt`'s
 /// `mergeArtists` (Android's #14/#56).
 public func mergeArtists(relistenArtists: [ArtistRef], favorites: Set<String>) -> [ArtistRef] {
+    let groups = groupArtistsForBrowse(relistenArtists: relistenArtists, favorites: favorites)
+    return [groups.phish].compactMap { $0 }
+        + groups.favorited.sorted { $0.showCount > $1.showCount }
+        + groups.others.sorted { $0.showCount > $1.showCount }
+}
+
+/// Artist list sort control (#116). Port of `Catalog.kt`'s `ArtistSortMode`.
+public enum ArtistSortMode: String, CaseIterable, Identifiable, Sendable {
+    case popular
+    case alphabetical
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .popular: return "Most shows"
+        case .alphabetical: return "A–Z"
+        }
+    }
+}
+
+extension Array where Element == ArtistRef {
+    public func sorted(by mode: ArtistSortMode) -> [ArtistRef] {
+        switch mode {
+        case .popular: return sorted { $0.showCount > $1.showCount }
+        case .alphabetical: return sorted { $0.name.lowercased() < $1.name.lowercased() }
+        }
+    }
+
+    public func filterByName(_ query: String) -> [ArtistRef] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return self }
+        return filter { $0.name.range(of: trimmed, options: .caseInsensitive) != nil }
+    }
+}
+
+/// The same phish-pinned / favorited / everyone-else split `mergeArtists` flattens, kept
+/// apart so `ArtistsView` can render favorites as their own pinned section (#116) and re-sort
+/// or filter each group independently while Phish — whose position-1 slot predates favoriting
+/// and isn't earned by being liked, see `mergeArtists`'s doc — stays outside either section.
+/// Port of `Catalog.kt`'s `ArtistGroups`.
+public struct ArtistGroups: Equatable, Sendable {
+    public let phish: ArtistRef?
+    public let favorited: [ArtistRef]
+    public let others: [ArtistRef]
+
+    public init(phish: ArtistRef?, favorited: [ArtistRef], others: [ArtistRef]) {
+        self.phish = phish
+        self.favorited = favorited
+        self.others = others
+    }
+}
+
+public func groupArtistsForBrowse(relistenArtists: [ArtistRef], favorites: Set<String>) -> ArtistGroups {
     let rest = relistenArtists.filter { $0.name.caseInsensitiveCompare(PHISH.name) != .orderedSame }
-    let (favorited, unfavorited) = rest.reduce(into: ([ArtistRef](), [ArtistRef]())) { acc, artist in
+    let (favorited, others) = rest.reduce(into: ([ArtistRef](), [ArtistRef]())) { acc, artist in
         if favorites.contains(artist.key) {
             acc.0.append(artist)
         } else {
             acc.1.append(artist)
         }
     }
-    return [PHISH]
-        + favorited.sorted { $0.showCount > $1.showCount }
-        + unfavorited.sorted { $0.showCount > $1.showCount }
+    return ArtistGroups(phish: PHISH, favorited: favorited, others: others)
 }
 
 /// Adapts `PhishInAPI` to the seam. Deliberately thin: it reuses the client untouched,
@@ -747,7 +865,8 @@ extension Show {
             recordingCount: 1,
             rating: Double(likesCount),
             tags: tags,
-            popularity: nil
+            popularity: nil,
+            likesCount: likesCount
         )
     }
 
