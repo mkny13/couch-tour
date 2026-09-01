@@ -3620,3 +3620,88 @@ exercised directly — status transitions in both directions, note attach/detach
 against all four endpoints and through the rendered page, which caught a real bug: hyphenated
 element ids (`c-pend`) never become JS globals, so the first render threw `ReferenceError` and the
 board showed zero items despite a 200 response and correct JSON.
+
+## Iteration 70 — List Sort and Filter, macOS Parity (#91, #116, #90, D210)
+
+### D210 — Porting D205's Android sort/filter helpers to macOS, plus the platform gaps that changed the port
+
+Phase 2's Batch 2B ([phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md)): the macOS half
+of D205, gated on both D205 (Android) and D206 (the macOS tag/sort/artwork wiring, since both
+touch `SearchView.swift`) having merged first. Follows D205's decisions rather than
+re-deriving them, with the same "pure helper in `CouchTourKit`, tested, called from a view" shape
+D206 established.
+
+- **#116 — Artists list.** `groupArtistsForBrowse(relistenArtists:favorites:)` ports D205's
+  `ArtistGroups` split (phish / favorited / others, no overlap), and `mergeArtists` is refactored
+  to build on it rather than duplicating the partition logic — same relationship the Kotlin
+  originals have. `ArtistSortMode` (`.popular`/`.alphabetical`) and `filterByName` are direct
+  ports. `ArtistsView` gained `.searchable` and a toolbar sort `Picker`, and — this is the one
+  real behavior change from what was there before — **the "Artists" section no longer repeats
+  favorited artists.** The pre-#116 macOS code intentionally showed favorites in both the
+  "Favorites" shortcut and the full "Artists" list ("favoriting doesn't remove an artist from the
+  full list"); D205's `ArtistGroups.others` is favorited-exclusive by construction, and matching
+  it here is what lets "favorites stay pinned regardless of sort, filter applies to both" (the
+  batch's stated rule) hold without Phish itself losing its always-first position under an
+  alphabetical sort. A favorited artist is still one screen-scroll away, just not in two places
+  on the same one.
+- **#91 — search result sort.** `SearchSortMode` (`.relevance`/`.dateDesc`/`.dateAsc`/
+  `.mostLiked`) ports D205's four-case enum, applied via a toolbar `Picker` in `SearchView`
+  (D206 already established the toolbar-over-chip-row idiom for `ShowsView`'s sort, so this reuses
+  it rather than introducing a third stacked row) to the Shows and Tracks sections only, matching
+  Android's scope. `ShowSummary` gained a `likesCount: Int` field, populated from phish.in's
+  `Show.likesCount` in `toShowSummary()` and left at the default 0 for Relisten — same mechanism
+  as D205, and what lets Relisten hits settle after every phish.in hit under `.mostLiked` with no
+  special-cased branch. This is a genuinely new field, not a rename of the existing `rating`:
+  `rating` already held `Double(likesCount)` for phish.in shows (a pre-D210 shortcut, since
+  phish.in has no separate numeric rating), but is shared with Relisten's actual 0-10
+  `avg_rating` on the same field — two different scales that "Top Rated" already sorted together
+  before this batch touched it, out of scope to fix here. `likesCount` sidesteps that by being
+  phish.in-only and correctly zero for Relisten, matching D205's `ShowSummary.likesCount` exactly.
+  The sort helper is named `sortedForSearch(by:)`, not `sorted(by:)` — `[ShowSummary]` already
+  has `sorted(by: ShowSortOption)` from D206, and `ShowSortOption` and `SearchSortMode` both
+  declare a `.dateAsc` case, so `.dateAsc` shorthand at a call site is ambiguous between the two
+  enums when both `sorted(by:)` overloads are in scope. Same shape of problem as D205 needing
+  `@JvmName` for its own two-enums-one-case-name collision on the JVM; a distinct method name is
+  Swift's equivalent fix.
+- **#90 — search within a playlist.** `filterByTitleIndexed`, added to `LocalPlaylist.swift`,
+  ports D205's shape: matches paired with their index in the *original* `rows` array, because
+  both playback and reordering key off that position rather than a filtered list's own. Applied
+  to `LocalPlaylistView` via `.searchable`. Reordering is disabled while a filter is active
+  (`reorderable = query.isEmpty`) exactly as D205 decided for Android — both the up/down chevrons
+  (`.disabled`) and drag reordering (`.moveDisabled` per row, since `.onMove`'s indices are only
+  meaningful against `rows` while nothing is filtered out). **The batch prompt's "for the
+  phish.in playlist screen, its counterpart" doesn't exist on macOS to port to** — unlike
+  Android's `PlaylistScreen` (a read-only view of phish.in's own hosted/liked playlists),
+  `PhishInAPI.swift` documents that this MVP has no playlists screen at all (D5), and nothing in
+  `macos/CouchTour` reads a phish.in playlist. #90's macOS parity is therefore local-playlist-only,
+  not a scope cut made here but the pre-existing platform gap D5 already recorded.
+
+**Two worktree-provisioning landmines, same class as D206's `.xcodeproj` symlink, worth adding to
+that running list.** This worktree's `macos/CouchTour.xcodeproj` was *again* a symlink into the
+original checkout (deleted and regenerated with `xcodegen generate`, same fix as D206). Less
+obviously, `macos/build` — the derived-data directory `macos/scripts/install.sh` builds into —
+was **also** a symlink into the original checkout's `macos/build`. Unlike the `.xcodeproj` case
+this isn't necessarily wrong on its own (it's Release WMO, which recompiles the whole module as
+one job rather than reusing per-file incremental state the way Debug does, so a shared derived-data
+cache is less likely to serve stale per-file output) — but it was worth not trusting on faith.
+Confirmed the installed binary actually reflects this worktree's source via `strings` on the
+built binary for `"Filter artists"`, `"Search this playlist"`, `"No artists match"`, `"No tracks
+match"`, `"mostLiked"`, and `"relevance"` — all present, all new or renamed in this batch, none of
+which would appear in the previously-installed build.
+
+**Testing:**
+- `swift test`: 400/400 (384 baseline + 16 new — `groupArtistsForBrowse`, `ArtistSortMode`,
+  `filterByName`, `SearchSortMode`/`sortedForSearch` on both `ShowSummary` and `Track`, and
+  `filterByTitleIndexed`).
+- `xcodegen generate` + `xcodebuild … build` (Debug): succeeds, no new warnings, from a real
+  worktree-local project (symlink removed first, per above).
+- `macos/scripts/install.sh` (Release): succeeds; installed to `/Applications/Couch Tour.app`,
+  confirmed via `strings` per above to be this batch's build.
+- **The interactive click-through this batch's verification calls for — filtering/sorting the
+  artist list, sorting search results, searching and reordering a local playlist — did not
+  happen**, same open item D206 left. This time the blocker wasn't a locked display session but
+  missing permissions for this session's automation: `screencapture` failed with "could not
+  create image from display" and `osascript`'s System Events access failed with "osascript is
+  not allowed assistive access" (-1719, an Accessibility permission neither this process nor Mike
+  can grant without him at the machine). The app is built, installed, and waiting; the actual
+  click-through is still owed and needs Mike at the machine, same as D204's and D206's before it.

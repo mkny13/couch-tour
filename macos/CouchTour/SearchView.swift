@@ -13,6 +13,7 @@ struct SearchView: View {
     @State private var hits: SearchHits?
     @State private var selectedArtistKey: String?
     @State private var selectedTag: String = "All"
+    @State private var sortMode: SearchSortMode = .relevance
     @EnvironmentObject private var appModel: AppModel
 
     private var term: String { appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -93,6 +94,21 @@ struct SearchView: View {
                 )
             } else {
                 resultsListBody(filtered)
+                    // A toolbar control, not a third stacked chip row on top of the artist
+                    // and tag pickers above (#91) — only shown when it would do something,
+                    // matching Android's `r.shows.isNotEmpty() || r.tracks.isNotEmpty()` guard.
+                    .toolbar {
+                        if !filtered.shows.isEmpty || !filtered.tracks.isEmpty {
+                            ToolbarItem {
+                                Picker("Sort", selection: $sortMode) {
+                                    ForEach(SearchSortMode.allCases) { mode in
+                                        Text(mode.displayName).tag(mode)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            }
+                        }
+                    }
             }
         }
     }
@@ -140,7 +156,7 @@ struct SearchView: View {
             }
             if !hits.shows.isEmpty {
                 Section("Shows") {
-                    ForEach(hits.shows, id: \.self) { show in
+                    ForEach(hits.shows.sortedForSearch(by: sortMode), id: \.self) { show in
                         NavigationLink(value: Route.show(show)) {
                             row(title: show.date, subtitle: showSubtitle(show))
                         }
@@ -164,7 +180,7 @@ struct SearchView: View {
             }
             // A track with no show_date can't be opened inside its show, so it's dropped
             // rather than pushing a summary that can't load.
-            let openableTracks = hits.tracks.filter { $0.showDate != nil }
+            let openableTracks = hits.tracks.filter { $0.showDate != nil }.sortedForSearch(by: sortMode)
             if !openableTracks.isEmpty {
                 Section("Tracks") {
                     ForEach(openableTracks, id: \.id) { track in
