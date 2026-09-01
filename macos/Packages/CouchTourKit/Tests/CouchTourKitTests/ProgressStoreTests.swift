@@ -384,27 +384,6 @@ final class ProgressStoreTests: XCTestCase {
         XCTAssertEqual(1, try store.getAllTourPreferences().count)
     }
 
-    func testTrackedTourStoreSharingProgressStore() throws {
-        let trackedStore = try TrackedTourStore(sharing: store)
-
-        let pref = ArtistTourPreference(artistKey: "relisten:wsp", tourName: "Spring 1996", year: "1996", updatedAt: 9_999)
-        try trackedStore.savePreference(pref)
-
-        let fromProgressStore = try store.getTourPreference(artistKey: "relisten:wsp")
-        let fromTrackedStore = try trackedStore.preference(for: "relisten:wsp")
-
-        XCTAssertEqual(pref, fromProgressStore)
-        XCTAssertEqual(pref, fromTrackedStore)
-
-        let all = try trackedStore.allPreferences()
-        XCTAssertEqual(1, all.count)
-        XCTAssertEqual("relisten:wsp", all.first?.artistKey)
-
-        try trackedStore.deletePreference(for: "relisten:wsp")
-        XCTAssertNil(try store.getTourPreference(artistKey: "relisten:wsp"))
-        XCTAssertNil(try trackedStore.preference(for: "relisten:wsp"))
-    }
-
     func testV9MigrationPreservesExistingData() throws {
         let queue = try DatabaseQueue()
 

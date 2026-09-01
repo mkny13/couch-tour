@@ -2719,7 +2719,7 @@ To give users full control over which era, tour, or year they want to track on t
   - **macOS (GRDB):** Migration v9 in `ProgressStore.swift` creates `artist_tour_preferences` table with matching schema and constraints.
 - **Preference Storage & DAOs:**
   - `ArtistTourPreferenceEntity` and `ArtistTourPreferenceDao` (`Progress.kt`) provide CRUD operations (`getPreference`, `getAllPreferences`, `setPreference`, `deletePreference`).
-  - `ArtistTourPreference` and `ArtistTourPreferenceStore` (`ProgressStore.swift`) provide async persistence via GRDB on macOS.
+  - `ArtistTourPreference` (`ProgressStore.swift`), persisted via `ProgressStore.saveTourPreference`/`getTourPreference`/etc., not a separate store class.
 - **NextStop Resolution Engine:**
   - `NextStop.kt` & `NextStop.swift`: `tourFor` checks for a configured preference. If a specific `tour_name` is selected, all candidate periods are queried to find matching tour shows. If a specific `year` is selected, candidate shows are fetched from that year's period. If no preference is set, the engine falls back to standard `recentPeriods(TOUR_PERIODS)` and `currentTourShows`.
   - Cache key `NextStop.cacheKey` incorporates sorted artist keys and preference mappings (`artist_key:tour_name:year`) so network caches invalidate immediately when preferences change.

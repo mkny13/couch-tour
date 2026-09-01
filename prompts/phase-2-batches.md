@@ -310,10 +310,9 @@ so it doesn't read as an oversight.
 
 ## Observations noted in passing (no action taken)
 
-- `TrackedTourStore` (`ProgressStore.swift:302`) registers a `v9_artistTourPreferences` migration
-  identical to `ProgressStore`'s, and is constructed **only** by one test
-  (`ProgressStoreTests.swift:388`) — the app uses `ProgressStore.saveTourPreference` directly.
-  Harmless today and the test passes; flagged as dead-ish code per CLAUDE.md rather than removed.
+- `TrackedTourStore` (formerly `ProgressStore.swift:302`) registered a `v9_artistTourPreferences`
+  migration identical to `ProgressStore`'s, and was constructed only by one test — the app used
+  `ProgressStore.saveTourPreference` directly. Confirmed genuinely unused and removed 2026-08-31.
 - GRDB migrations jump v6 → v7 → v9 with no v8, matching Android's Room versions rather than
   numbering densely. Intentional per D83; noting it so it isn't "fixed."
 - `local.properties` is gitignored and machine-specific, so a fresh worktree cannot run
