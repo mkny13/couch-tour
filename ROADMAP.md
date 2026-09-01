@@ -22,6 +22,7 @@ Historical implementation details and architectural choices are logged separatel
 - **Filler Track Skipping**: Configurable persistent toggle on Android and macOS to bypass tuning, intro/outro banter, crowd chatter, and announcements during playback (#49, D178).
 - **Listened Track & Show Completion Indicators**: Visual checkmarks for tracks listened to $\ge 90\%$ and completed show badges (#83, D182).
 - **Android Auto Support**: Full MediaLibraryService browse hierarchy for phish.in and Relisten with car Continue Listening support (#5, P8, D73).
+- **FLAC Streaming Support**: Lossless FLAC playback preferred over MP3 on Android and macOS, with a Cast-time MP3 rewrite for stock receiver compatibility and codec badges across Now Playing surfaces (#27, D187, D189).
 
 ### 2. Personal Library & Account Parity (Shipped)
 - **Favorite Artists**: Star toggle and pinned favorites section on Android (#14, #38) and macOS (#56, #75).
@@ -32,6 +33,7 @@ Historical implementation details and architectural choices are logged separatel
 ### 3. Discovery & Browse Enhancements (Shipped)
 - **Home Screen "On This Date"**: Anniversary shows across favorited artists with backend-bounded request batching and caching (#13, #42, D162).
 - **"Next Couch Tour Stop"**: Automatic discovery of unplayed shows on active tours for favorited artists (#22, #46, D164, D165).
+- **"Next Stop" Tour/Era Picker for Defunct Artists**: Lets users pick a past tour or era to track for bands that no longer tour, rather than a strict opt-out (#68, D190).
 - **Browse by Top Rated / Popular**: phish.in "Popular" synthetic period sorted by server likes; Relisten period-level `avg_rating` sort filter (#21, #33, D158–D159).
 - **"Surprise Me" Random Show**: Full merged catalog random show selector (#20, #32, D157).
 - **Universal Search**: Multi-artist search across artists, shows, songs, and venues on Android and macOS (#25, D169).
@@ -77,22 +79,19 @@ flowchart LR
     subgraph NearTerm ["Phase 2: Discovery, Audio Fidelity & Media Power"]
         direction TB
         M1["#65 Offline Downloads"]
-        M2["#18 Volume Leveling Across Sources"]
-        M3["#27 FLAC Streaming Support"]
-        M4["#68 Next Stop Era/Tour Picker"]
-        M5["#67 Browse & Filter by Tag"]
-        M6["#21 Trending / Momentum Sort"]
-        M7["#61 Multi-Level Catalog Cache"]
-        M8["#62 Relisten Show Artwork"]
-        M9["#60 macOS Auto-Updates (Sparkle)"]
+        M2["#67 Browse & Filter by Tag"]
+        M3["#21 Trending / Momentum Sort"]
+        M4["#61 Multi-Level Catalog Cache"]
+        M5["#62 Relisten Show Artwork"]
     end
 
     subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]
         direction TB
-        L1["#24 Taper Intelligence & Source Comparison"]
-        L2["#9 Google TV App"]
-        L3["#15 Spotify Live Releases"]
-        L4["#16 YouTube Audio/Video Support"]
+        L1["#18 Volume Leveling Across Sources (deferred from Phase 2)"]
+        L2["#24 Taper Intelligence & Source Comparison"]
+        L3["#9 Google TV App"]
+        L4["#15 Spotify Live Releases"]
+        L5["#16 YouTube Audio/Video Support"]
     end
 
     Polish --> NearTerm --> LongTerm
@@ -127,20 +126,16 @@ is the remaining work.
 ### Phase 2: Audio Fidelity, Discovery & Media Power Features
 
 Focus on advanced audio streaming, caching infrastructure, and richer catalog exploration.
+Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md).
 
 | Issue | Feature | Description | Platforms |
 |---|---|---|---|
 | **#65** | **Offline Downloads** | Download individual tracks or complete shows for local offline playback with storage management. | Android, macOS |
-| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. | Android, macOS |
-| **#27** | **FLAC Streaming Support** | Support lossless FLAC streaming from Relisten/archive.org (`flac_url`), with progressive MP3 fallback for Google Cast compatibility. | Android, macOS |
-| **#85** | **Post-Show Next Tour Stop Prompt** | When a show ends at the encore, stop playback automatically and surface an interactive prompt/banner to play the next consecutive show on the tour/run. | Android, macOS |
-| **#68** | **"Next Stop" Tour Picker for Defunct Artists** | For non-touring bands (e.g. Grateful Dead), allow the user to select a past tour or year to track on "Next Couch Tour Stop". | Android, macOS |
 | **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS |
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS |
 | **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS |
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS |
 | **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS |
-| **#60** | **macOS Auto-Updates (Sparkle)** | Integrate [Sparkle](https://sparkle-project.org) framework with a hosted appcast feed and signing keys for seamless desktop app updates. | macOS |
 
 ---
 
@@ -148,8 +143,15 @@ Focus on advanced audio streaming, caching infrastructure, and richer catalog ex
 
 Longer-range exploration of new media surfaces and third-party streaming ecosystems.
 
+**#18 was deliberately deferred out of Phase 2** (audit closeout, 2026-08-31) — not an oversight.
+The loudness-normalization source is unsolved (no reliable per-track/per-show gain data across
+phish.in and Relisten today), and #65 (offline downloads) may change what's feasible once files
+are local rather than streamed. Revisit after #65 lands rather than pulling this back into Phase 2
+before that question has an answer.
+
 | Issue | Feature | Description | Platforms |
 |---|---|---|---|
+| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. | Android, macOS |
 | **#24** | **Advanced Source Selection & Taper Intelligence** | Side-by-side snippet comparisons across tapers, taper reputation scoring, and user-preferred / avoided taper filters. | Android, macOS |
 | **#86** | **Waveform Scrubber Visualization** | Render phish.in's `waveform_image_url` behind the player scrubber (nice-to-have visual enhancement). | Android, macOS |
 | **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. | Android TV |
