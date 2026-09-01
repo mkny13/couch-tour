@@ -2,9 +2,9 @@
 
 Produced by [phase-2-plan.md](phase-2-plan.md)'s planning pass on 2026-08-31, and **approved by
 Mike the same day** — see "Decisions taken" at the bottom, which the batches above already
-reflect. This is still a plan, not a set of working prompts: the next step is turning these
-batches into prompts, the same way Batch C1's chosen direction became Batch C2's prompt in
-[macos-ux-polish-batches.md](macos-ux-polish-batches.md).
+reflect. The batches below have since been turned into working prompts:
+**[phase-2-batch-prompts.md](phase-2-batch-prompts.md)** is what you hand to a worktree. This file
+stays the reasoning and the audit behind them.
 
 Baseline at the time of writing: `main` @ `5e6ad7b`, Android **463 tests / 0 failures**, macOS
 **370 tests / 0 failures**, no open PRs, no stale branches.
