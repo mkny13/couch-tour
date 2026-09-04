@@ -1,9 +1,9 @@
 import CouchTourKit
 import SwiftUI
 
-/// Left sidebar for the 3-pane macOS Ledger layout.
-/// Displays Navigation items (Home, Search, Library, Settings),
-/// Favorite Artists with show counts and unread cues, and Sync pairing status.
+/// Left sidebar for the 3-pane macOS Ledger layout (Screen 2A/2B/2C/2E).
+/// Displays Window traffic lights, primary navigation (Home, Search, Library, History, Settings),
+/// FAVORITE ARTISTS with show counts and gradient hairline, and Synced with phone footer.
 struct SidebarView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
@@ -12,24 +12,22 @@ struct SidebarView: View {
     let favoritedArtists: [ArtistRef]
     let onSelectArtist: (ArtistRef) -> Void
 
+    private static let countFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        return f
+    }()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // App Branding Header
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
-                    .frame(width: 10, height: 10)
-                Text("COUCH TOUR")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundStyle(colors.textSecondary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 20)
+            // Window Traffic Lights
+            TrafficLights()
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 22)
 
             // Primary Navigation
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 SidebarNavItem(
                     title: "Home",
                     icon: "house",
@@ -51,101 +49,111 @@ struct SidebarView: View {
                 SidebarNavItem(
                     title: "Library",
                     icon: "books.vertical",
-                    isSelected: appModel.path.last == .playlists || appModel.path.last == .listening
+                    isSelected: appModel.path.last == .playlists
                 ) {
                     if appModel.path.last != .playlists {
                         appModel.path.append(.playlists)
                     }
                 }
-            }
-            .padding(.horizontal, 10)
 
-            Divider()
-                .overlay(colors.divider)
-                .padding(.vertical, 14)
-                .padding(.horizontal, 14)
-
-            // FAVORITES Section
-            VStack(alignment: .leading, spacing: 6) {
-                Text("FAVORITES")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(colors.textMuted)
-                    .padding(.horizontal, 16)
-
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(favoritedArtists, id: \.key) { artist in
-                            Button {
-                                onSelectArtist(artist)
-                            } label: {
-                                HStack {
-                                    Text(artist.name)
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(colors.textPrimary)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text("\(artist.showCount)")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(colors.textMuted)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
-                        }
+                SidebarNavItem(
+                    title: "History",
+                    icon: "clock",
+                    isSelected: appModel.path.last == .listening
+                ) {
+                    if appModel.path.last != .listening {
+                        appModel.path.append(.listening)
                     }
-                    .padding(.horizontal, 10)
                 }
+
+                SidebarNavItem(
+                    title: "Settings",
+                    icon: "gearshape",
+                    isSelected: false
+                ) {
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                }
+            }
+            .padding(.horizontal, 8)
+
+            // FAVORITE ARTISTS Section
+            Text("FAVORITE ARTISTS")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .padding(.horizontal, 18)
+                .padding(.top, 26)
+                .padding(.bottom, 8)
+
+            GradientHairline(height: 1, opacity: 0.9)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 6)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 1) {
+                    ForEach(favoritedArtists, id: \.key) { artist in
+                        Button {
+                            onSelectArtist(artist)
+                        } label: {
+                            HStack {
+                                Text(ArtistAbbreviations.label(for: artist.name))
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(colors.textPrimary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(Self.countFormatter.string(from: NSNumber(value: artist.showCount)) ?? "\(artist.showCount)")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            }
+                            .frame(height: 32)
+                            .padding(.horizontal, 10)
+                            .background(Color.clear, in: RoundedRectangle(cornerRadius: 7))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 8)
             }
 
             Spacer()
 
             // SYNC STATUS Footer
-            Divider()
-                .overlay(colors.divider)
-                .padding(.horizontal, 14)
+            Divider().overlay(colors.divider)
 
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(appModel.syncSession.paired ? Color.green : colors.textMuted.opacity(0.5))
-                    .frame(width: 8, height: 8)
+            HStack(spacing: 9) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(appModel.syncSession.paired ? "Sync active" : "Not paired")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(colors.textPrimary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(appModel.syncSession.paired ? "Synced with phone" : "Not paired")
+                        .font(.system(size: 12))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineLimit(1)
 
                     if let lastSynced = appModel.syncSession.lastSyncedAt, lastSynced > 0 {
-                        Text("Synced \(timeAgo(lastSynced))")
-                            .font(.system(size: 10))
-                            .foregroundStyle(colors.textMuted)
+                        Text(relativeTime(lastSynced))
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    } else {
+                        Text("Ready to sync")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
                     }
                 }
 
                 Spacer()
 
-                Button {
-                    appModel.syncNow()
-                } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.accent)
-                }
-                .buttonStyle(.plain)
+                Circle()
+                    .fill(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
+                    .frame(width: 6, height: 6)
+                    .shadow(color: Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.9), radius: 4)
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
         .frame(width: 236)
         .background(colors.elevated)
-    }
-
-    private func timeAgo(_ timestamp: Int64) -> String {
-        let diff = Date().timeIntervalSince1970 - Double(timestamp) / 1000.0
-        if diff < 60 { return "just now" }
-        if diff < 3600 { return "\(Int(diff / 60))m ago" }
-        return "\(Int(diff / 3600))h ago"
     }
 }
 
@@ -161,21 +169,21 @@ private struct SidebarNavItem: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .font(.system(size: 16))
                     .frame(width: 18)
-                    .foregroundStyle(isSelected ? colors.accent : colors.textMuted)
+                    .foregroundStyle(isSelected ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
 
                 Text(title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? colors.textPrimary : colors.textSecondary)
+                    .font(.system(size: 14, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
 
                 Spacer()
             }
+            .frame(height: 34)
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
             .background(
-                isSelected ? colors.surface : Color.clear,
-                in: RoundedRectangle(cornerRadius: 6)
+                isSelected ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.16) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 7)
             )
         }
         .buttonStyle(.plain)

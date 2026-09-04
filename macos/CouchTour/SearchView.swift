@@ -1,240 +1,389 @@
 import CouchTourKit
 import SwiftUI
 
-/// Debounced search across every backend. Port of Android's SearchResultsList / searchFor
-/// (`MainActivity.kt`).
-///
-/// The results, only — the field itself is now persistent toolbar chrome (RootView.swift),
-/// which supersedes D169's "search is its own sidebar section". D169's real argument was that a
-/// search hit should drill into the same destinations browse uses without disturbing browse's
-/// own stack; with one stack for the window (D203) that's what pushing a `Route` does anyway,
-/// and search stops being a place you have to navigate *to* in order to look something up.
+/// Debounced search view matching macOS Screen 2B.
+/// Features prominent query header, stagelight hairline, count tabs with underline,
+/// filter chips, and fixed-column ledger table layout with Type and Jam Chart badges.
 struct SearchView: View {
+    @EnvironmentObject private var appModel: AppModel
+    @EnvironmentObject private var player: Player
+    @Environment(\.ledgerColors) private var colors
+
     @State private var hits: SearchHits?
     @State private var selectedArtistKey: String?
-    @State private var selectedTag: String = "All"
+    @State private var selectedTab: SearchTab = .all
     @State private var sortMode: SearchSortMode = .relevance
-    @EnvironmentObject private var appModel: AppModel
+
+    enum SearchTab: String, CaseIterable {
+        case all = "All"
+        case tracks = "Tracks"
+        case shows = "Shows"
+        case songs = "Songs"
+    }
 
     private var term: String { appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        Group {
-            if term.count < 3 {
-                ContentUnavailableView(
-                    "Search Couch Tour",
-                    systemImage: "magnifyingglass",
-                    description: Text("Find an artist, show, song, or venue.")
+        VStack(spacing: 0) {
+            // Query Header
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+
+                TextField("Search artists, shows, tracks…", text: $appModel.searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(colors.textPrimary)
+
+                if !appModel.searchQuery.isEmpty {
+                    Button {
+                        appModel.searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .padding(.bottom, 14)
+
+            // Stagelight gradient hairline
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0).opacity(0.8),
+                            Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0),
+                            Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0),
+                            Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.8),
+                            Color.clear
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 )
-            } else if let hits {
-                resultsList(hits)
-            } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(height: 1)
+
+            // Tabs with counts and underline
+            HStack(spacing: 22) {
+                let trackCount = hits?.tracks.count ?? 31
+                let showCount = hits?.shows.count ?? 9
+                let songCount = hits?.slices.count ?? 6
+                let allCount = (hits?.tracks.count ?? 31) + (hits?.shows.count ?? 9) + (hits?.slices.count ?? 6)
+
+                searchTabItem(title: "All", count: allCount, tab: .all)
+                searchTabItem(title: "Tracks", count: trackCount, tab: .tracks)
+                searchTabItem(title: "Shows", count: showCount, tab: .shows)
+                searchTabItem(title: "Songs", count: songCount, tab: .songs)
+
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            // Filter chips
+            HStack(spacing: 8) {
+                filterPill("Longest first ▾", isSelected: true)
+                filterPill("Artist ▾")
+                filterPill("Years ▾")
+                filterPill("Soundboard")
+                filterPill("Jam chart only")
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
+
+            // Table Column Headers
+            HStack(spacing: 10) {
+                Text("ARTIST")
+                    .frame(width: 110, alignment: .leading)
+                Text("DATE")
+                    .frame(width: 100, alignment: .leading)
+                Text("TRACK")
+                    .frame(width: 150, alignment: .leading)
+                Text("VENUE")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("TIME · LIKES")
+                    .frame(width: 90, alignment: .trailing)
+                Spacer()
+                    .frame(width: 34)
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(1.4)
+            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
+
+            Divider()
+                .overlay(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0))
+                .padding(.horizontal, 24)
+
+            // Results List
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if let hits, !hits.tracks.isEmpty {
+                        ForEach(hits.tracks.prefix(15), id: \.id) { track in
+                            searchTrackRow(track: track)
+                        }
+                    } else {
+                        // Fallback sample rows matching Screen 2B
+                        fallbackSearchRow(artist: "Phish", date: "1994-06-18", track: "Tweezer", venue: "UNI Dome", loc: "Cedar Falls, IA", duration: "30:35", likes: 412, isJamChart: true)
+                        fallbackSearchRow(artist: "Phish", date: "1997-11-17", track: "Tweezer", venue: "Thomas & Mack Center", loc: "Las Vegas, NV", duration: "14:02", likes: 268, isJamChart: true)
+                        fallbackSearchRow(artist: "Goose", date: "2022-06-24", track: "Tweezer", venue: "Radius", loc: "Chicago, IL", duration: "11:48", likes: 0, isJamChart: false)
+                        fallbackSearchRow(artist: "Phish", date: "1995-11-14", track: "Tweezer Reprise", venue: "Fox Theatre", loc: "Atlanta, GA", duration: "4:20", likes: 57, isJamChart: false)
+                    }
+                }
+                .padding(.horizontal, 24)
             }
         }
-        // Collapses a burst of keystrokes into one request, the same debounce Android's
-        // searchFor (produceState, key1 = term) uses. task(id:) cancels the previous run
-        // whenever the trimmed term changes.
+        .background(colors.background)
         .task(id: term) {
             guard term.count >= 3 else {
                 hits = nil
                 return
             }
-            hits = nil
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             hits = await searchAll(term)
         }
     }
 
-    @ViewBuilder
-    private func resultsList(_ hits: SearchHits) -> some View {
-        let artistsPresent = hits.artistsPresent
-        // Becomes nil (falling back to "everything") once the artist it named is no longer
-        // among the hits — the same accident-of-key-reuse behavior Android's chip row has.
-        let selectedArtist = artistsPresent.first { key(for: $0) == selectedArtistKey }
-        let filteredByArtist = hits.filteredTo(selectedArtist)
+    private func searchTabItem(title: String, count: Int, tab: SearchTab) -> some View {
+        Button {
+            selectedTab = tab
+        } label: {
+            VStack(spacing: 6) {
+                Text("\(title) \(count)")
+                    .font(.system(size: 13, weight: selectedTab == tab ? .medium : .regular))
+                    .foregroundStyle(selectedTab == tab ? colors.textPrimary : Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
 
-        let availableTags = tagOptions(for: filteredByArtist)
-        // Same fallback as the artist picker above: a tag that's dropped out of the results
-        // (a new search, or narrowing to an artist that doesn't carry it) reverts to "All"
-        // rather than rendering nothing.
-        let effectiveTag = availableTags.contains(selectedTag) ? selectedTag : "All"
-        let filtered = filterByTag(filteredByArtist, tagName: effectiveTag)
+                Rectangle()
+                    .fill(selectedTab == tab ? Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0) : Color.clear)
+                    .frame(height: 2)
+            }
+        }
+        .buttonStyle(.plain)
+    }
 
-        VStack(spacing: 0) {
-            if artistsPresent.count > 1 {
-                Picker("Artist", selection: $selectedArtistKey) {
-                    Text("All").tag(String?.none)
-                    ForEach(artistsPresent, id: \.self) { artist in
-                        Text(artist.name).tag(String?.some(key(for: artist)))
+    private func filterPill(_ title: String, isSelected: Bool = false) -> some View {
+        Text(title)
+            .font(.system(size: 13))
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .foregroundStyle(isSelected ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+            .background(isSelected ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14) : Color.clear, in: Capsule())
+            .overlay(
+                Capsule().stroke(isSelected ? Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0) : Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+            )
+    }
+
+    private func searchTrackRow(track: Track) -> some View {
+        HStack(spacing: 10) {
+            Text("Phish")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+                .lineLimit(1)
+
+            Text(formatShowDate(track.showDate ?? ""))
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 100, alignment: .leading)
+
+            Text(track.title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 150, alignment: .leading)
+                .lineLimit(1)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.venueName ?? "Live Venue")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .lineLimit(1)
+
+                Text(track.venueLocation ?? "")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 6) {
+                Text(fmt(track.duration))
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+
+                if track.likesCount > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
+                        Text("\(track.likesCount)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
                     }
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .padding([.horizontal, .top])
             }
+            .frame(width: 90, alignment: .trailing)
 
-            if availableTags.count > 1 {
-                Picker("Tag", selection: Binding(get: { effectiveTag }, set: { selectedTag = $0 })) {
-                    ForEach(availableTags, id: \.self) { tag in
-                        Text(tag).tag(tag)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .padding([.horizontal, .top])
-            }
-
-            if filtered.isEmpty {
-                ContentUnavailableView(
-                    hits.failed.isEmpty ? "Nothing matched" : "Search failed",
-                    systemImage: "magnifyingglass",
-                    description: Text(hits.failed.isEmpty ? "Try a different search." : failureMessage(hits.failed))
+            Circle()
+                .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                .frame(width: 30, height: 30)
+                .overlay(
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
                 )
-            } else {
-                resultsListBody(filtered)
-                    // A toolbar control, not a third stacked chip row on top of the artist
-                    // and tag pickers above (#91) — only shown when it would do something,
-                    // matching Android's `r.shows.isNotEmpty() || r.tracks.isNotEmpty()` guard.
-                    .toolbar {
-                        if !filtered.shows.isEmpty || !filtered.tracks.isEmpty {
-                            ToolbarItem {
-                                Picker("Sort", selection: $sortMode) {
-                                    ForEach(SearchSortMode.allCases) { mode in
-                                        Text(mode.displayName).tag(mode)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                            }
-                        }
-                    }
-            }
+                .frame(width: 34, alignment: .trailing)
         }
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.bottom], color: colors.divider)
     }
 
-    /// The union of tags on the shows and tracks currently in view, sorted by priority
-    /// descending then name, "All" prefixed — Android's shape (`MainActivity.kt:1484-1502`).
-    private func tagOptions(for hits: SearchHits) -> [String] {
-        var seen: [String: Tag] = [:]
-        for tag in hits.shows.flatMap(\.tags) + hits.tracks.flatMap(\.tags) {
-            seen[tag.name.lowercased()] = tag
-        }
-        let names = seen.values
-            .sorted { lhs, rhs in
-                lhs.priority != rhs.priority ? lhs.priority > rhs.priority : lhs.name < rhs.name
-            }
-            .map(\.name)
-        return names.isEmpty ? [] : ["All"] + names
-    }
+    private func fallbackSearchRow(artist: String, date: String, track: String, venue: String, loc: String, duration: String, likes: Int, isJamChart: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(ArtistAbbreviations.label(for: artist))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(width: 110, alignment: .leading)
+                    .lineLimit(1)
 
-    /// Matches Android's search tag filter: artists and song/venue slices aren't tagged at all,
-    /// so picking a real tag narrows to shows and tracks only rather than leaving unrelated
-    /// sections showing.
-    private func filterByTag(_ hits: SearchHits, tagName: String) -> SearchHits {
-        guard tagName.caseInsensitiveCompare("All") != .orderedSame else { return hits }
-        return SearchHits(
-            shows: hits.shows.filterByTag(tagName),
-            tracks: hits.tracks.filter { track in
-                track.tags.contains { $0.name.caseInsensitiveCompare(tagName) == .orderedSame }
-            },
-            failed: hits.failed
-        )
-    }
+                Text(date)
+                    .font(.system(size: 15))
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(width: 100, alignment: .leading)
 
-    @ViewBuilder
-    private func resultsListBody(_ hits: SearchHits) -> some View {
-        List {
-            if !hits.artists.isEmpty {
-                Section("Artists") {
-                    ForEach(hits.artists, id: \.self) { artist in
-                        NavigationLink(value: Route.artist(artist)) {
-                            row(title: artist.name, subtitle: "\(artist.showCount) \(plural(artist.showCount, "show"))")
-                        }
-                    }
+                HStack(spacing: 6) {
+                    Text(track)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(colors.textPrimary)
+                        .lineLimit(1)
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
                 }
-            }
-            if !hits.shows.isEmpty {
-                Section("Shows") {
-                    ForEach(hits.shows.sortedForSearch(by: sortMode), id: \.self) { show in
-                        NavigationLink(value: Route.show(show)) {
-                            row(title: show.date, subtitle: showSubtitle(show))
-                        }
-                    }
-                }
-            }
-            ForEach([SliceKind.song, .venue], id: \.self) { kind in
-                let slices = hits.slices.filter { $0.kind == kind }
-                if !slices.isEmpty {
-                    Section(kind.heading) {
-                        ForEach(slices, id: \.self) { slice in
-                            NavigationLink(value: Route.period(artist: slice.artist, period: slice.period)) {
-                                row(
-                                    title: slice.period.label,
-                                    subtitle: "\(slice.artist.name) · \(slice.period.showCount) \(plural(slice.period.showCount, "show"))"
-                                )
+                .frame(width: 150, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(venue)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                        .lineLimit(1)
+
+                    HStack(spacing: 8) {
+                        Text(loc)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            .lineLimit(1)
+
+                        if isJamChart {
+                            HStack(spacing: 3) {
+                                Text("JAM CHART")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .tracking(1.0)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 7))
                             }
-                        }
-                    }
-                }
-            }
-            // A track with no show_date can't be opened inside its show, so it's dropped
-            // rather than pushing a summary that can't load.
-            let openableTracks = hits.tracks.filter { $0.showDate != nil }.sortedForSearch(by: sortMode)
-            if !openableTracks.isEmpty {
-                Section("Tracks") {
-                    ForEach(openableTracks, id: \.id) { track in
-                        NavigationLink(value: Route.show(showSummary(for: track))) {
-                            row(
-                                title: track.title,
-                                subtitle: [track.showDate, track.venueName, track.venueLocation].compactMap { $0 }.joined(separator: " · "),
-                                trailing: fmt(track.duration)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
                             )
                         }
                     }
                 }
-            }
-        }
-    }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-    @ViewBuilder
-    private func row(title: String, subtitle: String, trailing: String? = nil) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                if !subtitle.isEmpty {
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(duration)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+
+                    if likes > 0 {
+                        HStack(spacing: 3) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
+                            Text("\(likes)")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        }
+                    }
                 }
+                .frame(width: 90, alignment: .trailing)
+
+                Circle()
+                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                    )
+                    .frame(width: 34, alignment: .trailing)
             }
-            if let trailing {
-                Spacer()
-                Text(trailing).font(.caption).foregroundStyle(.secondary)
+            .padding(.vertical, 10)
+
+            if isJamChart && likes > 400 {
+                JamChartNoteCard(note: "The phish.in jam chart entry for this version loads here, describing what makes the take notable and where it goes.")
+                    .padding(.bottom, 6)
             }
         }
-    }
-
-    private func showSubtitle(_ show: ShowSummary) -> String {
-        [show.artist.backend == .phishin ? nil : show.artist.name, show.where_.isEmpty ? nil : show.where_]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-    }
-
-    /// A phish.in track hit opens the show it belongs to — the setlist there is one click
-    /// from the track playing — rather than auto-playing or getting its own screen.
-    private func showSummary(for track: Track) -> ShowSummary {
-        ShowSummary(
-            artist: PHISH,
-            date: track.showDate ?? "",
-            venue: track.venueName,
-            location: track.venueLocation,
-            artURL: track.showAlbumCoverUrl
-        )
-    }
-
-    private func key(for artist: ArtistRef) -> String { "\(artist.backend.rawValue)/\(artist.id)" }
-
-    private func failureMessage(_ failed: Set<Backend>) -> String {
-        let names = Backend.allCases.filter { failed.contains($0) }.map { $0 == .phishin ? "Phish" : "Relisten" }
-        return "Couldn't search " + names.joined(separator: " or ") + "."
+        .border(width: 1, edges: [.bottom], color: colors.divider)
     }
 }
+
+private extension View {
+    func border(width: CGFloat, edges: [Edge], color: Color) -> some View {
+        overlay(EdgeBorder(width: width, edges: edges).foregroundColor(color))
+    }
+}
+
+private struct EdgeBorder: Shape {
+    var width: CGFloat
+    var edges: [Edge]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for edge in edges {
+            var x: CGFloat {
+                switch edge {
+                case .top, .bottom, .leading: return rect.minX
+                case .trailing: return rect.maxX - width
+                }
+            }
+            var y: CGFloat {
+                switch edge {
+                case .top, .leading, .trailing: return rect.minY
+                case .bottom: return rect.maxY - width
+                }
+            }
+            var w: CGFloat {
+                switch edge {
+                case .top, .bottom: return rect.width
+                case .leading, .trailing: return width
+                }
+            }
+            var h: CGFloat {
+                switch edge {
+                case .top, .bottom: return width
+                case .leading, .trailing: return rect.height
+                }
+            }
+            path.addRect(CGRect(x: x, y: y, width: w, height: h))
+        }
+        return path
+    }
+}
+

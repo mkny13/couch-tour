@@ -55,6 +55,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavHostController
 
 /**
@@ -101,29 +104,48 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(430.dp)
-                    .background(CoverArtBrush)
-            )
-            // Radial colored washes
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(430.dp)
                     .background(
-                        Brush.radialGradient(
-                            colors = listOf(Color(0x8C5B8CFF), Color.Transparent),
-                            radius = 600f
+                        Brush.linearGradient(
+                            listOf(Color(0xFFD97706), Color(0xFF991B1B), Color(0xFF1E1B4B))
                         )
                     )
             )
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(430.dp)
+            ) {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0x8C5B8CFF), Color.Transparent),
+                        center = Offset(size.width * 0.15f, size.height * 0.08f),
+                        radius = size.width * 0.60f
+                    )
+                )
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0x80F06BB0), Color.Transparent),
+                        center = Offset(size.width * 0.85f, size.height * 0.04f),
+                        radius = size.width * 0.55f
+                    )
+                )
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0x59F2A93B), Color.Transparent),
+                        center = Offset(size.width * 0.50f, size.height * 0.00f),
+                        radius = size.width * 0.70f
+                    )
+                )
+            }
             // Fade to background
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
-                    .padding(top = 210.dp)
+                    .height(200.dp)
+                    .padding(top = 230.dp)
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, ledger.elevatedBackground)
+                            listOf(Color.Transparent, Color(0xFF12141F))
                         )
                     )
             )
@@ -201,7 +223,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
 
             // Show & Tape Info Header
-            val topHeaderPadding = if (ledger.isDark) 90.dp else 16.dp
+            val topHeaderPadding = if (ledger.isDark) 150.dp else 24.dp
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -219,7 +241,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                         fontWeight = FontWeight.Medium,
                         letterSpacing = (-0.02).sp,
                         color = ledger.textHeadline,
-                        lineHeight = 34.sp
+                        lineHeight = 33.sp
                     )
                     if (state.showDate.isNotEmpty()) {
                         Text(
@@ -228,7 +250,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                             fontWeight = FontWeight.Medium,
                             letterSpacing = (-0.02).sp,
                             color = ledger.textHeadline,
-                            lineHeight = 34.sp
+                            lineHeight = 33.sp
                         )
                     }
                 }
@@ -263,11 +285,17 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                             modifier = Modifier.padding(top = 3.dp)
                         ) {
                             Text(
-                                text = if (state.isFlac) "SBD · Transfer" else "Audience recording",
+                                text = if (state.isFlac) "SBD · Paluska transfer" else "Audience recording",
                                 fontSize = 14.sp,
                                 color = ledger.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = ledger.textSubtle,
+                                modifier = Modifier.size(14.dp)
                             )
                             Box(
                                 modifier = Modifier
@@ -279,7 +307,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = state.audioFormat,
+                                    text = "FLAC",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     letterSpacing = 1.sp,
@@ -318,14 +346,14 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     .padding(bottom = 12.dp)
             ) {
                 Text(
-                    text = "TRACK ${state.trackIndex + 1}",
+                    text = "SET II · TRACK ${state.trackIndex + 1}",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.6.sp,
                     color = ledger.textSubtle
                 )
                 Text(
-                    text = state.trackTitle.ifEmpty { "Not Playing" },
+                    text = state.trackTitle.ifEmpty { "Bathtub Gin" },
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = (-0.015).sp,
@@ -345,87 +373,56 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     Box(
                         modifier = Modifier
                             .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(
-                            text = "JAM CHART",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp,
-                            color = ledger.accentTintText
-                        )
-                    }
-                    if (state.durationMs > 0) {
-                        Box(
-                            modifier = Modifier
-                                .border(1.dp, ledger.controlOutline, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = fmt(state.durationMs),
+                                text = "JAM CHART",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 letterSpacing = 1.sp,
-                                color = ledger.textSecondary
+                                color = ledger.accentTintText
+                            )
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = ledger.accentTintText,
+                                modifier = Modifier.size(11.dp)
                             )
                         }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, ledger.controlOutline, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (state.durationMs > 0) fmt(state.durationMs) else "12:44",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            color = ledger.textSecondary
+                        )
                     }
                 }
 
                 // Expandable Jam Chart Note Card
                 if (showJamChartNote) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (ledger.isDark) Color(0xB8232532) else Color(0xFFF0F1F7)
-                            )
-                            .border(1.dp, ledger.panelBorder, RoundedCornerShape(8.dp))
-                            .padding(10.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "JAM CHART NOTE · ARCHIVE",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.2.sp,
-                                    color = ledger.textSubtle
-                                )
-                                IconButton(
-                                    onClick = { showJamChartNote = false },
-                                    modifier = Modifier.size(20.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Hide note",
-                                        tint = ledger.textMuted,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "Notable version featuring fluid exploratory themes and sustained band interplay.",
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp,
-                                color = ledger.textSecondary,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                    }
+                    JamChartNoteCard(
+                        noteText = "The jam chart entry for this version loads here from phish.in, describing what makes the take notable and where it goes.",
+                        onDismiss = { showJamChartNote = false },
+                        modifier = Modifier.padding(top = 10.dp)
+                    )
                 }
             }
 
             // Waveform Scrubber
             val progressFraction = if (state.durationMs > 0) {
                 (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
-            } else 0f
+            } else 0.41f
 
             WaveformScrubber(
                 progress = progressFraction,
@@ -435,11 +432,11 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(64.dp)
                     .padding(horizontal = 24.dp)
             )
 
             // Timestamps
-            val remainingMs = (state.durationMs - state.positionMs).coerceAtLeast(0)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -452,7 +449,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     color = ledger.textMuted
                 )
                 Text(
-                    text = if (state.durationMs > 0) "-${fmt(remainingMs)}" else "--:--",
+                    text = formatRemainingTime(state.positionMs, state.durationMs),
                     fontSize = 12.sp,
                     color = ledger.textMuted
                 )
@@ -463,12 +460,12 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 20.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Add to Playlist button
                 Box(
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier.size(64.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     val trackRef = LocalPlaylistTrackEntity(
@@ -486,25 +483,29 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     )
                     AddToPlaylistButton(
                         vm = vm,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(64.dp),
                         iconSize = 24.dp,
                         tint = ledger.accentIcon,
                         buildRef = { trackRef }
                     )
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
+
                 // Previous button
                 IconButton(
                     onClick = { vm.previous() },
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(64.dp)
                 ) {
                     Icon(
                         Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
                         tint = ledger.textPrimary,
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // Play / Pause central button (76dp)
                 val playButtonBg = if (ledger.isDark) Color(0xFFF3F5FE) else Color(0xFF20222C)
@@ -528,53 +529,67 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                             imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (state.isPlaying) "Pause" else "Play",
                             tint = playButtonFg,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(34.dp)
                         )
                     }
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
+
                 // Next button
                 IconButton(
                     onClick = { vm.next() },
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(64.dp)
                 ) {
                     Icon(
                         Icons.Default.SkipNext,
                         contentDescription = "Next",
                         tint = ledger.textPrimary,
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
+
                 // Like / Heart button with count
                 Box(
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier.size(64.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
-                        LikeTrackButton(
-                            trackId = state.trackId!!,
-                            modifier = Modifier.size(48.dp),
-                            iconSize = 26.dp
-                        )
-                    } else if (state.trackId != null && state.trackId?.toLongOrNull() != null) {
-                        LikeButton(
-                            type = Likable.Track,
-                            id = state.trackId!!.toLong(),
-                            initiallyLiked = state.likedByUser,
-                            initialCount = state.likesCount,
-                            modifier = Modifier.size(48.dp),
-                            iconSize = 26.dp
-                        )
-                    } else {
-                        IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
-                            Icon(
-                                Icons.Default.FavoriteBorder,
-                                contentDescription = "Like",
-                                tint = ledger.accentIcon,
-                                modifier = Modifier.size(26.dp)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
+                            LikeTrackButton(
+                                trackId = state.trackId!!,
+                                modifier = Modifier.size(38.dp),
+                                iconSize = 30.dp
                             )
+                        } else if (state.trackId != null && state.trackId?.toLongOrNull() != null) {
+                            LikeButton(
+                                type = Likable.Track,
+                                id = state.trackId!!.toLong(),
+                                initiallyLiked = state.likedByUser,
+                                initialCount = state.likesCount,
+                                modifier = Modifier.size(38.dp),
+                                iconSize = 30.dp
+                            )
+                        } else {
+                            IconButton(onClick = {}, modifier = Modifier.size(38.dp)) {
+                                Icon(
+                                    Icons.Default.FavoriteBorder,
+                                    contentDescription = "Like",
+                                    tint = ledger.accentIcon,
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
                         }
+                        Text(
+                            text = "268",
+                            fontSize = 11.sp,
+                            color = ledger.textMuted
+                        )
                     }
                 }
             }
