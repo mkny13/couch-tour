@@ -108,9 +108,8 @@ gated on both landing.
 
 Working prompts for each batch: [prompts/macos-ux-polish-batches.md](prompts/macos-ux-polish-batches.md).
 
-**Status:** Batches A (#107, D200; #110, D201) and B (#112, D202) have merged. Batch C's design
-step is done and the direction is chosen — the sidebar comes out entirely; implementation (C2)
-is the remaining work.
+**Status:** Batches A (#107, D200; #110, D201), B (#112, D202), and C (#114, D203, D204) have
+all merged and shipped. The macOS sidebar has been replaced with the hub model and shared components.
 
 | Batch | Issue | Feature | Description | Platforms |
 |---|---|---|---|---|
@@ -128,14 +127,14 @@ is the remaining work.
 Focus on advanced audio streaming, caching infrastructure, and richer catalog exploration.
 Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md).
 
-| Issue | Feature | Description | Platforms |
-|---|---|---|---|
-| **#65** | **Offline Downloads** | Download individual tracks or complete shows for local offline playback with storage management. | Android, macOS |
-| **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS |
-| **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS |
-| **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS |
-| **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS |
-| **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS |
+| Issue | Feature | Description | Platforms | Status |
+|---|---|---|---|---|
+| **#65** | **Offline Downloads** | Download individual tracks or complete shows for local offline playback with storage management. | Android, macOS | Up next (Phase 2 primary remaining work) |
+| **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS | Search filter shipped (D206, verified `uat-004`); show list interaction queued for UI revamp |
+| **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS | Shipped (D206, verified in UAT `uat-001`, `uat-002`) |
+| **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS | Shipped (D205, D210, verified in UAT `uat-011`) |
+| **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS | Shipped (D207, verified in UAT `uat-014`, `uat-015`) |
+| **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS | Shipped (D206, verified in UAT `uat-005`, `uat-006`; date badge & moe. casing queued for UI revamp) |
 
 ---
 
@@ -176,8 +175,10 @@ before that question has an answer.
 
 ## Real-Device Verification Checklist
 
-Items that compile and pass unit test suites, but require physical on-device verification:
+Physical on-device and manual checks are tracked centrally in [UAT.md](UAT.md) via the local UAT
+board (`python3 scripts/uat-server.py`, D209):
 
-- [ ] **Notification Audio Ducking (#23, D93)**: Confirm on physical Android hardware that audio smoothly ducks when system notifications sound.
-- [ ] **Native Android Share Sheet (#19, D155–D156)**: Confirm `ACTION_CHOOSER` launches cleanly and shared URLs resolve in third-party target apps.
-- [ ] **macOS Reactive Background Sync (D172)**: Verify that playing a track on a phone updates the macOS Continue Listening view in the background without user interaction.
+- [ ] **Notification Audio Ducking (`uat-018`, #23/D93)**: Confirm on physical Android hardware that audio smoothly ducks when system notifications sound.
+- [x] **Native Android Share Sheet (`uat-019`, #19/D155–D156, D212)**: `ACTION_CHOOSER` launches and shared URLs resolve; Relisten show URL scheme fixed in D212.
+- [x] **macOS Reactive Background Sync (`uat-020`, D172)**: Verified passing in UAT — phone playback updates Mac Continue Listening shelf in the background.
+- [ ] **Sleep / Rate Change Sync Resilience (`uat-026`, #127/D211)**: Mac sleep/wake does not clobber newer remote progress.
