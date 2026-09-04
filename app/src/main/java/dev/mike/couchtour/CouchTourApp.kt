@@ -14,6 +14,7 @@ class CouchTourApp : Application() {
         Favorites.init(this)
         LikedTracks.init(this)
         PlaybackSettings.init(this)
+        ThemeSettings.init(this)
         // Asynchronous and best-effort: the playback service picks Cast up whenever it
         // turns up, and never, on a device without Play services.
         Casting.init(this)
