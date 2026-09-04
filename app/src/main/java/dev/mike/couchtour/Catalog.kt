@@ -645,13 +645,12 @@ internal fun Track.toPlayableTrack(showArt: String?) = PlayableTrack(
  * the model already carries, not new data of its own.
  *
  * Both URLs confirmed live (#19): phish.in's `/<date>` returns its own `og:url` matching
- * exactly; Relisten's `/<artist-slug>/<date>` renders that show's own `<title>`, while an
- * unknown artist or date 404s with a real "404 - Page Not Found" page — Relisten has no
- * catch-all SPA shell here, so a 200 means the page is genuine.
+ * exactly; Relisten's `/<artist-slug>/<year>/<month>/<day>` renders that show's own `<title>`
+ * and tracks, while an unknown artist or date 404s with a real "404 - Page Not Found" page.
  */
 fun showShareUrl(artist: ArtistRef, date: String): String = when (artist.backend) {
     Backend.PHISHIN -> "https://phish.in/$date"
-    Backend.RELISTEN -> "https://relisten.net/${artist.id}/$date"
+    Backend.RELISTEN -> "https://relisten.net/${artist.id}/${date.replace('-', '/')}"
 }
 
 /**
