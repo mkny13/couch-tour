@@ -3295,3 +3295,39 @@ setting.
   automate. This is a local-signing artifact, unrelated to this batch, and it walled off GUI
   automation for the session. Worth knowing for any future macOS batch whose verification is
   interactive: answer that prompt once by hand before starting.
+
+## Iteration 21 — Player rate sync clobber fix (#127)
+
+### D205 — Deduplicate ProgressRecorder writes and ignore redundant rate=0 events (#127)
+
+Issue #127 investigated an incident where playback of Phish 2026-07-29 on Android (YEM) was
+overwritten by an older finished track (Harpua) after Couch Tour was launched on macOS.
+
+Diagnosis of system power logs and sync records revealed:
+1. The Mac Mini had a power loss / reboot earlier in the day (`Thu Sep 3 14:22 EDT`).
+2. At 14:40:40 EDT, the Mac Mini went to sleep. Audio hardware route teardown triggered an
+   AVFoundation KVO notification on `AVQueuePlayer.rate`.
+3. `Player.swift`'s `rateObservation` treated `rate == 0` as a trigger to run
+   `saveProgress(force: true)` unconditionally, even though `self.isPlaying` was already false.
+4. `ProgressRecorder` stamped the in-memory show progress (`Harpua`, paused at 14:15) with
+   `Date.now` (`1788460842062` / 14:40:42 EDT) and saved it to the local SQLite database.
+5. Hours later, when macOS Couch Tour launched, it pushed its local progress with that 14:40:42
+   timestamp to Cloudflare D1. D1's last-write-wins logic accepted Harpua over the user's newer
+   listening on Android because Harpua's artificial timestamp was newer.
+6. The next sync pull on Android and macOS replaced YEM with Harpua.
+
+Fix:
+- Moved `ProgressRecorder` into `CouchTourKit` where its state transitions and database writes
+  can be unit-tested directly without depending on AVFoundation or UI.
+- In `ProgressRecorder.saveTick`, track `lastSavedQueueKey`, `lastSavedTrackIndex`, and
+  `lastSavedPositionMs`. If none of these values have changed since the last save, skip the
+  database write and do not re-stamp with `Date.now`, returning `false`.
+- In `ProgressRecorder.markFinished`, reset the saved position cache so replay starts fresh.
+- In `Player.swift`, guarded `rateObservation` with `guard self.isPlaying != isPlaying else { return }`
+  so redundant `rate == 0` calls during system sleep, route switches, or audio teardowns are dropped.
+- In `Player.swift`, checked the return value of `recorder.saveTick` before triggering
+  `syncSession.requestDebouncedPush(progressStore)` during `saveProgress(force:)`.
+- Added 6 unit tests in `ProgressRecorderTests.swift` covering position advancement, identical tick
+  skipping, track transitions, queue key transitions, and finished state handling. Total package
+  tests increased from 369 to 375.
+

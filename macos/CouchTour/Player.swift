@@ -337,9 +337,12 @@ final class Player: NSObject, ObservableObject {
         rateObservation = queuePlayer.observe(\.rate, options: [.new]) { [weak self] _, change in
             Task { @MainActor in
                 guard let self, !self.isCasting else { return }
-                self.isPlaying = (change.newValue ?? 0) > 0
+                let newRate = change.newValue ?? 0
+                let isPlaying = newRate > 0
+                guard self.isPlaying != isPlaying else { return }
+                self.isPlaying = isPlaying
                 self.updateNowPlayingElapsedTime()
-                if (change.newValue ?? 0) > 0 { self.claimNowPlaying(playing: true) }
+                if isPlaying { self.claimNowPlaying(playing: true) }
                 self.saveProgress(force: true)
             }
         }
@@ -415,11 +418,11 @@ final class Player: NSObject, ObservableObject {
     }
 
     private func saveProgress(force: Bool) {
-        recorder.saveTick(
+        let didSave = recorder.saveTick(
             queueKey: queueKey, show: show, track: currentTrack, trackIndex: currentIndex,
             positionMs: positionMs, artURL: artURL, force: force
         )
-        if force, let syncSession, let progressStore {
+        if didSave && force, let syncSession, let progressStore {
             syncSession.requestDebouncedPush(progressStore)
         }
     }
