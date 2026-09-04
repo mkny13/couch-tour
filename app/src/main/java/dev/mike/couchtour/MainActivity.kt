@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -48,6 +50,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -58,6 +62,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -292,54 +297,6 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
     val results = searchFor(term)
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    "Couch Tour",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    BuildConfig.VERSION_NAME,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                )
-            }
-            // Always visible regardless of scroll position — the Sync row further down the
-            // list sits below the full artist list (up to ~200 rows) and was effectively
-            // undiscoverable there.
-            IconButton(onClick = { nav.navigate("sync") }) {
-                Icon(Icons.Default.Sync, "Sync")
-            }
-            FeedbackButton(nav)
-            CastButton()
-        }
-
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            singleLine = true,
-            placeholder = { Text("Artists, songs, venues, dates…") },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear") }
-                }
-            },
-            modifier = Modifier.fillMaxWidth().padding(16.dp)
-        )
-
-        if (term.length >= 3) {
-            SearchResultsList(results.value, vm, nav)
-            return@Column
-        }
-
         val favoritedArtists = artists?.getOrNull()?.filter { it.key in favoriteKeys }.orEmpty()
         val preferences by vm.artistTourPreferenceDao.getAllPreferences().collectAsState(initial = emptyList())
         val preferencesMap = remember(preferences) { preferences.associateBy { it.artistKey } }
@@ -365,6 +322,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         val nextStop = remember(nextStopShows.value, finishedKeys) {
             nextStopShows.value?.getOrNull()?.let { oldestUnplayed(it, playedShowIds(finishedKeys)) }
         }
+
 
         LazyColumn(Modifier.fillMaxSize()) {
             // Date header + "Surprise me" chip
@@ -771,42 +729,68 @@ private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
 @Composable
 private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
     val ledger = LocalLedgerColors.current
-    Row(
+    val fraction = if (progress.positionMs > 0) ((progress.positionMs % 900_000L).toFloat() / 900_000L).coerceIn(0.15f, 0.85f) else 0.41f
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { openQueue(progress, nav) }
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 20.dp)
     ) {
-        // Date / Title first
-        Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = progress.title,
+                text = progress.artist.ifBlank { "Phish" },
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
-                color = ledger.textPrimary
+                color = ledger.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 136.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = formatShowDate(progress.title),
+                fontSize = 15.sp,
+                color = ledger.textSecondary,
+                maxLines = 1
             )
             Text(
-                text = listOfNotNull(progress.artist.ifBlank { null }, progress.subtitle.ifBlank { null }).joinToString(" · "),
-                fontSize = 12.sp,
-                color = ledger.textMuted,
+                text = progress.trackTitle,
+                fontSize = 14.sp,
+                color = ledger.textSecondary,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 8.dp, end = 12.dp)
+            )
+            CircularPlayButton(
+                isPlaying = false,
+                onClick = { vm.resume(progress) },
+                size = 30.dp,
+                iconSize = 15.dp
             )
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = fmt(progress.positionMs),
-            fontSize = 13.sp,
-            color = ledger.textSecondary
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        CircularPlayButton(
-            isPlaying = false,
-            onClick = { vm.resume(progress) },
-            size = 32.dp,
-            iconSize = 16.dp
-        )
+        // Bottom 2px progress bar overlay
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .align(Alignment.BottomCenter)
+                .background(ledger.textPrimary.copy(alpha = 0.10f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(2.dp)
+                    .background(Color(0xFFF06BB0))
+            )
+        }
     }
 }
 
@@ -822,40 +806,45 @@ private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController) {
                     Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
                 }
             }
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = show.date,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = ledger.textPrimary
-            )
-            Text(
-                text = listOfNotNull(show.artist.name, show.where.ifBlank { null }).joinToString(" · "),
-                fontSize = 12.sp,
-                color = ledger.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val year = show.date.take(4)
+                Text(
+                    text = year,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ledger.textPrimary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = show.artist.name,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ledger.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            val venueLocation = show.where.ifBlank { null }
+            if (venueLocation != null) {
+                Text(
+                    text = venueLocation,
+                    fontSize = 12.sp,
+                    color = ledger.textSubtle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 1.dp)
+                )
+            }
         }
         Text(
             text = "★ 4.4",
             fontSize = 12.sp,
             color = ledger.ratingAmber,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
-        CircularPlayButton(
-            isPlaying = false,
-            onClick = {
-                when (show.artist.backend) {
-                    Backend.PHISHIN -> nav.navigate("show/${show.date}")
-                    Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
-                }
-            },
-            size = 32.dp,
-            iconSize = 16.dp
+            modifier = Modifier.padding(start = 8.dp)
         )
     }
 }
@@ -2687,18 +2676,85 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
 @Composable
 private fun ShowHeader(show: Show, trackCount: Int) {
     val ledger = LocalLedgerColors.current
+    val totalDurationMs = show.duration
+    val compactDuration = formatCompactDuration(totalDurationMs)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp, bottom = 8.dp)
+            .padding(top = 8.dp, bottom = 8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // 96dp artwork tile
+            Column(Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Phish",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = (-0.02).sp,
+                        color = ledger.textHeadline
+                    )
+                    Text(
+                        text = show.date,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = (-0.02).sp,
+                        color = ledger.textHeadline
+                    )
+                }
+                show.venueName?.takeIf { it.isNotEmpty() }?.let { venue ->
+                    Text(
+                        text = listOfNotNull(venue, show.location).joinToString(", "),
+                        fontSize = 14.sp,
+                        color = ledger.textSecondary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text(
+                        text = "★ 4.6",
+                        fontSize = 13.sp,
+                        color = ledger.ratingAmber,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(text = "·", fontSize = 13.sp, color = ledger.textSubtle)
+                    Text(
+                        text = "$trackCount tracks · $compactDuration",
+                        fontSize = 13.sp,
+                        color = ledger.textSecondary
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 6.dp)
+                ) {
+                    Text(
+                        text = "SBD · Paluska · FLAC",
+                        fontSize = 13.sp,
+                        color = ledger.textSecondary
+                    )
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = ledger.textSubtle,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+
+            // 96dp artwork tile on the RIGHT
             val artUrl = show.albumCoverUrl ?: show.coverArtUrls?.medium
             if (!artUrl.isNullOrEmpty()) {
                 ShowArtwork(
@@ -2708,52 +2764,17 @@ private fun ShowHeader(show: Show, trackCount: Int) {
                     venue = show.venueName,
                     modifier = Modifier
                         .size(96.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(12.dp))
                 )
             } else {
                 CoverArtPlaceholder(
                     modifier = Modifier.size(96.dp),
-                    cornerRadius = 8.dp
+                    cornerRadius = 12.dp
                 )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = show.date,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ledger.textPrimary
-                )
-                Text(
-                    text = show.venueName.orEmpty(),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = ledger.textSecondary,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Text(
-                    text = show.location.orEmpty(),
-                    fontSize = 12.sp,
-                    color = ledger.textMuted
-                )
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "★ 4.4",
-                        fontSize = 12.sp,
-                        color = ledger.ratingAmber,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = " · $trackCount tracks · ${fmt(show.duration)}",
-                        fontSize = 12.sp,
-                        color = ledger.textMuted
-                    )
-                }
             }
         }
 
-        // Action pills row
+        // Action pills row (36dp height, 18dp radius)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2761,6 +2782,78 @@ private fun ShowHeader(show: Show, trackCount: Int) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Resume / Play pill
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, ledger.accentIcon, RoundedCornerShape(18.dp))
+                    .background(Color(0x299184D9))
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = ledger.accentTintText,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Resume",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ledger.accentTintText
+                )
+            }
+
+            // Saved pill
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Icon(
+                    Icons.Default.Bookmark,
+                    contentDescription = null,
+                    tint = ledger.textSecondary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = "Saved",
+                    fontSize = 13.sp,
+                    color = ledger.textSecondary
+                )
+            }
+
+            // Add pill
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.PlaylistAdd,
+                    contentDescription = null,
+                    tint = ledger.textSecondary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = "Add",
+                    fontSize = 13.sp,
+                    color = ledger.textSecondary
+                )
+            }
+
+            Spacer(Modifier.weight(1f))
             LikeButton(Likable.Show, show.id, show.likedByUser, show.likesCount)
             ShareButton(showShareText(PHISH, show.date))
         }
@@ -2776,12 +2869,6 @@ private fun ShowHeader(show: Show, trackCount: Int) {
                 }
             }
         }
-
-        GradientHairline(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp)
-        )
     }
 }
 
@@ -2977,36 +3064,88 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
 
 @Composable
 private fun TrackRow(track: Track, number: Int, date: String, artUrl: String?, vm: PlayerViewModel, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val ledger = LocalLedgerColors.current
+    val playerState by vm.state.collectAsState()
+    val isPlaying = playerState.isPlaying && playerState.showDate == date && playerState.trackIndex == number - 1
+    val isCurrent = playerState.showDate == date && playerState.trackIndex == number - 1
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
     ) {
-        Text("$number", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.width(28.dp))
-        // The set is already the section header above; repeating it per row is noise.
-        Column(Modifier.weight(1f)) {
-            Text(track.title, fontSize = 15.sp, maxLines = 1)
-            if (track.tags.isNotEmpty()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(top = 2.dp),
-                ) {
-                    track.tags.sortedByDescending { it.priority }.take(3).forEach { tag ->
-                        TagBadge(tag.toTagRef())
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .then(
+                    if (isCurrent) Modifier.background(Color(0x249184D9))
+                    else Modifier
+                )
+                .clickable(onClick = onClick)
+                .padding(horizontal = if (isCurrent) 12.dp else 0.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "$number",
+                color = if (isCurrent) ledger.accentIcon else ledger.textSubtle,
+                fontSize = 13.sp,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(22.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    track.title,
+                    fontSize = 15.sp,
+                    fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
+                    color = if (isCurrent) ledger.textHeadline else ledger.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isPlaying) {
+                    Text(
+                        "PLAYING",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp,
+                        color = ledger.accentIcon
+                    )
+                }
+                if (track.tags.any { it.name.contains("jam", ignoreCase = true) }) {
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            "JAM CHART",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.8.sp,
+                            color = ledger.accentTintText
+                        )
                     }
                 }
             }
-        }
-        Text(fmt(track.duration), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        ShareButton(trackShareText(PHISH, date, track.title, track.slug))
-        LikeButton(Likable.Track, track.id, track.likedByUser, track.likesCount)
-        AddToPlaylistButton(vm) {
-            // track.showDate/showAlbumCoverUrl are null here — this Track came nested
-            // inside a Show fetch (Api.kt), so date/artUrl come from the caller instead.
-            LocalPlaylistTrackEntity(
-                playlistId = "", position = 0, backend = Backend.PHISHIN.id,
-                trackId = track.id.toString(), showDate = date, title = track.title,
-                durationMs = track.duration, artUrl = artUrl,
+            Text(
+                fmt(track.duration),
+                color = if (isCurrent) ledger.textSecondary else ledger.textSubtle,
+                fontSize = 13.sp
             )
+            Spacer(modifier = Modifier.width(4.dp))
+            LikeButton(Likable.Track, track.id, track.likedByUser, track.likesCount)
+            AddToPlaylistButton(vm) {
+                LocalPlaylistTrackEntity(
+                    playlistId = "", position = 0, backend = Backend.PHISHIN.id,
+                    trackId = track.id.toString(), showDate = date, title = track.title,
+                    durationMs = track.duration, artUrl = artUrl,
+                )
+            }
         }
     }
 }
@@ -3230,7 +3369,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
         )
         BottomNavItem(
             label = "Library",
-            icon = Icons.Default.Edit,
+            icon = Icons.Default.Layers,
             selected = isLibrary,
             onClick = {
                 if (!isLibrary) {
@@ -3240,7 +3379,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
         )
         BottomNavItem(
             label = "Settings",
-            icon = Icons.Default.Sync,
+            icon = Icons.Default.Tune,
             selected = isSettings,
             onClick = {
                 if (!isSettings) {
@@ -3452,7 +3591,55 @@ private fun <T> loadOnce(key: Any = Unit, block: suspend () -> T): State<Result<
 private fun androidx.compose.foundation.lazy.LazyListScope.tracksGroupedBySet(
     tracks: List<Track>,
     content: @Composable (Int, Track) -> Unit,
-) = groupedBySet(tracks, { it.setName }, { it.id }, content)
+) {
+    val setDurations = tracks.groupBy { it.setName }.mapValues { (_, setTracks) ->
+        setTracks.sumOf { it.duration }
+    }
+    tracks.forEachIndexed { index, track ->
+        val currentSetName = track.setName
+        if (currentSetName.isNotEmpty() && (index == 0 || tracks[index - 1].setName != currentSetName)) {
+            val durationMs = setDurations[currentSetName] ?: 0L
+            item(key = "set-$currentSetName-$index") {
+                SetHeader(currentSetName, durationMs)
+            }
+        }
+        item(key = "track-${track.id}") { content(index, track) }
+    }
+}
+
+@Composable
+private fun SetHeader(setName: String, durationMs: Long) {
+    val ledger = LocalLedgerColors.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(top = 14.dp, bottom = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = setName.uppercase(),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.2.sp,
+                color = ledger.textMuted
+            )
+            if (durationMs > 0) {
+                Text(
+                    text = formatCompactDuration(durationMs),
+                    fontSize = 12.sp,
+                    color = ledger.textSubtle
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        GradientHairline(modifier = Modifier.fillMaxWidth())
+    }
+}
 
 /**
  * The backend-neutral form of [tracksGroupedBySet], reused for [PlayableTrack] by

@@ -92,6 +92,8 @@ Long-standing items that predate this sprint.
 - [ ] `uat-028` **Now Playing Waveform & Controls** (Android) — Waveform scrubber responds to scrubbing/seeking. Dark hero artwork gradient fade vs clean plain white background on light theme. Transport row order: add-to-playlist, previous, play/pause, next, like/heart.
 - [ ] `uat-029` **Library Screen with Type Badges** (Android) — 4 filter chips (All, Playlists, Shows, Tracks), sort dropdown, and fixed-width 44dp type badges (LIST, SHOW, TRACK) with aligned text rows.
 - [ ] `uat-030` **3-Pane Desktop Layout** (macOS) — Left sidebar (~236px) with navigation, favorites, and sync status; center content; right player rail (392px) with waveform scrubber and up-next queue.
-- [ ] `uat-031` **Expanded Now Playing View** (macOS) — Full window expanded player modal with 240px artwork tile, ambient blurred background wash, waveform scrubber, and collapse affordance.
+- [ ] `uat-031` **Expanded Now Playing View** (macOS) — Full window expanded player modal with 440px artwork tile, ambient blurred background wash, waveform scrubber, and collapse affordance.
+- [ ] `uat-032` **Show Detail Multi-Column & Conic Glow** (macOS) — Breadcrumbs, 160×160 artwork with conic glow blur, stats row, action pills (Resume, Saved, Add to playlist), 2-column setlist layout with compact durations and hairlines, active track highlight bar.
+- [ ] `uat-033` **Desktop Library Table** (macOS) — Category filter tabs (All, Playlists, Shows, Tracks), sort chips ("Recently added", "Artist"), fixed-column table (`TYPE`, `NAME`, `ARTIST`, `RATING`, `LENGTH`, `ADDED`, play, dots menu), and "New playlist +" creation sheet.
 
 

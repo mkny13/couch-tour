@@ -6,7 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -272,3 +277,128 @@ fun WaveformScrubber(
         }
     }
 }
+
+/**
+ * 2dp bottom progress bar overlay for In Progress rows and mini-player.
+ */
+@Composable
+fun ProgressBarOverlay(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    height: Dp = 2.dp,
+    useGradient: Boolean = true
+) {
+    val ledger = LocalLedgerColors.current
+    val fraction = progress.coerceIn(0f, 1f)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .background(ledger.textPrimary.copy(alpha = 0.10f))
+    ) {
+        if (fraction > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(height)
+                    .background(if (useGradient) ledger.specGradient else Brush.linearGradient(listOf(ledger.accentBase, ledger.accentBase)))
+            )
+        }
+    }
+}
+
+/**
+ * Jam Chart Note card with dismiss control matching the design handoff.
+ */
+@Composable
+fun JamChartNoteCard(
+    noteText: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val ledger = LocalLedgerColors.current
+    val bgColor = if (ledger.isDark) Color(0xB8232532) else Color(0xD9E6E7F0)
+    val borderColor = if (ledger.isDark) ledger.panelBorder else ledger.listDivider
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "JAM CHART NOTE · PHISH.IN",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.2.sp,
+                    color = ledger.textSubtle
+                )
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Hide note",
+                        tint = ledger.textMuted,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            Text(
+                text = noteText,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                color = ledger.textSecondary,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 40x22 toggle switch matching Ledger design handoff.
+ */
+@Composable
+fun LedgerToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val ledger = LocalLedgerColors.current
+    val trackColor = if (checked) {
+        if (ledger.isDark) ledger.accentBase else Color(0xFF6F62C7)
+    } else {
+        if (ledger.isDark) ledger.controlOutline else ledger.panelBorder
+    }
+    val thumbColor = if (checked) Color(0xFFF3F5FE) else ledger.textMuted
+
+    Box(
+        modifier = modifier
+            .width(40.dp)
+            .height(22.dp)
+            .clip(RoundedCornerShape(11.dp))
+            .background(trackColor)
+            .clickable { onCheckedChange(!checked) }
+            .padding(2.dp),
+        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(thumbColor)
+        )
+    }
+}
+

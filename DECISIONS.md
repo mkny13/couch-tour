@@ -3828,3 +3828,44 @@ Key decisions and implementations:
    - Strictly preserved `uat-005` ("moe." lowercase with period) and `uat-006` (YYYY-MM-DD date formatting).
    - Verified 492 Android unit tests passing (`./gradlew testDebugUnitTest`) and 408 Swift package tests
      passing (`swift test` in `CouchTourKit`). macOS app target builds cleanly.
+
+### D215 — Reconciling visual fidelity with design handoff across Android and macOS
+
+Systematically audited and reconciled all visual discrepancies between the implemented Android and
+macOS clients and the design handoff specifications in `/Volumes/ExtSSD160/scripts/phish-in-app/design/handoff/`
+(`Couch Tour Android.dc.html`, `Couch Tour macOS.dc.html`, and reference screenshots in `screenshots/`).
+
+Key implementations & alignments:
+1. **Android Fidelity (Screens 1A–1E)**:
+   - **Home (Screen 1A)**: Top ledger bar with date and Surprise Me shuffle action; card shelves for
+     In Progress (with top 2px progress bar overlay), Next Tour Stops (with gradient accent bar), and
+     On This Date; mini-player docked above bottom navigation with spec-gradient played scrubber bar.
+   - **Search (Screen 1B)**: Tab headers with count pills and active underline indicator; filter chips;
+     collapsible Jam Chart note cards with 1px border; fixed 44dp type badges (`LIST`, `SHOW`, `TRACK`).
+   - **Now Playing (Screen 1D)**: 240dp artwork with ambient radial wash; dark hero gradient fade vs plain
+     white light theme; tape FLAC badge and rating row; 48dp waveform scrubber; like button with counter.
+   - **Tests**: Added `LedgerLayoutTest.kt` verifying progressFraction, compactDuration, formatShowDate,
+     and layout constraints. Suite passing: 31 classes, 497 tests.
+2. **macOS Fidelity (Screens 2A–2E)**:
+   - **Formatters & Tests**: Tested in `FormatTests.swift` (added tests for `progressFraction`, `formatCompactDuration`,
+     `formatRemainingTime`, `formatShowDate`). 412 package tests passing with 0 failures in `swift test`.
+   - **Design Components**: Added `ProgressBarOverlay`, `JamChartNoteCard`, `TrafficLights`, and `ConicGlowArtwork`
+     with conic gradient stagelight blur.
+   - **Sidebar (Screen 2A)**: Traffic lights window chrome, 34px nav items with active `#d2cefd` highlight,
+     `FAVORITE ARTISTS` with `GradientHairline` and formatted show counts, footer sync status with glowing purple indicator dot.
+   - **Player Rail (Screen 2A)**: 3-radial ambient wash, 344×344 artwork with conic glow, TAPE and SHOW RATING row,
+     track title and Jam Chart note card, 64px waveform scrubber, 72×72 filled circle play button, like button with counter.
+   - **Expanded Now Playing (Screen 2D)**: Full 1440×900 layout with traffic lights, 440×440 artwork tile,
+     TAPE/RATING/SET row, 44px track title with FLAC badge, 110px scrubber, 82×82 play button.
+   - **Search (Screen 2B)**: Query header, stagelight hairline, tabs with counts and underline, filter chips,
+     table column headers, fixed-width badge rows with collapsible jam chart note card.
+   - **Show Detail (Screen 2C)**: Breadcrumb header (`Artist / Year / Date`), 160×160 artwork with conic glow blur,
+     stats row (rating, sets · tracks · duration, tour name, tape/source picker), action pills (Resume with remaining time,
+     Saved bookmark, Add to playlist), 2-column setlist layout with compact durations and set hairlines, active track highlight bar.
+   - **Library (Screen 2E)**: `YOUR LIBRARY` header, search bar, sort chips ("Recently added ▾", "Artist ▾"),
+     category filter tabs with counts, table column headers (`TYPE`, `NAME`, `ARTIST`, `RATING`, `LENGTH`, `ADDED`, play, dots menu),
+     fixed `TypeBadge` rows with playlists, shows, and tracks.
+3. **Verification**:
+   - Xcode project generated with `xcodegen generate` and built clean with `xcodebuild` (0 errors).
+   - SwiftPM tests pass (412 tests). Android Robolectric & MockWebServer tests pass (497 tests).
+

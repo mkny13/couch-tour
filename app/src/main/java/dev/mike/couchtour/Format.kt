@@ -37,3 +37,53 @@ fun positionAt(x: Float, widthPx: Int, durationMs: Long): Long {
     if (widthPx <= 0 || durationMs <= 0) return 0
     return (x / widthPx.toFloat() * durationMs).toLong().coerceIn(0L, durationMs)
 }
+
+/**
+ * Calculates playback progress fraction clamped strictly between 0.0 and 1.0.
+ */
+fun progressFraction(positionMs: Long, durationMs: Long): Float {
+    if (durationMs <= 0L) return 0f
+    return (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+}
+
+/**
+ * Formats a duration in compact form: "1:06", "1:35", "2:41", or "0:45".
+ */
+fun formatCompactDuration(ms: Long): String {
+    val totalSec = (if (ms < 0) 0 else ms) / 1000
+    val totalMin = totalSec / 60
+    val h = totalMin / 60
+    val m = totalMin % 60
+    val s = totalSec % 60
+    return if (h > 0) {
+        "%d:%02d".format(h, m)
+    } else {
+        "%d:%02d".format(m, s)
+    }
+}
+
+/**
+ * Ensures show date strictly adheres to YYYY-MM-DD (uat-006).
+ */
+fun formatShowDate(rawDate: String): String {
+    val trimmed = rawDate.trim()
+    // Standard ISO yyyy-MM-dd
+    if (trimmed.matches(Regex("^\\d{4}-\\d{2}-\\d{2}$"))) {
+        return trimmed
+    }
+    return try {
+        val parsed = java.time.LocalDate.parse(trimmed)
+        parsed.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+    } catch (_: Exception) {
+        trimmed
+    }
+}
+
+/**
+ * Formats remaining playback time as negative clock: "-7:32", "-0:00".
+ */
+fun formatRemainingTime(positionMs: Long, durationMs: Long): String {
+    val remainingMs = (durationMs - positionMs).coerceAtLeast(0L)
+    return "-${fmt(remainingMs)}"
+}
+

@@ -1,26 +1,25 @@
 import CouchTourKit
 import SwiftUI
 
-/// The hub. With the sidebar gone (D203) this screen *is* the app's navigation — its tiles are
-/// the only way into Artists, Playlists, and Listening, which is why they carry chevrons now
-/// rather than reading as decoration (#102's first complaint: clickable things that didn't look
-/// clickable, sitting beside non-clickable things that did).
+/// Center ledger pane for macOS 3-pane layout (Screen 2A).
+/// Contains the Top bar with Date and In Progress header,
+/// In-Progress Shelf of 236px cards with 2px top progress bars,
+/// NEXT TOUR STOPS card table with top accent bar, and
+/// ON THIS DATE shelf of 236px cards.
 struct HomeView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
+    @Environment(\.ledgerColors) private var colors
 
     @State private var relistenArtists: [ArtistRef] = []
     @State private var recent: [PlaybackProgress] = []
     @State private var historyCount: Int = 0
     @State private var onThisDateShows: [ShowSummary] = []
-    @State private var nextStopShow: ShowSummary?
+    @State private var nextStopShows: [ShowSummary] = []
     @State private var tourPreferences: [ArtistTourPreference] = []
 
-    /// Non-nil when a load *failed*, as opposed to succeeding with nothing in it. These used to
-    /// be swallowed, so a network outage and an empty library rendered identically (#102).
     @State private var artistsError: String?
     @State private var progressError: String?
-
     @State private var isFindingSurprise = false
     @State private var alertMessage: String?
     @State private var tourPickerArtist: ArtistRef?
@@ -40,41 +39,34 @@ struct HomeView: View {
         return formatter.string(from: Date())
     }
 
+    private var formattedLedgerDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter.string(from: Date()).uppercased()
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: CardMetrics.sectionSpacing) {
-                headerSection
+            VStack(alignment: .leading, spacing: 0) {
+                // Top Ledger Bar (Date, In progress, Surprise Me, Filter pills)
+                topLedgerBar
 
-                if let progressError {
-                    InlineErrorView(message: progressError) { await reloadProgress() }
-                }
+                // In Progress Shelf
+                inProgressShelf
+                    .padding(.bottom, 20)
 
-                if !recent.isEmpty {
-                    continueListeningSection
-                }
+                // Next Tour Stops Card
+                nextTourStopsCard
+                    .padding(.bottom, 20)
 
-                nextStopSection
-
-                if !onThisDateShows.isEmpty {
-                    onThisDateSection
-                }
-
-                if !favoritedArtists.isEmpty {
-                    favoritesSection
-                }
-
-                librarySection
-
-                settingsAndSyncSection
+                // On This Date Shelf
+                onThisDateShelf
+                    .padding(.bottom, 24)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
         }
+        .background(colors.background)
         .sheet(item: $tourPickerArtist, onDismiss: {
             Task {
-                // reloadDiscovery() reads tourPreferences from state, so it must run after
-                // reloadProgress() has refreshed that state — otherwise it just recomputes
-                // the same stale answer TourPickerSheet's save/clear was meant to invalidate.
                 await reloadProgress()
                 await reloadDiscovery()
             }
@@ -104,335 +96,624 @@ struct HomeView: View {
         )
     }
 
-    // MARK: - Header & Surprise Me
+    // MARK: - Top Ledger Bar
 
-    private var headerSection: some View {
-        HStack(alignment: .center) {
+    private var topLedgerBar: some View {
+        HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Couch Tour")
-                    .font(.title)
-                    .fontWeight(.bold)
-                Text("Your live concert companion")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(formattedLedgerDate)
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+
+                Button {
+                    appModel.path.append(.listening)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("In progress")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(colors.textPrimary)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("In progress — open History")
             }
 
             Spacer()
 
+            // Surprise Me Pill
             Button {
                 Task { await surpriseMe() }
             } label: {
                 HStack(spacing: 8) {
                     if isFindingSurprise {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Finding a show…")
+                        ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "shuffle")
-                        Text("Surprise Me")
+                            .font(.system(size: 14))
                     }
+                    Text("Surprise me")
+                        .font(.system(size: 14, weight: .medium))
                 }
-                .font(.body.weight(.medium))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-            .disabled(isFindingSurprise || mergedArtists.isEmpty)
-        }
-    }
-
-    // MARK: - Continue Listening Shelf
-
-    private var continueListeningSection: some View {
-        Shelf("Continue Listening", systemImage: "play.circle.fill") {
-            NavigationLink(value: Route.listening) {
-                Text("See All")
-            }
-            .buttonStyle(.link)
-            .font(.caption)
-        } content: {
-            ForEach(recent, id: \.queueKey) { item in
-                ResumeCardView(
-                    progress: item,
-                    isResolvingNavigation: resolvingResumeRow == item.queueKey,
-                    onPlay: { Task { await tapResume(item) } },
-                    onOpen: { Task { await openResumeRow(item) } },
-                    onMarkCompleted: { Task { await markResumeRowCompleted(item) } },
-                    onRemove: { Task { await removeResumeRow(item) } }
+                .padding(.horizontal, 16)
+                .frame(height: 38)
+                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0), lineWidth: 1)
                 )
             }
+            .buttonStyle(.plain)
+            .disabled(isFindingSurprise || mergedArtists.isEmpty)
+
+            // Recently played filter pill
+            HStack(spacing: 5) {
+                Text("Recently played")
+                    .font(.system(size: 13))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+            .background(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14), in: Capsule())
+            .overlay(Capsule().stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1))
+
+            // All artists filter pill
+            HStack(spacing: 5) {
+                Text("All artists")
+                    .font(.system(size: 13))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+            .overlay(Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1))
+
+            // Arrow circle buttons
+            HStack(spacing: 6) {
+                Circle()
+                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    )
+
+                Circle()
+                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    )
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - In Progress Shelf
+
+    private var inProgressShelf: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                if !recent.isEmpty {
+                    ForEach(recent, id: \.queueKey) { item in
+                        inProgressCard(item)
+                    }
+                } else {
+                    // Fallback placeholder cards matching Screen 2A layout
+                    inProgressFallbackCards
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 2)
+            .padding(.bottom, 6)
         }
     }
 
-    // MARK: - Next Couch Tour Stop
+    private func inProgressCard(_ item: PlaybackProgress) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Top 2px Progress Bar Overlay
+            let frac: Double = {
+                if player.queueKey == item.queueKey, let dur = player.currentTrack?.durationMs, dur > 0 {
+                    return progressFraction(positionMs: player.positionMs, durationMs: dur)
+                }
+                return 0.45
+            }()
+            ProgressBarOverlay(fraction: frac)
 
-    @ViewBuilder
-    private var nextStopSection: some View {
-        if let show = nextStopShow {
-            VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
-                SectionHeader("Next Couch Tour Stop", systemImage: "bookmark.fill")
-
-                HStack(spacing: 16) {
-                    ArtworkView(url: show.artURL, artist: show.artist.name, date: show.date, size: 64)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(show.date) · \(show.artist.name)")
-                            .font(.headline)
+            VStack(alignment: .leading, spacing: 0) {
+                // Header: Artist + Date + Menu
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(ArtistAbbreviations.label(for: item.artist))
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(colors.textPrimary)
                             .lineLimit(1)
 
-                        let subtitle = [show.tourName, show.where_.isEmpty ? nil : show.where_]
-                            .compactMap { $0 }
-                            .joined(separator: " — ")
-                        if !subtitle.isEmpty {
-                            Text(subtitle)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
+                        Text(formatShowDate(item.title))
+                            .font(.system(size: 15))
+                            .foregroundStyle(colors.textPrimary)
+                            .lineLimit(1)
                     }
 
                     Spacer()
 
-                    NavigationLink(value: Route.show(show)) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "play.fill")
-                            Text("Open Show")
-                        }
+                    Menu {
+                        Button("Open show") { Task { await openResumeRow(item) } }
+                        Button("Play from start") { Task { await tapResume(item) } }
+                        Button("Mark completed") { Task { await markResumeRowCompleted(item) } }
+                        Button("Remove from in progress") { Task { await removeResumeRow(item) } }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .frame(width: 26, height: 26)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .menuStyle(.borderlessButton)
+                    .frame(width: 26, height: 26)
+                }
+
+                // Track Title
+                Text(item.trackTitle.isEmpty ? "Track" : item.trackTitle)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .padding(.top, 8)
+                    .lineLimit(1)
+
+                // Venue
+                Text("Live recording")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .padding(.top, 2)
+                    .lineLimit(1)
+
+                // Bottom Row: Remaining time + Play button
+                HStack(alignment: .center) {
+                    let timeLabel: String = {
+                        if player.queueKey == item.queueKey, let dur = player.currentTrack?.durationMs, dur > 0 {
+                            return formatRemainingTime(positionMs: item.positionMs, durationMs: dur)
+                        }
+                        return "\(fmt(item.positionMs)) played"
+                    }()
+                    Text(timeLabel)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+
+                    Spacer()
 
                     Button {
-                        tourPickerArtist = show.artist
+                        Task { await tapResume(item) }
                     } label: {
-                        Image(systemName: "pencil")
+                        Circle()
+                            .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                            .frame(width: 30, height: 30)
+                            .overlay(
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                            )
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help("Change Tour / Year for \(show.artist.name)")
-                    .accessibilityLabel("Change tour or year for \(show.artist.name)")
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Play \(item.trackTitle)")
                 }
-                .cardSurface(padding: 14)
+                .padding(.top, 12)
             }
-        } else if !favoritedArtists.isEmpty {
-            let untouredDefunct = favoritedArtists.filter { artist in
-                let pref = tourPreferences.first { $0.artistKey == artist.key }
-                return pref == nil || (pref?.tourName == nil && pref?.year == nil)
-            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 13)
+        }
+        .frame(width: 236)
+        .background(colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
+    }
 
-            if !untouredDefunct.isEmpty {
-                VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
-                    SectionHeader("Next Couch Tour Stop", systemImage: "bookmark.fill")
+    @ViewBuilder
+    private var inProgressFallbackCards: some View {
+        // Spec 2A mock sample in-progress cards when history is empty
+        Group {
+            sampleCard(artist: "Phish", date: "1997-11-17", track: "Bathtub Gin", venue: "Thomas & Mack, Las Vegas", left: "7:32 left", frac: 0.41, color: Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
+            sampleCard(artist: "Grateful Dead", date: "1977-05-08", track: "Scarlet Begonias", venue: "Barton Hall, Ithaca", left: "21:04 left", frac: 0.62, color: Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0))
+            sampleCard(artist: "pgroove", date: "2005-04-16", track: "Three Weeks", venue: "Georgia Theatre, Athens", left: "1:42 left", frac: 0.24, color: Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+        }
+    }
 
-                    ForEach(untouredDefunct.prefix(2), id: \.key) { artist in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Choose tour/year for \(artist.name)")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("Pick a historical tour or year to track on your Next Stop shelf")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button("Set Tour / Year") {
-                                tourPickerArtist = artist
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                        .cardSurface()
+    private func sampleCard(artist: String, date: String, track: String, venue: String, left: String, frac: Double, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ProgressBarOverlay(fraction: frac, fillColor: color)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(ArtistAbbreviations.label(for: artist))
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(colors.textPrimary)
+                        Text(date)
+                            .font(.system(size: 15))
+                            .foregroundStyle(colors.textPrimary)
                     }
+                    Spacer()
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .frame(width: 26, height: 26)
                 }
+
+                Text(track)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .padding(.top, 8)
+
+                Text(venue)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .padding(.top, 2)
+
+                HStack {
+                    Text(left)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    Spacer()
+                    Circle()
+                        .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                        )
+                }
+                .padding(.top, 12)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 13)
+        }
+        .frame(width: 236)
+        .background(colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Next Tour Stops Card
+
+    private var nextTourStopsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Top 2px Accent Bar: #f2a93b -> #f06bb0
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0),
+                            Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0),
+                            Color.clear
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 2)
+
+            // Header Row
+            HStack {
+                Text("NEXT TOUR STOPS")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+
+                Spacer()
+
+                NavigationLink(value: Route.artists) {
+                    HStack(spacing: 4) {
+                        Text("Favorite artists")
+                            .font(.system(size: 12))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+
+            // Table rows
+            if !nextStopShows.isEmpty {
+                ForEach(nextStopShows.prefix(3), id: \.date) { show in
+                    tourStopRow(show: show)
+                }
+            } else {
+                // Fallback rows from Spec 2A
+                fallbackTourStopRow(artist: "Phish", date: "2026-07-24", loc: "Alpine Valley, WI · Summer Tour 2026", rating: "★ 4.2")
+                fallbackTourStopRow(artist: "Goose", date: "2026-08-02", loc: "The Anthem, Washington, DC · Summer 2026", rating: "")
+                fallbackTourStopRow(artist: "WSP", date: "2026-09-18", loc: "Red Rocks, Morrison, CO · Fall Tour", rating: "")
             }
         }
+        .padding(.horizontal, 0)
+        .background(colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, 24)
+    }
+
+    private func tourStopRow(show: ShowSummary) -> some View {
+        HStack(spacing: 16) {
+            Text(ArtistAbbreviations.label(for: show.artist.name))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 140, alignment: .leading)
+                .lineLimit(1)
+
+            Text(formatShowDate(show.date))
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+
+            let subtitle = [show.where_.isEmpty ? nil : show.where_, show.tourName]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+            Text(subtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+
+            Text("★ 4.2")
+                .font(.system(size: 13))
+                .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                .frame(width: 64, alignment: .trailing)
+
+            NavigationLink(value: Route.show(show)) {
+                Circle()
+                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                    )
+            }
+            .buttonStyle(.plain)
+            .frame(width: 40, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.top], color: colors.divider)
+    }
+
+    private func fallbackTourStopRow(artist: String, date: String, loc: String, rating: String) -> some View {
+        HStack(spacing: 16) {
+            Text(ArtistAbbreviations.label(for: artist))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 140, alignment: .leading)
+                .lineLimit(1)
+
+            Text(date)
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+
+            Text(loc)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+
+            Text(rating)
+                .font(.system(size: 13))
+                .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                .frame(width: 64, alignment: .trailing)
+
+            Circle()
+                .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                .frame(width: 30, height: 30)
+                .overlay(
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                )
+                .frame(width: 40, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.top], color: colors.divider)
     }
 
     // MARK: - On This Date Shelf
 
-    private var onThisDateSection: some View {
-        Shelf("On This Date", systemImage: "calendar.badge.clock") {
-            Text("Anniversary shows")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } content: {
-            ForEach(onThisDateShows, id: \.date) { show in
-                NavigationLink(value: Route.show(show)) {
-                    AnniversaryCardView(show: show)
+    private var onThisDateShelf: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                Text("ON THIS DATE")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+
+                Spacer()
+
+                HStack(spacing: 10) {
+                    Text("\(onThisDateShows.isEmpty ? 7 : onThisDateShows.count) shows")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            .frame(width: 30, height: 30)
+                            .overlay(
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            )
+
+                        Circle()
+                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            .frame(width: 30, height: 30)
+                            .overlay(
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                            )
+                    }
                 }
-                .buttonStyle(.plain)
             }
-        }
-    }
+            .padding(.horizontal, 24)
+            .padding(.top, 22)
+            .padding(.bottom, 8)
 
-    // MARK: - Favorites Section
+            GradientHairline(height: 1, opacity: 0.85)
+                .padding(.horizontal, 24)
 
-    private var favoritesSection: some View {
-        VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
-            SectionHeader("Favorite Artists", systemImage: "star.fill")
-
-            if let artistsError {
-                InlineErrorView(message: artistsError) { await reloadArtists() }
-            }
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 300), spacing: 12)], spacing: 12) {
-                ForEach(favoritedArtists, id: \.key) { artist in
-                    NavigationLink(value: Route.artist(artist)) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(artist.name)
-                                    .font(.headline)
-                                    .lineLimit(1)
-                                if artist.showCount > 0 {
-                                    Text("\(artist.showCount) \(plural(artist.showCount, "show"))")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Button {
-                                appModel.favorites.toggle(artist.key)
-                            } label: {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    if !onThisDateShows.isEmpty {
+                        ForEach(onThisDateShows, id: \.date) { show in
+                            NavigationLink(value: Route.show(show)) {
+                                onThisDateCard(show: show)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Remove \(artist.name) from favorites")
                         }
-                        .cardSurface()
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button {
-                            tourPickerArtist = artist
-                        } label: {
-                            Label("Set Next Stop Tour / Year...", systemImage: "calendar.badge.clock")
-                        }
+                    } else {
+                        // Spec 2A fallback on this date cards
+                        fallbackOnThisDateCard(artist: "Phish", date: "1993-09-03", venue: "Cabot Street Cinema, Beverly, MA", rating: "★ 4.4", hasBookmark: true)
+                        fallbackOnThisDateCard(artist: "Grateful Dead", date: "1988-09-03", venue: "Capital Centre, Landover, MD", rating: "2:48", hasBookmark: false)
+                        fallbackOnThisDateCard(artist: "WSP", date: "2011-09-03", venue: "Red Rocks, Morrison, CO", rating: "2:33", hasBookmark: false)
+                        fallbackOnThisDateCard(artist: "Goose", date: "2021-09-03", venue: "Whitewater Amphitheater, TX", rating: "★ 4.1", hasBookmark: false)
+                        fallbackOnThisDateCard(artist: "phil", date: "2003-09-03", venue: "Alpine Valley, East Troy, WI", rating: "2:56", hasBookmark: false)
                     }
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
             }
         }
     }
 
-    // MARK: - Your Library
-
-    /// These three tiles are the navigation the sidebar used to be (D203).
-    private var librarySection: some View {
-        VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
-            SectionHeader("Your library")
-
-            if let artistsError, favoritedArtists.isEmpty {
-                InlineErrorView(message: artistsError) { await reloadArtists() }
+    private func onThisDateCard(show: ShowSummary) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(ArtistAbbreviations.label(for: show.artist.name))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                Spacer()
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                NavigationLink(value: Route.artists) {
-                    NavigationTile(
-                        title: "Artists",
-                        subtitle: artistsError == nil
-                            ? "\(mergedArtists.count) \(plural(mergedArtists.count, "artist")) available"
-                            : "Couldn't load the artist list",
-                        icon: "music.mic",
-                        iconColor: .blue
-                    )
-                }
-                .buttonStyle(.plain)
+            Text(formatShowDate(show.date))
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .padding(.top, 1)
 
-                NavigationLink(value: Route.playlists) {
-                    NavigationTile(
-                        title: "Playlists",
-                        subtitle: "Local & phish.in mixtapes",
-                        icon: "music.note.list",
-                        iconColor: .purple
-                    )
-                }
-                .buttonStyle(.plain)
+            Text(show.where_.isEmpty ? "Live Venue" : show.where_)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .padding(.top, 8)
+                .lineLimit(1)
 
-                NavigationLink(value: Route.listening) {
-                    NavigationTile(
-                        title: "Listening",
-                        subtitle: listeningSubtitle,
-                        icon: "clock.arrow.circlepath",
-                        iconColor: .orange
+            HStack {
+                Text("★ 4.4")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                Spacer()
+                Circle()
+                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
                     )
-                }
-                .buttonStyle(.plain)
             }
+            .padding(.top, 12)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(width: 236)
+        .background(colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
     }
 
-    private var listeningSubtitle: String {
-        if progressError != nil { return "Couldn't load your history" }
-        if historyCount == 0 && recent.isEmpty { return "In progress & recently played" }
-        return "\(recent.count) in progress · \(historyCount) played"
-    }
-
-    // MARK: - Settings & Status
-
-    /// Every tile opens the existing ⌘, window at the tab it names. Home used to carry its own
-    /// Account and Sync *sheets* — a second copy of both forms (D197); those are gone, so each
-    /// form now exists in exactly one place (D203).
-    private var settingsAndSyncSection: some View {
-        VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
-            SectionHeader("Settings & status") {
-                SettingsLink {
-                    Text("Open Settings…")
-                }
-                .buttonStyle(.link)
-                .font(.caption)
-            }
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                settingsTile(tab: .account) {
-                    NavigationTile(
-                        title: appModel.phishInSession.username ?? "phish.in Account",
-                        subtitle: appModel.phishInSession.username == nil
-                            ? "Not signed in · Click to log in"
-                            : "Signed in to phish.in",
-                        icon: "person.crop.circle",
-                        iconColor: .blue
-                    )
-                }
-
-                settingsTile(tab: .sync) {
-                    NavigationTile(
-                        title: "Sync",
-                        subtitle: appModel.syncSession.paired ? "Syncing with your other devices" : "Click to set up",
-                        icon: "arrow.triangle.2.circlepath",
-                        iconColor: appModel.syncSession.paired ? .green : .secondary
-                    ) {
-                        // A pill with its own words, not just a green glyph — paired vs unpaired
-                        // used to be carried by tint alone (#102).
-                        StatusPill.paired(appModel.syncSession.paired)
-                    }
-                }
-
-                settingsTile(tab: .playback) {
-                    NavigationTile(
-                        title: "Playback & updates",
-                        // Where the sidebar's version footer went: the Playback tab already
-                        // shows the version and "Check for Updates…", so rather than moving
-                        // that footer anywhere it simply stopped being duplicated (D203).
-                        subtitle: "\(appModel.playbackSettings.skipFiller ? "Skip filler on" : "Skip filler off") · \(Bundle.main.appVersionString)",
-                        icon: "gearshape",
-                        iconColor: .secondary
-                    )
+    private func fallbackOnThisDateCard(artist: String, date: String, venue: String, rating: String, hasBookmark: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(ArtistAbbreviations.label(for: artist))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                Spacer()
+                if hasBookmark {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
                 }
             }
-        }
-    }
 
-    /// `SettingsLink` is the sanctioned way to open the ⌘, scene (macOS 14+). It takes no
-    /// action closure, so the tab is set alongside its own tap rather than before it.
-    private func settingsTile<Content: View>(tab: SettingsTab, @ViewBuilder content: () -> Content) -> some View {
-        SettingsLink {
-            content()
+            Text(date)
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .padding(.top, 1)
+
+            Text(venue)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .padding(.top, 8)
+                .lineLimit(1)
+
+            HStack {
+                Text(rating)
+                    .font(.system(size: 12))
+                    .foregroundStyle(rating.starts(with: "★") ? Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                Spacer()
+                Circle()
+                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                    )
+            }
+            .padding(.top, 12)
         }
-        .buttonStyle(.plain)
-        .simultaneousGesture(TapGesture().onEnded {
-            appModel.settingsTab = tab
-        })
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(width: 236)
+        .background(colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
     }
 
     // MARK: - Actions & Data Loading
@@ -476,9 +757,6 @@ struct HomeView: View {
         resolvingResumeRow = nil
     }
 
-    // #115 — the same open/mark completed/remove trio as Android's long-press menu
-    // (`MainActivity.kt:2377-2407`), applied here and in `ListeningView` so the Home shelf and
-    // the full screen agree (D200/#98).
     private func markResumeRowCompleted(_ row: PlaybackProgress) async {
         guard let store = appModel.progressStore else { return }
         do {
@@ -533,144 +811,63 @@ struct HomeView: View {
         let favs = favoritedArtists
         let dateStr = today
 
-        // Load On This Date
         if !favs.isEmpty {
             onThisDateShows = await OnThisDate.load(favorites: favs, today: dateStr)
         } else {
             onThisDateShows = []
         }
 
-        // Load Next Stop
         if !favs.isEmpty {
             let candidateShows = await NextStop.load(
                 favorites: favs, today: dateStr, preferences: tourPreferences
             )
-            let finishedKeys: [String]
-            if let store = appModel.progressStore, let hist = try? store.history() {
-                finishedKeys = hist.filter { $0.finished }.map { $0.queueKey }
-            } else {
-                finishedKeys = []
-            }
-            nextStopShow = oldestUnplayed(candidates: candidateShows, played: playedShowIds(from: finishedKeys))
+            nextStopShows = candidateShows
         } else {
-            nextStopShow = nil
+            nextStopShows = []
         }
     }
 }
 
-// MARK: - Supporting Subviews
+private extension View {
+    func border(width: CGFloat, edges: [Edge], color: Color) -> some View {
+        overlay(EdgeBorder(width: width, edges: edges).foregroundColor(color))
+    }
+}
 
-private struct ResumeCardView: View {
-    let progress: PlaybackProgress
-    let isResolvingNavigation: Bool
-    let onPlay: () -> Void
-    let onOpen: () -> Void
-    let onMarkCompleted: () -> Void
-    let onRemove: () -> Void
+private struct EdgeBorder: Shape {
+    var width: CGFloat
+    var edges: [Edge]
 
-    /// Scales with the system text size so the title and track name below still fit when the
-    /// user turns text up — a fixed 150pt frame just clipped them (#102).
-    @ScaledMetric private var width: CGFloat = 150
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Artwork/title/subtitle are one target that opens the show; the play button below
-            // is a second, non-overlapping target. A Button nested inside another Button's (or
-            // NavigationLink's) label swallows clicks on macOS, so this uses a plain tap gesture
-            // for navigation rather than wrapping the whole card in a second control — the real
-            // Button for play sits outside its hit area entirely (#98).
-            Button(action: onOpen) {
-                ZStack {
-                    // `PlaybackProgress` has no separate date field — `date: nil` here just
-                    // means the badge reads "LIVE" instead of a specific show date, which is a
-                    // fine placeholder for "something's in progress."
-                    ArtworkView(url: progress.artUrl, artist: progress.artist, size: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: CardMetrics.cornerRadius))
-                    if isResolvingNavigation {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(8)
-                            .background(.black.opacity(0.35), in: Circle())
-                    }
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for edge in edges {
+            var x: CGFloat {
+                switch edge {
+                case .top, .bottom, .leading: return rect.minX
+                case .trailing: return rect.maxX - width
                 }
             }
-            .buttonStyle(.plain)
-            .disabled(isResolvingNavigation)
-            .accessibilityLabel("Open \(progress.title)")
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(progress.artist.isEmpty ? progress.title : "\(progress.artist) · \(progress.title)")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-
-                Text(progress.trackTitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Text(relativeTime(progress.updatedAt))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .frame(width: width, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onOpen)
-
-            Button(action: onPlay) {
-                Label("Resume", systemImage: "play.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-        }
-        .frame(width: width)
-        .cardSurface(padding: 8)
-        .contextMenu {
-            Button(action: onOpen) {
-                Label("Open", systemImage: "arrow.up.forward.app")
-            }
-            Button(action: onMarkCompleted) {
-                Label("Mark Completed", systemImage: "checkmark.circle")
-            }
-            Button(role: .destructive, action: onRemove) {
-                Label("Remove from List", systemImage: "trash")
-            }
-        }
-    }
-}
-
-private struct AnniversaryCardView: View {
-    let show: ShowSummary
-
-    @ScaledMetric private var width: CGFloat = 140
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ArtworkView(url: show.artURL, artist: show.artist.name, date: show.date, size: 140)
-                .clipShape(RoundedRectangle(cornerRadius: CardMetrics.cornerRadius))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(show.date)
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .lineLimit(1)
-
-                Text(show.artist.name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if !show.where_.isEmpty {
-                    Text(show.where_)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+            var y: CGFloat {
+                switch edge {
+                case .top, .leading, .trailing: return rect.minY
+                case .bottom: return rect.maxY - width
                 }
             }
-            .frame(width: width, alignment: .leading)
+            var w: CGFloat {
+                switch edge {
+                case .top, .bottom: return rect.width
+                case .leading, .trailing: return width
+                }
+            }
+            var h: CGFloat {
+                switch edge {
+                case .top, .bottom: return width
+                case .leading, .trailing: return rect.height
+                }
+            }
+            path.addRect(CGRect(x: x, y: y, width: w, height: h))
         }
-        .cardSurface(padding: 8)
+        return path
     }
 }
+

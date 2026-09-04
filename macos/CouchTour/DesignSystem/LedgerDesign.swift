@@ -83,24 +83,41 @@ public struct TypeBadge: View {
         self.type = type.uppercased()
     }
 
-    private var badgeColor: (bg: Color, text: Color) {
+    private var badgeColor: (bg: Color, border: Color, text: Color) {
         switch type {
-        case "LIST":
-            return (Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.18), colors.accent)
+        case "PLAYLIST", "LIST":
+            return (
+                Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.18),
+                Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45),
+                Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0)
+            )
         case "SHOW":
-            return (Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.18), colors.ratingAmber)
+            return (
+                Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.18),
+                Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.45),
+                Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0)
+            )
         default:
-            return (colors.textMuted.opacity(0.15), colors.textSecondary)
+            return (
+                Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0).opacity(0.12),
+                Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0),
+                Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0)
+            )
         }
     }
 
     public var body: some View {
         Text(type)
-            .font(.system(size: 10, weight: .bold))
-            .tracking(0.8)
+            .font(.system(size: 9, weight: .semibold))
+            .tracking(0.9)
             .foregroundStyle(badgeColor.text)
-            .frame(width: 44, height: 18)
-            .background(badgeColor.bg, in: RoundedRectangle(cornerRadius: 3))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(badgeColor.bg, in: RoundedRectangle(cornerRadius: 4))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(badgeColor.border, lineWidth: 1)
+            )
     }
 }
 
@@ -121,3 +138,154 @@ public struct GradientHairline: View {
             .opacity(opacity)
     }
 }
+
+/// Top 2px progress bar overlay on In-Progress cards.
+public struct ProgressBarOverlay: View {
+    public let fraction: Double
+    public var fillColor: Color
+
+    public init(fraction: Double, fillColor: Color = Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0)) {
+        self.fraction = min(max(fraction, 0.0), 1.0)
+        self.fillColor = fillColor
+    }
+
+    public var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0).opacity(0.10))
+                Rectangle()
+                    .fill(fillColor)
+                    .frame(width: geo.size.width * CGFloat(fraction))
+            }
+        }
+        .frame(height: 2)
+    }
+}
+
+/// Dismissible Jam Chart note card with 1px border.
+public struct JamChartNoteCard: View {
+    public let note: String
+    public let onDismiss: (() -> Void)?
+    @Environment(\.ledgerColors) private var colors
+
+    public init(note: String, onDismiss: (() -> Void)? = nil) {
+        self.note = note
+        self.onDismiss = onDismiss
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("JAM CHART NOTE · PHISH.IN")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(colors.textMuted)
+
+                Spacer()
+
+                if let onDismiss {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(colors.textMuted)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss jam chart note")
+                }
+            }
+
+            Text(note)
+                .font(.system(size: 13))
+                .lineSpacing(3)
+                .foregroundStyle(colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(colors.isDark ? Color(red: 0x23 / 255.0, green: 0x25 / 255.0, blue: 0x32 / 255.0).opacity(0.72) : Color(red: 0xE6 / 255.0, green: 0xE7 / 255.0, blue: 0xF0 / 255.0).opacity(0.85))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
+    }
+}
+
+/// Window traffic lights (12px red/yellow/green) matching macOS window chrome.
+public struct TrafficLights: View {
+    public init() {}
+
+    public var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color(red: 1.0, green: 0x5F / 255.0, blue: 0x57 / 255.0))
+                .frame(width: 12, height: 12)
+            Circle()
+                .fill(Color(red: 0xFE / 255.0, green: 0xBC / 255.0, blue: 0x2E / 255.0))
+                .frame(width: 12, height: 12)
+            Circle()
+                .fill(Color(red: 0x28 / 255.0, green: 0xC8 / 255.0, blue: 0x40 / 255.0))
+                .frame(width: 12, height: 12)
+        }
+    }
+}
+
+/// Artwork wrapper with conic-gradient stagelight glow blur.
+public struct ConicGlowArtwork: View {
+    public let url: String?
+    public let artist: String
+    public let date: String
+    public let size: CGFloat
+    public let cornerRadius: CGFloat
+    public let glowPadding: CGFloat
+    public let blurRadius: CGFloat
+    @Environment(\.ledgerColors) private var colors
+
+    public init(
+        url: String?,
+        artist: String,
+        date: String,
+        size: CGFloat,
+        cornerRadius: CGFloat = 14,
+        glowPadding: CGFloat = 14,
+        blurRadius: CGFloat = 24
+    ) {
+        self.url = url
+        self.artist = artist
+        self.date = date
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.glowPadding = glowPadding
+        self.blurRadius = blurRadius
+    }
+
+    public var body: some View {
+        ZStack {
+            if colors.isDark {
+                AngularGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0),
+                        Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0),
+                        Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0),
+                        Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0),
+                        Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0)
+                    ]),
+                    center: .center,
+                    startAngle: .degrees(200),
+                    endAngle: .degrees(560)
+                )
+                .frame(width: size + glowPadding * 2, height: size + glowPadding * 2)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius + 8))
+                .blur(radius: blurRadius)
+                .opacity(0.5)
+            }
+
+            ArtworkView(url: url, artist: artist, date: date, size: size)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+        .frame(width: size, height: size)
+    }
+}
+

@@ -51,4 +51,34 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual(0, positionAt(x: 120, widthPx: 0, durationMs: 60_000))
         XCTAssertEqual(0, positionAt(x: 120, widthPx: 1000, durationMs: 0))
     }
+
+    func testProgressFractionClampsBetweenZeroAndOne() {
+        XCTAssertEqual(0.0, progressFraction(positionMs: 0, durationMs: 100_000), accuracy: 0.001)
+        XCTAssertEqual(0.5, progressFraction(positionMs: 50_000, durationMs: 100_000), accuracy: 0.001)
+        XCTAssertEqual(1.0, progressFraction(positionMs: 100_000, durationMs: 100_000), accuracy: 0.001)
+        XCTAssertEqual(1.0, progressFraction(positionMs: 150_000, durationMs: 100_000), accuracy: 0.001)
+        XCTAssertEqual(0.0, progressFraction(positionMs: -50_000, durationMs: 100_000), accuracy: 0.001)
+        XCTAssertEqual(0.0, progressFraction(positionMs: 50_000, durationMs: 0), accuracy: 0.001)
+    }
+
+    func testFormatCompactDuration() {
+        // Sub-hour: m:ss
+        XCTAssertEqual("1:06", formatCompactDuration(ms: 66_000))
+        XCTAssertEqual("12:44", formatCompactDuration(ms: 764_000))
+        // Multi-hour: h:mm
+        XCTAssertEqual("2:41", formatCompactDuration(ms: 9_660_000))
+        XCTAssertEqual("0:00", formatCompactDuration(ms: 0))
+    }
+
+    func testFormatRemainingTime() {
+        XCTAssertEqual("7:32 left", formatRemainingTime(positionMs: 312_000, durationMs: 764_000))
+        XCTAssertEqual("0:00 left", formatRemainingTime(positionMs: 800_000, durationMs: 764_000))
+        XCTAssertEqual("0:00 left", formatRemainingTime(positionMs: 0, durationMs: 0))
+    }
+
+    func testFormatShowDate() {
+        XCTAssertEqual("1997-11-17", formatShowDate("1997-11-17"))
+        XCTAssertEqual("1997-11-17", formatShowDate("1997/11/17"))
+        XCTAssertEqual("1977-05-08", formatShowDate("May 8, 1977"))
+    }
 }
