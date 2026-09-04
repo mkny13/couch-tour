@@ -76,3 +76,8 @@ Long-standing items that predate this sprint.
 - [ ] `uat-018` **Notification audio ducking** (Android, #23/D93) — Play a show, trigger a system notification sound, confirm audio ducks smoothly and recovers.
 - [ ] `uat-019` **Native share sheet** (Android, #19/D155–D156) — Share a show and a track; confirm the chooser opens and the shared URL resolves in another app.
 - [ ] `uat-020` **Reactive background sync** (macOS, D172) — Play something on the phone and confirm the Mac's Continue Listening updates in the background without being touched.
+
+## Sleep / rate change sync resilience (#127, D211)
+
+- [ ] `uat-026` **Mac sleep/wake does not clobber newer remote progress** (both) — Listen to a track on Android to advance it past what was paused on macOS. Let the Mac sleep or change audio outputs. Wake Mac or launch Couch Tour; verify Android's newer track remains current and is not reverted by the Mac.
+
