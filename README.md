@@ -100,7 +100,7 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Tests
 
-488 Android unit tests, no device or emulator required:
+492 Android unit tests, no device or emulator required:
 
 ```bash
 ./gradlew testDebugUnitTest

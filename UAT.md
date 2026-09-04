@@ -86,3 +86,12 @@ Long-standing items that predate this sprint.
 
 - [ ] `uat-026` **Mac sleep/wake does not clobber newer remote progress** (both) — Listen to a track on Android to advance it past what was paused on macOS. Let the Mac sleep or change audio outputs. Wake Mac or launch Couch Tour; verify Android's newer track remains current and is not reverted by the Mac.
 
+## Batch 5 — Ledger Design Revamp (Android & macOS)
+
+- [ ] `uat-027` **Ledger Theme & Navigation** (Android) — Bottom nav bar with 4 tabs (Home, Search, Library, Settings), docked mini-player with 2px spec gradient progress bar. Dark and light appearance toggle.
+- [ ] `uat-028` **Now Playing Waveform & Controls** (Android) — Waveform scrubber responds to scrubbing/seeking. Dark hero artwork gradient fade vs clean plain white background on light theme. Transport row order: add-to-playlist, previous, play/pause, next, like/heart.
+- [ ] `uat-029` **Library Screen with Type Badges** (Android) — 4 filter chips (All, Playlists, Shows, Tracks), sort dropdown, and fixed-width 44dp type badges (LIST, SHOW, TRACK) with aligned text rows.
+- [ ] `uat-030` **3-Pane Desktop Layout** (macOS) — Left sidebar (~236px) with navigation, favorites, and sync status; center content; right player rail (392px) with waveform scrubber and up-next queue.
+- [ ] `uat-031` **Expanded Now Playing View** (macOS) — Full window expanded player modal with 240px artwork tile, ambient blurred background wash, waveform scrubber, and collapse affordance.
+
+
