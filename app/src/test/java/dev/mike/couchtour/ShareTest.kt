@@ -27,9 +27,9 @@ class ShareUrlTest {
     }
 
     @Test
-    fun `relisten show url is the artist slug then the date`() {
+    fun `relisten show url is the artist slug then the date with slashes`() {
         assertEquals(
-            "https://relisten.net/grateful-dead/1977-05-08",
+            "https://relisten.net/grateful-dead/1977/05/08",
             showShareUrl(dead, "1977-05-08"),
         )
     }
@@ -72,7 +72,7 @@ class ShareUrlTest {
     @Test
     fun `track share text falls back to the show url when the backend has none`() {
         assertEquals(
-            "Minglewood Blues — Grateful Dead · 1977-05-08\nhttps://relisten.net/grateful-dead/1977-05-08",
+            "Minglewood Blues — Grateful Dead · 1977-05-08\nhttps://relisten.net/grateful-dead/1977/05/08",
             trackShareText(dead, "1977-05-08", "Minglewood Blues", null),
         )
     }

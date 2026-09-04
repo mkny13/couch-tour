@@ -3740,3 +3740,38 @@ Fix:
 - Added 6 unit tests in `ProgressRecorderTests.swift` covering position advancement, identical tick
   skipping, track transitions, queue key transitions, and finished state handling. Total package
   tests increased from 400 to 406.
+
+## Iteration 72 — Post-UAT Non-UI Fixes & Feedback Logging
+
+### D212 — Slashes in Relisten Share URLs; Record UAT Results and Non-Functional Feedback
+
+Mike completed the first manual UAT round on the v0.65 beta via the local UAT board (`http://127.0.0.1:4785`,
+backed by `UAT.md`). Out of 20 items tested across Batches 1, 2A, 4, and pre-existing checklist items:
+- 12 passed (`uat-001`, `uat-002`, `uat-004`, `uat-007`, `uat-008`, `uat-009`, `uat-010`, `uat-011`,
+  `uat-012`, `uat-014`, `uat-015`, `uat-020`).
+- 5 marked needs-work (`uat-003`, `uat-005`, `uat-006`, `uat-013`, `uat-019`).
+- 3 pending (`uat-016`, `uat-017`, `uat-018`).
+
+Per instruction ("I am about to deliver a revamped UI, so don't immediately touch anything purely-UI
+related, just log it. everything else, fix now"):
+
+1. **Non-UI fix: Relisten share URLs (`uat-019`, #19)**
+   - Symptom: Relisten show URLs shared from Android (`https://relisten.net/<artist-slug>/YYYY-MM-DD`)
+     returned a generic Next.js title page with no show or track data rather than the actual show.
+   - Root cause: Relisten's web client routes shows under `/<artist-slug>/<year>/<month>/<day>`
+     (e.g., `/grateful-dead/1977/05/08`), with forward slashes rather than ISO-8601 hyphens.
+   - Fix: `showShareUrl` in `Catalog.kt` now formats Relisten dates with `date.replace('-', '/')`.
+     Unit test assertions updated in `ShareTest.kt`.
+
+2. **Logged UI feedback for upcoming revamp:**
+   - `uat-003`: Show list tag filter — Mike asked for example shows to try, noting that clicking
+     "partial" in the show row had no effect. (In current UI, tags on rows are badges; the filter is
+     driven by the toolbar picker when tags exist).
+   - `uat-005`: Band name display — "moe." must always be displayed in lowercase with a trailing period.
+   - `uat-006`: Date badge on artwork — date format must always be YYYY-MM-DD.
+   - `uat-013`: Playlist reorder — Android playlist track reordering is implemented with up/down arrow
+     buttons rather than drag-to-reorder; the UAT description prompted for drag-to-reorder.
+
+3. **Status logged in `UAT.md`** and corresponding GitHub issues updated (#115, #116, #91, #61 closed;
+   #90, #62, #67, #19 updated with UAT notes).
+
