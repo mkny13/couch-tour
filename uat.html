@@ -1,84 +1,4 @@
-#!/usr/bin/env python3
-"""Local UAT checklist board, backed directly by UAT.md.
-
-No dependencies — stdlib only. Run it, click things off, and the markdown file is
-rewritten in place so the result lands in git where Claude and Kanban tasks can read it.
-
-    python3 scripts/uat-server.py [--port 4785]
-
-Statuses map to the checkbox character in UAT.md: ' ' pending, 'x' pass, '!' needs work.
-A "needs work" item carries a note on the following line, indented under the list item.
-"""
-
-import argparse
-import json
-import re
-import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-UAT_PATH = REPO_ROOT / "UAT.md"
-
-ITEM_RE = re.compile(r"^- \[([ x!])\] `(uat-\d+)` (.*)$")
-NOTE_RE = re.compile(r"^  > (.*)$")
-SECTION_RE = re.compile(r"^## (.*)$")
-
-STATUS_BY_CHAR = {" ": "pending", "x": "pass", "!": "needs-work"}
-CHAR_BY_STATUS = {v: k for k, v in STATUS_BY_CHAR.items()}
-
-
-def parse(text):
-    """Return a list of sections, each with its items, in document order."""
-    sections, current = [], None
-    lines = text.splitlines()
-    for i, line in enumerate(lines):
-        if m := SECTION_RE.match(line):
-            current = {"title": m.group(1), "items": []}
-            sections.append(current)
-            continue
-        if m := ITEM_RE.match(line):
-            note = ""
-            if i + 1 < len(lines) and (n := NOTE_RE.match(lines[i + 1])):
-                note = n.group(1)
-            item = {
-                "id": m.group(2),
-                "status": STATUS_BY_CHAR[m.group(1)],
-                "text": m.group(3),
-                "note": note,
-            }
-            if current is None:
-                current = {"title": "Ungrouped", "items": []}
-                sections.append(current)
-            current["items"].append(item)
-    return [s for s in sections if s["items"]]
-
-
-def update(item_id, status, note):
-    """Rewrite one item's status (and note) in UAT.md, leaving everything else byte-identical."""
-    lines = UAT_PATH.read_text().splitlines()
-    out, i, found = [], 0, False
-    while i < len(lines):
-        line = lines[i]
-        m = ITEM_RE.match(line)
-        if m and m.group(2) == item_id:
-            found = True
-            out.append(f"- [{CHAR_BY_STATUS[status]}] `{item_id}` {m.group(3)}")
-            i += 1
-            # Drop any existing note line; it is re-added below only if still relevant.
-            if i < len(lines) and NOTE_RE.match(lines[i]):
-                i += 1
-            if status == "needs-work" and note.strip():
-                out.append(f"  > {note.strip()}")
-            continue
-        out.append(line)
-        i += 1
-    if not found:
-        raise KeyError(item_id)
-    UAT_PATH.write_text("\n".join(out) + "\n")
-
-
-PAGE = """<!doctype html><html><head><meta charset="utf-8">
+<!doctype html><html><head><meta charset="utf-8">
 <title>UAT — Couch Tour</title>
 <style>
 :root{
@@ -227,10 +147,10 @@ let currentSearch = '';
 
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const md = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+const md = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
 async function load() {
-  data = await (await fetch('/api/items')).json();
+  data = [{"title": "Batch 1 \u2014 macOS tag filter, sort, artwork, context menu (v0.63, #67/#21/#62/#115, D206)", "items": [{"id": "uat-001", "status": "pass", "text": "**Show sort control** (macOS) \u2014 Artist \u2192 a year \u2192 shows. Change the toolbar sort to \"Top Rated\", then \"Trending (48h)\". List reorders each time, with no spinner and no refetch.", "note": ""}, {"id": "uat-002", "status": "pass", "text": "**Sort survives nothing it shouldn't** (macOS) \u2014 With a non-default sort applied, navigate into a show and back. Confirm what happens to the sort is sane (either preserved or reset \u2014 just not a crash or an empty list).", "note": ""}, {"id": "uat-003", "status": "needs-work", "text": "**Tag filter on a show list** (macOS) \u2014 Same screen. The tag picker appears only when the shows actually carry tags; picking one narrows the list; picking \"All\" restores it.", "note": "give me some examples to try. clicking the one I found, \"partial\" in the phish list has no different effect than clicking anywhere else on that item"}, {"id": "uat-004", "status": "pass", "text": "**Tag filter on search** (macOS) \u2014 Search something broad (\"dark star\"). Tag picker narrows results. Then change the query so the selected tag no longer exists in the results \u2014 it must fall back to \"All\", not show an empty list.", "note": ""}, {"id": "uat-005", "status": "needs-work", "text": "**Procedural artwork** (macOS) \u2014 Find a Relisten (non-Phish) show, which has no artwork. Home cards and the player show a coloured gradient with the artist's monogram, not a grey music-note box. The same show always gets the same colours.", "note": "not really a bug but note in all situations, it's always properly displayed as \"moe.\" with lowercase and period. This is th eonly band with this rule"}, {"id": "uat-006", "status": "needs-work", "text": "**Artwork date badge** (macOS) \u2014 On the large artwork (Now Playing inspector), a date badge appears; on the small mini-player thumbnail it does not.", "note": "shows but date format must always be YYYY-MM-DD"}, {"id": "uat-007", "status": "pass", "text": "**Continue Listening context menu \u2014 Home** (macOS) \u2014 Right-click a Continue Listening card on Home. Open / Mark Completed / Remove all appear and all three do what they say.", "note": ""}, {"id": "uat-008", "status": "pass", "text": "**Continue Listening context menu \u2014 Listening screen** (macOS) \u2014 Same three actions on a row in the full Listening screen, behaving identically to the Home shelf.", "note": ""}]}, {"title": "Batch 2A \u2014 Android list sort and filter (v0.62, #91/#116/#90, D205)", "items": [{"id": "uat-009", "status": "pass", "text": "**Artists sort toggle** (Android) \u2014 Artists screen. Toggle Popular \u2194 A\u2013Z; order changes. Favorites stay in their own pinned section under both, and Phish stays pinned above both.", "note": ""}, {"id": "uat-010", "status": "pass", "text": "**Artists filter field** (Android) \u2014 Type a partial band name. List narrows, including matching a favorited artist. Clearing restores the full list; a no-match query shows a sensible empty state, not a blank screen.", "note": ""}, {"id": "uat-011", "status": "pass", "text": "**Search result sort** (Android) \u2014 Search, then switch sort between Relevance / Newest / Oldest / Most liked. Under \"Most liked\", Relisten hits (which have no like count) settle at the end rather than scattering.", "note": ""}, {"id": "uat-012", "status": "pass", "text": "**In-playlist search \u2014 phish.in playlist** (Android) \u2014 Open a public playlist, use the new search field, confirm it filters that playlist's tracks.", "note": ""}, {"id": "uat-013", "status": "needs-work", "text": "**In-playlist search \u2014 local playlist, and reorder interlock** (Android) \u2014 Open a local mixtape, filter it, and confirm drag-to-reorder is disabled while a filter is active. **This is the one worth testing hardest** \u2014 reordering a filtered list would silently scramble the real track order.", "note": "drag to reorder doesn't work,period"}]}, {"title": "Batch 2B \u2014 macOS list sort and filter (#91/#116/#90, D210)", "items": [{"id": "uat-021", "status": "pending", "text": "**Artists sort toggle** (macOS) \u2014 Artists screen. Toggle Popular \u2194 A\u2013Z. Order changes, Favorites stay in their own section, and an artist appears in Favorites *or* the main list but not confusingly duplicated.", "note": ""}, {"id": "uat-022", "status": "pending", "text": "**Artists filter field** (macOS) \u2014 Type a partial band name; list narrows, including favorited artists. Clearing restores everything; a no-match query shows a sensible empty state.", "note": ""}, {"id": "uat-023", "status": "pending", "text": "**Search result sort** (macOS) \u2014 Switch between Relevance / Newest / Oldest / Most liked. Under \"Most liked\", Relisten hits (no like count) settle after phish.in hits rather than scattering.", "note": ""}, {"id": "uat-024", "status": "pending", "text": "**Local playlist search + reorder interlock** (macOS) \u2014 Filter a local playlist and confirm drag-to-reorder is disabled while the filter is active. Same scrambling hazard as `uat-013` on Android \u2014 worth testing hard.", "note": ""}, {"id": "uat-025", "status": "pending", "text": "**Android/macOS agreement** (both) \u2014 Sort the same artist list both ways on phone and Mac. Same ordering under the same option; this is a parity batch, so a divergence is the bug.", "note": ""}]}, {"title": "Batch 4 \u2014 catalog cache (#61, D207)", "items": [{"id": "uat-014", "status": "pass", "text": "**Back-navigation is faster** (Android) \u2014 Artist \u2192 year \u2192 shows \u2192 back \u2192 into the same year again. The second entry should be visibly quicker and not re-show a loading spinner.", "note": ""}, {"id": "uat-015", "status": "pass", "text": "**Back-navigation is faster** (macOS) \u2014 Same walk on the desktop app.", "note": ""}, {"id": "uat-016", "status": "pending", "text": "**No cross-artist bleed** (either platform) \u2014 Open artist A's 1995, go back, open artist B's 1995. B must show B's shows. A cache keyed carelessly would show A's.", "note": ""}, {"id": "uat-017", "status": "pending", "text": "**Fresh data still arrives** (either platform) \u2014 Leave the app open a while, then revisit a previously-viewed list. Nothing should be permanently frozen to a stale copy.", "note": ""}]}, {"title": "Pre-existing, carried from ROADMAP's device checklist", "items": [{"id": "uat-018", "status": "pending", "text": "**Notification audio ducking** (Android, #23/D93) \u2014 Play a show, trigger a system notification sound, confirm audio ducks smoothly and recovers.", "note": ""}, {"id": "uat-019", "status": "needs-work", "text": "**Native share sheet** (Android, #19/D155\u2013D156) \u2014 Share a show and a track; confirm the chooser opens and the shared URL resolves in another app.", "note": "phish.in links are good. relisten ones don't appear to have correctly formatted URLs. They return a relisten page but not the actual show page"}, {"id": "uat-020", "status": "pass", "text": "**Reactive background sync** (macOS, D172) \u2014 Play something on the phone and confirm the Mac's Continue Listening updates in the background without being touched.", "note": ""}]}, {"title": "Sleep / rate change sync resilience (#127, D211)", "items": [{"id": "uat-026", "status": "pending", "text": "**Mac sleep/wake does not clobber newer remote progress** (both) \u2014 Listen to a track on Android to advance it past what was paused on macOS. Let the Mac sleep or change audio outputs. Wake Mac or launch Couch Tour; verify Android's newer track remains current and is not reverted by the Mac.", "note": ""}]}, {"title": "Batch 5 \u2014 Ledger Design Revamp (Android & macOS)", "items": [{"id": "uat-027", "status": "pending", "text": "**Ledger Theme & Navigation** (Android) \u2014 Bottom nav bar with 4 tabs (Home, Search, Library, Settings), docked mini-player with 2px spec gradient progress bar. Dark and light appearance toggle.", "note": ""}, {"id": "uat-028", "status": "pending", "text": "**Now Playing Waveform & Controls** (Android) \u2014 Waveform scrubber responds to scrubbing/seeking. Dark hero artwork gradient fade vs clean plain white background on light theme. Transport row order: add-to-playlist, previous, play/pause, next, like/heart.", "note": ""}, {"id": "uat-029", "status": "pending", "text": "**Library Screen with Type Badges** (Android) \u2014 4 filter chips (All, Playlists, Shows, Tracks), sort dropdown, and fixed-width 44dp type badges (LIST, SHOW, TRACK) with aligned text rows.", "note": ""}, {"id": "uat-030", "status": "pending", "text": "**3-Pane Desktop Layout** (macOS) \u2014 Left sidebar (~236px) with navigation, favorites, and sync status; center content; right player rail (392px) with waveform scrubber and up-next queue.", "note": ""}, {"id": "uat-031", "status": "pending", "text": "**Expanded Now Playing View** (macOS) \u2014 Full window expanded player modal with 440px artwork tile, ambient blurred background wash, waveform scrubber, and collapse affordance.", "note": ""}, {"id": "uat-032", "status": "pending", "text": "**Show Detail Multi-Column & Conic Glow** (macOS) \u2014 Breadcrumbs, 160\u00d7160 artwork with conic glow blur, stats row, action pills (Resume, Saved, Add to playlist), 2-column setlist layout with compact durations and hairlines, active track highlight bar.", "note": ""}, {"id": "uat-033", "status": "pending", "text": "**Desktop Library Table** (macOS) \u2014 Category filter tabs (All, Playlists, Shows, Tracks), sort chips (\"Recently added\", \"Artist\"), fixed-column table (`TYPE`, `NAME`, `ARTIST`, `RATING`, `LENGTH`, `ADDED`, play, dots menu), and \"New playlist +\" creation sheet.", "note": ""}]}];
   render();
 }
 
@@ -348,73 +268,4 @@ async function setNote(id, note) {
 }
 
 load();
-</script></body></html>"""
-
-
-class Handler(BaseHTTPRequestHandler):
-    def _send(self, code, body, ctype):
-        payload = body.encode()
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def do_GET(self):
-        if self.path == "/":
-            self._send(200, PAGE, "text/html; charset=utf-8")
-        elif self.path == "/api/items":
-            self._send(200, json.dumps(parse(UAT_PATH.read_text())), "application/json")
-        else:
-            self._send(404, "not found", "text/plain")
-
-    def do_POST(self):
-        if self.path != "/api/item":
-            return self._send(404, "not found", "text/plain")
-        try:
-            payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            update(payload["id"], payload["status"], payload.get("note", ""))
-        except KeyError as e:
-            return self._send(404, json.dumps({"error": f"unknown item {e}"}), "application/json")
-        except Exception as e:  # malformed body, unwritable file
-            return self._send(400, json.dumps({"error": str(e)}), "application/json")
-        self._send(200, json.dumps({"ok": True}), "application/json")
-
-    def log_message(self, *args):
-        pass  # the page is chatty; keep the terminal readable
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=4785)
-    ap.add_argument("--no-open", action="store_true")
-    ap.add_argument("--export", type=str, nargs="?", const="uat.html", help="Export standalone HTML file")
-    args = ap.parse_args()
-    if not UAT_PATH.exists():
-        raise SystemExit(f"No UAT.md at {UAT_PATH}")
-
-    if args.export:
-        out_path = Path(args.export)
-        if not out_path.is_absolute():
-            out_path = REPO_ROOT / out_path
-        items_json = json.dumps(parse(UAT_PATH.read_text()))
-        standalone = PAGE.replace("data = await (await fetch('/api/items')).json();", f"data = {items_json};")
-        out_path.write_text(standalone)
-        print(f"Exported standalone UAT board to {out_path}")
-        return
-
-    url = f"http://127.0.0.1:{args.port}"
-    n = sum(len(s["items"]) for s in parse(UAT_PATH.read_text()))
-    print(f"UAT board: {url}  ({n} items from {UAT_PATH.relative_to(REPO_ROOT)})")
-    print("Ctrl-C to stop. Commit UAT.md when you're done.")
-    if not args.no_open:
-        webbrowser.open(url)
-    try:
-        HTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
-    except KeyboardInterrupt:
-        print("\nstopped")
-
-
-if __name__ == "__main__":
-    main()
-
+</script></body></html>
