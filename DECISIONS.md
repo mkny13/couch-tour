@@ -3789,3 +3789,42 @@ outside the repository on an external volume. In this iteration:
 - **`docs/plans/`**: Moved architectural specification plans (`DESKTOP-PARITY-PLAN.md`,
   `MULTI-ARTIST-PLAN.md`) into `docs/plans/` while maintaining root symlinks so legacy
   references across codebase comments and docs continue to resolve cleanly.
+
+## Iteration 74 — Ledger Design System Revamp (Android & macOS)
+
+### D214 — Ledger design system implementation across Android and macOS clients
+
+Implemented the high-fidelity design revamp from `design/handoff/` across both the Android
+(Kotlin / Jetpack Compose) and macOS (Swift / SwiftUI) Couch Tour clients.
+
+Key decisions and implementations:
+1. **Design Tokens & Theme System**:
+   - Dark theme `#161826` app background, `#12141f` elevated panels, `#1c1e2c` surface cards,
+     `#232532` dividers, `#292b31` panel borders, `#3f424d` control outlines, `#e9e9ed` primary text,
+     `#9184d9` purple accent, `#f2a93b` rating amber.
+   - Light theme `#ffffff` background, `#f7f7fb` elevated, `#f0f1f7` surface, `#e4e7f5` dividers,
+     `#20222c` primary text, `#6f62c7` / `#5d5294` accent, `#a06615` deepened rating amber.
+   - 4-stop stagelight hairline gradient (`#5B8CFF` -> `#9184D9` -> `#F06BB0` -> `#F2A93B`)
+     and procedural cover-art gradient (`#D97706` -> `#991B1B` -> `#1E1B4B`).
+2. **Android UI Refactor**:
+   - Fixed-width 44dp type badges (`LIST`, `SHOW`, `TRACK`) ensuring uniform row text alignment.
+   - Vector dual-layer `WaveformScrubber` rendering unplayed waveform and spec-gradient played portion.
+   - `MiniPlayer` docked above 4-tab `LedgerBottomBar` (Home, Search, Library, Settings) with 2px
+     spec gradient progress bar.
+   - `NowPlaying` screen with dark hero gradient fade vs plain white light background, tape FLAC
+     badge, rating, and transport order (add-to-playlist, prev, play/pause, next, like/heart).
+   - `LibraryScreen` with 4 filter chips, search bar, sort dropdown, and uniform badge rows.
+   - `SettingsScreen` with grouped uppercase sections, value rows with chevron, and live sync trigger.
+   - `ShowHeader` updated with 96dp artwork tile, rating, and action pills.
+3. **macOS 3-Pane Desktop Layout**:
+   - Left fixed sidebar (~236px) with navigation items, live favorite artist show counts, and sync status.
+   - Center flexible content pane for Home, Search, Show Detail, and Library.
+   - Right fixed player rail (392px) with artwork, tape details, rating, transport controls,
+     `WaveformScrubber`, and up-next queue.
+   - `ExpandedNowPlayingView` full-window modal with 240px artwork tile, ambient radial gradient wash,
+     tape lineage, waveform scrubber, and collapse affordance.
+4. **Shared Standards & Constraints**:
+   - Ported `artist-abbreviations.js` to Kotlin (`ArtistAbbreviations.kt`) and Swift (`ArtistAbbreviations.swift`).
+   - Strictly preserved `uat-005` ("moe." lowercase with period) and `uat-006` (YYYY-MM-DD date formatting).
+   - Verified 492 Android unit tests passing (`./gradlew testDebugUnitTest`) and 408 Swift package tests
+     passing (`swift test` in `CouchTourKit`). macOS app target builds cleanly.

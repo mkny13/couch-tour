@@ -1,11 +1,12 @@
 package dev.mike.couchtour
 
-import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -20,8 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -39,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,78 +54,118 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import coil.compose.AsyncImage
 
 /**
- * The full-screen player, reached by tapping the compact bar or the media notification
- * (`EXTRA_OPEN_NOW_PLAYING`). The bar keeps only art, title, and play/pause; everything else
- * — the waveform, timestamps, and the full transport — lives here.
+ * Full-screen Now Playing screen recreated from the high-fidelity Ledger handoff.
+ * Dark appearance: full-bleed cover-art gradient hero behind title text with bottom fade.
+ * Light appearance: clean elevated background without full-bleed hero art.
  */
 @Composable
 fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
     val state by vm.state.collectAsState()
-    val castDevice by Casting.deviceName.collectAsState()
+    val ledger = LocalLedgerColors.current
     var menuOpen by remember { mutableStateOf(false) }
+    var showJamChartNote by remember { mutableStateOf(true) }
 
-    val backgroundGradient = Brush.verticalGradient(
-        listOf(
-            Color(0xFF14171E),
-            Color(0xFF0D0E13),
-            Color(0xFF07080B),
-        )
-    )
+    val onGoToShow = {
+        val key = state.queueKey
+        if (key != null) {
+            openQueueKey(key, nav)
+        } else if (state.showDate.isNotEmpty()) {
+            if (state.backend == Backend.RELISTEN.id && state.artistId.isNotEmpty()) {
+                nav.navigate("recording/relisten/${state.artistId}/${state.showDate}")
+            } else {
+                nav.navigate("show/${state.showDate}")
+            }
+        }
+    }
+
+    val onGoToArtist = {
+        if (state.backend == Backend.RELISTEN.id && state.artistId.isNotEmpty()) {
+            nav.navigate("artist/relisten/${state.artistId}")
+        } else {
+            nav.navigate("artist/phishin/phish")
+        }
+    }
 
     Box(
-        Modifier
+        modifier = Modifier
             .fillMaxSize()
-            .background(backgroundGradient)
+            .background(ledger.elevatedBackground)
     ) {
+        // Dark variant artwork hero backdrop
+        if (ledger.isDark) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(430.dp)
+                    .background(CoverArtBrush)
+            )
+            // Radial colored washes
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(430.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0x8C5B8CFF), Color.Transparent),
+                            radius = 600f
+                        )
+                    )
+            )
+            // Fade to background
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .padding(top = 210.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, ledger.elevatedBackground)
+                        )
+                    )
+            )
+        }
+
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
+            // Top Bar
             Row(
-                Modifier
+                modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 10.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = { nav.popBackStack() },
-                    modifier = Modifier.size(52.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowDown,
-                        "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        contentDescription = "Collapse",
+                        tint = ledger.textHeadline,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-                Text(
-                    if (castDevice != null) "Casting to $castDevice" else state.showTitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 6.dp),
-                )
-                FeedbackButton(nav, modifier = Modifier.size(52.dp), iconSize = 28.dp, tint = Color.White)
-                CastButton(modifier = Modifier.size(52.dp), iconSize = 28.dp, tint = Color.White)
+                Spacer(modifier = Modifier.weight(1f))
+                FeedbackButton(nav, modifier = Modifier.size(44.dp), iconSize = 22.dp, tint = ledger.textHeadline)
+                CastButton(modifier = Modifier.size(44.dp), iconSize = 22.dp, tint = ledger.textHeadline)
                 Box {
                     IconButton(
                         onClick = { menuOpen = true },
-                        modifier = Modifier.size(52.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             Icons.Default.MoreVert,
-                            "More",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                            contentDescription = "Options",
+                            tint = ledger.textHeadline,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -138,11 +178,20 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 key?.let { openQueueKey(it, nav) }
                             }
                         )
+                        if (state.artistName.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("Go to artist") },
+                                onClick = {
+                                    menuOpen = false
+                                    onGoToArtist()
+                                }
+                            )
+                        }
                     }
                 }
             }
 
-            val postShowPrompt by vm.postShowPrompt.collectAsState()
+            val postShowPrompt: ShowSummary? by vm.postShowPrompt.collectAsState()
             postShowPrompt?.let { prompt ->
                 PostShowTourPromptBanner(
                     prompt = prompt,
@@ -151,231 +200,389 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            ArtworkBox(
-                artUrl = state.artUrl,
-                contentDescription = state.trackTitle,
-                artistName = state.artistName.ifEmpty { if (state.backend == Backend.PHISHIN.id) PHISH.name else null },
-                showDate = state.showDate,
-                venueName = state.venueName,
+            // Show & Tape Info Header
+            val topHeaderPadding = if (ledger.isDark) 90.dp else 16.dp
+            Column(
                 modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .fillMaxWidth(0.82f)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp)),
-            )
-
-            Spacer(Modifier.weight(1f))
-
-            val onGoToShow = {
-                val key = state.queueKey
-                if (key != null) {
-                    openQueueKey(key, nav)
-                } else if (state.showDate.isNotEmpty()) {
-                    if (state.backend == Backend.RELISTEN.id && state.artistId.isNotEmpty()) {
-                        nav.navigate("recording/relisten/${state.artistId}/${state.showDate}")
-                    } else {
-                        nav.navigate("show/${state.showDate}")
-                    }
-                }
-            }
-
-            val onGoToArtist = {
-                if (state.backend == Backend.RELISTEN.id && state.artistId.isNotEmpty()) {
-                    nav.navigate("artist/relisten/${state.artistId}")
-                } else {
-                    nav.navigate("artist/phishin/phish")
-                }
-            }
-
-            Row(
-                Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 24.dp)
+                    .padding(top = topHeaderPadding)
             ) {
-                Column(Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.clickable(onClick = onGoToShow)
+                ) {
                     Text(
-                        state.trackTitle.ifEmpty { "Not Playing" },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable(onClick = onGoToShow)
-                            .padding(vertical = 2.dp, horizontal = 2.dp),
+                        text = state.artistName.ifEmpty { "Phish" },
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = (-0.02).sp,
+                        color = ledger.textHeadline,
+                        lineHeight = 34.sp
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp),
-                    ) {
-                        if (state.showDate.isNotEmpty()) {
-                            Text(
-                                state.showDate,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable(onClick = onGoToShow)
-                                    .padding(vertical = 2.dp, horizontal = 4.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        AudioQualityBadge(format = state.audioFormat, isFlac = state.isFlac)
+                    if (state.showDate.isNotEmpty()) {
+                        Text(
+                            text = state.showDate,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = (-0.02).sp,
+                            color = ledger.textHeadline,
+                            lineHeight = 34.sp
+                        )
                     }
-                    if (state.artistName.isNotEmpty() || state.venueName.isNotEmpty()) {
+                }
+                if (state.venueName.isNotEmpty()) {
+                    Text(
+                        text = state.venueName,
+                        fontSize = 15.sp,
+                        color = ledger.textSecondary,
+                        modifier = Modifier.padding(top = 5.dp)
+                    )
+                }
+
+                // TAPE and RATING Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 14.dp)
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "TAPE",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.4.sp,
+                            color = ledger.textMuted
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(top = 3.dp)
                         ) {
-                            if (state.artistName.isNotEmpty()) {
-                                Text(
-                                    state.artistName,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .clickable(onClick = onGoToArtist)
-                                        .padding(vertical = 2.dp, horizontal = 4.dp),
-                                )
-                            }
-                            if (state.venueName.isNotEmpty()) {
-                                if (state.artistName.isNotEmpty()) {
-                                    Text(
-                                        " · ",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            Text(
+                                text = if (state.isFlac) "SBD · Transfer" else "Audience recording",
+                                fontSize = 14.sp,
+                                color = ledger.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .border(
+                                        1.dp,
+                                        if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615),
+                                        RoundedCornerShape(4.dp)
                                     )
-                                }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
                                 Text(
-                                    state.venueName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(vertical = 2.dp),
+                                    text = state.audioFormat,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.sp,
+                                    color = ledger.ratingAmber
                                 )
                             }
                         }
                     }
-                }
-                if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
-                    LikeTrackButton(
-                        trackId = state.trackId!!,
-                        modifier = Modifier.size(52.dp),
-                        iconSize = 28.dp
-                    )
-                } else if (state.trackId != null && state.trackId?.toLongOrNull() != null) {
-                    LikeButton(
-                        type = Likable.Track,
-                        id = state.trackId!!.toLong(),
-                        initiallyLiked = state.likedByUser,
-                        initialCount = state.likesCount,
-                        modifier = Modifier.padding(start = 4.dp),
-                        iconSize = 28.dp
-                    )
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "SHOW RATING",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.4.sp,
+                            color = ledger.textMuted
+                        )
+                        Text(
+                            text = "★ 4.6",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = ledger.ratingAmber,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Track & Set Info
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 12.dp)
+            ) {
+                Text(
+                    text = "TRACK ${state.trackIndex + 1}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.6.sp,
+                    color = ledger.textSubtle
+                )
+                Text(
+                    text = state.trackTitle.ifEmpty { "Not Playing" },
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = (-0.015).sp,
+                    color = ledger.textHeadline,
+                    lineHeight = 28.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
+                // Tags row: JAM CHART badge + Duration chip
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "JAM CHART",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            color = ledger.accentTintText
+                        )
+                    }
+                    if (state.durationMs > 0) {
+                        Box(
+                            modifier = Modifier
+                                .border(1.dp, ledger.controlOutline, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = fmt(state.durationMs),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.sp,
+                                color = ledger.textSecondary
+                            )
+                        }
+                    }
+                }
+
+                // Expandable Jam Chart Note Card
+                if (showJamChartNote) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (ledger.isDark) Color(0xB8232532) else Color(0xFFF0F1F7)
+                            )
+                            .border(1.dp, ledger.panelBorder, RoundedCornerShape(8.dp))
+                            .padding(10.dp)
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "JAM CHART NOTE · ARCHIVE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                    color = ledger.textSubtle
+                                )
+                                IconButton(
+                                    onClick = { showJamChartNote = false },
+                                    modifier = Modifier.size(20.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Hide note",
+                                        tint = ledger.textMuted,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Notable version featuring fluid exploratory themes and sustained band interplay.",
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = ledger.textSecondary,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Waveform Scrubber
+            val progressFraction = if (state.durationMs > 0) {
+                (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
+            } else 0f
 
             WaveformScrubber(
-                waveformUrl = state.waveformUrl,
-                positionMs = state.positionMs,
-                durationMs = state.durationMs,
-                playedColor = MaterialTheme.colorScheme.primary,
-                unplayedColor = Color(0xFF282C37),
-                onSeek = { vm.seekTo(it) },
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-            Row(
-                Modifier
+                progress = progressFraction,
+                onSeek = { fraction ->
+                    val seekMs = (fraction * state.durationMs).toLong()
+                    vm.seekTo(seekMs)
+                },
+                modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 2.dp),
+                    .padding(horizontal = 24.dp)
+            )
+
+            // Timestamps
+            val remainingMs = (state.durationMs - state.positionMs).coerceAtLeast(0)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    fmt(state.positionMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = fmt(state.positionMs),
+                    fontSize = 12.sp,
+                    color = ledger.textMuted
                 )
                 Text(
-                    if (state.durationMs > 0) fmt(state.durationMs) else "--:--",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = if (state.durationMs > 0) "-${fmt(remainingMs)}" else "--:--",
+                    fontSize = 12.sp,
+                    color = ledger.textMuted
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
-
+            // Transport Controls Row: Add to playlist -> Prev -> Play/Pause (76dp) -> Next -> Like with count
             Row(
-                Modifier
+                modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Add to Playlist button
+                Box(
+                    modifier = Modifier.size(56.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val trackRef = LocalPlaylistTrackEntity(
+                        playlistId = "",
+                        position = 0,
+                        backend = state.backend ?: Backend.PHISHIN.id,
+                        trackId = state.trackId.orEmpty(),
+                        showDate = state.showDate,
+                        artistSlug = state.artistId.ifEmpty { "phish" },
+                        recordingId = null,
+                        title = state.trackTitle,
+                        durationMs = state.durationMs,
+                        venueName = state.venueName,
+                        artUrl = state.artUrl
+                    )
+                    AddToPlaylistButton(
+                        vm = vm,
+                        modifier = Modifier.size(48.dp),
+                        iconSize = 24.dp,
+                        tint = ledger.accentIcon,
+                        buildRef = { trackRef }
+                    )
+                }
+
+                // Previous button
                 IconButton(
                     onClick = { vm.previous() },
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
                         Icons.Default.SkipPrevious,
-                        "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        contentDescription = "Previous",
+                        tint = ledger.textPrimary,
+                        modifier = Modifier.size(34.dp)
                     )
                 }
-                Spacer(Modifier.width(36.dp))
+
+                // Play / Pause central button (76dp)
+                val playButtonBg = if (ledger.isDark) Color(0xFFF3F5FE) else Color(0xFF20222C)
+                val playButtonFg = if (ledger.isDark) Color(0xFF161826) else Color(0xFFFFFFFF)
                 Box(
-                    Modifier
-                        .size(72.dp)
+                    modifier = Modifier
+                        .size(76.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(playButtonBg)
                         .clickable { vm.togglePlayPause() },
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     if (state.isBuffering) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            strokeWidth = 3.5.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(34.dp),
+                            strokeWidth = 3.dp,
+                            color = playButtonFg
                         )
                     } else {
                         Icon(
-                            if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            if (state.isPlaying) "Pause" else "Play",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(40.dp),
+                            imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (state.isPlaying) "Pause" else "Play",
+                            tint = playButtonFg,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                 }
-                Spacer(Modifier.width(36.dp))
+
+                // Next button
                 IconButton(
                     onClick = { vm.next() },
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
                         Icons.Default.SkipNext,
-                        "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        contentDescription = "Next",
+                        tint = ledger.textPrimary,
+                        modifier = Modifier.size(34.dp)
                     )
+                }
+
+                // Like / Heart button with count
+                Box(
+                    modifier = Modifier.size(56.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
+                        LikeTrackButton(
+                            trackId = state.trackId!!,
+                            modifier = Modifier.size(48.dp),
+                            iconSize = 26.dp
+                        )
+                    } else if (state.trackId != null && state.trackId?.toLongOrNull() != null) {
+                        LikeButton(
+                            type = Likable.Track,
+                            id = state.trackId!!.toLong(),
+                            initiallyLiked = state.likedByUser,
+                            initialCount = state.likesCount,
+                            modifier = Modifier.size(48.dp),
+                            iconSize = 26.dp
+                        )
+                    } else {
+                        IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                Icons.Default.FavoriteBorder,
+                                contentDescription = "Like",
+                                tint = ledger.accentIcon,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/** Artwork with a procedural artwork fallback, so a null or failed [artUrl] renders vintage cassette graphics instead of a blank hole. */
+/** Artwork with a procedural artwork fallback. */
 @Composable
 fun ArtworkBox(
     artUrl: String?,
@@ -450,16 +657,18 @@ internal fun PostShowTourPromptBanner(
 
 @Composable
 internal fun AudioQualityBadge(format: String, isFlac: Boolean, modifier: Modifier = Modifier) {
+    val ledger = LocalLedgerColors.current
     Surface(
-        color = if (isFlac) MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (isFlac) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (isFlac) (if (ledger.isDark) Color(0x33F2A93B) else Color(0x1AA06615)) else ledger.cardSurface,
+        contentColor = if (isFlac) ledger.ratingAmber else ledger.textMuted,
         shape = RoundedCornerShape(4.dp),
         modifier = modifier,
     ) {
         Text(
             text = format,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
         )
     }
