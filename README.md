@@ -141,7 +141,12 @@ Install to a connected device or running emulator:
 | `CastButton.kt` | Cast button and device picker, driving `MediaRouter` directly |
 | `Progress.kt` | Room table of per-queue playback positions |
 | `Waveform.kt` | Waveform scrubber — tints the phish.in waveform PNG by play position |
+| `DesignComponents.kt` | Ledger design tokens and reusable components (hairlines, badges, waveform scrubber, play buttons) |
+| `NowPlaying.kt` | Full-screen Now Playing sheet with ambient artwork glow, tape specs, waveform scrubber, and transport controls |
+| `Format.kt` | Formatting helpers for durations, progress fractions, timestamps, and show dates |
 | `MainActivity.kt` | Compose UI — home, search, shows, artists, recordings, mini player |
+
+For the macOS client, see `macos/Packages/CouchTourKit` for the shared Swift package and `macos/CouchTour` for the SwiftUI app.
 
 ## API notes
 
