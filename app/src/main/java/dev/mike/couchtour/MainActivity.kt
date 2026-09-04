@@ -1706,7 +1706,7 @@ private fun RenamePlaylistDialog(currentName: String, onDismiss: () -> Unit, onR
 }
 
 @Composable
-private fun ThemePickerDialog(
+internal fun ThemePickerDialog(
     currentMode: ThemeMode,
     onDismiss: () -> Unit,
     onSelect: (ThemeMode) -> Unit,
