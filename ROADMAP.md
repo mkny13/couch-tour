@@ -61,19 +61,22 @@ Historical implementation details and architectural choices are logged separatel
 ### 7. Desktop Power & Distribution (Shipped — Phase 2 Batch 3)
 - **Desktop Cast & AirPlay Sender Support**: Google Cast sender integration via Bonjour mDNS and TLS V2 channels with remote queue management, transport controls, and AirPlay output picker (#10, D196).
 
+### 8. Ledger Design System & Visual Handoff Parity (Shipped — D214, D215)
+- **Unified Design Tokens**: Dark (`#161826`) and light (`#ffffff` / `#f7f7fb`) token foundations, 4-stop stagelight hairline gradient, procedural cover-art gradient, and artist abbreviation helpers preserving `uat-005` ("moe." lowercase with period) and `uat-006` (`YYYY-MM-DD` date formatting).
+- **Android Client Parity (Screens 1A–1E)**: Top ledger bar with live date and "Surprise Me" shuffle, horizontal card shelves for In-Progress (with top 2px progress bar overlay), Next Tour Stops (with top gradient accent bar), and On This Date. Fixed-width 44dp type badges (`LIST`, `SHOW`, `TRACK`), search tabs with count pills, collapsible Jam Chart notes, ambient radial artwork glow, and vector dual-layer waveform scrubber (`DesignComponents.kt`, `NowPlaying.kt`, `MainActivity.kt`).
+- **macOS Desktop 3-Pane & Expanded Player (Screens 2A–2E)**: Window traffic lights chrome, left sidebar with active `#d2cefd` highlight and live favorite artist show counts, right player rail with 3-radial wash, conic glow artwork, Jam Chart note card, and 64px waveform scrubber. Expanded 1440×900 Now Playing modal with 440px artwork and 110px scrubber. 2-column show detail setlist layout with compact durations and active track highlight bar, and fixed-column desktop library table (`LedgerDesign.swift`, `SidebarView.swift`, `PlayerRailView.swift`, `ExpandedNowPlayingView.swift`, `ShowDetailView.swift`, `LocalPlaylistsView.swift`).
+
 ---
 
 ## Prioritized Product Roadmap
 
 ```mermaid
 flowchart LR
-    subgraph Polish ["Phase 2 Batch 4: macOS Desktop UX Polish"]
+    subgraph Shipped ["Shipped Milestones"]
         direction TB
-        P1["Batch A — #97 Feedback · #98 Continue Listening · #100 Tour Picker Refresh · #101 Surprise Me"]
-        P2["Batch B — #99 Player Bar Navigation"]
-        P3["Batch C — #102 Sidebar Removal & Design Pass"]
-        P1 --> P3
-        P2 --> P3
+        S1["macOS Desktop UX Polish (#97-#102, D200-D204)"]
+        S2["Desktop Cast & AirPlay Sender (#10, D196)"]
+        S3["Ledger Design System & Handoff Fidelity (#128, D214, D215)"]
     end
 
     subgraph NearTerm ["Phase 2: Discovery, Audio Fidelity & Media Power"]
@@ -94,7 +97,7 @@ flowchart LR
         L5["#16 YouTube Audio/Video Support"]
     end
 
-    Polish --> NearTerm --> LongTerm
+    Shipped --> NearTerm --> LongTerm
 ```
 
 ---
@@ -134,7 +137,8 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS | Shipped (D206, verified in UAT `uat-001`, `uat-002`) |
 | **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS | Shipped (D205, D210, verified in UAT `uat-011`) |
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS | Shipped (D207, verified in UAT `uat-014`, `uat-015`) |
-| **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS | Shipped (D206, verified in UAT `uat-005`, `uat-006`; date badge & moe. casing queued for UI revamp) |
+| **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS | Shipped (D206, D214, D215; procedural covers, conic glow artwork, strict YYYY-MM-DD formatting, and moe. casing) |
+| **#86** | **Waveform Scrubber Visualization** | Dual-layer vector waveform scrubber with live seek/drag interaction across Now Playing surfaces. | Android, macOS | Shipped (D214, D215) |
 
 ---
 
@@ -152,7 +156,6 @@ before that question has an answer.
 |---|---|---|---|
 | **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. | Android, macOS |
 | **#24** | **Advanced Source Selection & Taper Intelligence** | Side-by-side snippet comparisons across tapers, taper reputation scoring, and user-preferred / avoided taper filters. | Android, macOS |
-| **#86** | **Waveform Scrubber Visualization** | Render phish.in's `waveform_image_url` behind the player scrubber (nice-to-have visual enhancement). | Android, macOS |
 | **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. | Android TV |
 | **#15** | **Spotify/Tidal Live Release Links** | Where a show matches an officially released live album on Spotify or Tidal, surface a simple external link to it (in-app playback isn't feasible). | Cross-platform |
 | **#16** | **YouTube Concert Video / Audio** | Stream concert video from YouTube with a dedicated toggle for audio-only background playback. | Cross-platform |
@@ -162,7 +165,7 @@ before that question has an answer.
 ## Product Principles & Resolved Decisions
 
 - **Show End Behavior**: Playback stops at the end of the show/encore rather than silently auto-advancing into the next show. An actionable prompt/banner is presented to start the next show on the tour/run.
-- **Waveform Scrubber**: `waveform_image_url` rendering is categorized as a nice-to-have visual enhancement (Phase 3) while keeping the plain scrubber lightweight and uniform across backends in the interim.
+- **Waveform Scrubber**: Dual-layer vector waveform scrubber is implemented across Android and macOS Now Playing surfaces (D214, D215) with live drag/seek scrubbing, matching the design handoff spec while keeping audio rendering responsive and lightweight.
 
 ---
 
@@ -182,3 +185,9 @@ board (`python3 scripts/uat-server.py`, D209):
 - [x] **Native Android Share Sheet (`uat-019`, #19/D155–D156, D212)**: `ACTION_CHOOSER` launches and shared URLs resolve; Relisten show URL scheme fixed in D212.
 - [x] **macOS Reactive Background Sync (`uat-020`, D172)**: Verified passing in UAT — phone playback updates Mac Continue Listening shelf in the background.
 - [ ] **Sleep / Rate Change Sync Resilience (`uat-026`, #127/D211)**: Mac sleep/wake does not clobber newer remote progress.
+- [ ] **Now Playing Waveform & Controls (`uat-028`, D214/D215)**: Waveform scrubber responds to scrubbing/seeking. Dark hero artwork gradient fade vs clean plain white background on light theme. Transport row order: add-to-playlist, previous, play/pause, next, like/heart.
+- [ ] **Library Screen with Type Badges (`uat-029`, D214/D215)**: 4 filter chips (All, Playlists, Shows, Tracks), sort dropdown, and fixed-width 44dp type badges (LIST, SHOW, TRACK) with aligned text rows.
+- [ ] **3-Pane Desktop Layout (`uat-030`, D214/D215)**: Left sidebar (~236px) with navigation, favorites, and sync status; center content; right player rail (392px) with waveform scrubber and up-next queue.
+- [ ] **Expanded Now Playing View (`uat-031`, D214/D215)**: Full window expanded player modal with 440px artwork tile, ambient blurred background wash, waveform scrubber, and collapse affordance.
+- [ ] **Show Detail Multi-Column & Conic Glow (`uat-032`, D215)**: Breadcrumbs, 160×160 artwork with conic glow blur, stats row, action pills (Resume, Saved, Add to playlist), 2-column setlist layout with compact durations and hairlines, active track highlight bar.
+- [ ] **Desktop Library Table (`uat-033`, D215)**: Category filter tabs (All, Playlists, Shows, Tracks), sort chips ("Recently added", "Artist"), fixed-column table (`TYPE`, `NAME`, `ARTIST`, `RATING`, `LENGTH`, `ADDED`, play, dots menu), and "New playlist +" creation sheet.
