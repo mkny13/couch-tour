@@ -49,9 +49,9 @@ hosted on archive.org.
 
 ## Not in yet
 
-Offline downloads, sleep timer, creating or editing playlists, and liking things from
-inside the app. See [ROADMAP.md](ROADMAP.md) for the full list and open questions, and
-[DECISIONS.md](DECISIONS.md) for why the app looks the way it does today.
+Offline downloads (#65) and volume leveling across sources (#18). See [ROADMAP.md](ROADMAP.md)
+for the full list and open questions, and [DECISIONS.md](DECISIONS.md) for why the app looks the
+way it does today.
 
 ## Casting
 
