@@ -3775,3 +3775,17 @@ related, just log it. everything else, fix now"):
 3. **Status logged in `UAT.md`** and corresponding GitHub issues updated (#115, #116, #91, #61 closed;
    #90, #62, #67, #19 updated with UAT notes).
 
+## Iteration 73 — project assets and design handoff organization (D213)
+
+### D213 — Organizing project assets: design handoff, branding artwork, and plans
+
+The external high-fidelity HTML design handoffs and original branding artwork previously lived
+outside the repository on an external volume. In this iteration:
+
+- **`design/handoff/`**: Moved the design handoff package containing high-fidelity HTML
+  prototypes (`Couch Tour Android.dc.html`, `Couch Tour macOS.dc.html`), design tokens and screen
+  specifications in `README.md`, `artist-abbreviations.js`, and screen capture PNGs in `screenshots/`.
+- **`design/branding/`**: Centralized original Couch Tour logos and app icon source artwork.
+- **`docs/plans/`**: Moved architectural specification plans (`DESKTOP-PARITY-PLAN.md`,
+  `MULTI-ARTIST-PLAN.md`) into `docs/plans/` while maintaining root symlinks so legacy
+  references across codebase comments and docs continue to resolve cleanly.
