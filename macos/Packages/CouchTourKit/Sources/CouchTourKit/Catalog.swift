@@ -284,6 +284,66 @@ extension Array where Element == PlayableTrack {
     }
 }
 
+/// Search results' sort control (#91). `.relevance` is the order the backends already
+/// returned (exact show first, etc.) — it exists so a sort menu can offer "clear the sort"
+/// rather than forcing one of the other three at all times. Port of `Catalog.kt`'s
+/// `SearchSortMode`.
+public enum SearchSortMode: String, CaseIterable, Identifiable, Sendable {
+    case relevance
+    case dateDesc
+    case dateAsc
+    case mostLiked
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .relevance: return "Relevance"
+        case .dateDesc: return "Newest"
+        case .dateAsc: return "Oldest"
+        case .mostLiked: return "Most liked"
+        }
+    }
+}
+
+extension Array where Element == ShowSummary {
+    /// Named `sortedForSearch` rather than overloading `sorted(by:)` a second time — with
+    /// `ShowSortOption` also carrying a `.dateAsc` case, `.dateAsc` shorthand at a call site
+    /// becomes ambiguous between the two enums otherwise (Swift picks the overload by argument
+    /// type, but can't do that until the shorthand itself resolves). Same shape as `Catalog.kt`
+    /// needing `@JvmName` for the same two-enums-one-case-name collision.
+    ///
+    /// Relisten shows default `likesCount` to 0 (see `ShowSummary`), so they settle after
+    /// every phish.in hit under `.mostLiked` with no branch needed for the mixed-backend case.
+    public func sortedForSearch(by mode: SearchSortMode) -> [ShowSummary] {
+        switch mode {
+        case .relevance: return self
+        case .dateDesc: return sorted { $0.date > $1.date }
+        case .dateAsc: return sorted { $0.date < $1.date }
+        case .mostLiked:
+            return sorted { lhs, rhs in
+                lhs.likesCount != rhs.likesCount ? lhs.likesCount > rhs.likesCount : lhs.date > rhs.date
+            }
+        }
+    }
+}
+
+extension Array where Element == Track {
+    public func sortedForSearch(by mode: SearchSortMode) -> [Track] {
+        switch mode {
+        case .relevance: return self
+        case .dateDesc: return sorted { ($0.showDate ?? "") > ($1.showDate ?? "") }
+        case .dateAsc: return sorted { ($0.showDate ?? "") < ($1.showDate ?? "") }
+        case .mostLiked:
+            return sorted { lhs, rhs in
+                lhs.likesCount != rhs.likesCount
+                    ? lhs.likesCount > rhs.likesCount
+                    : (lhs.showDate ?? "") > (rhs.showDate ?? "")
+            }
+        }
+    }
+}
+
 public struct ShowSummary: Hashable, Sendable {
     public let artist: ArtistRef
     public let date: String
@@ -297,6 +357,10 @@ public struct ShowSummary: Hashable, Sendable {
     public let rating: Double
     public let tags: [Tag]
     public let popularity: RelistenPopularity?
+    /// phish.in's `Show.likesCount` (#91's search sort) — Relisten has no equivalent and
+    /// leaves this at the default 0, which is what lets `SearchSortMode.mostLiked` sort
+    /// Relisten hits after every phish.in one with no special-cased branch.
+    public let likesCount: Int
 
     public init(
         artist: ArtistRef,
@@ -309,7 +373,8 @@ public struct ShowSummary: Hashable, Sendable {
         recordingCount: Int = 1,
         rating: Double = 0.0,
         tags: [Tag] = [],
-        popularity: RelistenPopularity? = nil
+        popularity: RelistenPopularity? = nil,
+        likesCount: Int = 0
     ) {
         self.artist = artist
         self.date = date
@@ -322,6 +387,7 @@ public struct ShowSummary: Hashable, Sendable {
         self.rating = rating
         self.tags = tags
         self.popularity = popularity
+        self.likesCount = likesCount
     }
 
     /// "McNichols Arena · Denver, CO"
@@ -653,22 +719,79 @@ public let PHISH = ArtistRef(backend: .phishin, id: "phish", name: "Phish")
 /// copy is dropped rather than shown as a second, confusing "Phish". Port of `Catalog.kt`'s
 /// `mergeArtists` (Android's #14/#56).
 public func mergeArtists(relistenArtists: [ArtistRef], favorites: Set<String>) -> [ArtistRef] {
+    let groups = groupArtistsForBrowse(relistenArtists: relistenArtists, favorites: favorites)
+    return [groups.phish].compactMap { $0 }
+        + groups.favorited.sorted { $0.showCount > $1.showCount }
+        + groups.others.sorted { $0.showCount > $1.showCount }
+}
+
+/// Artist list sort control (#116). Port of `Catalog.kt`'s `ArtistSortMode`.
+public enum ArtistSortMode: String, CaseIterable, Identifiable, Sendable {
+    case popular
+    case alphabetical
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .popular: return "Most shows"
+        case .alphabetical: return "A–Z"
+        }
+    }
+}
+
+extension Array where Element == ArtistRef {
+    public func sorted(by mode: ArtistSortMode) -> [ArtistRef] {
+        switch mode {
+        case .popular: return sorted { $0.showCount > $1.showCount }
+        case .alphabetical: return sorted { $0.name.lowercased() < $1.name.lowercased() }
+        }
+    }
+
+    public func filterByName(_ query: String) -> [ArtistRef] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return self }
+        return filter { $0.name.range(of: trimmed, options: .caseInsensitive) != nil }
+    }
+}
+
+/// The same phish-pinned / favorited / everyone-else split `mergeArtists` flattens, kept
+/// apart so `ArtistsView` can render favorites as their own pinned section (#116) and re-sort
+/// or filter each group independently while Phish — whose position-1 slot predates favoriting
+/// and isn't earned by being liked, see `mergeArtists`'s doc — stays outside either section.
+/// Port of `Catalog.kt`'s `ArtistGroups`.
+public struct ArtistGroups: Equatable, Sendable {
+    public let phish: ArtistRef?
+    public let favorited: [ArtistRef]
+    public let others: [ArtistRef]
+
+    public init(phish: ArtistRef?, favorited: [ArtistRef], others: [ArtistRef]) {
+        self.phish = phish
+        self.favorited = favorited
+        self.others = others
+    }
+}
+
+public func groupArtistsForBrowse(relistenArtists: [ArtistRef], favorites: Set<String>) -> ArtistGroups {
     let rest = relistenArtists.filter { $0.name.caseInsensitiveCompare(PHISH.name) != .orderedSame }
-    let (favorited, unfavorited) = rest.reduce(into: ([ArtistRef](), [ArtistRef]())) { acc, artist in
+    let (favorited, others) = rest.reduce(into: ([ArtistRef](), [ArtistRef]())) { acc, artist in
         if favorites.contains(artist.key) {
             acc.0.append(artist)
         } else {
             acc.1.append(artist)
         }
     }
-    return [PHISH]
-        + favorited.sorted { $0.showCount > $1.showCount }
-        + unfavorited.sorted { $0.showCount > $1.showCount }
+    return ArtistGroups(phish: PHISH, favorited: favorited, others: others)
 }
 
 /// Adapts `PhishInAPI` to the seam. Deliberately thin: it reuses the client untouched,
 /// including the period/year-range branch and the audio filtering, so nothing about the Phish
 /// path changes and its tests pin the exact same traps DECISIONS.md already paid for.
+///
+/// A `struct` rather than an actor like `RelistenCatalogSource`, so a shared cache (#61) can't
+/// live on `self` — `sourceFor` builds a fresh `PhishInSource()` on every call, and any
+/// per-instance state would be discarded with it. `PhishInCatalogCache.shared` is the actor
+/// that actually holds the state; this struct just delegates to it.
 public struct PhishInSource: MusicSource {
     public let backend = Backend.phishin
 
@@ -677,19 +800,49 @@ public struct PhishInSource: MusicSource {
     public func artists() async throws -> [ArtistRef] { [PHISH] }
 
     public func periods(artist: ArtistRef) async throws -> [PeriodRef] {
-        try await PhishInAPI.years().map { $0.toPeriodRef() }
+        if let cached = await PhishInCatalogCache.shared.periods.get(PhishInCatalogCache.periodsKey) { return cached }
+        let periods = try await PhishInAPI.years().map { $0.toPeriodRef() }
+        await PhishInCatalogCache.shared.periods.put(PhishInCatalogCache.periodsKey, periods)
+        return periods
     }
 
     public func shows(artist: ArtistRef, period: PeriodRef) async throws -> [ShowSummary] {
-        try await PhishInAPI.showsForPeriod(period.id).map { $0.toShowSummary() }
+        if let cached = await PhishInCatalogCache.shared.shows.get(period.id) { return cached }
+        let shows = try await PhishInAPI.showsForPeriod(period.id).map { $0.toShowSummary() }
+        await PhishInCatalogCache.shared.shows.put(period.id, shows)
+        return shows
     }
 
     public func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
-        try await PhishInAPI.show(date).toShowDetail()
+        if let cached = await PhishInCatalogCache.shared.showDetail.get(date) { return cached }
+        let detail = try await PhishInAPI.show(date).toShowDetail()
+        await PhishInCatalogCache.shared.showDetail.put(date, detail)
+        return detail
     }
 
     public func search(term: String) async throws -> SearchHits {
         try await PhishInAPI.search(term).toSearchHits()
+    }
+}
+
+/// The shared cache state `PhishInSource` delegates to (#61) — see its doc comment for why a
+/// stateless struct needs a separate holder. `periodsKey` is a constant because phish.in's
+/// "artist list" is the single `PHISH` constant, so there's only ever one periods list to
+/// cache; a `TTLCache` is still the right shape for it so `resetCache` and the TTL logic
+/// aren't duplicated.
+actor PhishInCatalogCache {
+    static let shared = PhishInCatalogCache()
+    static let periodsKey = "phish"
+
+    let periods = TTLCache<String, [PeriodRef]>(ttl: catalogCacheTTL, maxEntries: 1)
+    let shows = TTLCache<String, [ShowSummary]>(ttl: catalogCacheTTL, maxEntries: 60)
+    let showDetail = TTLCache<String, ShowDetail>(ttl: catalogCacheTTL, maxEntries: 200)
+
+    /// Test-only hook: clears every cache in one call, the way `RelistenCatalogSource.resetCache()` does.
+    func resetCache() async {
+        await periods.clear()
+        await shows.clear()
+        await showDetail.clear()
     }
 }
 
@@ -712,7 +865,8 @@ extension Show {
             recordingCount: 1,
             rating: Double(likesCount),
             tags: tags,
-            popularity: nil
+            popularity: nil,
+            likesCount: likesCount
         )
     }
 

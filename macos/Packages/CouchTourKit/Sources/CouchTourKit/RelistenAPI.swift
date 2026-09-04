@@ -763,43 +763,74 @@ public actor RelistenCatalogSource: MusicSource {
 
     public static let shared = RelistenCatalogSource()
 
-    // The one cache the plan calls for: a ~200-entry list re-fetched on every back-navigation
-    // is the one case worth it; a real catalog cache stays out of scope for the MVP.
+    // The one cache O4 originally called for: a ~200-entry list re-fetched on every
+    // back-navigation is the one case worth it on its own. #61 gives it the same TTL as the
+    // caches below rather than letting it live forever.
     private var cachedArtists: [ArtistRef]?
+    private var cachedArtistsAt: Date?
+
+    // Periods, shows, and show detail (#61) — O4's deliberate scope cut on everything below
+    // the artist list. Keyed by `ArtistRef.key`, which already embeds the backend, so there's
+    // no risk of a phish.in and a Relisten period id colliding in the same store.
+    private let periodsCache = TTLCache<String, [PeriodRef]>(ttl: catalogCacheTTL, maxEntries: 250)
+    private let showsCache = TTLCache<String, [ShowSummary]>(ttl: catalogCacheTTL, maxEntries: 400)
+    private let showDetailCache = TTLCache<String, ShowDetail>(ttl: catalogCacheTTL, maxEntries: 200)
 
     public init() {}
 
     public func artists() async throws -> [ArtistRef] {
-        if let cachedArtists { return cachedArtists }
+        if let cachedArtists, let cachedArtistsAt, Date().timeIntervalSince(cachedArtistsAt) < catalogCacheTTL {
+            return cachedArtists
+        }
         let artists = try await RelistenAPI.artists().map { $0.toArtistRef() }
         cachedArtists = artists
+        cachedArtistsAt = Date()
         return artists
     }
 
-    /// Test-only hook: `cachedArtists` above is private to the actor, so tests reset caching
-    /// state through the shared instance rather than reaching in directly.
-    public func resetCache() { cachedArtists = nil }
+    /// Test-only hook: clears every cache above in one call, the way `PhishInSource` does —
+    /// `cachedArtists` is private to the actor, so tests reset through the shared instance
+    /// rather than reaching in directly.
+    public func resetCache() async {
+        cachedArtists = nil
+        cachedArtistsAt = nil
+        await periodsCache.clear()
+        await showsCache.clear()
+        await showDetailCache.clear()
+    }
 
     public func periods(artist: ArtistRef) async throws -> [PeriodRef] {
-        try await RelistenAPI.years(artistUuid: artist.id).map { $0.toPeriodRef() }
+        if let cached = await periodsCache.get(artist.key) { return cached }
+        let periods = try await RelistenAPI.years(artistUuid: artist.id).map { $0.toPeriodRef() }
+        await periodsCache.put(artist.key, periods)
+        return periods
     }
 
     /// A `period` id namespaced `song:`/`venue:` (from a search hit) routes to the matching
     /// entity endpoint instead of the ordinary year lookup — see the prefix constants above.
     public func shows(artist: ArtistRef, period: PeriodRef) async throws -> [ShowSummary] {
+        let cacheKey = "\(artist.key)/\(period.id)"
+        if let cached = await showsCache.get(cacheKey) { return cached }
+        let shows: [ShowSummary]
         if period.id.hasPrefix(songPrefix) {
             let uuid = String(period.id.dropFirst(songPrefix.count))
-            return try await RelistenAPI.song(artistIdOrSlug: artist.id, songUuid: uuid).toShowSummaries(artist: artist)
-        }
-        if period.id.hasPrefix(venuePrefix) {
+            shows = try await RelistenAPI.song(artistIdOrSlug: artist.id, songUuid: uuid).toShowSummaries(artist: artist)
+        } else if period.id.hasPrefix(venuePrefix) {
             let uuid = String(period.id.dropFirst(venuePrefix.count))
-            return try await RelistenAPI.venue(artistIdOrSlug: artist.id, venueUuid: uuid).toShowSummaries(artist: artist)
+            shows = try await RelistenAPI.venue(artistIdOrSlug: artist.id, venueUuid: uuid).toShowSummaries(artist: artist)
+        } else {
+            shows = try await RelistenAPI.year(artistUuid: artist.id, yearUuid: period.id).shows.map { $0.toShowSummary(artist: artist) }
         }
-        return try await RelistenAPI.year(artistUuid: artist.id, yearUuid: period.id).shows.map { $0.toShowSummary(artist: artist) }
+        await showsCache.put(cacheKey, shows)
+        return shows
     }
 
     public func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
-        try await RelistenAPI.show(artistIdOrSlug: artist.id, date: date).toShowDetail(artist: artist, recordingId: recordingId)
+        let cacheKey = "\(artist.key)/\(date)/\(recordingId ?? "default")"
+        if let cached = await showDetailCache.get(cacheKey) { return cached }
+        let detail = try await RelistenAPI.show(artistIdOrSlug: artist.id, date: date).toShowDetail(artist: artist, recordingId: recordingId)
+        await showDetailCache.put(cacheKey, detail)
+        return detail
     }
 
     public func search(term: String) async throws -> SearchHits {

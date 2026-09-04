@@ -106,22 +106,62 @@ final class LocalPlaylistStoreTests: XCTestCase {
     }
 }
 
+/// #90's search-within-a-playlist helper. Port of `Catalog.kt`'s
+/// `filterByTitleIndexed`-on-`LocalPlaylistTrackEntity` tests.
+final class FilterByTitleIndexedTests: XCTestCase {
+    private func track(_ title: String) -> LocalPlaylistTrack {
+        LocalPlaylistTrack(playlistId: "p", backend: "phishin", trackId: title, showDate: "1997-11-17", title: title, durationMs: 1_000)
+    }
+
+    func testAnEmptyQueryReturnsEveryTrackWithItsOriginalIndex() {
+        let tracks = [track("Tweezer"), track("Reba"), track("Weekapaug Groove")]
+        let result = filterByTitleIndexed(tracks, query: "")
+        XCTAssertEqual([0, 1, 2], result.map(\.offset))
+        XCTAssertEqual(["Tweezer", "Reba", "Weekapaug Groove"], result.map(\.element.title))
+    }
+
+    func testMatchingKeepsTheOriginalIndexNotTheFilteredPosition() {
+        let tracks = [track("Tweezer"), track("Reba"), track("Weekapaug Groove")]
+        let result = tracks.filterByTitleIndexed("weeka")
+        XCTAssertEqual([2], result.map(\.offset))
+        XCTAssertEqual(["Weekapaug Groove"], result.map(\.element.title))
+    }
+
+    func testMatchingIsCaseInsensitiveAndTrimsWhitespace() {
+        let tracks = [track("Tweezer"), track("Reba")]
+        XCTAssertEqual(["Tweezer"], tracks.filterByTitleIndexed("  TWEEZ  ").map(\.element.title))
+    }
+
+    func testNoMatchesReturnsAnEmptyArrayRatherThanEverything() {
+        let tracks = [track("Tweezer"), track("Reba")]
+        XCTAssertTrue(tracks.filterByTitleIndexed("bathtub gin").isEmpty)
+    }
+}
+
 final class ResolveLocalPlaylistTracksTests: XCTestCase {
     private var server: MockServer!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         server = MockServer()
         server.start()
         PhishInAPI.baseURL = URL(string: "https://mock.test/api/v2")!
         RelistenAPI.baseURL = URL(string: "https://mock.test/api")!
+        // resolveLocalPlaylistTracks resolves shows through sourceFor(_:), which hands back
+        // the process-wide RelistenCatalogSource.shared/PhishInCatalogCache.shared (#61) —
+        // without a reset here, a show cached by an earlier test with the same artist/date
+        // would silently serve stale data instead of hitting this test's own mock server.
+        await PhishInCatalogCache.shared.resetCache()
+        await RelistenCatalogSource.shared.resetCache()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         server.shutdown()
         PhishInAPI.baseURL = URL(string: "https://phish.in/api/v2")!
         RelistenAPI.baseURL = URL(string: "https://api.relisten.net/api")!
-        super.tearDown()
+        await PhishInCatalogCache.shared.resetCache()
+        await RelistenCatalogSource.shared.resetCache()
+        try await super.tearDown()
     }
 
     func testResolvesPhishInTracksFetchingTheShowOnce() async throws {

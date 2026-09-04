@@ -433,29 +433,63 @@ object RelistenApi {
 object RelistenCatalogSource : MusicSource {
     override val backend = Backend.RELISTEN
 
-    // The one cache the plan calls for (O4): a ~200-entry list re-fetched on every
-    // back-navigation is the one case worth it; a real catalog cache stays out of scope.
+    // The one cache O4 originally called for: a ~200-entry list re-fetched on every
+    // back-navigation is the one case worth it on its own. #61 gives it the same TTL as the
+    // caches below rather than letting it live forever.
     // Not private: tests reset it between runs, the same way PhishInApi exposes baseUrl.
     @Volatile internal var cachedArtists: List<ArtistRef>? = null
+    @Volatile private var cachedArtistsAt: Long = 0L
 
-    override suspend fun artists(): List<ArtistRef> =
-        cachedArtists ?: RelistenApi.artists().map { it.toArtistRef() }.also { cachedArtists = it }
+    // Periods, shows, and show detail (#61) — O4's deliberate scope cut on everything below
+    // the artist list. Keyed by [ArtistRef.key], which already embeds the backend, so there's
+    // no risk of a phish.in and a Relisten period id colliding in the same map.
+    internal val periodsCache = TtlCache<String, List<PeriodRef>>(CATALOG_CACHE_TTL_MS, maxEntries = 250)
+    internal val showsCache = TtlCache<String, List<ShowSummary>>(CATALOG_CACHE_TTL_MS, maxEntries = 400)
+    internal val showDetailCache = TtlCache<String, ShowDetail>(CATALOG_CACHE_TTL_MS, maxEntries = 200)
+
+    override suspend fun artists(): List<ArtistRef> {
+        cachedArtists?.let { if (System.currentTimeMillis() - cachedArtistsAt < CATALOG_CACHE_TTL_MS) return it }
+        return RelistenApi.artists().map { it.toArtistRef() }.also {
+            cachedArtists = it
+            cachedArtistsAt = System.currentTimeMillis()
+        }
+    }
 
     override suspend fun periods(artist: ArtistRef): List<PeriodRef> =
-        RelistenApi.years(artist.id).map { it.toPeriodRef() }
+        periodsCache.get(artist.key) ?: RelistenApi.years(artist.id).map { it.toPeriodRef() }
+            .also { periodsCache.put(artist.key, it) }
 
     /** A [period] id namespaced `song:`/`venue:` (from a search hit) routes to the matching
      *  entity endpoint instead of the ordinary year lookup — see the prefix constants above. */
-    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> = when {
-        period.id.startsWith(SONG_PREFIX) ->
-            RelistenApi.song(artist.id, period.id.removePrefix(SONG_PREFIX)).toShowSummaries(artist)
-        period.id.startsWith(VENUE_PREFIX) ->
-            RelistenApi.venue(artist.id, period.id.removePrefix(VENUE_PREFIX)).toShowSummaries(artist)
-        else -> RelistenApi.year(artist.id, period.id).shows.map { it.toShowSummary(artist) }
+    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+        val cacheKey = "${artist.key}/${period.id}"
+        showsCache.get(cacheKey)?.let { return it }
+        val shows = when {
+            period.id.startsWith(SONG_PREFIX) ->
+                RelistenApi.song(artist.id, period.id.removePrefix(SONG_PREFIX)).toShowSummaries(artist)
+            period.id.startsWith(VENUE_PREFIX) ->
+                RelistenApi.venue(artist.id, period.id.removePrefix(VENUE_PREFIX)).toShowSummaries(artist)
+            else -> RelistenApi.year(artist.id, period.id).shows.map { it.toShowSummary(artist) }
+        }
+        showsCache.put(cacheKey, shows)
+        return shows
     }
 
-    override suspend fun show(artist: ArtistRef, date: String, recordingId: String?): ShowDetail =
-        RelistenApi.show(artist.id, date).toShowDetail(artist, recordingId)
+    override suspend fun show(artist: ArtistRef, date: String, recordingId: String?): ShowDetail {
+        val cacheKey = "${artist.key}/$date/${recordingId ?: "default"}"
+        showDetailCache.get(cacheKey)?.let { return it }
+        return RelistenApi.show(artist.id, date).toShowDetail(artist, recordingId)
+            .also { showDetailCache.put(cacheKey, it) }
+    }
 
     override suspend fun search(term: String): SearchHits = RelistenApi.search(term).toSearchHits()
+
+    /** Test-only hook: clears every cache above in one call, the way [PhishInSource] does. */
+    internal fun resetCache() {
+        cachedArtists = null
+        cachedArtistsAt = 0L
+        periodsCache.clear()
+        showsCache.clear()
+        showDetailCache.clear()
+    }
 }

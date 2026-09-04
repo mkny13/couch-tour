@@ -32,8 +32,14 @@ Each of these is a fresh worktree off `main`. Every batch ends the same way:
   if its own work moves the number.
 - Log the work in `DECISIONS.md` under a new iteration with new `Dnn` identifiers. Where a
   decision reverses an earlier one, add a superseding entry — never edit history.
-- Open a PR, let CI finish, self-review the actual diff, merge, then delete the branch **and**
-  remove the worktree.
+- Open a PR, let CI finish, self-review the actual diff, merge, then delete the branch.
+  **Do not remove the worktree** if you are running under the Kanban board — it owns yours. See
+  CLAUDE.md's "Working under the Cline Kanban board" for the full rules, including allocating
+  your `Dnnn` against `main` at merge time rather than branch time, and the two macOS
+  worktree build hazards (a symlinked `.xcodeproj`, and `xcodebuild` resolving `CouchTourKit`
+  from the main checkout) that can make a green macOS build meaningless.
+- Add anything only a human can confirm to [UAT.md](../UAT.md) — see CLAUDE.md's project
+  conventions. A green suite is not a verified feature.
 
 **A separate session is currently editing
 `macos/Packages/CouchTourKit/Sources/CouchTourKit/ProgressStore.swift` and

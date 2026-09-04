@@ -124,6 +124,69 @@ fun List<PlayableTrack>.filterByTag(tagName: String): List<PlayableTrack> =
     if (tagName.isBlank() || tagName.equals("All", ignoreCase = true)) this
     else filter { track -> track.tags.any { it.name.equals(tagName, ignoreCase = true) } }
 
+/**
+ * Search results' sort control (#91). [RELEVANCE] is the order the backends already returned
+ * (exact show first, etc.) — it exists so a sort menu can offer "clear the sort" rather than
+ * forcing one of the other three at all times.
+ */
+enum class SearchSortMode(val label: String) {
+    RELEVANCE("Relevance"),
+    DATE_DESC("Newest"),
+    DATE_ASC("Oldest"),
+    MOST_LIKED("Most liked"),
+}
+
+@JvmName("sortedShowsForSearch")
+fun List<ShowSummary>.sortedByMode(mode: SearchSortMode): List<ShowSummary> = when (mode) {
+    SearchSortMode.RELEVANCE -> this
+    SearchSortMode.DATE_DESC -> sortedWith(compareByDescending<ShowSummary> { it.date })
+    SearchSortMode.DATE_ASC -> sortedWith(compareBy<ShowSummary> { it.date })
+    // Relisten shows default likesCount to 0 (see ShowSummary), so they settle after every
+    // phish.in hit under this sort with no branch needed for the mixed-backend case.
+    SearchSortMode.MOST_LIKED -> sortedWith(
+        compareByDescending<ShowSummary> { it.likesCount }.thenByDescending { it.date }
+    )
+}
+
+@JvmName("sortedTracksForSearch")
+fun List<Track>.sortedByMode(mode: SearchSortMode): List<Track> = when (mode) {
+    SearchSortMode.RELEVANCE -> this
+    SearchSortMode.DATE_DESC -> sortedWith(compareByDescending<Track> { it.showDate.orEmpty() })
+    SearchSortMode.DATE_ASC -> sortedWith(compareBy<Track> { it.showDate.orEmpty() })
+    SearchSortMode.MOST_LIKED -> sortedWith(
+        compareByDescending<Track> { it.likesCount }.thenByDescending { it.showDate.orEmpty() }
+    )
+}
+
+/** Artist list sort control (#116). */
+enum class ArtistSortMode(val label: String) {
+    POPULAR("Most shows"),
+    ALPHABETICAL("A–Z"),
+}
+
+fun List<ArtistRef>.sortedByMode(mode: ArtistSortMode): List<ArtistRef> = when (mode) {
+    ArtistSortMode.POPULAR -> sortedByDescending { it.showCount }
+    ArtistSortMode.ALPHABETICAL -> sortedBy { it.name.lowercase() }
+}
+
+fun List<ArtistRef>.filterByName(query: String): List<ArtistRef> =
+    if (query.isBlank()) this
+    else filter { it.name.contains(query.trim(), ignoreCase = true) }
+
+/**
+ * Search within a playlist (#90). Returns matches paired with their index in the original,
+ * unfiltered list — playback (and, for a local playlist, reordering) both operate on that
+ * original position, so the index has to survive filtering intact rather than being
+ * recomputed from the filtered list's own position.
+ */
+@JvmName("filterPlaylistEntriesByTitleIndexed")
+fun List<PlaylistEntry>.filterByTitleIndexed(query: String): List<IndexedValue<PlaylistEntry>> =
+    withIndex().filter { query.isBlank() || it.value.track.title.contains(query.trim(), ignoreCase = true) }
+
+@JvmName("filterLocalPlaylistTracksByTitleIndexed")
+fun List<LocalPlaylistTrackEntity>.filterByTitleIndexed(query: String): List<IndexedValue<LocalPlaylistTrackEntity>> =
+    withIndex().filter { query.isBlank() || it.value.title.contains(query.trim(), ignoreCase = true) }
+
 enum class Backend(val id: String) {
     PHISHIN("phishin"),
     RELISTEN("relisten");
@@ -180,6 +243,10 @@ data class ShowSummary(
     val rating: Double = 0.0,
     val popularity: Popularity? = null,
     val tags: List<TagRef> = emptyList(),
+    /** phish.in's `Show.likesCount` (#91's search sort) — Relisten has no equivalent and
+     *  leaves this at the default 0, which is what lets [SearchSortMode.MOST_LIKED] sort
+     *  Relisten hits after every phish.in one without a special-cased branch. */
+    val likesCount: Int = 0,
 ) {
     /** "McNichols Arena · Denver, CO" */
     val where: String get() = listOfNotNull(venue, location).joinToString(" · ")
@@ -299,11 +366,33 @@ internal fun mergeArtists(
     perBackend: Map<Backend, List<ArtistRef>>,
     favorites: Set<String> = emptySet(),
 ): List<ArtistRef> {
-    val phish = perBackend[Backend.PHISHIN].orEmpty()
+    val groups = groupArtistsForBrowse(perBackend, favorites)
+    return listOfNotNull(groups.phish) +
+        groups.favorited.sortedByDescending { it.showCount } +
+        groups.others.sortedByDescending { it.showCount }
+}
+
+/**
+ * The same phish-pinned / favorited / everyone-else split [mergeArtists] flattens, kept apart
+ * so [ArtistsScreen] can render favorites as their own pinned section (#116) and re-sort or
+ * filter each group independently while Phish — whose position-1 slot predates favoriting and
+ * isn't earned by being liked, see [mergeArtists]'s doc — stays outside either section.
+ */
+data class ArtistGroups(
+    val phish: ArtistRef?,
+    val favorited: List<ArtistRef>,
+    val others: List<ArtistRef>,
+)
+
+internal fun groupArtistsForBrowse(
+    perBackend: Map<Backend, List<ArtistRef>>,
+    favorites: Set<String> = emptySet(),
+): ArtistGroups {
+    val phish = perBackend[Backend.PHISHIN].orEmpty().firstOrNull()
     val rest = perBackend.filterKeys { it != Backend.PHISHIN }.values.flatten()
         .filterNot { it.name.equals(PHISH.name, ignoreCase = true) }
-    val (favorited, unfavorited) = rest.partition { it.key in favorites }
-    return phish + favorited.sortedByDescending { it.showCount } + unfavorited.sortedByDescending { it.showCount }
+    val (favorited, others) = rest.partition { it.key in favorites }
+    return ArtistGroups(phish, favorited, others)
 }
 
 /**
@@ -316,7 +405,11 @@ internal fun mergeArtists(
  * callers recompose on, not something to fetch once and cache alongside the network data.
  */
 internal suspend fun loadArtistsByBackend(): Map<Backend, List<ArtistRef>> {
-    val phishShows = runCatching { PhishInApi.years().sumOf { it.showsWithAudioCount } }
+    // Routed through PhishInSource.periods() (#61) rather than PhishInApi.years() directly,
+    // so the Home screen's artist list shares the same cached years fetch ShowsScreen's
+    // period picker uses instead of a second, uncached round trip for the same data. The
+    // synthetic "Popular" period contributes 0 to the sum, so this totals the same as before.
+    val phishShows = runCatching { PhishInSource.periods(PHISH).sumOf { it.showCount } }
     val relistenArtists = runCatching { RelistenCatalogSource.artists() }
     if (phishShows.isFailure && relistenArtists.isFailure) {
         throw relistenArtists.exceptionOrNull() ?: phishShows.exceptionOrNull()!!
@@ -458,19 +551,43 @@ const val POPULAR_PERIOD_SUBTITLE = "Top rated by likes"
 object PhishInSource : MusicSource {
     override val backend = Backend.PHISHIN
 
+    // Periods, shows, and show detail (#61) — O4's deliberate scope cut on everything below
+    // the artist list, which needed no cache of its own here since phish.in's "artist list"
+    // is the [PHISH] constant. [periodsCache] only ever holds the one key below; a TtlCache
+    // is still the right shape for it so [resetCache] and the TTL logic aren't duplicated.
+    private const val PERIODS_KEY = "phish"
+    internal val periodsCache = TtlCache<String, List<PeriodRef>>(CATALOG_CACHE_TTL_MS, maxEntries = 1)
+    internal val showsCache = TtlCache<String, List<ShowSummary>>(CATALOG_CACHE_TTL_MS, maxEntries = 60)
+    internal val showDetailCache = TtlCache<String, ShowDetail>(CATALOG_CACHE_TTL_MS, maxEntries = 200)
+
     override suspend fun artists() = listOf(PHISH)
 
     override suspend fun periods(artist: ArtistRef): List<PeriodRef> =
-        listOf(PeriodRef(POPULAR_PERIOD_ID, POPULAR_PERIOD_LABEL)) + PhishInApi.years().map { it.toPeriodRef() }
+        periodsCache.get(PERIODS_KEY)
+            ?: (listOf(PeriodRef(POPULAR_PERIOD_ID, POPULAR_PERIOD_LABEL)) + PhishInApi.years().map { it.toPeriodRef() })
+                .also { periodsCache.put(PERIODS_KEY, it) }
 
-    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> =
-        if (period.id == POPULAR_PERIOD_ID) PhishInApi.popularShows().map { it.toShowSummary() }
-        else PhishInApi.showsForPeriod(period.id).map { it.toShowSummary() }
+    override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+        showsCache.get(period.id)?.let { return it }
+        val shows = if (period.id == POPULAR_PERIOD_ID) PhishInApi.popularShows().map { it.toShowSummary() }
+            else PhishInApi.showsForPeriod(period.id).map { it.toShowSummary() }
+        showsCache.put(period.id, shows)
+        return shows
+    }
 
-    override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) =
-        PhishInApi.show(date).toShowDetail()
+    override suspend fun show(artist: ArtistRef, date: String, recordingId: String?): ShowDetail {
+        showDetailCache.get(date)?.let { return it }
+        return PhishInApi.show(date).toShowDetail().also { showDetailCache.put(date, it) }
+    }
 
     override suspend fun search(term: String) = PhishInApi.search(term).toSearchHits()
+
+    /** Test-only hook: clears every cache above in one call, the way [RelistenCatalogSource] does. */
+    internal fun resetCache() {
+        periodsCache.clear()
+        showsCache.clear()
+        showDetailCache.clear()
+    }
 }
 
 internal fun Period.toPeriodRef() =
@@ -486,6 +603,7 @@ internal fun Show.toShowSummary() = ShowSummary(
     partial = audioStatus == "partial",
     recordingCount = 1,
     tags = tags.map { it.toTagRef() },
+    likesCount = likesCount,
 )
 
 internal fun Show.toShowDetail(): ShowDetail {

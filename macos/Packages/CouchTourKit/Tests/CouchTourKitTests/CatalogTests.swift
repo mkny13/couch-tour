@@ -248,6 +248,91 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual([PHISH, dead], merged)
     }
 
+    // ---------------------------------------------------------------- groupArtistsForBrowse (#116)
+
+    func testGroupArtistsForBrowseSplitsPhishFavoritedAndOthersWithNoOverlap() {
+        let a = ArtistRef(backend: .relisten, id: "a", name: "A", showCount: 10)
+        let b = ArtistRef(backend: .relisten, id: "b", name: "B", showCount: 50)
+        let groups = groupArtistsForBrowse(relistenArtists: [a, b], favorites: [a.key])
+        XCTAssertEqual(PHISH, groups.phish)
+        XCTAssertEqual([a], groups.favorited)
+        XCTAssertEqual([b], groups.others)
+    }
+
+    func testGroupArtistsForBrowseDropsRelistensOwnDuplicatePhishEntry() {
+        let relistenPhish = ArtistRef(backend: .relisten, id: "phish", name: "Phish", showCount: 999)
+        let dead = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
+        let groups = groupArtistsForBrowse(relistenArtists: [relistenPhish, dead], favorites: [])
+        XCTAssertEqual([dead], groups.others)
+        XCTAssertTrue(groups.favorited.isEmpty)
+    }
+
+    // ---------------------------------------------------------------- ArtistSortMode / filterByName (#116)
+
+    func testArtistSortModePopularSortsByShowCountDescending() {
+        let a = ArtistRef(backend: .relisten, id: "a", name: "A", showCount: 10)
+        let b = ArtistRef(backend: .relisten, id: "b", name: "B", showCount: 50)
+        XCTAssertEqual([b, a], [a, b].sorted(by: .popular))
+    }
+
+    func testArtistSortModeAlphabeticalSortsCaseInsensitively() {
+        let z = ArtistRef(backend: .relisten, id: "z", name: "zappa")
+        let a = ArtistRef(backend: .relisten, id: "a", name: "ABC")
+        XCTAssertEqual([a, z], [z, a].sorted(by: .alphabetical))
+    }
+
+    func testFilterByNameMatchesCaseInsensitiveSubstring() {
+        let dead = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
+        let wsp = ArtistRef(backend: .relisten, id: "wsp", name: "Widespread Panic")
+        XCTAssertEqual([dead], [dead, wsp].filterByName("dead"))
+    }
+
+    func testFilterByNameWithABlankQueryReturnsEverythingUnchanged() {
+        let dead = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
+        XCTAssertEqual([dead], [dead].filterByName("  "))
+    }
+
+    func testFilterByNameWithNoMatchReturnsEmpty() {
+        let dead = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
+        XCTAssertTrue([dead].filterByName("phish").isEmpty)
+    }
+
+    // ---------------------------------------------------------------- SearchSortMode (#91)
+
+    func testSearchSortModeRelevanceLeavesShowOrderUnchanged() {
+        let shows = [
+            ShowSummary(artist: dead, date: "1977-05-08"),
+            ShowSummary(artist: dead, date: "1977-05-09"),
+        ]
+        XCTAssertEqual(shows, shows.sortedForSearch(by: .relevance))
+    }
+
+    func testSearchSortModeDateDescAndDateAscOnShows() {
+        let older = ShowSummary(artist: dead, date: "1977-05-08")
+        let newer = ShowSummary(artist: dead, date: "1977-05-09")
+        XCTAssertEqual([newer, older], [older, newer].sortedForSearch(by: .dateDesc))
+        XCTAssertEqual([older, newer], [older, newer].sortedForSearch(by: .dateAsc))
+    }
+
+    func testSearchSortModeMostLikedSortsPhishInShowsByLikesDescending() {
+        let fewLikes = ShowSummary(artist: PHISH, date: "1997-11-17", likesCount: 3)
+        let manyLikes = ShowSummary(artist: PHISH, date: "1997-11-22", likesCount: 40)
+        XCTAssertEqual([manyLikes, fewLikes], [fewLikes, manyLikes].sortedForSearch(by: .mostLiked))
+    }
+
+    func testSearchSortModeMostLikedSortsRelistenHitsAfterEveryPhishInHitWithNoSpecialCase() {
+        let relistenShow = ShowSummary(artist: dead, date: "2099-01-01")
+        let phishShow = ShowSummary(artist: PHISH, date: "1997-11-17", likesCount: 1)
+        XCTAssertEqual([phishShow, relistenShow], [relistenShow, phishShow].sortedForSearch(by: .mostLiked))
+    }
+
+    func testSearchSortModeOnTracksMirrorsShows() {
+        let fewLikes = Track(id: 1, title: "a", likesCount: 1, showDate: "1997-11-17")
+        let manyLikes = Track(id: 2, title: "b", likesCount: 40, showDate: "1997-11-22")
+        XCTAssertEqual([manyLikes, fewLikes], [fewLikes, manyLikes].sortedForSearch(by: .mostLiked))
+        XCTAssertEqual([manyLikes, fewLikes], [fewLikes, manyLikes].sortedForSearch(by: .dateDesc))
+    }
+
     // ---------------------------------------------------------------- surpriseMeArtists (#101)
 
     func testSurpriseMeArtistsUsesFavoritedWhenAnyAreStarred() {

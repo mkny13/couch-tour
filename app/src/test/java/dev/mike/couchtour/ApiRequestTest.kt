@@ -29,6 +29,7 @@ class ApiRequestTest {
         PhishInApi.baseUrl = server.url("/api/v2")
         PhishInApi.authToken = null
         PhishInApi.onUnauthorized = null
+        PhishInSource.resetCache()
     }
 
     @After
@@ -37,6 +38,7 @@ class ApiRequestTest {
         PhishInApi.baseUrl = "https://phish.in/api/v2".toHttpUrl()
         PhishInApi.authToken = null
         PhishInApi.onUnauthorized = null
+        PhishInSource.resetCache()
     }
 
     private fun enqueue(body: String, code: Int = 200) {

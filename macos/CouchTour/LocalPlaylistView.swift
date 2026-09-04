@@ -18,6 +18,17 @@ struct LocalPlaylistView: View {
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var error: String?
+    @State private var query = ""
+
+    // Reordering (both the chevrons and `.onMove`'s drag) writes positions computed against
+    // `rows`' full indices — doing that while a filter narrows what's on screen would scramble
+    // the playlist (#90), so reordering is simply unavailable until the filter is cleared,
+    // matching Batch 2A's Android rule.
+    private var reorderable: Bool { query.isEmpty }
+
+    private var filtered: [(offset: Int, element: LocalPlaylistTrack)] {
+        rows.filterByTitleIndexed(query)
+    }
 
     var body: some View {
         Group {
@@ -27,9 +38,15 @@ struct LocalPlaylistView: View {
                     systemImage: "music.note.list",
                     description: Text("Add tracks from any show using the playlist button next to its like button.")
                 )
+            } else if filtered.isEmpty {
+                ContentUnavailableView(
+                    "No tracks match \"\(query)\"",
+                    systemImage: "magnifyingglass",
+                    description: Text("Try a different search.")
+                )
             } else {
                 List {
-                    ForEach(Array(rows.enumerated()), id: \.element.rowId) { index, row in
+                    ForEach(filtered, id: \.element.rowId) { index, row in
                         HStack {
                             Button {
                                 Task { await play(startingAt: row) }
@@ -53,19 +70,19 @@ struct LocalPlaylistView: View {
                                     moveUp(row)
                                 } label: {
                                     Image(systemName: "chevron.up")
-                                        .foregroundStyle(index > 0 ? .secondary : .quaternary)
+                                        .foregroundStyle(reorderable && index > 0 ? .secondary : .quaternary)
                                 }
                                 .buttonStyle(.plain)
-                                .disabled(index == 0)
+                                .disabled(!reorderable || index == 0)
 
                                 Button {
                                     moveDown(row)
                                 } label: {
                                     Image(systemName: "chevron.down")
-                                        .foregroundStyle(index < rows.count - 1 ? .secondary : .quaternary)
+                                        .foregroundStyle(reorderable && index < rows.count - 1 ? .secondary : .quaternary)
                                 }
                                 .buttonStyle(.plain)
-                                .disabled(index >= rows.count - 1)
+                                .disabled(!reorderable || index >= rows.count - 1)
 
                                 Button {
                                     remove(row)
@@ -77,16 +94,23 @@ struct LocalPlaylistView: View {
                             }
                         }
                         .contextMenu {
-                            Button("Move Up") { moveUp(row) }.disabled(index == 0)
-                            Button("Move Down") { moveDown(row) }.disabled(index >= rows.count - 1)
+                            Button("Move Up") { moveUp(row) }.disabled(!reorderable || index == 0)
+                            Button("Move Down") { moveDown(row) }.disabled(!reorderable || index >= rows.count - 1)
                             Divider()
                             Button("Remove", role: .destructive) { remove(row) }
                         }
+                        // `.onMove`'s indices are relative to what's actually on screen, which
+                        // only lines up with `rows`' own indices while the list is unfiltered
+                        // — disabling per-row while a filter is active (rather than just the
+                        // chevrons above) keeps drag reordering from writing positions computed
+                        // against a subset.
+                        .moveDisabled(!reorderable)
                     }
                     .onMove(perform: move)
                 }
             }
         }
+        .searchable(text: $query, prompt: "Search this playlist…")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

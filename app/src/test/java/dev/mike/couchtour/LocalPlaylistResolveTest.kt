@@ -29,7 +29,7 @@ class LocalPlaylistResolveTest {
         relistenServer = MockWebServer().apply { start() }
         PhishInApi.baseUrl = phishInServer.url("/api/v2")
         RelistenApi.baseUrl = relistenServer.url("/api")
-        RelistenCatalogSource.cachedArtists = null
+        RelistenCatalogSource.resetCache()
     }
 
     @After
@@ -38,7 +38,7 @@ class LocalPlaylistResolveTest {
         relistenServer.shutdown()
         PhishInApi.baseUrl = "https://phish.in/api/v2".toHttpUrl()
         RelistenApi.baseUrl = "https://api.relisten.net/api".toHttpUrl()
-        RelistenCatalogSource.cachedArtists = null
+        RelistenCatalogSource.resetCache()
     }
 
     private fun phishRef(showDate: String, trackId: String, title: String) = LocalPlaylistTrackEntity(

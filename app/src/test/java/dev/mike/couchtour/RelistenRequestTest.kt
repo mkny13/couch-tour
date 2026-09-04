@@ -27,14 +27,14 @@ class RelistenRequestTest {
         server = MockWebServer()
         server.start()
         RelistenApi.baseUrl = server.url("/api")
-        RelistenCatalogSource.cachedArtists = null
+        RelistenCatalogSource.resetCache()
     }
 
     @After
     fun tearDown() {
         server.shutdown()
         RelistenApi.baseUrl = "https://api.relisten.net/api".toHttpUrl()
-        RelistenCatalogSource.cachedArtists = null
+        RelistenCatalogSource.resetCache()
     }
 
     private fun enqueue(body: String, code: Int = 200) {

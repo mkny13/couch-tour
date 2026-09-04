@@ -3296,9 +3296,419 @@ setting.
   automation for the session. Worth knowing for any future macOS batch whose verification is
   interactive: answer that prompt once by hand before starting.
 
-## Iteration 21 — Player rate sync clobber fix (#127)
+## Iteration 66 — macOS: wire #67/#21/#62 into the UI, plus #115 (D206)
 
-### D205 — Deduplicate ProgressRecorder writes and ignore redundant rate=0 events (#127)
+### D206 — Wire #67/#21/#62 into the macOS UI, plus #115's context menu
+
+Phase 2's audit (`phase-2-batches.md`, 2026-08-31) found that D191/D192/D193 had each claimed
+macOS UI shipped for tags, sort, and artwork when only the `CouchTourKit` model and its tests
+had — see D208, which supersedes them on macOS only, for the full story. This batch is the
+actual wiring, plus #115 riding along in the same worktree per that plan's decision.
+
+**#21 — sort.** `ShowsView.swift` gets a toolbar `Picker` over `ShowSortOption`, not Android's
+chip row. Android's `FilterChip` row is that platform's idiom for a small, always-visible choice;
+this app's own macOS screens already reach for a menu-style `Picker` for exactly this kind of
+inline filter (`SearchView`'s artist picker, `ListeningView`'s scope and artist pickers), so a
+second visual language for the same kind of decision would read as inconsistent rather than
+native. Sort is applied to `shows` already held in view state — `load()` still only resets
+`loadState`, never re-fetches on a sort or filter change.
+
+**#67 — tags.** `ShowsView.swift` and `SearchView.swift` both build their available-tag list the
+way `MainActivity.kt:837-846`/`:1484-1502` do: the tags actually present in the current results,
+deduped case-insensitively, sorted by `priority` descending then name, "All" prefixed, and the
+picker only rendered once there's a real tag to filter by. A selected tag that drops out of the
+result set (a new search, narrowing to a different artist, a different period) falls back to
+"All" rather than rendering nothing, matching the existing accident-of-key-reuse handling
+`SearchView`'s artist picker already had. In `SearchView`, picking a real tag also empties the
+Artists and Song/Venue-slice sections rather than leaving them showing untagged, unrelated hits —
+Android's search screen does the same (`rArtist.copy(artists = emptyList(), slices = emptyList()
+...)`).
+
+**#62 — artwork.** `ArtworkView` gains two optional parameters, `artist` and `date`, threaded
+through its five call sites (`HomeView`'s Next Stop, Continue Listening, and On This Date cards;
+`MiniPlayerView`; `NowPlayingInspector`) from whatever each already had in scope — `ShowSummary`
+for the first and last, `PlaybackProgress.artist` for Continue Listening (no real date there, so
+`date` stays nil and `ShowArtworkGenerator.dateBadge` falls back to "LIVE", which reads fine for
+an in-progress card), and `player.show` for the two player surfaces. The placeholder is a
+`LinearGradient` from `palette.primaryColor` to `palette.backgroundColor` with the artist
+monogram overlaid, plus the date badge once the artwork is drawn large enough (`scaledSize >=
+60`) for a second line to read as information rather than noise — the mini player's default
+36pt skips it. This is the gradient-plus-monogram shape decided in the batch plan, not a port of
+Android's `Canvas` cassette; `ShowArtworkGenerator.palette`/`monogram`/`dateBadge` were already
+written and tested and needed no changes.
+
+**#115 — Continue Listening context menu.** `ResumeCardView` (Home) and each row in
+`ListeningView`'s list get a `.contextMenu` — Open / Mark Completed / Remove from List, matching
+Android's long-press menu (`MainActivity.kt:2377-2407`). Both call straight through to
+`ProgressStore.markFinished(key:)` and `.dismiss(key:)`, which already existed and needed no
+changes, then reload their own list state so the row's disappearance from "Continue Listening"
+(or its "completed"/"removed" status in History) is immediate.
+
+**Why CI didn't catch the original gap, and still can't catch this one.** `macos-tests.yml`
+triggers only on `macos/Packages/CouchTourKit/**`; every change in this batch is in
+`macos/CouchTour/**` (the app target), so this PR runs no macOS CI at all. The only checks that
+ran are Android's (irrelevant here) and whatever `swift test` this batch ran locally, which
+exercises the unchanged `CouchTourKit` helpers, not the views calling them. Same gap D191-D193
+fell into; still open after this batch, since closing it would mean building the app target in
+CI, which needs local ad-hoc signing this repo doesn't have configured for a CI runner.
+
+**A worktree-local landmine, unrelated to the code above but worth recording:** this worktree's
+`macos/CouchTour.xcodeproj` (gitignored, generated — D103) was found as a **symlink** into the
+original checkout's copy (`/Volumes/.../phish-in-app/macos/CouchTour.xcodeproj`, via
+`.git/info/exclude`), left over from however this worktree was provisioned. `xcodegen generate`
+happily followed it and wrote a real project file at the *original* checkout's path, so
+`xcodebuild` was compiling and linking that checkout's sources — not this worktree's edits —
+until the symlink was deleted and `xcodegen generate` re-run to produce a real, worktree-local
+project file. A build that "succeeds" against a symlinked project proves nothing about the
+worktree it was run from; worth checking `ls -la macos/CouchTour.xcodeproj` for a `->` before
+trusting any macOS build/test result in a fresh worktree.
+
+**Testing:**
+- `swift test`: 369/369 (`CouchTourKit`'s own suite, unchanged by this batch — see D204's count,
+  now 369 after `#120` removed `TrackedTourStore`'s duplicate migration).
+- `xcodegen generate` + `xcodebuild … build` (Debug): succeeds, no new warnings, from a real
+  worktree-local project (see the symlink note above).
+- `macos/scripts/install.sh` (Release): succeeds; installed to `/Applications/Couch Tour.app`,
+  confirmed via `strings` that the binary carries this batch's new UI strings.
+- **The interactive click-through this batch's own verification section calls for — sorting a
+  year's shows, filtering by tag, looking at artwork-less Relisten shows, right-clicking a
+  Continue Listening card — did not happen.** The keychain prompt this file already warned about
+  wasn't even reached: the machine's display session was locked for the whole batch, so
+  `screencapture`/`osascript` GUI scripting couldn't reach the screen either. The app is built,
+  installed, and waiting; the actual click-through is still owed and needs Mike at the machine,
+  same as D204's before it.
+
+## Iteration 65 — List Sort and Filter, Android (#91, #116, #90, D205)
+
+### D205 — Artist List Sort/Filter, Search Result Sort, and In-Playlist Search (Android only)
+
+Phase 2's Batch 2A ([phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md)): three
+Feedback-filed issues that are one shape of request — reorder or narrow a long list — landed
+together as Android-only groundwork macOS's Batch 2B will port. Every helper is a pure function
+in `Catalog.kt`, matching the file's existing `sortedByMode`/`filterByTag` pattern, so the
+sorting/filtering logic itself is unit-tested rather than only reachable by a manual pass — the
+same gap D191-D193 documented for the macOS side (see Batch 0's audit and its superseding entry).
+
+- **#116 — Artists list.** `ArtistsScreen` gained a Popular/A–Z sort (`ArtistSortMode`) and a
+  name filter (`filterByName`). Phish stays pinned outside either section — its position-1 slot
+  predates favoriting (D157) and isn't earned by being liked, so neither the new sort nor the
+  filter displaces it as long as its name still matches. `mergeArtists` was refactored to build
+  on a new `groupArtistsForBrowse` (phish / favorited / everyone-else, as a typed `ArtistGroups`
+  rather than a flattened list) so the screen can render Favorites as its own pinned section,
+  sorted and filtered independently, without duplicating the dedup logic `mergeArtists` already
+  had tests for. An empty filter result renders `No artists match "<query>".` rather than a blank
+  screen.
+- **#91 — search result sort.** `SearchResultsList` already stacks an artist chip row and a tag
+  chip row; a third `LazyRow` would be too much chrome, so the new `SearchSortMode` (Relevance /
+  Newest / Oldest / Most liked) is one compact `TextButton` + `DropdownMenu` line instead. Sort
+  applies to both the Shows and Tracks sections (not Artists/Venues/Songs/Playlists, which have
+  no date or like count to sort by). "Most liked" needed `ShowSummary` to carry phish.in's
+  `likes_count` at all — it didn't before, since the field only ever mattered per-period via
+  `POPULAR_PERIOD_ID`'s server-side query. It's now on `ShowSummary` itself (default `0`,
+  populated from `Show.likesCount` in `toShowSummary()`), which is what lets Relisten hits settle
+  after every phish.in hit under that sort with no special-cased branch: Relisten never sets it,
+  so it defaults to 0 and sorts last.
+- **#90 — search within a playlist.** Both `PlaylistScreen` (phish.in, read-only) and
+  `LocalPlaylistScreen` (local, reorderable) gained a search field over their track list. The
+  trap flagged in the batch prompt was real: the existing `TextField`s in the macOS playlist
+  views are rename inputs, not search, so Batch 2B can't reuse them as a starting point either.
+  `filterByTitleIndexed` returns matches paired with their index in the *unfiltered* list,
+  because both playback (`vm.playPlaylist`/`vm.playLocalPlaylist`) and, for the local playlist,
+  reordering (`vm.moveLocalPlaylistTrack`) key off that original position — a filtered list's own
+  position would start the wrong track or write positions computed against a subset.
+  **Reordering is disabled while a filter is active** (the up/down arrows grey out) rather than
+  clearing the filter when reorder starts — D184's drag targets already read `tracks`, the full
+  list, by index, and disabling is one boolean versus adding filter-clearing side effects to
+  every reorder callback.
+
+Three `sortedByMode` overloads now exist on `List<ShowSummary>` (`ShowSortMode`, pre-existing,
+and the new `SearchSortMode`) plus one on `List<Track>` and one on `List<ArtistRef>`. The two
+`SearchSortMode` overloads needed `@JvmName` (`sortedShowsForSearch`/`sortedTracksForSearch`) —
+same value-parameter type on two different receivers erases to the same JVM signature, the same
+reason `filterByTag`'s two overloads already carried one. `filterByTitleIndexed`'s two overloads
+(`PlaylistEntry`, `LocalPlaylistTrackEntity`) needed the same treatment for the same reason.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 473/473 passing (463 baseline + 10 new,
+  covering sort/filter/grouping correctness and the empty/no-match cases for all three features).
+- Not done: macOS (out of scope — Batch 2B) and a manual on-device pass of the new Android UI.
+
+## Iteration 67 — Multi-Level Catalog Cache, Android and macOS (#61, D207)
+
+### D207 — In-memory TTL cache for periods, shows, and show detail on both platforms (#61)
+
+O4 (`MULTI-ARTIST-PLAN.md`) deliberately cut catalog caching down to one `@Volatile`/actor-private
+artist list — "a real catalog cache stays out of scope." Everything below the artist list —
+periods (years), a period's shows, and show detail — re-fetched on every screen entry, including
+plain back-navigation. This batch revisits that scope cut, per Batch 4 of
+[phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md).
+
+**In-memory, not on-disk.** On-disk would mean a real Room migration on Android and a GRDB
+migration on macOS for a table holding nothing but re-derivable network responses — exactly the
+kind of state CLAUDE.md's Room-migration section is strict about, and unlike `progress`, catalog
+data isn't the thing the app exists to never lose. An in-memory cache meets the goal (kill the
+extra round trips on ordinary back-navigation within a session) without any of that, and it's
+trivially reversible if it turns out not to be worth keeping.
+
+**Shape:** a generic TTL-and-LRU cache — `TtlCache<K, V>` (`CatalogCache.kt`) and the actor
+`TTLCache<Key, Value>` (`CatalogCache.swift`) — shared by both `MusicSource` implementations on
+each platform. A 15-minute TTL (`CATALOG_CACHE_TTL_MS` / `catalogCacheTTL`) is long enough that
+browsing back and forth within one sitting costs no network call, short enough that a show's
+rating, popularity, or tags don't go stale for the length of a whole sitting. Past `maxEntries`
+the least-recently-used entry is evicted (`LinkedHashMap(accessOrder = true)` on Android, an
+explicit access-order list on macOS) rather than growing without bound — the memory ceiling for a
+~200-artist catalog: periods capped at 250 entries (roughly one per artist), shows at 400, show
+detail at 200, tuned generously rather than measured, since a bounded cache turning into extra
+network calls on eviction is a performance regression, not a correctness one.
+
+**Wired into every `MusicSource` implementation:**
+- `RelistenCatalogSource` (Android `Relisten.kt`, macOS `RelistenAPI.swift`) gets `periodsCache`,
+  `showsCache`, and `showDetailCache`, plus a TTL added to the existing artist-list cache — it
+  never expired before this, which was fine when its only caller was one back button but is a
+  correctness gap on its own next to caches that do expire.
+- `PhishInSource` needed the cache to live somewhere shared explicitly: on Android it's already a
+  singleton `object`, but on macOS it's a `struct` `sourceFor` recreates on every call, so its
+  cache lives on a separate actor singleton (`PhishInCatalogCache.shared`) that the struct
+  delegates to rather than on `self`.
+- `Catalog.kt`'s `loadArtistsByBackend` (the Home screen's artist list) now sums show counts off
+  `PhishInSource.periods(PHISH)` instead of a second, uncached `PhishInApi.years()` call — the
+  synthetic "Popular" period contributes 0 to that sum, so the total is unchanged, but the Home
+  screen and the period picker now share one cached years fetch instead of paying for it twice.
+
+**Cache-key correctness across backends.** phish.in periods can be a range ("1983-1987"); Relisten
+periods are year uuids. Both key off `ArtistRef.key`, which already embeds the backend
+(`"phishin:phish"` vs `"relisten:grateful-dead"`), so there's no way a same-shaped id from the two
+backends collides in one shared map even though periods/shows/show-detail all use one cache
+instance per source rather than one per backend.
+
+**Interaction with `NextStop.cacheKey`, which already invalidates on tour-preference changes
+(D190), is none, by design.** `NextStop`'s own cache is keyed on favorites/date/tour-preferences
+and still invalidates exactly as before — it calls through `MusicSource.periods`/`.shows`, which
+this batch's cache sits underneath. A tour-preference change still busts `NextStop`'s cache and
+re-derives an answer; that re-derivation can now be served from the periods/shows cache instead of
+the network, which is strictly a speed-up, not a change in what invalidates when.
+
+**Test hooks preserved.** `RelistenCatalogSource.cachedArtists` stays exactly as before (same
+type, same direct-null-assignment reset some tests already used) so no existing test broke; both
+sources also gained a one-call `resetCache()` (`PhishInCatalogCache.shared.resetCache()` on
+macOS, since the cache doesn't live on the struct) mirroring the shape `RelistenCatalogSource`'s
+`resetCache()` already had on macOS. Any test file that exercises a real `MusicSource` against a
+mock server now resets these caches in `setUp`/`tearDown` — including two files this batch didn't
+otherwise touch, `LocalPlaylistResolveTest.kt`/`LocalPlaylistTests.swift`'s
+`ResolveLocalPlaylistTracksTests`, which resolve shows through the same shared singletons and
+would otherwise silently serve one test's mock response to a later test using the same
+artist/date. The macOS instance was caught by an actual test failure during this batch's own
+verification, not by inspection — worth remembering for any future cache added to a
+process-lifetime singleton under macOS's shared `MockServer`.
+
+**Testing:**
+- Android (`./gradlew testDebugUnitTest`): 488/488 passing after merging with Batch 2A's D205 —
+  463 baseline + 10 (D205) + 15 new here (`CatalogCacheTest.kt`): `TtlCacheTest` covers hit, miss,
+  expiry at and just under the TTL boundary, `clear`, and LRU eviction against an injected clock;
+  `CatalogCacheHitTest` covers a second call being served from cache, per-artist/per-period
+  keying, and `resetCache()` forcing a real re-fetch, against both `PhishInSource` and
+  `RelistenCatalogSource`.
+- macOS (`swift test`): 384/384 passing, up from 369 (`CatalogCacheTests.swift`,
+  `TTLCacheTests`/`CatalogCacheHitTests`) — the same coverage, ported. Unaffected by D205, which
+  was Android-only.
+- macOS app target (`xcodegen generate` + `xcodebuild`): build reported success, but **this
+  worktree's `xcodebuild` resolves the local `CouchTourKit` package from the main checkout's path
+  (`/Volumes/ExtSSD160/scripts/phish-in-app`) rather than this worktree's own copy** — confirmed
+  by deliberately breaking this worktree's `CatalogCache.swift` with a syntax error and watching
+  the app build succeed anyway. Clearing `DerivedData` didn't fix it. This batch touches no
+  app-target file, so the risk is low, but the app-target build above did not actually verify
+  this diff and shouldn't be read as having done so. Worth knowing for any future batch relying on
+  an app-target build from inside a worktree rather than the primary checkout.
+- No UI changed and the `MusicSource` interface's shape is untouched, matching the batch's scope:
+  this stays invisible behind the seam that made it parallelizable with Batches 1 and 2A.
+
+## Iteration 68 — Phase 2 Audit Closeout: Correcting D191–D193's macOS Claim (#67, #21, #62, D208)
+
+### D208 — D191, D192, and D193 overstated macOS status; only the Android UI and the `CouchTourKit` model shipped (supersedes D191, D192, D193 on macOS only)
+
+A 2026-08-31 audit ahead of Phase 2 planning ([prompts/phase-2-batches.md](prompts/phase-2-batches.md))
+found that D191 (#67 tags), D192 (#21 momentum sort), and D193 (#62 procedural artwork) each state
+or imply that macOS UI shipped alongside Android. It did not, for any of the three, as of that
+audit:
+
+- **#67 (tags):** `filterShowsByTag` / `filterTracksByTag` / `filterByTag` existed and were tested
+  in `Catalog.swift`, but `grep -rn "Tag" macos/CouchTour` returned nothing — no macOS view read
+  them.
+- **#21 (momentum sort):** `ShowSortOption` and `sortShows(_:by:)` existed and were tested in
+  `Catalog.swift`, but `ShowsView.swift` was a plain unsorted `List` with no sort `@State` at all.
+- **#62 (artwork):** `ShowArtworkGenerator` (palette, monogram, date badge) existed and was tested
+  in `Artwork.swift`, but `ArtworkView.swift` still drew a bare `music.note` placeholder and never
+  called it.
+
+Android was unaffected by this correction — its chip-row sort control, tag filter, and cassette
+artwork for these three issues were real, in `MainActivity.kt`, and D191–D193's Android claims
+stand. Only the macOS half of each entry was wrong, which is why this supersedes them on macOS
+only rather than retracting them outright. The actual macOS wiring landed as D206, above this
+entry despite the later decision number — DECISIONS.md orders by when an entry merged to `main`,
+not by when the underlying work was done, and this audit was written before D206's wiring batch
+but merged after it (and after D207 too, which is why D206 isn't immediately adjacent).
+
+**Why CI never caught it — worth having on the record:** `swift test`
+(`macos/Packages/CouchTourKit`) covers the `CouchTourKit` package only. The app target
+(`macos/CouchTour`) isn't part of that package and isn't built by `macos-tests.yml`, so a tested
+pure function that no screen calls is fully green regardless. `TagTests.testShowSummarySortedByOption`
+passed at the time of the audit against a sort no macOS user could reach. **A green `swift test` is
+not evidence a macOS feature is reachable** — macOS UI work needs an install-and-click pass
+(`macos/scripts/install.sh`), same as any other platform's manual verification, and a passing
+package build should not be read as that pass having happened.
+
+**Process note.** This entry documents an audit written 2026-08-31, but its own commit was
+stranded on a detached-HEAD worktree by an orchestration misconfiguration and didn't reach `main`
+until other Phase 2 batches (D205, D206, D207) had already landed — including D206, which this
+entry supersedes and which itself refers forward to this one. Four parallel worktrees, each
+computing "next available iteration/decision number" from `main` at branch time rather than at
+merge time, is also why D205 and D206 were each independently claimed by two different batches;
+those collisions were resolved by renumbering the later-merging entry (D206→D207) rather than
+editing the content of either. Worth keeping in mind for any future sprint run as several parallel
+agents against one shared docs file: decision numbering is a shared mutable resource, and only the
+merge order — not the branch/authoring order — determines who actually gets which number.
+
+## Iteration 69 — Kanban as the primary development plane, and a UAT board (D209)
+
+### D209 — Board-owned worktrees, merge-time decision IDs, and `UAT.md` as the home for manual verification
+
+Development now runs through the Cline Kanban board (`http://127.0.0.1:3484`) rather than
+hand-made worktrees. The board creates a worktree per task under `~/.cline/worktrees/` and starts
+`claude --permission-mode auto` in it. That collided with instructions written for the old model,
+and the first sprint through it (Batches 0/1/2A/4) surfaced exactly how:
+
+- **Batch 0's work was nearly lost.** Its orchestration prompt said not to create a branch, on the
+  assumption the board's auto-PR would handle git. Nothing did, and the commit sat on a detached
+  HEAD, unreachable from any branch, until rescued in `#124`. The other three batches ignored that
+  instruction, followed CLAUDE.md's own autonomous loop, and merged fine.
+- **Two batches picked the same decision number.** Batches 1 and 4 each computed "next `Dnnn`"
+  from `main` at branch time and both landed as D206 — a real duplicate that git cannot detect,
+  since the two entries are appends to different regions of the same file (see D208).
+
+The rules that resolve this are in CLAUDE.md under "Working under the Cline Kanban board", and the
+shape of them is: **the board owns the worktree, the agent owns the branch.** Never
+`git worktree add`/`remove` under the board; always `git checkout -b` off the detached HEAD before
+committing; own git through to a merged PR rather than depending on board automation that has been
+observed to silently no-op; end with a `STATUS:` line, because the board's column tracks whether an
+agent finished, not whether anything merged. Decision IDs are allocated against `origin/main` at
+merge time, not branch time, and a collision is resolved by renumbering the later-merging entry —
+never by editing the other batch's content.
+
+**`UAT.md` and `scripts/uat-server.py`.** Manual verification kept being recorded in a DECISIONS
+entry's testing section — which is write-only in practice. D204's owed click-through went unread
+until D206's batch re-derived it, and D206 then added an identical note of its own. Meanwhile the
+gap is the single biggest correctness risk in this repo: Android's suite is Robolectric/MockWebServer
+and `swift test` covers `CouchTourKit` only, never the macOS app target, which is precisely how
+D191–D193 marked three features shipped while no macOS view called them (D208).
+
+So outstanding manual checks live in `UAT.md` — git-tracked, so it is visible to Claude and to any
+Kanban task — and `scripts/uat-server.py` serves a local three-state board (untested / works /
+needs work) that writes straight back to that file. Stdlib only, no dependencies, no build step;
+it is deliberately a flat markdown file rather than a database so the state diffs, reviews, and
+merges like everything else here. An item marked **needs work** carries a note and is treated as a
+bug report addressed to whoever next touches that feature.
+
+**Two macOS worktree build hazards are also now documented in CLAUDE.md**, both found the hard way
+during this sprint and both capable of making a green macOS build meaningless: a `.xcodeproj` that
+is a symlink into the main checkout (D206), and `xcodebuild` resolving the local `CouchTourKit`
+package from the main checkout's path rather than the worktree's own copy (D207, confirmed by
+deliberately breaking a file and watching the build still succeed).
+
+**Testing:** no application code changed. `scripts/uat-server.py`'s parse/write round-trip was
+exercised directly — status transitions in both directions, note attach/detach when leaving the
+"needs work" state, unknown-id rejection, and item-count preservation — then end-to-end over HTTP
+against all four endpoints and through the rendered page, which caught a real bug: hyphenated
+element ids (`c-pend`) never become JS globals, so the first render threw `ReferenceError` and the
+board showed zero items despite a 200 response and correct JSON.
+
+## Iteration 70 — List Sort and Filter, macOS Parity (#91, #116, #90, D210)
+
+### D210 — Porting D205's Android sort/filter helpers to macOS, plus the platform gaps that changed the port
+
+Phase 2's Batch 2B ([phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md)): the macOS half
+of D205, gated on both D205 (Android) and D206 (the macOS tag/sort/artwork wiring, since both
+touch `SearchView.swift`) having merged first. Follows D205's decisions rather than
+re-deriving them, with the same "pure helper in `CouchTourKit`, tested, called from a view" shape
+D206 established.
+
+- **#116 — Artists list.** `groupArtistsForBrowse(relistenArtists:favorites:)` ports D205's
+  `ArtistGroups` split (phish / favorited / others, no overlap), and `mergeArtists` is refactored
+  to build on it rather than duplicating the partition logic — same relationship the Kotlin
+  originals have. `ArtistSortMode` (`.popular`/`.alphabetical`) and `filterByName` are direct
+  ports. `ArtistsView` gained `.searchable` and a toolbar sort `Picker`, and — this is the one
+  real behavior change from what was there before — **the "Artists" section no longer repeats
+  favorited artists.** The pre-#116 macOS code intentionally showed favorites in both the
+  "Favorites" shortcut and the full "Artists" list ("favoriting doesn't remove an artist from the
+  full list"); D205's `ArtistGroups.others` is favorited-exclusive by construction, and matching
+  it here is what lets "favorites stay pinned regardless of sort, filter applies to both" (the
+  batch's stated rule) hold without Phish itself losing its always-first position under an
+  alphabetical sort. A favorited artist is still one screen-scroll away, just not in two places
+  on the same one.
+- **#91 — search result sort.** `SearchSortMode` (`.relevance`/`.dateDesc`/`.dateAsc`/
+  `.mostLiked`) ports D205's four-case enum, applied via a toolbar `Picker` in `SearchView`
+  (D206 already established the toolbar-over-chip-row idiom for `ShowsView`'s sort, so this reuses
+  it rather than introducing a third stacked row) to the Shows and Tracks sections only, matching
+  Android's scope. `ShowSummary` gained a `likesCount: Int` field, populated from phish.in's
+  `Show.likesCount` in `toShowSummary()` and left at the default 0 for Relisten — same mechanism
+  as D205, and what lets Relisten hits settle after every phish.in hit under `.mostLiked` with no
+  special-cased branch. This is a genuinely new field, not a rename of the existing `rating`:
+  `rating` already held `Double(likesCount)` for phish.in shows (a pre-D210 shortcut, since
+  phish.in has no separate numeric rating), but is shared with Relisten's actual 0-10
+  `avg_rating` on the same field — two different scales that "Top Rated" already sorted together
+  before this batch touched it, out of scope to fix here. `likesCount` sidesteps that by being
+  phish.in-only and correctly zero for Relisten, matching D205's `ShowSummary.likesCount` exactly.
+  The sort helper is named `sortedForSearch(by:)`, not `sorted(by:)` — `[ShowSummary]` already
+  has `sorted(by: ShowSortOption)` from D206, and `ShowSortOption` and `SearchSortMode` both
+  declare a `.dateAsc` case, so `.dateAsc` shorthand at a call site is ambiguous between the two
+  enums when both `sorted(by:)` overloads are in scope. Same shape of problem as D205 needing
+  `@JvmName` for its own two-enums-one-case-name collision on the JVM; a distinct method name is
+  Swift's equivalent fix.
+- **#90 — search within a playlist.** `filterByTitleIndexed`, added to `LocalPlaylist.swift`,
+  ports D205's shape: matches paired with their index in the *original* `rows` array, because
+  both playback and reordering key off that position rather than a filtered list's own. Applied
+  to `LocalPlaylistView` via `.searchable`. Reordering is disabled while a filter is active
+  (`reorderable = query.isEmpty`) exactly as D205 decided for Android — both the up/down chevrons
+  (`.disabled`) and drag reordering (`.moveDisabled` per row, since `.onMove`'s indices are only
+  meaningful against `rows` while nothing is filtered out). **The batch prompt's "for the
+  phish.in playlist screen, its counterpart" doesn't exist on macOS to port to** — unlike
+  Android's `PlaylistScreen` (a read-only view of phish.in's own hosted/liked playlists),
+  `PhishInAPI.swift` documents that this MVP has no playlists screen at all (D5), and nothing in
+  `macos/CouchTour` reads a phish.in playlist. #90's macOS parity is therefore local-playlist-only,
+  not a scope cut made here but the pre-existing platform gap D5 already recorded.
+
+**Two worktree-provisioning landmines, same class as D206's `.xcodeproj` symlink, worth adding to
+that running list.** This worktree's `macos/CouchTour.xcodeproj` was *again* a symlink into the
+original checkout (deleted and regenerated with `xcodegen generate`, same fix as D206). Less
+obviously, `macos/build` — the derived-data directory `macos/scripts/install.sh` builds into —
+was **also** a symlink into the original checkout's `macos/build`. Unlike the `.xcodeproj` case
+this isn't necessarily wrong on its own (it's Release WMO, which recompiles the whole module as
+one job rather than reusing per-file incremental state the way Debug does, so a shared derived-data
+cache is less likely to serve stale per-file output) — but it was worth not trusting on faith.
+Confirmed the installed binary actually reflects this worktree's source via `strings` on the
+built binary for `"Filter artists"`, `"Search this playlist"`, `"No artists match"`, `"No tracks
+match"`, `"mostLiked"`, and `"relevance"` — all present, all new or renamed in this batch, none of
+which would appear in the previously-installed build.
+
+**Testing:**
+- `swift test`: 400/400 (384 baseline + 16 new — `groupArtistsForBrowse`, `ArtistSortMode`,
+  `filterByName`, `SearchSortMode`/`sortedForSearch` on both `ShowSummary` and `Track`, and
+  `filterByTitleIndexed`).
+- `xcodegen generate` + `xcodebuild … build` (Debug): succeeds, no new warnings, from a real
+  worktree-local project (symlink removed first, per above).
+- `macos/scripts/install.sh` (Release): succeeds; installed to `/Applications/Couch Tour.app`,
+  confirmed via `strings` per above to be this batch's build.
+- **The interactive click-through this batch's verification calls for — filtering/sorting the
+  artist list, sorting search results, searching and reordering a local playlist — did not
+  happen**, same open item D206 left. This time the blocker wasn't a locked display session but
+  missing permissions for this session's automation: `screencapture` failed with "could not
+  create image from display" and `osascript`'s System Events access failed with "osascript is
+  not allowed assistive access" (-1719, an Accessibility permission neither this process nor Mike
+  can grant without him at the machine). The app is built, installed, and waiting; the actual
+  click-through is still owed and needs Mike at the machine, same as D204's and D206's before it.
+
+## Iteration 71 — Player rate sync clobber fix (#127)
+
+### D211 — Deduplicate ProgressRecorder writes and ignore redundant rate=0 events (#127)
 
 Issue #127 investigated an incident where playback of Phish 2026-07-29 on Android (YEM) was
 overwritten by an older finished track (Harpua) after Couch Tour was launched on macOS.
@@ -3329,5 +3739,4 @@ Fix:
   `syncSession.requestDebouncedPush(progressStore)` during `saveProgress(force:)`.
 - Added 6 unit tests in `ProgressRecorderTests.swift` covering position advancement, identical tick
   skipping, track transitions, queue key transitions, and finished state handling. Total package
-  tests increased from 369 to 375.
-
+  tests increased from 400 to 406.
