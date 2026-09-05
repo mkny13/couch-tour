@@ -87,6 +87,7 @@ struct ThreePaneRootView: View {
         }
         let merged = mergeArtists(relistenArtists: relistenArtists, favorites: appModel.favorites.keys)
         favoritedArtists = merged.filter { appModel.favorites.keys.contains($0.key) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     @ViewBuilder
