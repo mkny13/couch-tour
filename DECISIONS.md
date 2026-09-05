@@ -3972,3 +3972,44 @@ and resolved multiple instances of unwired buttons, mock/hardcoded values, and m
 11. **#149: macOS Show Detail Action Pills Wiring & Dynamic Card Ratings** (`ShowDetailView.swift`, `HomeView.swift`):
     - Wired `Add to Playlist` button on the show detail view to show a picker sheet for adding all tracks in the show to a local playlist.
     - Replaced hardcoded `★ 4.2` and `★ 4.4` ratings on tour stop and anniversary show cards in `HomeView.swift` with dynamic `show.rating > 0` checks.
+
+## Iteration 77 — Design docs comparison audit & wiring across Android and macOS (D219)
+
+### D219 — Design docs comparison audit, light mode contrast restoration, and interactive pill controls across Android and macOS
+
+Comprehensive comparison between the running app and the design docs (`design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html`) resolved 10 discrepancies across macOS and Android:
+
+1. **macOS Expanded Now Playing Light Mode Contrast & Dynamic Tape Lineage** (`ExpandedNowPlayingView.swift`, `Player.swift`):
+   - Restored adaptive theme contrast colors (`colors.textPrimary`, `colors.textSecondary`, `colors.surfaceElevated`, `colors.panelBorder`) across the entire modal sheet, eliminating washed-out low contrast text in light mode.
+   - Replaced hardcoded `"SBD · Charlie Miller · 24/48 FLAC"` with dynamic `tapeLabel` derived from `player.recording` metadata (`rec.sourceType`, `rec.taper`, `rec.format`), matching Player Rail.
+   - Eliminated hardcoded idle fallback text (`"Split Open and Melt"`, `"1994-12-31"`) in favor of dynamic fallback state (`"No track playing"`).
+
+2. **macOS Player Rail Light Mode Contrast & Dynamic Tape Lineage** (`PlayerRailView.swift`):
+   - Replaced hardcoded `Color.white` and `.white.opacity(...)` with adaptive `colors.textPrimary` and `colors.textSecondary` so text and controls render crisply in both light and dark themes.
+   - Made tape lineage tag reactive to the current `player.recording` rather than a static label.
+
+3. **macOS Home Screen "Next Tour Stop" Action Inversion** (`HomeView.swift`):
+   - Corrected inverted click handlers: tapping the tour stop card body navigates to the show detail view (`show`), while clicking the circular play button directly plays the show via `tapPlayShow(show)`.
+
+4. **macOS Search Filter Chips & Track Row Artist Label** (`SearchView.swift`):
+   - Wired interactive search filter chips below the search bar: Sort dropdown menu (`Relevance`, `Show Date (Newest)`, `Show Date (Oldest)`, `Rating (High to Low)`), Artist filter menu derived from `hits.artistsPresent`, and toggles for Soundboard (SBD) and Jam Chart.
+   - Fixed track hit artist label to display proper artist abbreviation (`ArtistAbbreviations.label(for: "Phish")`) rather than generic hardcoded strings.
+
+5. **macOS Library Search Field & Sort Pill** (`LocalPlaylistsView.swift`):
+   - Fixed search field styling to use proper `colors.surface` and `colors.panelBorder` backgrounds with 12pt font.
+   - Replaced static sort pill with an interactive SwiftUI `Menu` offering `Recently Added`, `Title`, and `Artist` sorting, with active sorting applied to library items.
+
+6. **Android Next Tour Stop Card Navigation** (`MainActivity.kt`):
+   - Wired `.clickable` modifier on the show info card content to route to `show/${show.date}` or `recording/${show.date}/${show.recordingId}`, allowing users to inspect the upcoming stop without immediately starting playback.
+
+7. **Android Show Screen Action Pills & Show Add-to-Playlist Dialog** (`MainActivity.kt`):
+   - Wired all three 36dp header action pills on `ShowHeader`: "Resume" starts playback of the current track, "Saved" toggles bookmark/like status with filled star/heart, and "Add" opens a bottom sheet allowing the entire show's tracks to be added to a local playlist.
+   - Added `AddTracksToPlaylistDialog` modal bottom sheet.
+   - Replaced hardcoded `"★ 4.6"` and `"SBD · Paluska · FLAC"` with dynamic show rating / likes count and tape lineage details.
+
+8. **Android Recording Detail Screen Header Alignment** (`MainActivity.kt`):
+   - Refactored `RecordingHeader` to match Ledger Screen 1C specification with 96dp right-aligned artwork tile, venue/city/date hierarchy, dynamic rating and taper/lineage metadata, and wired 36dp action pills.
+
+9. **Unit Testing & Documentation Updates** (`FormatTest.kt`, `README.md`, `UAT.md`):
+   - Added unit tests for compact duration formatting in `FormatTest.kt` (501 Android unit tests total).
+   - Added UAT test items `uat-034` (macOS light mode player contrast and search filters) and `uat-035` (Android show action pills & tour stop navigation).

@@ -61,4 +61,12 @@ class FormatTest {
         assertEquals(0L, positionAt(120f, 0, 60_000))
         assertEquals(0L, positionAt(120f, 1000, 0))
     }
+
+    @Test
+    fun `formats compact duration sub-hour and hour-plus`() {
+        assertEquals("0:00", formatCompactDuration(0))
+        assertEquals("1:06", formatCompactDuration(66_000))
+        assertEquals("2:41", formatCompactDuration(161_000))
+        assertEquals("1:05", formatCompactDuration(3_930_000))
+    }
 }

@@ -472,36 +472,45 @@ struct HomeView: View {
 
     private func tourStopRow(show: ShowSummary) -> some View {
         HStack(spacing: 16) {
-            Text(ArtistAbbreviations.label(for: show.artist.name))
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(colors.textPrimary)
-                .frame(width: 140, alignment: .leading)
-                .lineLimit(1)
-
-            Text(formatShowDate(show.date))
-                .font(.system(size: 15))
-                .foregroundStyle(colors.textPrimary)
-                .frame(width: 110, alignment: .leading)
-
-            let subtitle = [show.where_.isEmpty ? nil : show.where_, show.tourName]
-                .compactMap { $0 }
-                .joined(separator: " · ")
-            Text(subtitle)
-                .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(1)
-
-            if show.rating > 0 {
-                Text(String(format: "★ %.1f", show.rating))
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
-                    .frame(width: 64, alignment: .trailing)
-            } else {
-                Spacer().frame(width: 64)
-            }
-
             NavigationLink(value: Route.show(show)) {
+                HStack(spacing: 16) {
+                    Text(ArtistAbbreviations.label(for: show.artist.name))
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 140, alignment: .leading)
+                        .lineLimit(1)
+
+                    Text(formatShowDate(show.date))
+                        .font(.system(size: 15))
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 110, alignment: .leading)
+
+                    let subtitle = [show.where_.isEmpty ? nil : show.where_, show.tourName]
+                        .compactMap { $0 }
+                        .joined(separator: " · ")
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1)
+
+                    if show.rating > 0 {
+                        Text(String(format: "★ %.1f", show.rating))
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                            .frame(width: 64, alignment: .trailing)
+                    } else {
+                        Spacer().frame(width: 64)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Task {
+                    await tapPlayShow(show)
+                }
+            } label: {
                 Circle()
                     .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
                     .frame(width: 30, height: 30)

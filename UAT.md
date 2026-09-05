@@ -95,5 +95,7 @@ Long-standing items that predate this sprint.
 - [ ] `uat-031` **Expanded Now Playing View** (macOS) — Full window expanded player modal with 440px artwork tile, ambient blurred background wash, waveform scrubber, and collapse affordance.
 - [ ] `uat-032` **Show Detail Multi-Column & Conic Glow** (macOS) — Breadcrumbs, 160×160 artwork with conic glow blur, stats row, action pills (Resume, Saved, Add to playlist), 2-column setlist layout with compact durations and hairlines, active track highlight bar.
 - [ ] `uat-033` **Desktop Library Table** (macOS) — Category filter tabs (All, Playlists, Shows, Tracks), sort chips ("Recently added", "Artist"), fixed-column table (`TYPE`, `NAME`, `ARTIST`, `RATING`, `LENGTH`, `ADDED`, play, dots menu), and "New playlist +" creation sheet.
+- [ ] `uat-034` **macOS Light Mode Player Contrast & Search Filters** (macOS) — Expanded Now Playing and Player Rail have dark, high-contrast text (`#20222C`) in Light mode; search filter pills (Sort, Artist, Soundboard, Jam chart) dynamically filter and sort search results.
+- [ ] `uat-035` **Show Detail Action Pills & Next Tour Stop Tap** (Android) — ShowHeader and RecordingHeader action pills (Resume, Saved, Add) respond to touch; tapping Next Tour Stop card navigates to show details.
 
 

@@ -94,16 +94,36 @@ struct PlayerRailView: View {
                         HStack(spacing: 10) {
                             Text(show.artist.name)
                                 .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                .foregroundStyle(colors.textPrimary)
                             Text(formatShowDate(show.date))
                                 .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                .foregroundStyle(colors.textPrimary)
                         }
 
                         Text(show.where_.isEmpty ? "Live Concert" : show.where_)
                             .font(.system(size: 14))
-                            .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                            .foregroundStyle(colors.textSecondary)
                             .padding(.top, 5)
+
+                        let tapeLabel: String = {
+                            if let rec = player.recording {
+                                var parts: [String] = []
+                                parts.append(rec.isSoundboard ? "SBD" : "AUD")
+                                if let taper = rec.taper, !taper.isEmpty {
+                                    parts.append(taper)
+                                }
+                                if rec.hasFlac {
+                                    parts.append("FLAC")
+                                }
+                                return parts.joined(separator: " · ")
+                            }
+                            let isSbd = show.tags.contains { $0.name.localizedCaseInsensitiveContains("sbd") }
+                            let hasFlac = player.currentTrack?.flacUrl?.isEmpty == false
+                            var parts: [String] = []
+                            parts.append(isSbd ? "SBD" : "AUD")
+                            if hasFlac { parts.append("FLAC") }
+                            return parts.joined(separator: " · ")
+                        }()
 
                         // TAPE & SHOW RATING Row
                         HStack(alignment: .center, spacing: 12) {
@@ -114,9 +134,9 @@ struct PlayerRailView: View {
                                     .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
 
                                 HStack(spacing: 6) {
-                                    Text("SBD · Paluska · FLAC")
+                                    Text(tapeLabel)
                                         .font(.system(size: 14))
-                                        .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                                        .foregroundStyle(colors.textPrimary)
                                         .lineLimit(1)
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 10))
@@ -146,7 +166,7 @@ struct PlayerRailView: View {
                         .padding(.top, 14)
                         .overlay(
                             Rectangle()
-                                .fill(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0).opacity(0.14))
+                                .fill(colors.divider)
                                 .frame(height: 1),
                             alignment: .top
                         )
@@ -166,7 +186,7 @@ struct PlayerRailView: View {
 
                         Text(player.currentTrack?.title ?? "—")
                             .font(.system(size: 23, weight: .medium))
-                            .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                            .foregroundStyle(colors.textPrimary)
                             .padding(.top, 4)
                             .lineLimit(1)
 

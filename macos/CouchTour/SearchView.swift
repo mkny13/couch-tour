@@ -10,7 +10,9 @@ struct SearchView: View {
     @Environment(\.ledgerColors) private var colors
 
     @State private var hits: SearchHits?
-    @State private var selectedArtistKey: String?
+    @State private var selectedArtist: ArtistRef?
+    @State private var soundboardOnly = false
+    @State private var jamChartOnly = false
     @State private var selectedTab: SearchTab = .all
     @State private var sortMode: SearchSortMode = .relevance
 
@@ -23,7 +25,42 @@ struct SearchView: View {
 
     private var term: String { appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    private var filteredHits: SearchHits? {
+        guard let hits else { return nil }
+        let h = hits.filteredTo(selectedArtist)
+        var tracks = h.tracks.sortedForSearch(by: sortMode)
+        var shows = h.shows.sortedForSearch(by: sortMode)
+        let slices = h.slices
+
+        if soundboardOnly {
+            shows = shows.filter { show in
+                show.tags.contains { $0.name.localizedCaseInsensitiveContains("sbd") }
+            }
+            tracks = tracks.filter { track in
+                track.tags.contains { $0.name.localizedCaseInsensitiveContains("sbd") }
+            }
+        }
+
+        if jamChartOnly {
+            tracks = tracks.filter { track in
+                track.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") }
+            }
+            shows = shows.filter { show in
+                show.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") }
+            }
+        }
+
+        return SearchHits(
+            artists: h.artists,
+            shows: shows,
+            slices: slices,
+            tracks: tracks,
+            failed: h.failed
+        )
+    }
+
     var body: some View {
+        let activeHits = filteredHits
         VStack(spacing: 0) {
             // Query Header
             HStack(spacing: 12) {
@@ -72,9 +109,9 @@ struct SearchView: View {
 
             // Tabs with counts and underline
             HStack(spacing: 22) {
-                let trackCount = hits?.tracks.count ?? 0
-                let showCount = hits?.shows.count ?? 0
-                let songCount = hits?.slices.count ?? 0
+                let trackCount = activeHits?.tracks.count ?? 0
+                let showCount = activeHits?.shows.count ?? 0
+                let songCount = activeHits?.slices.count ?? 0
                 let allCount = trackCount + showCount + songCount
 
                 searchTabItem(title: "All", count: allCount, tab: .all)
@@ -90,11 +127,55 @@ struct SearchView: View {
 
             // Filter chips
             HStack(spacing: 8) {
-                filterPill("Longest first ▾", isSelected: true)
-                filterPill("Artist ▾")
-                filterPill("Years ▾")
-                filterPill("Soundboard")
-                filterPill("Jam chart only")
+                Menu {
+                    ForEach(SearchSortMode.allCases, id: \.self) { mode in
+                        Button {
+                            sortMode = mode
+                        } label: {
+                            HStack {
+                                Text(mode.displayName)
+                                if sortMode == mode {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    filterPill("Sort: \(sortMode.displayName) ▾", isSelected: sortMode != .relevance)
+                }
+                .menuStyle(.borderlessButton)
+
+                if let artists = hits?.artistsPresent, artists.count > 1 {
+                    Menu {
+                        Button("All Artists") {
+                            selectedArtist = nil
+                        }
+                        Divider()
+                        ForEach(artists, id: \.self) { artist in
+                            Button(artist.name) {
+                                selectedArtist = artist
+                            }
+                        }
+                    } label: {
+                        filterPill(selectedArtist != nil ? "\(selectedArtist!.name) ▾" : "Artist ▾", isSelected: selectedArtist != nil)
+                    }
+                    .menuStyle(.borderlessButton)
+                }
+
+                Button {
+                    soundboardOnly.toggle()
+                } label: {
+                    filterPill("Soundboard", isSelected: soundboardOnly)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    jamChartOnly.toggle()
+                } label: {
+                    filterPill("Jam chart only", isSelected: jamChartOnly)
+                }
+                .buttonStyle(.plain)
+
                 Spacer()
             }
             .padding(.horizontal, 24)
@@ -139,8 +220,8 @@ struct SearchView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 60)
-                    } else if let hits {
-                        let totalHits = hits.tracks.count + hits.shows.count + hits.slices.count
+                    } else if let activeHits {
+                        let totalHits = activeHits.tracks.count + activeHits.shows.count + activeHits.slices.count
                         if totalHits == 0 {
                             VStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
@@ -155,25 +236,25 @@ struct SearchView: View {
                         } else {
                             switch selectedTab {
                             case .all:
-                                ForEach(hits.tracks, id: \.id) { track in
+                                ForEach(activeHits.tracks, id: \.id) { track in
                                     searchTrackRow(track: track)
                                 }
-                                ForEach(hits.shows, id: \.self) { show in
+                                ForEach(activeHits.shows, id: \.self) { show in
                                     searchShowRow(show: show)
                                 }
-                                ForEach(hits.slices, id: \.self) { slice in
+                                ForEach(activeHits.slices, id: \.self) { slice in
                                     searchSliceRow(slice: slice)
                                 }
                             case .tracks:
-                                ForEach(hits.tracks, id: \.id) { track in
+                                ForEach(activeHits.tracks, id: \.id) { track in
                                     searchTrackRow(track: track)
                                 }
                             case .shows:
-                                ForEach(hits.shows, id: \.self) { show in
+                                ForEach(activeHits.shows, id: \.self) { show in
                                     searchShowRow(show: show)
                                 }
                             case .songs:
-                                ForEach(hits.slices, id: \.self) { slice in
+                                ForEach(activeHits.slices, id: \.self) { slice in
                                     searchSliceRow(slice: slice)
                                 }
                             }
@@ -226,7 +307,7 @@ struct SearchView: View {
 
     private func searchTrackRow(track: Track) -> some View {
         HStack(spacing: 10) {
-            Text("Phish")
+            Text(ArtistAbbreviations.label(for: "Phish"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
                 .frame(width: 110, alignment: .leading)
@@ -246,7 +327,7 @@ struct SearchView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.venueName ?? "Live Venue")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .foregroundStyle(colors.textSecondary)
                     .lineLimit(1)
 
                 Text(track.venueLocation ?? "")
