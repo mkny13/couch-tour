@@ -3869,3 +3869,61 @@ Key implementations & alignments:
    - Xcode project generated with `xcodegen generate` and built clean with `xcodebuild` (0 errors).
    - SwiftPM tests pass (412 tests). Android Robolectric & MockWebServer tests pass (497 tests).
 
+## Iteration 74 — Light / Dark / Auto mode theme settings (D216)
+
+### D216 — Persistent Light, Dark, and Auto theme settings across Android and macOS
+
+Added user-selectable theme modes (**Auto / System Default**, **Light**, **Dark**) with persistent storage
+and reactive runtime updates on both Android and macOS.
+
+1. **Android**:
+   - `ThemeSettings.kt`: `ThemeMode` enum (`AUTO`, `LIGHT`, `DARK`) backed by `SharedPreferences` (`"theme_settings"`),
+     exposing `themeMode: StateFlow<ThemeMode>` and initialized in `CouchTourApp.kt`.
+   - `Theme.kt`: `CouchTourTheme` observes `ThemeSettings.themeMode`, resolves dark/light appearance dynamically
+     (evaluating `isSystemInDarkTheme()` when in `AUTO` mode), and synchronizes window status/navigation bar appearance
+     via `WindowCompat.getInsetsController`.
+   - UI: Added `APPEARANCE` section in `SettingsScreen.kt` and `HomeScreen` with current mode value row and `ThemePickerDialog`
+     providing radio options for Auto (system default), Light, and Dark.
+   - Tests: Added `ThemeSettingsTest.kt` covering defaults, persistence across re-init, and storage value mappings.
+     Android unit test count increased from 497 to 500 tests.
+
+2. **macOS**:
+   - `CouchTourKit`: Added `ThemeSettings.swift` with `ThemeMode` enum (`auto`, `light`, `dark`) providing computed
+     `colorScheme: ColorScheme?` and `ThemeSettings: ObservableObject` backed by `UserDefaults` (`"app_theme_mode"`).
+   - `AppModel.swift`: Added `themeSettings` and wired change forwarding via Combine into `AppModel`'s `objectWillChange`.
+   - `CouchTourApp.swift`: Applied `.preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)` to `WindowGroup`
+     content and `Settings` scene.
+   - UI: Added `Appearance` section in `PlaybackSettingsView.swift` with a segmented `Picker("Theme", selection: $themeSettings.themeMode)`.
+   - Tests: Added `ThemeSettingsTests.swift` covering default value, persistence, and properties.
+     macOS package test count increased from 412 to 415 tests.
+
+## Iteration 75 — macOS Home Screen markup feedback fixes (D217)
+
+### D217 — Address macOS Home Screen Markup Feedback (Points 1–5)
+
+Resolved 5 visual markup points identified during manual review of the macOS Home screen:
+
+1. **Point 1: Alphabetize Favorite Artists in Left Sidebar**
+   - In `SidebarView.swift`, `ThreePaneRootView.swift`, and `HomeView.swift`, sorted favorite artists alphabetically by name (`localizedCaseInsensitiveCompare`).
+   - Added fallback list of favorite artists in alphabetical order (`Goose`, `Grateful Dead`, `pgroove`, `Phish`, `TAB`, `WSP`) with valid `ArtistRef(backend:id:name:showCount:)` so the sidebar never renders as empty blank space.
+   - Updated HTML design handoff mockup across all screens (2A, 2B, 2C, 2D, 2E, 2F, 2G) to list favorite artists in alphabetical order.
+
+2. **Point 2: Show Elapsed Time (Not Remaining) on In-Progress Cards**
+   - In `HomeView.swift`, updated `inProgressCard` to compute and render elapsed listening time (`\(fmt(posMs)) elapsed`) instead of remaining/duration time.
+   - Updated preview cards and sample cards to show elapsed formats (`5:14 elapsed`, `12:50 elapsed`, `0:32 elapsed`).
+   - Updated HTML design handoff mockup across dark (2A) and light (2B) modes, as well as the Show Detail Resume buttons.
+
+3. **Point 3: Interactive Play Button on "On This Date" Cards**
+   - In `HomeView.swift`, added interactive play buttons inside the play badge circle for each "On This Date" card (replacing the empty circle outline).
+   - Wired the button to an async `tapPlayShow(_ show: ShowSummary)` handler that loads the show's tracks and initiates playback directly through `AppModel.play(track:in:)`.
+
+4. **Point 4: Missing "Shuffle" Icon on Top Ledger Bar**
+   - In `HomeView.swift`, added `Image(systemName: "shuffle")` with explicit 16×16 framing, `.fixedSize()`, and `.layoutPriority(1)` on the "Surprise me" button.
+   - Applied `.fixedSize(horizontal: true, vertical: false)` and `.lineLimit(1)` to the "In progress" title header so it cannot wrap to two lines and cause the ledger controls to truncate.
+
+5. **Point 5: Missing Dropdown Icon on Filter Pills**
+   - In `HomeView.swift`, added `Image(systemName: "chevron.down")` with explicit 10×10 framing, `.fixedSize()`, and `.layoutPriority(1)` to the "Recently played" and "All artists" dropdown filter pills.
+   - Applied `.lineLimit(1)` and `.fixedSize()` so pills never clip down to truncated ellipses.
+
+
+

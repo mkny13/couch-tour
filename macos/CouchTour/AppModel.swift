@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import CouchTourKit
 import Foundation
 
@@ -32,6 +33,7 @@ final class AppModel: ObservableObject {
     let favorites = Favorites()
     let likedTracks = LikedTracks()
     let playbackSettings = PlaybackSettings()
+    let themeSettings = ThemeSettings()
     #if BETA
     let phishInSession = PhishInSession(store: PhishInTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.phishin")))
     #else
@@ -60,6 +62,7 @@ final class AppModel: ObservableObject {
     /// Which tab ⌘, opens on. Home's Settings & status tiles set this before opening the
     /// window, so a tile lands on the form it names.
     @Published var settingsTab: SettingsTab = .playback
+    private var themeCancellable: AnyCancellable?
 
     init() {
         do {
@@ -74,6 +77,9 @@ final class AppModel: ObservableObject {
             progressStoreError = "Couldn't open the listening history database: \(error)"
         }
         localPlaylistStore = progressStore.flatMap { try? LocalPlaylistStore(sharing: $0) }
+        themeCancellable = themeSettings.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     /// One push-then-pull cycle. Fire-and-forget: `sync` is a no-op if unpaired, and any

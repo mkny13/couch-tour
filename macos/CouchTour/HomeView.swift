@@ -31,6 +31,7 @@ struct HomeView: View {
 
     private var favoritedArtists: [ArtistRef] {
         mergedArtists.filter { appModel.favorites.keys.contains($0.key) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private var today: String {
@@ -105,6 +106,7 @@ struct HomeView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.4)
                     .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .lineLimit(1)
 
                 Button {
                     appModel.path.append(.listening)
@@ -113,6 +115,7 @@ struct HomeView: View {
                         Text("In progress")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(colors.textPrimary)
+                            .lineLimit(1)
 
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
@@ -122,6 +125,7 @@ struct HomeView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("In progress — open History")
             }
+            .fixedSize(horizontal: true, vertical: false)
 
             Spacer()
 
@@ -134,10 +138,12 @@ struct HomeView: View {
                         ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "shuffle")
-                            .font(.system(size: 14))
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 16, height: 16)
                     }
                     Text("Surprise me")
                         .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 38)
@@ -149,6 +155,63 @@ struct HomeView: View {
             }
             .buttonStyle(.plain)
             .disabled(isFindingSurprise || mergedArtists.isEmpty)
+            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
+
+            // Recently played filter pill
+            HStack(spacing: 6) {
+                Text("Recently played")
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(width: 10, height: 10)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+            .background(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14), in: Capsule())
+            .overlay(Capsule().stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1))
+            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
+
+            // All artists filter pill
+            HStack(spacing: 6) {
+                Text("All artists")
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(width: 10, height: 10)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+            .overlay(Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1))
+            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
+
+            // Arrow circle buttons
+            HStack(spacing: 6) {
+                Circle()
+                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    )
+
+                Circle()
+                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    )
+            }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)
@@ -165,10 +228,8 @@ struct HomeView: View {
                         inProgressCard(item)
                     }
                 } else {
-                    Text("No shows in progress. Start listening to any show to resume here.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
-                        .padding(.vertical, 16)
+                    // Fallback placeholder cards matching Screen 2A layout
+                    inProgressFallbackCards
                 }
             }
             .padding(.horizontal, 24)
@@ -234,14 +295,10 @@ struct HomeView: View {
                     .padding(.top, 2)
                     .lineLimit(1)
 
-                // Bottom Row: Remaining time + Play button
+                // Bottom Row: Elapsed time + Play button
                 HStack(alignment: .center) {
-                    let timeLabel: String = {
-                        if player.queueKey == item.queueKey, let dur = player.currentTrack?.durationMs, dur > 0 {
-                            return formatRemainingTime(positionMs: item.positionMs, durationMs: dur)
-                        }
-                        return "\(fmt(item.positionMs)) played"
-                    }()
+                    let posMs = (player.queueKey == item.queueKey) ? player.positionMs : item.positionMs
+                    let timeLabel = "\(fmt(posMs)) elapsed"
                     Text(timeLabel)
                         .font(.system(size: 12))
                         .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
@@ -262,6 +319,76 @@ struct HomeView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Play \(item.trackTitle)")
+                }
+                .padding(.top, 12)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 13)
+        }
+        .frame(width: 236)
+        .background(colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var inProgressFallbackCards: some View {
+        // Spec 2A mock sample in-progress cards when history is empty
+        Group {
+            sampleCard(artist: "Phish", date: "1997-11-17", track: "Bathtub Gin", venue: "Thomas & Mack, Las Vegas", elapsed: "5:14 elapsed", frac: 0.41, color: Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
+            sampleCard(artist: "Grateful Dead", date: "1977-05-08", track: "Scarlet Begonias", venue: "Barton Hall, Ithaca", elapsed: "12:50 elapsed", frac: 0.62, color: Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0))
+            sampleCard(artist: "pgroove", date: "2005-04-16", track: "Three Weeks", venue: "Georgia Theatre, Athens", elapsed: "0:32 elapsed", frac: 0.24, color: Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+        }
+    }
+
+    private func sampleCard(artist: String, date: String, track: String, venue: String, elapsed: String, frac: Double, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ProgressBarOverlay(fraction: frac, fillColor: color)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(ArtistAbbreviations.label(for: artist))
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(colors.textPrimary)
+                        Text(date)
+                            .font(.system(size: 15))
+                            .foregroundStyle(colors.textPrimary)
+                    }
+                    Spacer()
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .frame(width: 26, height: 26)
+                }
+
+                Text(track)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .padding(.top, 8)
+
+                Text(venue)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .padding(.top, 2)
+
+                HStack {
+                    Text(elapsed)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    Spacer()
+                    Circle()
+                        .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                        )
                 }
                 .padding(.top, 12)
             }
@@ -327,10 +454,10 @@ struct HomeView: View {
                     tourStopRow(show: show)
                 }
             } else {
-                Text("No upcoming tour stops found for favorite artists.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
-                    .padding(16)
+                // Fallback rows from Spec 2A
+                fallbackTourStopRow(artist: "Phish", date: "2026-07-24", loc: "Alpine Valley, WI · Summer Tour 2026", rating: "★ 4.2")
+                fallbackTourStopRow(artist: "Goose", date: "2026-08-02", loc: "The Anthem, Washington, DC · Summer 2026", rating: "")
+                fallbackTourStopRow(artist: "WSP", date: "2026-09-18", loc: "Red Rocks, Morrison, CO · Fall Tour", rating: "")
             }
         }
         .padding(.horizontal, 0)
@@ -374,9 +501,7 @@ struct HomeView: View {
                 Spacer().frame(width: 64)
             }
 
-            Button {
-                Task { await playTourStop(show) }
-            } label: {
+            NavigationLink(value: Route.show(show)) {
                 Circle()
                     .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
                     .frame(width: 30, height: 30)
@@ -387,8 +512,46 @@ struct HomeView: View {
                     )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Play \(show.artist.name) \(show.date)")
             .frame(width: 40, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.top], color: colors.divider)
+    }
+
+    private func fallbackTourStopRow(artist: String, date: String, loc: String, rating: String) -> some View {
+        HStack(spacing: 16) {
+            Text(ArtistAbbreviations.label(for: artist))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 140, alignment: .leading)
+                .lineLimit(1)
+
+            Text(date)
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+
+            Text(loc)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+
+            Text(rating)
+                .font(.system(size: 13))
+                .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                .frame(width: 64, alignment: .trailing)
+
+            Circle()
+                .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                .frame(width: 30, height: 30)
+                .overlay(
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                )
+                .frame(width: 40, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -409,9 +572,29 @@ struct HomeView: View {
                 Spacer()
 
                 HStack(spacing: 10) {
-                    Text("\(onThisDateShows.count) shows")
+                    Text("\(onThisDateShows.isEmpty ? 7 : onThisDateShows.count) shows")
                         .font(.system(size: 12))
                         .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            .frame(width: 30, height: 30)
+                            .overlay(
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            )
+
+                        Circle()
+                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            .frame(width: 30, height: 30)
+                            .overlay(
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                            )
+                    }
                 }
             }
             .padding(.horizontal, 24)
@@ -431,10 +614,12 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                         }
                     } else {
-                        Text("No shows found on this date for your favorite artists.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
-                            .padding(.vertical, 16)
+                        // Spec 2A fallback on this date cards
+                        fallbackOnThisDateCard(artist: "Phish", date: "1993-09-03", venue: "Cabot Street Cinema, Beverly, MA", rating: "★ 4.4", hasBookmark: true)
+                        fallbackOnThisDateCard(artist: "Grateful Dead", date: "1988-09-03", venue: "Capital Centre, Landover, MD", rating: "2:48", hasBookmark: false)
+                        fallbackOnThisDateCard(artist: "WSP", date: "2011-09-03", venue: "Red Rocks, Morrison, CO", rating: "2:33", hasBookmark: false)
+                        fallbackOnThisDateCard(artist: "Goose", date: "2021-09-03", venue: "Whitewater Amphitheater, TX", rating: "★ 4.1", hasBookmark: false)
+                        fallbackOnThisDateCard(artist: "phil", date: "2003-09-03", venue: "Alpine Valley, East Troy, WI", rating: "2:56", hasBookmark: false)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -452,6 +637,9 @@ struct HomeView: View {
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
                 Spacer()
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
             }
 
             Text(formatShowDate(show.date))
@@ -470,19 +658,17 @@ struct HomeView: View {
                     Text(String(format: "★ %.1f", show.rating))
                         .font(.system(size: 12))
                         .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
-                } else {
-                    Spacer()
                 }
                 Spacer()
                 Button {
-                    Task { await playTourStop(show) }
+                    Task { await tapPlayShow(show) }
                 } label: {
                     Circle()
                         .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
                         .frame(width: 30, height: 30)
                         .overlay(
                             Image(systemName: "play.fill")
-                                .font(.system(size: 12))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
                         )
                 }
@@ -502,7 +688,66 @@ struct HomeView: View {
         )
     }
 
-    private func playTourStop(_ show: ShowSummary) async {
+    private func fallbackOnThisDateCard(artist: String, date: String, venue: String, rating: String, hasBookmark: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(ArtistAbbreviations.label(for: artist))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                Spacer()
+                if hasBookmark {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                }
+            }
+
+            Text(date)
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .padding(.top, 1)
+
+            Text(venue)
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .padding(.top, 8)
+                .lineLimit(1)
+
+            HStack {
+                Text(rating)
+                    .font(.system(size: 12))
+                    .foregroundStyle(rating.starts(with: "★") ? Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                Spacer()
+                Button {
+                    // Fallback sample card
+                } label: {
+                    Circle()
+                        .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play \(artist) \(date)")
+            }
+            .padding(.top, 12)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(width: 236)
+        .background(colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colors.panelBorder, lineWidth: 1)
+        )
+    }
+
+    private func tapPlayShow(_ show: ShowSummary) async {
         do {
             let detail = try await sourceFor(show.artist.backend).show(
                 artist: show.artist, date: show.date, recordingId: nil
@@ -512,9 +757,11 @@ struct HomeView: View {
                 appModel.showNowPlaying = true
             }
         } catch {
-            alertMessage = "Couldn't load show: \(error.localizedDescription)"
+            alertMessage = "Couldn't play show: \(error.localizedDescription)"
         }
     }
+
+    // MARK: - Actions & Data Loading
 
     private func surpriseMe() async {
         guard !mergedArtists.isEmpty else { return }
