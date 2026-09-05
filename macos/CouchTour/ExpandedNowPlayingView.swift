@@ -83,13 +83,36 @@ struct ExpandedNowPlayingView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 12)
 
-                let artistName = player.show?.artist.name ?? "Phish"
-                let showDate = player.show?.date ?? "1997-11-17"
-                let venueName = player.show?.where_.isEmpty == false ? player.show!.where_ : "Thomas & Mack Center, Las Vegas, NV"
-                let trackTitle = player.currentTrack?.title ?? "Bathtub Gin"
-                let duration = Double(player.currentTrack?.durationMs ?? 764_000)
+                let artistName = player.show?.artist.name ?? ""
+                let showDate = player.show?.date ?? ""
+                let venueName = player.show?.where_.isEmpty == false ? player.show!.where_ : ""
+                let trackTitle = player.currentTrack?.title ?? "No track playing"
+                let duration = Double(player.currentTrack?.durationMs ?? 0)
                 let currentPos = dragPositionMs ?? Double(player.positionMs)
                 let progressFrac = duration > 0 ? (currentPos / duration) : 0.0
+
+                let tapeLabel: String = {
+                    if let rec = player.recording {
+                        var parts: [String] = []
+                        parts.append(rec.isSoundboard ? "SBD" : "AUD")
+                        if let taper = rec.taper, !taper.isEmpty {
+                            parts.append(taper)
+                        }
+                        if rec.hasFlac {
+                            parts.append("FLAC")
+                        }
+                        return parts.joined(separator: " · ")
+                    }
+                    if let show = player.show {
+                        let isSbd = show.tags.contains { $0.name.localizedCaseInsensitiveContains("sbd") }
+                        let hasFlac = player.currentTrack?.flacUrl?.isEmpty == false
+                        var parts: [String] = []
+                        parts.append(isSbd ? "SBD" : "AUD")
+                        if hasFlac { parts.append("FLAC") }
+                        return parts.joined(separator: " · ")
+                    }
+                    return "SBD"
+                }()
 
                 Spacer()
 
@@ -111,15 +134,15 @@ struct ExpandedNowPlayingView: View {
                         HStack(spacing: 14) {
                             Text(artistName)
                                 .font(.system(size: 34, weight: .medium))
-                                .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                .foregroundStyle(colors.textPrimary)
                             Text(formatShowDate(showDate))
                                 .font(.system(size: 34, weight: .medium))
-                                .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                .foregroundStyle(colors.textPrimary)
                         }
 
                         Text(venueName)
                             .font(.system(size: 17))
-                            .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                            .foregroundStyle(colors.textSecondary)
                             .padding(.top, 7)
 
                         // Tape / Show Rating / Set Row
@@ -130,9 +153,9 @@ struct ExpandedNowPlayingView: View {
                                     .tracking(1.4)
                                     .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
                                 HStack(spacing: 6) {
-                                    Text("SBD · Paluska · FLAC")
+                                    Text(tapeLabel)
                                         .font(.system(size: 15))
-                                        .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                                        .foregroundStyle(colors.textPrimary)
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 10))
                                         .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
@@ -163,13 +186,13 @@ struct ExpandedNowPlayingView: View {
                                 let currentIdx = (player.currentIndex ?? 0) + 1
                                 Text("\(currentIdx) of \(player.tracks.count)")
                                     .font(.system(size: 15))
-                                    .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                                    .foregroundStyle(colors.textPrimary)
                             }
                         }
                         .padding(.top, 20)
                         .overlay(
                             Rectangle()
-                                .fill(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0).opacity(0.14))
+                                .fill(colors.divider)
                                 .frame(height: 1),
                             alignment: .top
                         )
@@ -179,7 +202,7 @@ struct ExpandedNowPlayingView: View {
                             HStack(spacing: 12) {
                                 Text(trackTitle)
                                     .font(.system(size: 44, weight: .medium))
-                                    .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                    .foregroundStyle(colors.textPrimary)
 
                                 if player.currentTrack?.flacUrl?.isEmpty == false {
                                     Text("FLAC")

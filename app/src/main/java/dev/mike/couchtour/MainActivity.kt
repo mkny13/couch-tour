@@ -470,7 +470,16 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                         .padding(horizontal = 14.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                when (show.artist.backend) {
+                                                    Backend.PHISHIN -> nav.navigate("show/${show.date}")
+                                                    Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                                                }
+                                            }
+                                    ) {
                                         Text(
                                             text = show.artist.name,
                                             fontSize = 16.sp,
@@ -1012,6 +1021,7 @@ fun ShowsScreen(period: String, nav: NavHostController) {
 fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
     val show = loadOnce(date) { PhishInApi.show(date) }
     val saved = loadOnce(date) { vm.progressFor(showQueueKey(date)) }
+    var addingToPlaylist by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         Header(date, nav)
@@ -1020,8 +1030,38 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
             // A finished show's stored position is the end of the encore, so
             // offering to resume it would just stop again immediately.
             val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
+            val artUrl = s.albumCoverUrl ?: s.coverArtUrls?.medium
+
+            if (addingToPlaylist) {
+                val trackEntities = playable.mapIndexed { idx, track ->
+                    LocalPlaylistTrackEntity(
+                        playlistId = "", position = idx, backend = Backend.PHISHIN.id,
+                        trackId = track.id.toString(), showDate = date, title = track.title,
+                        durationMs = track.duration, artUrl = artUrl,
+                    )
+                }
+                AddTracksToPlaylistDialog(
+                    vm = vm,
+                    tracks = trackEntities,
+                    onDismiss = { addingToPlaylist = false }
+                )
+            }
+
             LazyColumn {
-                item { ShowHeader(s, playable.size) }
+                item {
+                    ShowHeader(
+                        show = s,
+                        trackCount = playable.size,
+                        onResume = {
+                            if (progress != null) {
+                                vm.playShow(s, progress.trackIndex, progress.positionMs)
+                            } else {
+                                vm.playShow(s, 0, 0)
+                            }
+                        },
+                        onAdd = { addingToPlaylist = true }
+                    )
+                }
                 if (progress != null) {
                     item {
                         ResumeBanner(progress) {
@@ -1029,7 +1069,6 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                         }
                     }
                 }
-                val artUrl = s.albumCoverUrl ?: s.coverArtUrls?.medium
                 tracksGroupedBySet(playable) { index, track ->
                     TrackRow(track, index + 1, date, artUrl, vm) { vm.playShow(s, index, 0) }
                 }
@@ -1330,8 +1369,45 @@ fun RecordingScreen(
                     vm.playRecording(detail, resumeIndex.coerceIn(0, detail.tracks.lastIndex), resumeMs ?: 0)
                 }
             }
+            var addingToPlaylist by remember { mutableStateOf(false) }
+
+            if (addingToPlaylist) {
+                val trackEntities = detail.tracks.mapIndexed { idx, track ->
+                    LocalPlaylistTrackEntity(
+                        playlistId = "", position = idx, backend = backendId,
+                        trackId = track.id, showDate = date, title = track.title,
+                        durationMs = track.durationMs,
+                        artistSlug = artistId,
+                        recordingId = detail.recording?.id,
+                        artUrl = detail.summary.artUrl,
+                    )
+                }
+                AddTracksToPlaylistDialog(
+                    vm = vm,
+                    tracks = trackEntities,
+                    onDismiss = { addingToPlaylist = false }
+                )
+            }
+
             LazyColumn {
-                item { RecordingHeader(detail, backendId, artistId, date, vm, nav) }
+                item {
+                    RecordingHeader(
+                        detail = detail,
+                        backendId = backendId,
+                        artistId = artistId,
+                        date = date,
+                        vm = vm,
+                        nav = nav,
+                        onResume = {
+                            if (progress != null) {
+                                vm.playRecording(detail, progress.trackIndex, progress.positionMs)
+                            } else {
+                                vm.playRecording(detail, 0, 0)
+                            }
+                        },
+                        onAdd = { addingToPlaylist = true }
+                    )
+                }
                 if (progress != null) {
                     item {
                         ResumeBanner(progress) {
@@ -1348,30 +1424,171 @@ fun RecordingScreen(
 }
 
 @Composable
-private fun RecordingHeader(detail: ShowDetail, backendId: String, artistId: String, date: String, vm: PlayerViewModel, nav: NavHostController) {
+private fun RecordingHeader(
+    detail: ShowDetail,
+    backendId: String,
+    artistId: String,
+    date: String,
+    vm: PlayerViewModel,
+    nav: NavHostController,
+    onResume: (() -> Unit)? = null,
+    onAdd: (() -> Unit)? = null
+) {
     val summary = detail.summary
-    Column {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            ShowArtwork(
-                show = summary,
-                modifier = Modifier.size(88.dp).clip(RoundedCornerShape(8.dp))
-            )
-            Spacer(Modifier.width(14.dp))
+    val ledger = LocalLedgerColors.current
+    val totalDurationMs = detail.tracks.sumOf { it.durationMs }
+    val compactDuration = formatCompactDuration(totalDurationMs)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Top
+        ) {
             Column(Modifier.weight(1f)) {
-                Text(summary.artist.name, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                Text(summary.venue.orEmpty(), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                Text(summary.location.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                Text("${detail.tracks.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = summary.artist.name,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = (-0.02).sp,
+                        color = ledger.textHeadline
+                    )
+                    Text(
+                        text = date,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = (-0.02).sp,
+                        color = ledger.textHeadline
+                    )
+                }
+                summary.venue?.takeIf { it.isNotEmpty() }?.let { venue ->
+                    Text(
+                        text = listOfNotNull(venue, summary.location).joinToString(", "),
+                        fontSize = 14.sp,
+                        color = ledger.textSecondary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                val ratingVal = detail.recording?.rating?.takeIf { it > 0.0 } ?: summary.rating
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    if (ratingVal > 0.0) {
+                        Text(
+                            text = "★ ${"%.1f".format(java.util.Locale.US, ratingVal)}",
+                            fontSize = 13.sp,
+                            color = ledger.ratingAmber,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(text = "·", fontSize = 13.sp, color = ledger.textSubtle)
+                    }
+                    Text(
+                        text = "${detail.tracks.size} tracks · $compactDuration",
+                        fontSize = 13.sp,
+                        color = ledger.textSecondary
+                    )
+                }
                 detail.recording?.let { rec ->
-                    Text(recordingLabel(rec), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 6.dp)
+                    ) {
+                        Text(
+                            text = recordingLabel(rec),
+                            fontSize = 13.sp,
+                            color = ledger.textSecondary
+                        )
+                    }
                 }
             }
+
+            // 96dp artwork tile on the RIGHT
+            ShowArtwork(
+                show = summary,
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+        }
+
+        // Action pills row (36dp height, 18dp radius)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Resume / Play pill
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, ledger.accentIcon, RoundedCornerShape(18.dp))
+                    .background(Color(0x299184D9))
+                    .clickable(enabled = onResume != null) { onResume?.invoke() }
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = ledger.accentTintText,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Resume",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ledger.accentTintText
+                )
+            }
+
+            // Add pill
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .clickable(enabled = onAdd != null) { onAdd?.invoke() }
+                    .padding(horizontal = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.PlaylistAdd,
+                    contentDescription = null,
+                    tint = ledger.textSecondary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = "Add",
+                    fontSize = 13.sp,
+                    color = ledger.textSecondary
+                )
+            }
+
+            Spacer(Modifier.weight(1f))
             ShareButton(showShareText(summary.artist, date))
         }
+
         val headerTags = detail.recording?.tags?.takeIf { it.isNotEmpty() } ?: summary.tags
         if (headerTags.isNotEmpty()) {
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(bottom = 8.dp),
             ) {
@@ -1693,6 +1910,54 @@ internal fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AddTracksToPlaylistDialog(
+    vm: PlayerViewModel,
+    tracks: List<LocalPlaylistTrackEntity>,
+    onDismiss: () -> Unit
+) {
+    var creating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
+
+    if (creating) {
+        NewPlaylistDialog(
+            onDismiss = { creating = false },
+            onCreate = { name ->
+                creating = false
+                scope.launch {
+                    val id = vm.createLocalPlaylist(name)
+                    tracks.forEach { vm.addToLocalPlaylist(id, it) }
+                    onDismiss()
+                }
+            }
+        )
+    } else {
+        ModalBottomSheet(onDismissRequest = onDismiss) {
+            LazyColumn {
+                item {
+                    RowItem("New playlist", "", null) {
+                        creating = true
+                    }
+                }
+                items(playlists, key = { it.id }) { playlist ->
+                    RowItem(
+                        title = playlist.name,
+                        subtitle = "${playlist.trackCount} ${plural(playlist.trackCount, "track")}",
+                        artUrl = null,
+                    ) {
+                        scope.launch {
+                            tracks.forEach { vm.addToLocalPlaylist(playlist.id, it) }
+                            onDismiss()
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -2763,7 +3028,13 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
 // ---------------------------------------------------------------- pieces
 
 @Composable
-private fun ShowHeader(show: Show, trackCount: Int) {
+private fun ShowHeader(
+    show: Show,
+    trackCount: Int,
+    onResume: (() -> Unit)? = null,
+    onSave: (() -> Unit)? = null,
+    onAdd: (() -> Unit)? = null
+) {
     val ledger = LocalLedgerColors.current
     val totalDurationMs = show.duration
     val compactDuration = formatCompactDuration(totalDurationMs)
@@ -2811,35 +3082,39 @@ private fun ShowHeader(show: Show, trackCount: Int) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
-                    Text(
-                        text = "★ 4.6",
-                        fontSize = 13.sp,
-                        color = ledger.ratingAmber,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(text = "·", fontSize = 13.sp, color = ledger.textSubtle)
+                    if (show.likesCount > 0) {
+                        Text(
+                            text = "♥ ${show.likesCount}",
+                            fontSize = 13.sp,
+                            color = Color(0xFFF06BB0),
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(text = "·", fontSize = 13.sp, color = ledger.textSubtle)
+                    }
                     Text(
                         text = "$trackCount tracks · $compactDuration",
                         fontSize = 13.sp,
                         color = ledger.textSecondary
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(top = 6.dp)
-                ) {
-                    Text(
-                        text = "SBD · Paluska · FLAC",
-                        fontSize = 13.sp,
-                        color = ledger.textSecondary
-                    )
-                    Icon(
-                        Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = ledger.textSubtle,
-                        modifier = Modifier.size(13.dp)
-                    )
+                val hasSbd = show.tags.any { it.name.contains("sbd", ignoreCase = true) }
+                val hasFlac = show.tracks.any { it.mp3Url?.contains("flac", ignoreCase = true) == true }
+                val tapeStr = listOf(
+                    if (hasSbd) "SBD" else "AUD",
+                    if (hasFlac) "FLAC" else null
+                ).filterNotNull().joinToString(" · ")
+                if (tapeStr.isNotEmpty()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 6.dp)
+                    ) {
+                        Text(
+                            text = tapeStr,
+                            fontSize = 13.sp,
+                            color = ledger.textSecondary
+                        )
+                    }
                 }
             }
 
@@ -2878,6 +3153,7 @@ private fun ShowHeader(show: Show, trackCount: Int) {
                     .clip(RoundedCornerShape(18.dp))
                     .border(1.dp, ledger.accentIcon, RoundedCornerShape(18.dp))
                     .background(Color(0x299184D9))
+                    .clickable(enabled = onResume != null) { onResume?.invoke() }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -2902,6 +3178,7 @@ private fun ShowHeader(show: Show, trackCount: Int) {
                     .height(36.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .clickable(enabled = onSave != null) { onSave?.invoke() }
                     .padding(horizontal = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -2925,6 +3202,7 @@ private fun ShowHeader(show: Show, trackCount: Int) {
                     .height(36.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .clickable(enabled = onAdd != null) { onAdd?.invoke() }
                     .padding(horizontal = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)

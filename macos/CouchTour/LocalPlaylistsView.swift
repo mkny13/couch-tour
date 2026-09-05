@@ -17,8 +17,17 @@ struct LocalPlaylistsView: View {
     @State private var playlistTracks: [LocalPlaylistTrack] = []
     @State private var query = ""
     @State private var selectedCategory: LibraryCategory = .all
+    @State private var librarySort: LibrarySort = .recentlyAdded
     @State private var newName = ""
     @State private var showNewPlaylistField = false
+
+    enum LibrarySort: String, CaseIterable, Identifiable {
+        case recentlyAdded = "Recently added"
+        case title = "Title"
+        case artist = "Artist"
+
+        var id: String { rawValue }
+    }
 
     enum LibraryCategory: String, CaseIterable, Identifiable {
         case all = "All"
@@ -115,6 +124,7 @@ struct LocalPlaylistsView: View {
                 TextField("Search your library", text: $query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    .foregroundStyle(colors.textPrimary)
 
                 if !query.isEmpty {
                     Button {
@@ -129,40 +139,42 @@ struct LocalPlaylistsView: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 34)
-            .background(Color(red: 0x1C / 255.0, green: 0x1E / 255.0, blue: 0x2C / 255.0))
+            .background(colors.surface)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .stroke(colors.panelBorder, lineWidth: 1)
             )
 
-            // Recently added sort pill
-            HStack(spacing: 5) {
-                Text("Recently added")
-                    .font(.system(size: 13))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
+            // Sort menu pill
+            Menu {
+                ForEach(LibrarySort.allCases) { sort in
+                    Button {
+                        librarySort = sort
+                    } label: {
+                        HStack {
+                            Text(sort.rawValue)
+                            if librarySort == sort {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Text(librarySort.rawValue)
+                        .font(.system(size: 13))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 34)
+                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                .background(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1))
             }
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
-            .background(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1))
-
-            // Artist sort pill
-            HStack(spacing: 5) {
-                Text("Artist")
-                    .font(.system(size: 13))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
-            .background(Color.clear)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1))
+            .menuStyle(.borderlessButton)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 12)
@@ -447,12 +459,22 @@ struct LocalPlaylistsView: View {
             categoryFiltered = items.filter { $0.type == "TRACK" }
         }
 
+        let sorted: [LibraryItem]
+        switch librarySort {
+        case .recentlyAdded:
+            sorted = categoryFiltered
+        case .title:
+            sorted = categoryFiltered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .artist:
+            sorted = categoryFiltered.sorted { $0.artist.localizedCaseInsensitiveCompare($1.artist) == .orderedAscending }
+        }
+
         if query.trimmingCharacters(in: .whitespaces).isEmpty {
-            return categoryFiltered
+            return sorted
         }
 
         let q = query.localizedLowercase
-        return categoryFiltered.filter {
+        return sorted.filter {
             $0.name.localizedLowercase.contains(q) ||
             $0.subtitle.localizedLowercase.contains(q) ||
             $0.artist.localizedLowercase.contains(q)
