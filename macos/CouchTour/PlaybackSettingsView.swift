@@ -5,9 +5,18 @@ import SwiftUI
 struct PlaybackSettingsView: View {
     @ObservedObject var settings: PlaybackSettings
     @ObservedObject var updater: UpdaterViewModel
+    @ObservedObject var themeSettings: ThemeSettings
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Theme", selection: $themeSettings.themeMode) {
+                    ForEach(ThemeMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
             Section {
                 Toggle("Skip filler tracks", isOn: $settings.skipFiller)
                 Text("Automatically bypasses non-music tracks (intros, outros, tuning, stage banter, crowd noise, and stage announcements) during playback.")

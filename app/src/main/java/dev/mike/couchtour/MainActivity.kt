@@ -74,13 +74,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -635,6 +638,32 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                     },
                     onClick = { PlaybackSettings.toggle() },
                 )
+            }
+
+            item { SectionHeader("Appearance", divided = true) }
+            item {
+                val currentTheme by ThemeSettings.themeMode.collectAsState()
+                var showThemeDialog by rememberSaveable { mutableStateOf(false) }
+                RowItem(
+                    title = "Theme",
+                    subtitle = when (currentTheme) {
+                        ThemeMode.AUTO -> "Auto (system default)"
+                        ThemeMode.LIGHT -> "Light"
+                        ThemeMode.DARK -> "Dark"
+                    },
+                    artUrl = null,
+                    onClick = { showThemeDialog = true },
+                )
+                if (showThemeDialog) {
+                    ThemePickerDialog(
+                        currentMode = currentTheme,
+                        onDismiss = { showThemeDialog = false },
+                        onSelect = {
+                            ThemeSettings.setThemeMode(it)
+                            showThemeDialog = false
+                        },
+                    )
+                }
             }
 
             item { SectionHeader("Sync", divided = true) }
@@ -1673,6 +1702,52 @@ private fun RenamePlaylistDialog(currentName: String, onDismiss: () -> Unit, onR
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+internal fun ThemePickerDialog(
+    currentMode: ThemeMode,
+    onDismiss: () -> Unit,
+    onSelect: (ThemeMode) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose theme") },
+        text = {
+            Column {
+                listOf(
+                    ThemeMode.AUTO to "Auto (system default)",
+                    ThemeMode.LIGHT to "Light",
+                    ThemeMode.DARK to "Dark",
+                ).forEach { (mode, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = (mode == currentMode),
+                                onClick = { onSelect(mode) },
+                                role = Role.RadioButton,
+                            )
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = (mode == currentMode),
+                            onClick = null,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
     )
 }
 

@@ -75,6 +75,32 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
         )
 
+        // APPEARANCE Section
+        SectionEyebrow("APPEARANCE")
+        val currentTheme by ThemeSettings.themeMode.collectAsState()
+        var showThemeDialog by remember { mutableStateOf(false) }
+        SettingsValueRow(
+            label = "Theme",
+            value = when (currentTheme) {
+                ThemeMode.AUTO -> "Auto (system default)"
+                ThemeMode.LIGHT -> "Light"
+                ThemeMode.DARK -> "Dark"
+            },
+            onClick = { showThemeDialog = true }
+        )
+        if (showThemeDialog) {
+            ThemePickerDialog(
+                currentMode = currentTheme,
+                onDismiss = { showThemeDialog = false },
+                onSelect = {
+                    ThemeSettings.setThemeMode(it)
+                    showThemeDialog = false
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
         // PLAYBACK Section
         SectionEyebrow("PLAYBACK")
         SettingsValueRow(
