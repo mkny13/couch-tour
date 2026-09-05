@@ -97,6 +97,8 @@ internal fun mediaItem(
         likesCount = track.likesCount,
         showRating = showRating,
         tapeLineage = tapeLineage,
+        setName = track.setName,
+        trackPosition = track.position,
     )
 }
 
@@ -121,6 +123,8 @@ internal fun recordingMediaItem(
     flacUrl = track.flacUrl,
     showRating = showRating,
     tapeLineage = tapeLineage,
+    setName = track.setName,
+    trackPosition = track.position,
 )
 
 /**
@@ -149,6 +153,8 @@ private fun coreMediaItem(
     flacUrl: String? = null,
     showRating: Double = 0.0,
     tapeLineage: String? = null,
+    setName: String = "",
+    trackPosition: Int = 0,
 ): MediaItem {
     val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
     val resolvedVenue = venueName ?: info.subtitle
@@ -170,6 +176,8 @@ private fun coreMediaItem(
         putString(Keys.ARTIST_ID, artistId)
         if (showRating > 0.0) putDouble(Keys.SHOW_RATING, showRating)
         tapeLineage?.let { putString(Keys.TAPE_LINEAGE, it) }
+        if (setName.isNotBlank()) putString(Keys.SET_NAME, setName)
+        if (trackPosition > 0) putInt(Keys.TRACK_POSITION, trackPosition)
     }
     val meta = MediaMetadata.Builder()
         .setTitle(title)

@@ -162,10 +162,11 @@ struct SidebarView: View {
 
                     Spacer()
 
+                    let isPaired = appModel.syncSession.paired
                     Circle()
-                        .fill(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
+                        .fill(isPaired ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0) : Color.gray.opacity(0.35))
                         .frame(width: 6, height: 6)
-                        .shadow(color: Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.9), radius: 4)
+                        .shadow(color: isPaired ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.9) : Color.clear, radius: 4)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)

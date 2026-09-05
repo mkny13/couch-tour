@@ -50,12 +50,14 @@ object Keys {
     const val ARTIST_ID = "artist_id"
     const val SHOW_RATING = "show_rating"
     const val TAPE_LINEAGE = "tape_lineage"
+    const val SET_NAME = "set_name"
+    const val TRACK_POSITION = "track_position"
 
     /** Cast has to be told what to carry across the wire; nothing else enumerates these. */
     val ALL = listOf(
         QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID,
         LIKED, LIKES_COUNT, FLAC_URL, MP3_URL, SHOW_DATE, VENUE_NAME, ARTIST_NAME, ARTIST_ID,
-        SHOW_RATING, TAPE_LINEAGE
+        SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION
     )
 }
 

@@ -480,12 +480,14 @@ public struct PlayableTrack: Equatable, Sendable {
     public let likesCount: Int
     public let likedByUser: Bool
     public let tags: [Tag]
+    public let position: Int
     public let popularity: RelistenPopularity?
 
     public init(
         id: String,
         title: String,
         setName: String = "",
+        position: Int = 0,
         durationMs: Int64 = 0,
         url: String,
         waveformURL: String? = nil,
@@ -501,6 +503,7 @@ public struct PlayableTrack: Equatable, Sendable {
         self.id = id
         self.title = title
         self.setName = setName
+        self.position = position
         self.durationMs = durationMs
         self.url = url
         self.waveformURL = waveformURL
@@ -885,6 +888,7 @@ extension Track {
             id: String(id),
             title: title,
             setName: setName,
+            position: position,
             // Already milliseconds. Relisten's are seconds — see RelistenSourceTrack.toPlayableTrack.
             durationMs: duration,
             url: mp3Url ?? "",

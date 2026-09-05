@@ -574,6 +574,7 @@ extension RelistenSourceTrack {
             // Suppressed for an artist without real sets (verified live: Dead sources carry
             // one wrapper set literally named "Set") rather than every screen re-checking hasSets.
             setName: artist.hasSets ? setName : "",
+            position: trackPosition,
             durationMs: duration * 1000,
             url: mp3Url ?? "",
             showDate: showDate,

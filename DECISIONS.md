@@ -4051,3 +4051,40 @@ A second exhaustive screen-by-screen audit against `design/handoff/README.md`, `
    - Added unit test suites for `SavedShows` on both Android (`SavedShowsTest.kt`, 503 passing tests total) and macOS (`SavedShowsTests.swift`, 418 passing tests total).
    - Added `uat-036` (Saved Shows & Library Bookmark Parity) and `uat-037` (Now Playing Tape Lineage & Show Rating) to `UAT.md`.
 
+## Iteration 79 — Design Docs Comparison Audit Round 3 (D221)
+
+### D221 — Set/track eyebrow parity, waveform scrubber playhead needle, macOS height scaling, and Relisten set headers
+
+A third exhaustive screen-by-screen audit against `design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html` addressed remaining discrepancies and wiring details across macOS and Android:
+
+1. **Android Now Playing FLAC Badge & Set/Track Eyebrow** (`NowPlaying.kt`, `PlayerViewModel.kt`, `MediaItems.kt`, `PlaybackService.kt`):
+   - Guarded the FLAC pill in `NowPlaying.kt` with `if (state.isFlac)` so it only renders when the active stream is genuine FLAC audio.
+   - Added `SET_NAME` and `TRACK_POSITION` to `PlaybackService.Keys` and `Keys.ALL`.
+   - Wired `setName` and `trackPosition` through `mediaItem(...)` and `recordingMediaItem(...)` in `MediaItems.kt`.
+   - Exposed `setName: String` and `trackPosition: Int` in `PlayerState` and populated them in `PlayerViewModel.refresh()`.
+   - Formatted track eyebrow as `SET <I/II/ENCORE> · TRACK <N>` (e.g. `SET II · TRACK 4` matching spec line 355/430), falling back to `TRACK <N>` when set information is not present.
+
+2. **Android Waveform Scrubber Needle Cursor** (`DesignComponents.kt`):
+   - Added a 2px rounded playhead cursor needle in `#F3F5FE` at `playedWidth` with vertical extension matching the design spec (`position:absolute;left:34%;top:-4px;bottom:-4px;width:2px;background:#f3f5fe;border-radius:2px;box-shadow:0 0 12px rgba(240,107,176,.9)`).
+
+3. **Android RecordingScreen Set Headers Duration & Hairlines** (`MainActivity.kt`):
+   - Upgraded `groupedBySet` for `PlayableTrack` to calculate set durations and render `SetHeader(setName, durationMs)` with `GradientHairline`, matching `ShowScreen` and the design docs.
+
+4. **macOS WaveformScrubber Height Constraint Removal** (`WaveformScrubber.swift`):
+   - Removed hardcoded `.frame(height: 38)` on inner geometry so `WaveformScrubber` adopts the height provided by its caller (`.frame(height: 64)` in `PlayerRailView`, `.frame(height: 110)` in `ExpandedNowPlayingView`), matching design doc spec lines 363 & 1837.
+
+5. **macOS Now Playing Set & Track Eyebrows and Column Layout** (`Catalog.swift`, `PhishInAPI.swift`, `RelistenAPI.swift`, `Format.swift`, `PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - Added `position: Int = 0` to `PlayableTrack` in `CouchTourKit` and mapped track position from `Track` and `RelistenSourceTrack`.
+   - Added `formatSetRoman`, `formatSetAndTrackEyebrow`, and `formatSetColumn` helpers to `Format.swift`.
+   - In `PlayerRailView.swift`, updated eyebrow to `SET II · TRACK 4`.
+   - In `ExpandedNowPlayingView.swift`, updated column 3 of the metadata row to `SET` / `II · Track 4` and added `SET II · TRACK 4` eyebrow above the track title.
+
+6. **macOS Sidebar Sync Status Dot State** (`SidebarView.swift`):
+   - Conditioned the glowing purple sync dot on `appModel.syncSession.paired`, rendering dimmed/subtle when unpaired.
+
+7. **Automated Unit Testing & Documentation Updates** (`MediaItemsTest.kt`, `FormatTests.swift`, `README.md`, `UAT.md`):
+   - Added unit tests for `SET_NAME` and `TRACK_POSITION` extras in `MediaItemsTest.kt` (504 Android unit tests total).
+   - Added unit tests for `formatSetRoman`, `formatSetAndTrackEyebrow`, and `formatSetColumn` in `FormatTests.swift` (421 macOS package tests total).
+   - Added UAT items `uat-038` and `uat-039` to `UAT.md`.
+
+

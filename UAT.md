@@ -99,5 +99,7 @@ Long-standing items that predate this sprint.
 - [ ] `uat-035` **Show Detail Action Pills & Next Tour Stop Tap** (Android) — ShowHeader and RecordingHeader action pills (Resume, Saved, Add) respond to touch; tapping Next Tour Stop card navigates to show details.
 - [ ] `uat-036` **Saved Shows & Library Bookmark Parity** (macOS & Android) — On Show Detail, tapping "Saved" toggles bookmark state for the show (not the artist). Saved shows display bookmark icons on Home "On This Date" cards. On Android Show/Recording header, pills dynamically toggle between Play/Resume and Save/Saved.
 - [ ] `uat-037` **Now Playing Tape Lineage & Show Rating** (Android) — Now Playing screen tape header displays dynamic tape lineage (SBD / AUD / taper details) and renders "SHOW RATING ★ 4.6" when a rating is present.
+- [ ] `uat-038` **Now Playing Set & Track Eyebrow & FLAC Pill Condition** (Android & macOS) — Verify Now Playing screen eyebrow displays `SET <I/II/ENCORE> · TRACK <N>` (e.g. `SET II · TRACK 4`) rather than just `TRACK <N>`. Confirm the FLAC pill only appears when playing FLAC audio. On macOS Expanded Now Playing, verify the 3rd column displays `SET` / `II · Track 4`.
+- [ ] `uat-039` **Waveform Scrubber Needle & Height Scaling** (Android & macOS) — Verify Android waveform scrubber displays a 2px rounded needle cursor at the playhead position. Verify macOS waveform scrubber renders at full 64px height in the Right Player Rail and 110px height in Expanded Now Playing. Confirm Relisten tape set headers show set durations and gradient hairlines.
 
 

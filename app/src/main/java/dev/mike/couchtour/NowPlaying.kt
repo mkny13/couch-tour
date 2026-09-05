@@ -297,22 +297,24 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 tint = ledger.textSubtle,
                                 modifier = Modifier.size(14.dp)
                             )
-                            Box(
-                                modifier = Modifier
-                                    .border(
-                                        1.dp,
-                                        if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615),
-                                        RoundedCornerShape(4.dp)
+                            if (state.isFlac) {
+                                Box(
+                                    modifier = Modifier
+                                        .border(
+                                            1.dp,
+                                            if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615),
+                                            RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "FLAC",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 1.sp,
+                                        color = ledger.ratingAmber
                                     )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "FLAC",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.sp,
-                                    color = ledger.ratingAmber
-                                )
+                                }
                             }
                         }
                     }
@@ -347,8 +349,25 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 12.dp)
             ) {
+                val eyebrow = buildString {
+                    if (state.setName.isNotBlank()) {
+                        val romanSet = when (state.setName.trim().lowercase()) {
+                            "set 1", "set1", "1", "s1" -> "SET I"
+                            "set 2", "set2", "2", "s2" -> "SET II"
+                            "set 3", "set3", "3", "s3" -> "SET III"
+                            "set 4", "set4", "4", "s4" -> "SET IV"
+                            "encore", "e" -> "ENCORE"
+                            "soundcheck" -> "SOUNDCHECK"
+                            else -> state.setName.trim().uppercase()
+                        }
+                        append(romanSet)
+                        append(" · ")
+                    }
+                    val trackNum = if (state.trackPosition > 0) state.trackPosition else (state.trackIndex + 1)
+                    append("TRACK $trackNum")
+                }
                 Text(
-                    text = "TRACK ${state.trackIndex + 1}",
+                    text = eyebrow,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.6.sp,

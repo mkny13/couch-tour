@@ -292,6 +292,20 @@ fun WaveformScrubber(
                 }
             }
         }
+
+        // 3. Draw playhead needle cursor matching design spec (#f3f5fe / 2px wide)
+        if (playedWidth > 0f) {
+            val needleWidth = 2.dp.toPx()
+            val needleTop = (centerTop - 4.dp.toPx()).coerceAtLeast(0f)
+            val needleHeight = (h - (needleTop * 2)).coerceAtLeast(centerBarHeight + 8.dp.toPx())
+            val needleX = (playedWidth - needleWidth / 2f).coerceIn(0f, w - needleWidth)
+            drawRoundRect(
+                color = Color(0xFFF3F5FE),
+                topLeft = Offset(needleX, needleTop),
+                size = Size(needleWidth, needleHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
+            )
+        }
     }
 }
 

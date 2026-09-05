@@ -78,7 +78,6 @@ public struct WaveformScrubber: View {
                     }
             )
         }
-        .frame(height: 38)
     }
 }
 
