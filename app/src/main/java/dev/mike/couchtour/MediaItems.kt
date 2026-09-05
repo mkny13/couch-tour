@@ -41,7 +41,9 @@ internal fun showTrackItems(show: Show): List<MediaItem> {
     val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
     val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
     val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art, artist = "Phish", artistId = "phish")
-    return show.tracks.filter { it.playable }.map { mediaItem(it, info) }
+    val hasSbd = show.tags.any { it.name.contains("sbd", ignoreCase = true) }
+    val tapeLineage = if (hasSbd) "SBD · Soundboard" else "AUD · Audience recording"
+    return show.tracks.filter { it.playable }.map { mediaItem(it, info, tapeLineage = tapeLineage) }
 }
 
 /** Same as [showTrackItems], for a playlist — shared by [PlayerViewModel.playPlaylist] and Auto. */
@@ -62,7 +64,13 @@ internal fun playlistTrackItems(playlist: Playlist): List<MediaItem> {
     return entries.map { mediaItem(it.track, info, it) }
 }
 
-internal fun mediaItem(track: Track, info: QueueInfo, entry: PlaylistEntry? = null): MediaItem {
+internal fun mediaItem(
+    track: Track,
+    info: QueueInfo,
+    entry: PlaylistEntry? = null,
+    showRating: Double = 0.0,
+    tapeLineage: String? = null
+): MediaItem {
     // Per-track, not shared: waveform and cover differ for every track in a playlist.
     val art = track.showAlbumCoverUrl ?: info.art
     // Playlist entries can be excerpts; without this they'd play the full track. Playlists
@@ -87,11 +95,18 @@ internal fun mediaItem(track: Track, info: QueueInfo, entry: PlaylistEntry? = nu
         backend = Backend.PHISHIN.id,
         likedByUser = track.likedByUser,
         likesCount = track.likesCount,
+        showRating = showRating,
+        tapeLineage = tapeLineage,
     )
 }
 
 /** The Relisten counterpart of [mediaItem] — same shape, a [PlayableTrack] instead of a phish.in [Track]. */
-internal fun recordingMediaItem(track: PlayableTrack, info: QueueInfo): MediaItem = coreMediaItem(
+internal fun recordingMediaItem(
+    track: PlayableTrack,
+    info: QueueInfo,
+    showRating: Double = 0.0,
+    tapeLineage: String? = null
+): MediaItem = coreMediaItem(
     id = track.id,
     title = track.title,
     url = track.url,
@@ -104,6 +119,8 @@ internal fun recordingMediaItem(track: PlayableTrack, info: QueueInfo): MediaIte
     artistId = info.artistId,
     backend = Backend.RELISTEN.id,
     flacUrl = track.flacUrl,
+    showRating = showRating,
+    tapeLineage = tapeLineage,
 )
 
 /**
@@ -130,6 +147,8 @@ private fun coreMediaItem(
     likedByUser: Boolean = false,
     likesCount: Int = 0,
     flacUrl: String? = null,
+    showRating: Double = 0.0,
+    tapeLineage: String? = null,
 ): MediaItem {
     val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
     val resolvedVenue = venueName ?: info.subtitle
@@ -149,6 +168,8 @@ private fun coreMediaItem(
         resolvedVenue?.let { putString(Keys.VENUE_NAME, it) }
         putString(Keys.ARTIST_NAME, artist)
         putString(Keys.ARTIST_ID, artistId)
+        if (showRating > 0.0) putDouble(Keys.SHOW_RATING, showRating)
+        tapeLineage?.let { putString(Keys.TAPE_LINEAGE, it) }
     }
     val meta = MediaMetadata.Builder()
         .setTitle(title)
@@ -184,9 +205,8 @@ private fun coreMediaItem(
 }
 
 /**
- * The playable [MediaItem]s for one tape of a Relisten show, in track order. [ShowDetail]
- * already picked the recording (P3's `toShowDetail`) and filtered to tracks with audio, the
- * same contract [showTrackItems] relies on for phish.in.
+ * The Relisten counterpart of [showTrackItems] — builds the playable items for a chosen
+ * tape.
  *
  * A show with no chosen recording — [ShowDetail.queueKey] is then null — still builds a
  * (unresumable) queue rather than an empty one: better to let it play than to silently
@@ -202,7 +222,14 @@ internal fun recordingTrackItems(detail: ShowDetail): List<MediaItem> {
         artist = summary.artist.name,
         artistId = summary.artist.id,
     )
-    return detail.tracks.map { recordingMediaItem(it, info) }
+    val rating = detail.recording?.rating?.takeIf { it > 0.0 } ?: detail.summary.rating
+    val tapeLineage = detail.recording?.let { rec ->
+        val sbdAud = if (rec.isSoundboard) "SBD" else "AUD"
+        val infoPart = rec.taper?.takeIf { it.isNotBlank() }?.let { "taper: $it" }
+            ?: rec.lineage?.takeIf { it.isNotBlank() }
+        listOfNotNull(sbdAud, infoPart).joinToString(" · ").ifBlank { rec.label }
+    }
+    return detail.tracks.map { recordingMediaItem(it, info, rating, tapeLineage) }
 }
 
 /**

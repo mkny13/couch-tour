@@ -41,6 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -847,57 +848,71 @@ private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: Na
 @Composable
 private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController) {
     val ledger = LocalLedgerColors.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                when (show.artist.backend) {
-                    Backend.PHISHIN -> nav.navigate("show/${show.date}")
-                    Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    when (show.artist.backend) {
+                        Backend.PHISHIN -> nav.navigate("show/${show.date}")
+                        Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                    }
+                }
+                .padding(horizontal = 20.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val year = show.date.take(4)
+                    Text(
+                        text = year,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ledger.textPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = show.artist.name,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ledger.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                val venueLocation = show.where.ifBlank { null }
+                if (venueLocation != null) {
+                    Text(
+                        text = venueLocation,
+                        fontSize = 12.sp,
+                        color = ledger.textSubtle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 1.dp)
+                    )
                 }
             }
-            .padding(horizontal = 20.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val year = show.date.take(4)
+            if (show.rating > 0.0) {
                 Text(
-                    text = year,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = ledger.textPrimary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = show.artist.name,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = ledger.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            val venueLocation = show.where.ifBlank { null }
-            if (venueLocation != null) {
-                Text(
-                    text = venueLocation,
+                    text = "★ ${"%.1f".format(java.util.Locale.US, show.rating)}",
                     fontSize = 12.sp,
-                    color = ledger.textSubtle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 1.dp)
+                    color = ledger.ratingAmber,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            } else if (show.likesCount > 0) {
+                Text(
+                    text = "♥ ${show.likesCount}",
+                    fontSize = 12.sp,
+                    color = Color(0xFFF06BB0),
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
         }
-        if (show.rating > 0.0) {
-            Text(
-                text = "★ ${"%.1f".format(java.util.Locale.US, show.rating)}",
-                fontSize = 12.sp,
-                color = ledger.ratingAmber,
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        }
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            thickness = 1.dp,
+            color = ledger.listDivider
+        )
     }
 }
 
@@ -1047,11 +1062,16 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                 )
             }
 
+            val savedKeys by SavedShows.keys.collectAsState()
+            val isSaved = s.date in savedKeys
+
             LazyColumn {
                 item {
                     ShowHeader(
                         show = s,
                         trackCount = playable.size,
+                        hasProgress = progress != null,
+                        isSaved = isSaved,
                         onResume = {
                             if (progress != null) {
                                 vm.playShow(s, progress.trackIndex, progress.positionMs)
@@ -1059,6 +1079,7 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                                 vm.playShow(s, 0, 0)
                             }
                         },
+                        onSave = { SavedShows.toggle(s.date) },
                         onAdd = { addingToPlaylist = true }
                     )
                 }
@@ -1389,6 +1410,9 @@ fun RecordingScreen(
                 )
             }
 
+            val savedKeys by SavedShows.keys.collectAsState()
+            val isSaved = date in savedKeys
+
             LazyColumn {
                 item {
                     RecordingHeader(
@@ -1398,6 +1422,8 @@ fun RecordingScreen(
                         date = date,
                         vm = vm,
                         nav = nav,
+                        hasProgress = progress != null,
+                        isSaved = isSaved,
                         onResume = {
                             if (progress != null) {
                                 vm.playRecording(detail, progress.trackIndex, progress.positionMs)
@@ -1405,6 +1431,7 @@ fun RecordingScreen(
                                 vm.playRecording(detail, 0, 0)
                             }
                         },
+                        onSave = { SavedShows.toggle(date) },
                         onAdd = { addingToPlaylist = true }
                     )
                 }
@@ -1431,7 +1458,10 @@ private fun RecordingHeader(
     date: String,
     vm: PlayerViewModel,
     nav: NavHostController,
+    hasProgress: Boolean = false,
+    isSaved: Boolean = false,
     onResume: (() -> Unit)? = null,
+    onSave: (() -> Unit)? = null,
     onAdd: (() -> Unit)? = null
 ) {
     val summary = detail.summary
@@ -1550,10 +1580,36 @@ private fun RecordingHeader(
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
-                    text = "Resume",
+                    text = if (hasProgress) "Resume" else "Play",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = ledger.accentTintText
+                )
+            }
+
+            // Saved pill
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, if (isSaved) ledger.accentIcon else ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .background(if (isSaved) Color(0x299184D9) else Color.Transparent)
+                    .clickable(enabled = onSave != null) { onSave?.invoke() }
+                    .padding(horizontal = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Icon(
+                    if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                    contentDescription = null,
+                    tint = if (isSaved) ledger.accentTintText else ledger.textSecondary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = if (isSaved) "Saved" else "Save",
+                    fontSize = 13.sp,
+                    fontWeight = if (isSaved) FontWeight.Medium else FontWeight.Normal,
+                    color = if (isSaved) ledger.accentTintText else ledger.textSecondary
                 )
             }
 
@@ -3031,6 +3087,8 @@ fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
 private fun ShowHeader(
     show: Show,
     trackCount: Int,
+    hasProgress: Boolean = false,
+    isSaved: Boolean = false,
     onResume: (() -> Unit)? = null,
     onSave: (() -> Unit)? = null,
     onAdd: (() -> Unit)? = null
@@ -3165,7 +3223,7 @@ private fun ShowHeader(
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
-                    text = "Resume",
+                    text = if (hasProgress) "Resume" else "Play",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = ledger.accentTintText
@@ -3177,22 +3235,24 @@ private fun ShowHeader(
                 modifier = Modifier
                     .height(36.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .border(1.dp, if (isSaved) ledger.accentIcon else ledger.controlOutline, RoundedCornerShape(18.dp))
+                    .background(if (isSaved) Color(0x299184D9) else Color.Transparent)
                     .clickable(enabled = onSave != null) { onSave?.invoke() }
                     .padding(horizontal = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 Icon(
-                    Icons.Default.Bookmark,
+                    if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                     contentDescription = null,
-                    tint = ledger.textSecondary,
+                    tint = if (isSaved) ledger.accentTintText else ledger.textSecondary,
                     modifier = Modifier.size(15.dp)
                 )
                 Text(
-                    text = "Saved",
+                    text = if (isSaved) "Saved" else "Save",
                     fontSize = 13.sp,
-                    color = ledger.textSecondary
+                    fontWeight = if (isSaved) FontWeight.Medium else FontWeight.Normal,
+                    color = if (isSaved) ledger.accentTintText else ledger.textSecondary
                 )
             }
 
@@ -3221,7 +3281,6 @@ private fun ShowHeader(
             }
 
             Spacer(Modifier.weight(1f))
-            LikeButton(Likable.Show, show.id, show.likedByUser, show.likesCount)
             ShareButton(showShareText(PHISH, show.date))
         }
 

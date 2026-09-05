@@ -323,18 +323,12 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                 items(filteredShows, key = { "ip_${it.queueKey}" }) { item ->
                     val showDate = item.queueKey.removePrefix("show:").removePrefix("recording:relisten:")
                     val subtitleText = listOfNotNull(item.artist.ifBlank { null }, item.title.ifBlank { null }).joinToString(" · ")
+                    val trailing = if (item.positionMs > 0) "${fmt(item.positionMs)} elapsed" else null
                     LibraryRowItem(
                         badgeType = "SHOW",
                         title = formatShowDate(showDate),
                         subtitle = subtitleText.ifBlank { item.trackTitle },
-                        trailingAction = {
-                            CircularPlayButton(
-                                isPlaying = false,
-                                onClick = { vm.resume(item) },
-                                size = 30.dp,
-                                iconSize = 14.dp
-                            )
-                        },
+                        trailingText = trailing,
                         onClick = { openQueueKey(item.queueKey, nav) }
                     )
                 }
