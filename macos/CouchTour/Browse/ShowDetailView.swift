@@ -16,11 +16,14 @@ struct ShowDetailView: View {
     @State private var detail: ShowDetail?
     @State private var loadState: LoadState = .loading
     @State private var showSourcePicker = false
-    @State private var isSaved = false
     @State private var savedProgress: PlaybackProgress?
     @EnvironmentObject private var player: Player
     @EnvironmentObject private var appModel: AppModel
     @Environment(\.ledgerColors) private var colors
+
+    private var isSaved: Bool {
+        appModel.favorites.keys.contains(show.artist.key)
+    }
 
     private var yearString: String {
         String(show.date.prefix(4))
@@ -181,9 +184,11 @@ struct ShowDetailView: View {
     private func statsRow(_ detail: ShowDetail, groups: [TrackGroup]) -> some View {
         HStack(spacing: 16) {
             // Rating
-            Text("★ 4.6")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+            if show.rating > 0 {
+                Text(String(format: "★ %.1f", show.rating))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+            }
 
             // Sets · Tracks · Duration
             let countStr = "\(groups.count) \(plural(groups.count, "set")) · \(detail.tracks.count) tracks · \(formatCompactDuration(ms: totalDurationMs))"
@@ -192,9 +197,11 @@ struct ShowDetailView: View {
                 .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
 
             // Tour Name
-            Text("Fall Tour \(yearString)")
-                .font(.system(size: 14))
-                .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+            if let tourName = show.tourName, !tourName.isEmpty {
+                Text(tourName)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+            }
 
             // Tape Source Pill
             sourceBadgeButton(detail)
@@ -282,7 +289,7 @@ struct ShowDetailView: View {
 
             // Saved Toggle
             Button {
-                isSaved.toggle()
+                appModel.favorites.toggle(show.artist.key)
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
@@ -578,10 +585,7 @@ private struct TrackTableRow: View {
     @Environment(\.ledgerColors) private var colors
 
     private var isJamChart: Bool {
-        track.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") } ||
-        track.title.localizedCaseInsensitiveContains("tweezer") ||
-        track.title.localizedCaseInsensitiveContains("gin") ||
-        track.title.localizedCaseInsensitiveContains("ghost")
+        track.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") }
     }
 
     var body: some View {

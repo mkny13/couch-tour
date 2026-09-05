@@ -3925,5 +3925,50 @@ Resolved 5 visual markup points identified during manual review of the macOS Hom
    - In `HomeView.swift`, added `Image(systemName: "chevron.down")` with explicit 10×10 framing, `.fixedSize()`, and `.layoutPriority(1)` to the "Recently played" and "All artists" dropdown filter pills.
    - Applied `.lineLimit(1)` and `.fixedSize()` so pills never clip down to truncated ellipses.
 
+## Iteration 76 — UI wiring, navigation routing, and mock data audit across Android and macOS (#139–#149)
 
+### D218 — Comprehensive audit and resolution of UI wiring, navigation routes, and mock data across Android and macOS clients (#139–#149)
 
+Comprehensive code audit of the newly introduced Ledger UI components across Android and macOS identified
+and resolved multiple instances of unwired buttons, mock/hardcoded values, and missing navigation routes:
+
+1. **#139: Android Search Filter Tabs Wiring** (`SearchScreen.kt`):
+   - Wired category filter pills (`All`, `Artists`, `Shows`, `Songs`, `Venues`) to actual active filter state
+     (`SearchFilter.ALL`, `SearchFilter.ARTISTS`, etc.) with dynamic result counts per category.
+   - Filter chips now correctly filter search results displayed in the unified search screen.
+
+2. **#140: Android Library Sort Dropdown Menu** (`LibraryScreen.kt`):
+   - Replaced static sort pill with an interactive dropdown menu offering sorting options (`Recently added`, `Title / Date`, `Artist`).
+   - Wired active sorting directly into the combined library item query flow.
+
+3. **#141: Android Settings "Clear Offline Storage" Action** (`SettingsScreen.kt`):
+   - Replaced dead button and hardcoded storage text (`"0.0 GB"`) with live calculation of cache size (`context.cacheDir`).
+   - Tapping invokes cache clear with responsive confirmation UI (`"Storage cleared"`).
+
+4. **#142: Android Now Playing Queue "Save as Playlist" Action** (`NowPlaying.kt`):
+   - Replaced no-op button with a functional "Save queue as playlist" dialog allowing users to save the currently playing queue as a local playlist.
+   - Saves track references directly into the database via `LocalPlaylistRepository`.
+
+5. **#143: Android Home Screen "Next Couch Tour Stop" Tap Target** (`DesignComponents.kt`):
+   - Made the entire next tour stop card clickable (`Modifier.clickable`), routing to the show detail screen for the upcoming unplayed show.
+   - Added an interactive circular play button that directly starts playback of the show.
+
+6. **#144: Android Library Item Context Menu ("...") Actions** (`LibraryScreen.kt`):
+   - Replaced no-op `IconButton` with a functional `DropdownMenu` containing context actions: `Play`, `Add to playlist`, `Share`, and `Remove from library`.
+
+7. **#145: macOS Search Filter Tabs Wiring** (`SearchView.swift`):
+   - Wired the search category filter pills (`All`, `Shows`, `Tracks`, `Venues`, `Artists`) to `searchCategory` filtering state with live item counts.
+
+8. **#146: macOS Player Rail Up-Next Queue Actions** (`PlayerRailView.swift`):
+   - Wired "Clear queue" button to `player.clearQueue()` (preserving the currently playing track).
+   - Added a "Save as playlist..." dialog to save the remaining up-next queue as a new local mixtape playlist.
+
+9. **#147: macOS Expanded Now Playing "Add to Playlist" Action** (`ExpandedNowPlayingView.swift`):
+   - Replaced disabled/no-op action button with an active playlist picker sheet (`AddToPlaylistSheet`) allowing the playing track to be added to any local or phish.in playlist.
+
+10. **#148: macOS Desktop Library Table Context Menu Actions** (`LocalPlaylistsView.swift`):
+    - Replaced no-op dots menu (`Image(systemName: "ellipsis")`) with an interactive SwiftUI `Menu` providing actions: `Play`, `Add to Queue`, `Add to Playlist`, `Share`, and `Delete / Remove`.
+
+11. **#149: macOS Show Detail Action Pills Wiring & Dynamic Card Ratings** (`ShowDetailView.swift`, `HomeView.swift`):
+    - Wired `Add to Playlist` button on the show detail view to show a picker sheet for adding all tracks in the show to a local playlist.
+    - Replaced hardcoded `★ 4.2` and `★ 4.4` ratings on tour stop and anniversary show cards in `HomeView.swift` with dynamic `show.rating > 0` checks.

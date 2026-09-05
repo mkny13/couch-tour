@@ -46,8 +46,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+
 enum class LibraryFilter {
     ALL, PLAYLISTS, SHOWS, TRACKS
+}
+
+enum class LibrarySortMode(val label: String) {
+    RECENTLY_ADDED("Recently added"),
+    TITLE_ASC("Title (A–Z)"),
+    TITLE_DESC("Title (Z–A)"),
 }
 
 /**
@@ -61,15 +70,55 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
     val scope = rememberCoroutineScope()
     var selectedFilter by rememberSaveable { mutableStateOf(LibraryFilter.ALL) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var sortMode by rememberSaveable { mutableStateOf(LibrarySortMode.RECENTLY_ADDED) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
 
-    val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
-    val inProgressList by vm.progressDao.inProgress().collectAsState(initial = emptyList())
-    val finishedKeys by vm.progressDao.finishedKeys().collectAsState(initial = emptyList())
+    val rawPlaylists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
+    val rawInProgressList by vm.progressDao.inProgress().collectAsState(initial = emptyList())
+    val rawTracks by vm.localPlaylistDao.allTracks().collectAsState(initial = emptyList())
 
-    val playlistCount = playlists.size
-    val showCount = inProgressList.size + finishedKeys.size
-    val trackCount = playlists.sumOf { it.trackCount }
+    val queryTrimmed = searchQuery.trim()
+
+    // Filter by search query
+    val filteredPlaylists = remember(rawPlaylists, queryTrimmed, sortMode) {
+        val filtered = if (queryTrimmed.isBlank()) rawPlaylists else rawPlaylists.filter { it.name.contains(queryTrimmed, ignoreCase = true) }
+        when (sortMode) {
+            LibrarySortMode.RECENTLY_ADDED -> filtered.sortedByDescending { it.updatedAt }
+            LibrarySortMode.TITLE_ASC -> filtered.sortedBy { it.name.lowercase() }
+            LibrarySortMode.TITLE_DESC -> filtered.sortedByDescending { it.name.lowercase() }
+        }
+    }
+
+    val filteredShows = remember(rawInProgressList, queryTrimmed, sortMode) {
+        val filtered = if (queryTrimmed.isBlank()) rawInProgressList else rawInProgressList.filter {
+            it.title.contains(queryTrimmed, ignoreCase = true) ||
+            it.artist.contains(queryTrimmed, ignoreCase = true) ||
+            it.trackTitle.contains(queryTrimmed, ignoreCase = true)
+        }
+        when (sortMode) {
+            LibrarySortMode.RECENTLY_ADDED -> filtered.sortedByDescending { it.updatedAt }
+            LibrarySortMode.TITLE_ASC -> filtered.sortedBy { it.title.lowercase() }
+            LibrarySortMode.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
+        }
+    }
+
+    val filteredTracks = remember(rawTracks, queryTrimmed, sortMode) {
+        val filtered = if (queryTrimmed.isBlank()) rawTracks else rawTracks.filter {
+            it.title.contains(queryTrimmed, ignoreCase = true) ||
+            it.showDate.contains(queryTrimmed, ignoreCase = true) ||
+            (it.venueName != null && it.venueName.contains(queryTrimmed, ignoreCase = true))
+        }
+        when (sortMode) {
+            LibrarySortMode.RECENTLY_ADDED -> filtered.sortedByDescending { it.rowId }
+            LibrarySortMode.TITLE_ASC -> filtered.sortedBy { it.title.lowercase() }
+            LibrarySortMode.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
+        }
+    }
+
+    val playlistCount = filteredPlaylists.size
+    val showCount = filteredShows.size
+    val trackCount = filteredTracks.size
     val totalCount = playlistCount + showCount + trackCount
 
     Column(
@@ -175,32 +224,50 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .border(
-                        1.dp,
-                        ledger.accentIcon,
-                        RoundedCornerShape(14.dp)
+            Box {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .border(
+                            1.dp,
+                            ledger.accentIcon,
+                            RoundedCornerShape(14.dp)
+                        )
+                        .background(
+                            if (ledger.isDark) Color(0x249184D9) else Color(0x1A6F62C7),
+                            RoundedCornerShape(14.dp)
+                        )
+                        .clickable { sortMenuOpen = true }
+                        .padding(horizontal = 11.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = sortMode.label,
+                        fontSize = 12.sp,
+                        color = ledger.accentTintText
                     )
-                    .background(
-                        if (ledger.isDark) Color(0x249184D9) else Color(0x1A6F62C7),
-                        RoundedCornerShape(14.dp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = ledger.accentTintText,
+                        modifier = Modifier.size(12.dp)
                     )
-                    .padding(horizontal = 11.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "Recently added",
-                    fontSize = 12.sp,
-                    color = ledger.accentTintText
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = ledger.accentTintText,
-                    modifier = Modifier.size(12.dp)
-                )
+                }
+
+                DropdownMenu(
+                    expanded = sortMenuOpen,
+                    onDismissRequest = { sortMenuOpen = false }
+                ) {
+                    LibrarySortMode.entries.forEach { mode ->
+                        DropdownMenuItem(
+                            text = { Text(mode.label) },
+                            onClick = {
+                                sortMode = mode
+                                sortMenuOpen = false
+                            }
+                        )
+                    }
+                }
             }
 
             Row(
@@ -233,7 +300,7 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
         ) {
             // Playlists
             if (selectedFilter == LibraryFilter.ALL || selectedFilter == LibraryFilter.PLAYLISTS) {
-                items(playlists, key = { "pl_${it.id}" }) { playlist ->
+                items(filteredPlaylists, key = { "pl_${it.id}" }) { playlist ->
                     LibraryRowItem(
                         badgeType = "LIST",
                         title = playlist.name,
@@ -251,26 +318,50 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
-            // Shows from in-progress & finished history
+            // Shows from in-progress history
             if (selectedFilter == LibraryFilter.ALL || selectedFilter == LibraryFilter.SHOWS) {
-                items(inProgressList, key = { "ip_${it.queueKey}" }) { item ->
+                items(filteredShows, key = { "ip_${it.queueKey}" }) { item ->
                     val showDate = item.queueKey.removePrefix("show:").removePrefix("recording:relisten:")
+                    val subtitleText = listOfNotNull(item.artist.ifBlank { null }, item.title.ifBlank { null }).joinToString(" · ")
                     LibraryRowItem(
                         badgeType = "SHOW",
-                        title = showDate,
-                        subtitle = item.title,
-                        trailingText = "★ 4.5",
-                        trailingTextColor = ledger.ratingAmber,
+                        title = formatShowDate(showDate),
+                        subtitle = subtitleText.ifBlank { item.trackTitle },
+                        trailingAction = {
+                            CircularPlayButton(
+                                isPlaying = false,
+                                onClick = { vm.resume(item) },
+                                size = 30.dp,
+                                iconSize = 14.dp
+                            )
+                        },
                         onClick = { openQueueKey(item.queueKey, nav) }
                     )
                 }
             }
 
+            // Tracks tab
+            if (selectedFilter == LibraryFilter.ALL || selectedFilter == LibraryFilter.TRACKS) {
+                items(filteredTracks, key = { "trk_${it.rowId}" }) { track ->
+                    val trackSubtitle = listOfNotNull(track.showDate.ifBlank { null }, track.venueName?.ifBlank { null }).joinToString(" · ")
+                    LibraryRowItem(
+                        badgeType = "TRACK",
+                        title = track.title,
+                        subtitle = trackSubtitle.ifBlank { track.backend },
+                        trailingText = if (track.durationMs > 0) fmt(track.durationMs) else null,
+                        onClick = {
+                            nav.navigate("local-playlist/${track.playlistId}")
+                        }
+                    )
+                }
+            }
+
             // If empty
-            if (playlists.isEmpty() && inProgressList.isEmpty()) {
+            if (filteredPlaylists.isEmpty() && filteredShows.isEmpty() && filteredTracks.isEmpty()) {
                 item {
                     Text(
-                        text = "Your library is empty. Play shows, save tracks, or create playlists to see them here.",
+                        text = if (queryTrimmed.isNotEmpty()) "No results matching \"$queryTrimmed\"."
+                            else "Your library is empty. Play shows, save tracks, or create playlists to see them here.",
                         fontSize = 14.sp,
                         color = ledger.textMuted,
                         modifier = Modifier.padding(vertical = 32.dp)

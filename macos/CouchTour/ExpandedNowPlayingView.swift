@@ -144,17 +144,24 @@ struct ExpandedNowPlayingView: View {
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
                                     .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
-                                Text("★ 4.6")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                                if let rating = player.show?.rating, rating > 0 {
+                                    Text(String(format: "★ %.1f", rating))
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                                } else {
+                                    Text("—")
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                }
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("SET")
+                                Text("TRACK")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
                                     .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
-                                Text("II · Track 4")
+                                let currentIdx = (player.currentIndex ?? 0) + 1
+                                Text("\(currentIdx) of \(player.tracks.count)")
                                     .font(.system(size: 15))
                                     .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
                             }
@@ -174,55 +181,63 @@ struct ExpandedNowPlayingView: View {
                                     .font(.system(size: 44, weight: .medium))
                                     .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
 
-                                Text("FLAC")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .tracking(1.0)
-                                    .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 2)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.5), lineWidth: 1)
-                                    )
+                                if player.currentTrack?.flacUrl?.isEmpty == false {
+                                    Text("FLAC")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .tracking(1.0)
+                                        .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 2)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .stroke(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.5), lineWidth: 1)
+                                        )
+                                }
                             }
 
-                            HStack(spacing: 8) {
-                                Button {
-                                    showJamChartNote.toggle()
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Text("JAM CHART")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .tracking(1.0)
-                                        Image(systemName: "chevron.down")
-                                            .font(.system(size: 9))
-                                    }
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
+                            let isJamChart = player.currentTrack?.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") } == true
 
-                                Text(formatCompactDuration(ms: player.currentTrack?.durationMs ?? 764_000))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .tracking(1.0)
-                                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
-                                    )
+                            HStack(spacing: 8) {
+                                if isJamChart {
+                                    Button {
+                                        showJamChartNote.toggle()
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Text("JAM CHART")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .tracking(1.0)
+                                            Image(systemName: "chevron.down")
+                                                .font(.system(size: 9))
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                if let dur = player.currentTrack?.durationMs, dur > 0 {
+                                    Text(formatCompactDuration(ms: dur))
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .tracking(1.0)
+                                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                                        )
+                                }
                             }
                             .padding(.top, 14)
 
-                            if showJamChartNote {
+                            if isJamChart && showJamChartNote {
                                 JamChartNoteCard(
-                                    note: "The jam chart entry for this version loads here from phish.in, describing what makes the take notable and where it goes.",
+                                    note: "Jam chart entry available for this track.",
                                     onDismiss: { showJamChartNote = false }
                                 )
                                 .frame(maxWidth: 560)
@@ -246,7 +261,7 @@ struct ExpandedNowPlayingView: View {
                 .frame(height: 110)
                 .padding(.horizontal, 72)
 
-                // Timestamps: 5:12 and -7:32
+                // Timestamps
                 HStack {
                     Text(fmt(Int64(currentPos)))
                         .font(.system(size: 13))
@@ -262,15 +277,17 @@ struct ExpandedNowPlayingView: View {
 
                 // Transport Row (82x82 filled play button)
                 HStack(spacing: 14) {
-                    VStack(spacing: 2) {
-                        Image(systemName: "heart")
-                            .font(.system(size: 24))
-                            .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
-                        Text("268")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    if let show = player.show, let currentTrack = player.currentTrack {
+                        TrackLikeButton(
+                            backend: show.artist.backend,
+                            trackID: currentTrack.id,
+                            likesCount: currentTrack.likesCount,
+                            likedByUser: currentTrack.likedByUser
+                        )
+                        .frame(width: 64, height: 64)
+                    } else {
+                        Spacer().frame(width: 64, height: 64)
                     }
-                    .frame(width: 64, height: 64)
 
                     Button {
                         player.skipToPrevious()
@@ -307,13 +324,25 @@ struct ExpandedNowPlayingView: View {
                     }
                     .buttonStyle(.plain)
 
-                    Button {} label: {
-                        Image(systemName: "text.badge.plus")
-                            .font(.system(size: 24))
-                            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
-                            .frame(width: 64, height: 64)
+                    if let show = player.show, let currentTrack = player.currentTrack {
+                        AddToPlaylistButton {
+                            LocalPlaylistTrack(
+                                playlistId: "",
+                                backend: show.artist.backend.rawValue,
+                                trackId: currentTrack.id,
+                                showDate: show.date,
+                                artistSlug: show.artist.backend == .relisten ? show.artist.id : nil,
+                                recordingId: nil,
+                                title: currentTrack.title,
+                                durationMs: currentTrack.durationMs,
+                                venueName: show.where_,
+                                artUrl: currentTrack.artURL
+                            )
+                        }
+                        .frame(width: 64, height: 64)
+                    } else {
+                        Spacer().frame(width: 64, height: 64)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(.top, 20)
                 .padding(.bottom, 34)

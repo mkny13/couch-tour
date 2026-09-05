@@ -84,6 +84,9 @@ interface LocalPlaylistDao {
     @Query("SELECT * FROM local_playlist_tracks WHERE playlistId = :id ORDER BY position")
     suspend fun tracksOnce(id: String): List<LocalPlaylistTrackEntity>
 
+    @Query("SELECT * FROM local_playlist_tracks ORDER BY rowId DESC")
+    fun allTracks(): Flow<List<LocalPlaylistTrackEntity>>
+
     @Insert
     suspend fun insertPlaylist(playlist: LocalPlaylistEntity)
 

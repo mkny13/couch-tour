@@ -134,37 +134,44 @@ struct SidebarView: View {
             // SYNC STATUS Footer
             Divider().overlay(colors.divider)
 
-            HStack(spacing: 9) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
+            Button {
+                appModel.settingsTab = .sync
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(appModel.syncSession.paired ? "Synced with phone" : "Not paired")
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(appModel.syncSession.paired ? "Synced with phone" : "Not paired")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colors.textSecondary)
+                            .lineLimit(1)
 
-                    if let lastSynced = appModel.syncSession.lastSyncedAt, lastSynced > 0 {
-                        Text(relativeTime(lastSynced))
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
-                    } else {
-                        Text("Ready to sync")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        if let lastSynced = appModel.syncSession.lastSyncedAt, lastSynced > 0 {
+                            Text(relativeTime(lastSynced))
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        } else {
+                            Text("Ready to sync")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        }
                     }
+
+                    Spacer()
+
+                    Circle()
+                        .fill(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
+                        .frame(width: 6, height: 6)
+                        .shadow(color: Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.9), radius: 4)
                 }
-
-                Spacer()
-
-                Circle()
-                    .fill(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
-                    .frame(width: 6, height: 6)
-                    .shadow(color: Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.9), radius: 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .buttonStyle(.plain)
         }
         .frame(width: 236)
         .background(colors.elevated)

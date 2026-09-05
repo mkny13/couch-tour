@@ -203,7 +203,7 @@ fun App(
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
             composable("artists") { ArtistsScreen(nav) }
-            composable("search") { ArtistsScreen(nav) }
+            composable("search") { SearchScreen(vm, nav) }
             composable("library") { LibraryScreen(vm, nav) }
             composable("settings") { SettingsScreen(vm, nav) }
             composable("player") { NowPlayingScreen(vm, nav) }
@@ -495,20 +495,17 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
-                                    Text(
-                                        text = "★ 4.2",
-                                        fontSize = 12.sp,
-                                        color = ledger.ratingAmber,
-                                        modifier = Modifier.padding(horizontal = 8.dp)
-                                    )
+                                    if (show.rating > 0.0) {
+                                        Text(
+                                            text = "★ ${"%.1f".format(java.util.Locale.US, show.rating)}",
+                                            fontSize = 12.sp,
+                                            color = ledger.ratingAmber,
+                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                        )
+                                    }
                                     CircularPlayButton(
                                         isPlaying = false,
-                                        onClick = {
-                                            when (show.artist.backend) {
-                                                Backend.PHISHIN -> nav.navigate("show/${show.date}")
-                                                Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
-                                            }
-                                        },
+                                        onClick = { vm.playNextTourStop(show) },
                                         size = 34.dp,
                                         iconSize = 16.dp
                                     )
@@ -758,7 +755,16 @@ private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
 @Composable
 private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
     val ledger = LocalLedgerColors.current
-    val fraction = if (progress.positionMs > 0) ((progress.positionMs % 900_000L).toFloat() / 900_000L).coerceIn(0.15f, 0.85f) else 0.41f
+    val playerState by vm.state.collectAsState()
+    val isCurrentlyPlaying = playerState.hasQueue && playerState.queueKey == progress.queueKey
+    val fraction = if (isCurrentlyPlaying && playerState.durationMs > 0) {
+        (playerState.positionMs.toFloat() / playerState.durationMs.toFloat()).coerceIn(0f, 1f)
+    } else if (progress.positionMs > 0) {
+        // When duration is unknown from offline progress, estimate reasonable progress based on position
+        (progress.positionMs.toFloat() / (progress.positionMs + 300_000L).toFloat()).coerceIn(0.1f, 0.95f)
+    } else {
+        0.05f
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -799,8 +805,14 @@ private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: Na
                     .padding(start = 8.dp, end = 12.dp)
             )
             CircularPlayButton(
-                isPlaying = false,
-                onClick = { vm.resume(progress) },
+                isPlaying = isCurrentlyPlaying && playerState.isPlaying,
+                onClick = {
+                    if (isCurrentlyPlaying) {
+                        vm.togglePlayPause()
+                    } else {
+                        vm.resume(progress)
+                    }
+                },
                 size = 30.dp,
                 iconSize = 15.dp
             )
@@ -869,12 +881,14 @@ private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController) {
                 )
             }
         }
-        Text(
-            text = "★ 4.4",
-            fontSize = 12.sp,
-            color = ledger.ratingAmber,
-            modifier = Modifier.padding(start = 8.dp)
-        )
+        if (show.rating > 0.0) {
+            Text(
+                text = "★ ${"%.1f".format(java.util.Locale.US, show.rating)}",
+                fontSize = 12.sp,
+                color = ledger.ratingAmber,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
     }
 }
 
@@ -1872,7 +1886,7 @@ private fun TourPickerDialog(
 }
 
 @Composable
-private fun SearchResultsList(
+internal fun SearchResultsList(
     results: SearchHits?,
     vm: PlayerViewModel,
     nav: NavHostController,
@@ -3438,7 +3452,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
             selected = isSearch,
             onClick = {
                 if (!isSearch) {
-                    nav.navigate("artists")
+                    nav.navigate("search")
                 }
             }
         )
@@ -3598,7 +3612,7 @@ private fun RowItem(
 }
 
 @Composable
-private fun Loading() {
+internal fun Loading() {
     Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
     }
