@@ -81,4 +81,29 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual("1997-11-17", formatShowDate("1997/11/17"))
         XCTAssertEqual("1977-05-08", formatShowDate("May 8, 1977"))
     }
+
+    func testFormatSetRoman() {
+        XCTAssertEqual("SET I", formatSetRoman("Set 1"))
+        XCTAssertEqual("SET II", formatSetRoman("Set 2"))
+        XCTAssertEqual("SET III", formatSetRoman("Set 3"))
+        XCTAssertEqual("SET IV", formatSetRoman("Set 4"))
+        XCTAssertEqual("ENCORE", formatSetRoman("Encore"))
+        XCTAssertEqual("SOUNDCHECK", formatSetRoman("Soundcheck"))
+        XCTAssertEqual("SET 5", formatSetRoman("Set 5"))
+    }
+
+    func testFormatSetAndTrackEyebrow() {
+        XCTAssertEqual("SET II · TRACK 4", formatSetAndTrackEyebrow(setName: "Set 2", trackPosition: 4, fallbackIndex: 1))
+        XCTAssertEqual("SET I · TRACK 1", formatSetAndTrackEyebrow(setName: "Set 1", trackPosition: nil, fallbackIndex: 1))
+        XCTAssertEqual("ENCORE · TRACK 2", formatSetAndTrackEyebrow(setName: "Encore", trackPosition: 2, fallbackIndex: 2))
+        XCTAssertEqual("TRACK 7", formatSetAndTrackEyebrow(setName: "", trackPosition: nil, fallbackIndex: 7))
+        XCTAssertEqual("TRACK 3", formatSetAndTrackEyebrow(setName: nil, trackPosition: 3, fallbackIndex: 1))
+    }
+
+    func testFormatSetColumn() {
+        XCTAssertEqual("II · Track 4", formatSetColumn(setName: "Set 2", trackPosition: 4, fallbackIndex: 1))
+        XCTAssertEqual("I · Track 1", formatSetColumn(setName: "Set 1", trackPosition: nil, fallbackIndex: 1))
+        XCTAssertEqual("E · Track 2", formatSetColumn(setName: "Encore", trackPosition: 2, fallbackIndex: 2))
+        XCTAssertEqual("Track 5", formatSetColumn(setName: "", trackPosition: nil, fallbackIndex: 5))
+    }
 }

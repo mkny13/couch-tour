@@ -1442,7 +1442,7 @@ fun RecordingScreen(
                         }
                     }
                 }
-                groupedBySet(detail.tracks, { it.setName }, { it.id }) { index, track ->
+                groupedBySet(detail.tracks, { it.setName }, { it.id }, { it.durationMs }) { index, track ->
                     RecordingTrackRow(track, index + 1, detail.summary.artist, date, detail.recording?.id, vm) { vm.playRecording(detail, index, 0) }
                 }
             }
@@ -4077,11 +4077,20 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.groupedBySet(
     items: List<T>,
     setName: (T) -> String,
     key: (T) -> Any,
+    durationMs: ((T) -> Long)? = null,
     content: @Composable (Int, T) -> Unit,
 ) {
+    val setDurations = if (durationMs != null) {
+        items.groupBy { setName(it) }.mapValues { (_, groupItems) ->
+            groupItems.sumOf { durationMs(it) }
+        }
+    } else emptyMap()
+
     items.forEachIndexed { index, item ->
-        if (setName(item).isNotEmpty() && (index == 0 || setName(items[index - 1]) != setName(item))) {
-            item(key = "set-${setName(item)}-$index") { SectionHeader(setName(item)) }
+        val currentSetName = setName(item)
+        if (currentSetName.isNotEmpty() && (index == 0 || setName(items[index - 1]) != currentSetName)) {
+            val dMs = setDurations[currentSetName] ?: 0L
+            item(key = "set-$currentSetName-$index") { SetHeader(currentSetName, dMs) }
         }
         item(key = "track-${key(item)}") { content(index, item) }
     }

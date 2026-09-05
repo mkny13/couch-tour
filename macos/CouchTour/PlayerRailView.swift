@@ -179,7 +179,12 @@ struct PlayerRailView: View {
                     // Track Block (Eyebrow, Title, Jam Chart Pill, Note Card)
                     VStack(alignment: .leading, spacing: 0) {
                         let currentIdx = (player.currentIndex ?? 0) + 1
-                        Text("TRACK \(currentIdx)")
+                        let eyebrow = formatSetAndTrackEyebrow(
+                            setName: player.currentTrack?.setName,
+                            trackPosition: player.currentTrack?.position,
+                            fallbackIndex: currentIdx
+                        )
+                        Text(eyebrow)
                             .font(.system(size: 10, weight: .semibold))
                             .tracking(1.6)
                             .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))

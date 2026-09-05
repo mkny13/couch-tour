@@ -179,12 +179,17 @@ struct ExpandedNowPlayingView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("TRACK")
+                                Text("SET")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
                                     .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
                                 let currentIdx = (player.currentIndex ?? 0) + 1
-                                Text("\(currentIdx) of \(player.tracks.count)")
+                                let setCol = formatSetColumn(
+                                    setName: player.currentTrack?.setName,
+                                    trackPosition: player.currentTrack?.position,
+                                    fallbackIndex: currentIdx
+                                )
+                                Text(setCol)
                                     .font(.system(size: 15))
                                     .foregroundStyle(colors.textPrimary)
                             }
@@ -199,6 +204,18 @@ struct ExpandedNowPlayingView: View {
 
                         // Track Title & Badges
                         VStack(alignment: .leading, spacing: 0) {
+                            let currentIdx = (player.currentIndex ?? 0) + 1
+                            let eyebrow = formatSetAndTrackEyebrow(
+                                setName: player.currentTrack?.setName,
+                                trackPosition: player.currentTrack?.position,
+                                fallbackIndex: currentIdx
+                            )
+                            Text(eyebrow)
+                                .font(.system(size: 10, weight: .semibold))
+                                .tracking(1.6)
+                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                .padding(.bottom, 4)
+
                             HStack(spacing: 12) {
                                 Text(trackTitle)
                                     .font(.system(size: 44, weight: .medium))
