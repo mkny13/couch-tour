@@ -12,6 +12,20 @@ struct SidebarView: View {
     let favoritedArtists: [ArtistRef]
     let onSelectArtist: (ArtistRef) -> Void
 
+    private static let fallbackFavoriteArtists: [ArtistRef] = [
+        ArtistRef(backend: .relisten, id: "goose", name: "Goose", showCount: 412),
+        ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead", showCount: 2313),
+        ArtistRef(backend: .relisten, id: "perpetual-groove", name: "pgroove", showCount: 276),
+        ArtistRef(backend: .phishin, id: "phish", name: "Phish", showCount: 1884),
+        ArtistRef(backend: .relisten, id: "trey-anastasio", name: "TAB", showCount: 308),
+        ArtistRef(backend: .relisten, id: "widespread-panic", name: "WSP", showCount: 1102)
+    ]
+
+    private var sortedArtists: [ArtistRef] {
+        let list = favoritedArtists.isEmpty ? Self.fallbackFavoriteArtists : favoritedArtists
+        return list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     private static let countFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .decimal
@@ -91,7 +105,7 @@ struct SidebarView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(favoritedArtists, id: \.key) { artist in
+                    ForEach(sortedArtists, id: \.key) { artist in
                         Button {
                             onSelectArtist(artist)
                         } label: {
