@@ -214,6 +214,7 @@ public enum ShowArtworkGenerator {
         }
 
         let lower = artist.lowercased()
+        if lower == "moe." || lower == "moe" { return "moe." }
         if lower.contains("grateful dead") || lower == "gd" { return "GD" }
         if lower.contains("jerry garcia") || lower == "jgb" { return "JGB" }
         if lower.contains("phish") { return "PH" }

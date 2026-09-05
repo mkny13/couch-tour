@@ -343,6 +343,9 @@ fun getArtworkPalette(seed: String): ArtworkPalette {
 fun deriveArtistMonogram(artistName: String?): String {
     if (artistName.isNullOrBlank()) return "CT"
     val clean = artistName.trim()
+    if (clean.equals("moe.", ignoreCase = true) || clean.equals("moe", ignoreCase = true)) {
+        return "moe."
+    }
     val words = clean.split(Regex("""[\s\-_·/]+""")).filter { it.isNotEmpty() }
     return when {
         words.size >= 2 -> {
@@ -858,8 +861,13 @@ private fun LargeArtworkOverlay(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
         ) {
+            val displayArtist = if (artistName.equals("moe.", ignoreCase = true) || artistName.equals("moe", ignoreCase = true)) {
+                "moe."
+            } else {
+                artistName.uppercase()
+            }
             Text(
-                text = artistName.uppercase(),
+                text = displayArtist,
                 color = palette.text,
                 fontWeight = FontWeight.Black,
                 fontSize = 17.sp,
@@ -955,7 +963,7 @@ private fun MediumArtworkOverlay(
                 .padding(horizontal = 4.dp),
         ) {
             Text(
-                text = artistName,
+                text = ArtistAbbreviations.artistLabel(artistName),
                 color = palette.text,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
