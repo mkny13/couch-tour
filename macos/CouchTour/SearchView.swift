@@ -72,10 +72,10 @@ struct SearchView: View {
 
             // Tabs with counts and underline
             HStack(spacing: 22) {
-                let trackCount = hits?.tracks.count ?? 31
-                let showCount = hits?.shows.count ?? 9
-                let songCount = hits?.slices.count ?? 6
-                let allCount = (hits?.tracks.count ?? 31) + (hits?.shows.count ?? 9) + (hits?.slices.count ?? 6)
+                let trackCount = hits?.tracks.count ?? 0
+                let showCount = hits?.shows.count ?? 0
+                let songCount = hits?.slices.count ?? 0
+                let allCount = trackCount + showCount + songCount
 
                 searchTabItem(title: "All", count: allCount, tab: .all)
                 searchTabItem(title: "Tracks", count: trackCount, tab: .tracks)
@@ -106,7 +106,7 @@ struct SearchView: View {
                     .frame(width: 110, alignment: .leading)
                 Text("DATE")
                     .frame(width: 100, alignment: .leading)
-                Text("TRACK")
+                Text("TITLE / TRACK")
                     .frame(width: 150, alignment: .leading)
                 Text("VENUE")
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -128,16 +128,56 @@ struct SearchView: View {
             // Results List
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    if let hits, !hits.tracks.isEmpty {
-                        ForEach(hits.tracks.prefix(15), id: \.id) { track in
-                            searchTrackRow(track: track)
+                    if term.count < 3 {
+                        VStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 32))
+                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            Text("Type at least 3 characters to search artists, shows, and tracks")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
                         }
-                    } else {
-                        // Fallback sample rows matching Screen 2B
-                        fallbackSearchRow(artist: "Phish", date: "1994-06-18", track: "Tweezer", venue: "UNI Dome", loc: "Cedar Falls, IA", duration: "30:35", likes: 412, isJamChart: true)
-                        fallbackSearchRow(artist: "Phish", date: "1997-11-17", track: "Tweezer", venue: "Thomas & Mack Center", loc: "Las Vegas, NV", duration: "14:02", likes: 268, isJamChart: true)
-                        fallbackSearchRow(artist: "Goose", date: "2022-06-24", track: "Tweezer", venue: "Radius", loc: "Chicago, IL", duration: "11:48", likes: 0, isJamChart: false)
-                        fallbackSearchRow(artist: "Phish", date: "1995-11-14", track: "Tweezer Reprise", venue: "Fox Theatre", loc: "Atlanta, GA", duration: "4:20", likes: 57, isJamChart: false)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 60)
+                    } else if let hits {
+                        let totalHits = hits.tracks.count + hits.shows.count + hits.slices.count
+                        if totalHits == 0 {
+                            VStack(spacing: 12) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                Text("No results found for \"\(term)\"")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 60)
+                        } else {
+                            switch selectedTab {
+                            case .all:
+                                ForEach(hits.tracks, id: \.id) { track in
+                                    searchTrackRow(track: track)
+                                }
+                                ForEach(hits.shows, id: \.self) { show in
+                                    searchShowRow(show: show)
+                                }
+                                ForEach(hits.slices, id: \.self) { slice in
+                                    searchSliceRow(slice: slice)
+                                }
+                            case .tracks:
+                                ForEach(hits.tracks, id: \.id) { track in
+                                    searchTrackRow(track: track)
+                                }
+                            case .shows:
+                                ForEach(hits.shows, id: \.self) { show in
+                                    searchShowRow(show: show)
+                                }
+                            case .songs:
+                                ForEach(hits.slices, id: \.self) { slice in
+                                    searchSliceRow(slice: slice)
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 24)
@@ -234,95 +274,18 @@ struct SearchView: View {
             }
             .frame(width: 90, alignment: .trailing)
 
-            Circle()
-                .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
-                .frame(width: 30, height: 30)
-                .overlay(
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
-                )
-                .frame(width: 34, alignment: .trailing)
-        }
-        .padding(.vertical, 10)
-        .border(width: 1, edges: [.bottom], color: colors.divider)
-    }
-
-    private func fallbackSearchRow(artist: String, date: String, track: String, venue: String, loc: String, duration: String, likes: Int, isJamChart: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Text(ArtistAbbreviations.label(for: artist))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 110, alignment: .leading)
-                    .lineLimit(1)
-
-                Text(date)
-                    .font(.system(size: 15))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 100, alignment: .leading)
-
-                HStack(spacing: 6) {
-                    Text(track)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(1)
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
-                }
-                .frame(width: 150, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(venue)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
-                        .lineLimit(1)
-
-                    HStack(spacing: 8) {
-                        Text(loc)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
-                            .lineLimit(1)
-
-                        if isJamChart {
-                            HStack(spacing: 3) {
-                                Text("JAM CHART")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .tracking(1.0)
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 7))
-                            }
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 3)
-                                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
-                            )
+            Button {
+                guard let showDate = track.showDate else { return }
+                Task {
+                    do {
+                        let detail = try await sourceFor(.phishin).show(artist: PHISH, date: showDate, recordingId: nil)
+                        if let idx = detail.tracks.firstIndex(where: { $0.id == String(track.id) }) {
+                            player.play(detail: detail, startIndex: idx)
+                            appModel.showNowPlaying = true
                         }
-                    }
+                    } catch {}
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                HStack(spacing: 6) {
-                    Text(duration)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
-
-                    if likes > 0 {
-                        HStack(spacing: 3) {
-                            Image(systemName: "heart.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
-                            Text("\(likes)")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
-                        }
-                    }
-                }
-                .frame(width: 90, alignment: .trailing)
-
+            } label: {
                 Circle()
                     .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
                     .frame(width: 30, height: 30)
@@ -331,15 +294,140 @@ struct SearchView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
                     )
-                    .frame(width: 34, alignment: .trailing)
             }
-            .padding(.vertical, 10)
-
-            if isJamChart && likes > 400 {
-                JamChartNoteCard(note: "The phish.in jam chart entry for this version loads here, describing what makes the take notable and where it goes.")
-                    .padding(.bottom, 6)
+            .buttonStyle(.plain)
+            .frame(width: 34, alignment: .trailing)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let showDate = track.showDate {
+                let summary = ShowSummary(artist: PHISH, date: showDate, venue: track.venueName, location: track.venueLocation)
+                appModel.path.append(.show(summary))
             }
         }
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.bottom], color: colors.divider)
+    }
+
+    private func searchShowRow(show: ShowSummary) -> some View {
+        HStack(spacing: 10) {
+            Text(ArtistAbbreviations.label(for: show.artist.name))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+                .lineLimit(1)
+
+            Text(formatShowDate(show.date))
+                .font(.system(size: 15))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 100, alignment: .leading)
+
+            Text(show.tourName ?? "Show")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 150, alignment: .leading)
+                .lineLimit(1)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(show.venue ?? "Live Venue")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .lineLimit(1)
+
+                Text(show.location ?? "")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 6) {
+                if show.rating > 0 {
+                    Text(String(format: "★ %.1f", show.rating))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                }
+
+                if show.likesCount > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
+                        Text("\(show.likesCount)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    }
+                }
+            }
+            .frame(width: 90, alignment: .trailing)
+
+            Button {
+                Task {
+                    do {
+                        let detail = try await sourceFor(show.artist.backend).show(artist: show.artist, date: show.date, recordingId: nil)
+                        player.play(detail: detail, startIndex: 0)
+                        appModel.showNowPlaying = true
+                    } catch {}
+                }
+            } label: {
+                Circle()
+                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                    )
+            }
+            .buttonStyle(.plain)
+            .frame(width: 34, alignment: .trailing)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            appModel.path.append(.show(show))
+        }
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.bottom], color: colors.divider)
+    }
+
+    private func searchSliceRow(slice: SliceHit) -> some View {
+        HStack(spacing: 10) {
+            Text(ArtistAbbreviations.label(for: slice.artist.name))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+                .lineLimit(1)
+
+            Text(slice.kind.heading)
+                .font(.system(size: 13))
+                .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                .frame(width: 100, alignment: .leading)
+
+            Text(slice.period.label)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 150, alignment: .leading)
+                .lineLimit(1)
+
+            Text("\(slice.period.showCount) \(plural(slice.period.showCount, "show"))")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer()
+                .frame(width: 90)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .frame(width: 34, alignment: .trailing)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            appModel.path.append(.period(artist: slice.artist, period: slice.period))
+        }
+        .padding(.vertical, 10)
         .border(width: 1, edges: [.bottom], color: colors.divider)
     }
 }

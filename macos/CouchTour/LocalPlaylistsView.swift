@@ -13,6 +13,8 @@ struct LocalPlaylistsView: View {
     @Environment(\.ledgerColors) private var colors
 
     @State private var playlists: [LocalPlaylist] = []
+    @State private var recentProgress: [PlaybackProgress] = []
+    @State private var playlistTracks: [LocalPlaylistTrack] = []
     @State private var query = ""
     @State private var selectedCategory: LibraryCategory = .all
     @State private var newName = ""
@@ -395,161 +397,40 @@ struct LocalPlaylistsView: View {
             ))
         }
 
-        // Standard reference items from handoff Screen 2E
-        let sampleItems: [LibraryItem] = [
-            LibraryItem(
-                id: "sample-pl-1",
-                type: "PLAYLIST",
-                name: "Best Tweezers",
-                subtitle: "Phish · Goose",
-                artist: "",
-                rating: "24 tracks",
-                length: "4:12:08",
-                added: "2 days ago",
-                playlist: nil,
-                showSummary: nil,
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-show-1",
+        // In-progress / history shows
+        for prog in recentProgress {
+            result.append(LibraryItem(
+                id: "progress-\(prog.queueKey)",
                 type: "SHOW",
-                name: "1997-11-17",
-                subtitle: "Thomas & Mack Center, Las Vegas, NV",
-                artist: "Phish",
-                rating: "★ 4.6",
-                length: "2:41",
-                added: "2 days ago",
-                playlist: nil,
-                showSummary: ShowSummary(
-                    artist: ArtistRef(backend: .phishin, id: "phish", name: "Phish"),
-                    date: "1997-11-17",
-                    venue: "Thomas & Mack Center",
-                    location: "Las Vegas, NV"
-                ),
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-track-1",
-                type: "TRACK",
-                name: "Tweezer",
-                subtitle: "1994-06-18 · UNI Dome, Cedar Falls, IA",
-                artist: "Phish",
+                name: prog.title,
+                subtitle: prog.trackTitle,
+                artist: prog.artist,
                 rating: "",
-                length: "30:35",
-                added: "3 days ago",
+                length: fmt(prog.positionMs),
+                added: relativeTime(prog.updatedAt),
                 playlist: nil,
                 showSummary: nil,
                 track: nil
-            ),
-            LibraryItem(
-                id: "sample-pl-2",
-                type: "PLAYLIST",
-                name: "Late 90s Ghosts",
-                subtitle: "Phish",
-                artist: "",
-                rating: "16 tracks",
-                length: "3:04:41",
-                added: "last week",
-                playlist: nil,
-                showSummary: nil,
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-show-2",
-                type: "SHOW",
-                name: "1994-06-18",
-                subtitle: "UNI Dome, Cedar Falls, IA",
-                artist: "Phish",
-                rating: "★ 4.5",
-                length: "2:52",
-                added: "last week",
-                playlist: nil,
-                showSummary: ShowSummary(
-                    artist: ArtistRef(backend: .phishin, id: "phish", name: "Phish"),
-                    date: "1994-06-18",
-                    venue: "UNI Dome",
-                    location: "Cedar Falls, IA"
-                ),
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-track-2",
-                type: "TRACK",
-                name: "Bathtub Gin",
-                subtitle: "1997-11-17 · Thomas & Mack Center",
-                artist: "Phish",
-                rating: "",
-                length: "12:44",
-                added: "last week",
-                playlist: nil,
-                showSummary: nil,
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-pl-3",
-                type: "PLAYLIST",
-                name: "Couch tour warmups",
-                subtitle: "5 artists",
-                artist: "",
-                rating: "31 tracks",
-                length: "5:38:12",
-                added: "last week",
-                playlist: nil,
-                showSummary: nil,
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-show-3",
-                type: "SHOW",
-                name: "1977-05-08",
-                subtitle: "Barton Hall, Ithaca, NY",
-                artist: "Grateful Dead",
-                rating: "",
-                length: "3:08",
-                added: "last week",
-                playlist: nil,
-                showSummary: ShowSummary(
-                    artist: ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead"),
-                    date: "1977-05-08",
-                    venue: "Barton Hall",
-                    location: "Ithaca, NY"
-                ),
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-track-3",
-                type: "TRACK",
-                name: "Tweezer",
-                subtitle: "2022-06-24 · Radius, Chicago, IL",
-                artist: "Goose",
-                rating: "",
-                length: "11:48",
-                added: "last week",
-                playlist: nil,
-                showSummary: nil,
-                track: nil
-            ),
-            LibraryItem(
-                id: "sample-show-4",
-                type: "SHOW",
-                name: "2023-07-28",
-                subtitle: "Madison Square Garden, New York, NY",
-                artist: "Phish",
-                rating: "★ 4.3",
-                length: "2:44",
-                added: "last week",
-                playlist: nil,
-                showSummary: ShowSummary(
-                    artist: ArtistRef(backend: .phishin, id: "phish", name: "Phish"),
-                    date: "2023-07-28",
-                    venue: "Madison Square Garden",
-                    location: "New York, NY"
-                ),
-                track: nil
-            )
-        ]
+            ))
+        }
 
-        result.append(contentsOf: sampleItems)
+        // Playlist tracks
+        for (idx, tr) in playlistTracks.enumerated() {
+            result.append(LibraryItem(
+                id: "track-\(tr.rowId ?? Int64(idx))",
+                type: "TRACK",
+                name: tr.title,
+                subtitle: "\(tr.showDate) · \(tr.venueName ?? "")",
+                artist: tr.artistSlug ?? tr.backend,
+                rating: "",
+                length: formatCompactDuration(ms: tr.durationMs),
+                added: "",
+                playlist: nil,
+                showSummary: nil,
+                track: nil
+            ))
+        }
+
         return result
     }
 
@@ -580,6 +461,14 @@ struct LocalPlaylistsView: View {
 
     private func load() {
         playlists = (try? appModel.localPlaylistStore?.playlists()) ?? []
+        recentProgress = (try? appModel.progressStore?.inProgress()) ?? []
+        var allTr: [LocalPlaylistTrack] = []
+        for pl in playlists {
+            if let trs = try? appModel.localPlaylistStore?.tracks(playlistId: pl.id) {
+                allTr.append(contentsOf: trs)
+            }
+        }
+        playlistTracks = allTr
     }
 
     private func create(name: String) {

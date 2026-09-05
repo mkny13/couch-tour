@@ -24,6 +24,10 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -198,6 +202,8 @@ fun WaveformScrubber(
     val ledger = LocalLedgerColors.current
     val specBrush = ledger.specGradient
     val unplayedColor = ledger.textMuted.copy(alpha = 0.45f)
+    var dragFraction by remember { mutableStateOf<Float?>(null) }
+    val effectiveProgress = dragFraction ?: progress
 
     Canvas(
         modifier = modifier
@@ -209,11 +215,22 @@ fun WaveformScrubber(
                 }
             }
             .pointerInput(Unit) {
-                detectDragGestures { change, _ ->
-                    change.consume()
-                    val fraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                    onSeek(fraction)
-                }
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        dragFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                    },
+                    onDragEnd = {
+                        dragFraction?.let { onSeek(it) }
+                        dragFraction = null
+                    },
+                    onDragCancel = {
+                        dragFraction = null
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        dragFraction = (change.position.x / size.width).coerceIn(0f, 1f)
+                    }
+                )
             }
     ) {
         val totalBars = WAVEFORM_TOP.size
@@ -249,7 +266,7 @@ fun WaveformScrubber(
         }
 
         // 2. Draw played waveform with specGradient clipped to progress
-        val playedWidth = (w * progress.coerceIn(0f, 1f))
+        val playedWidth = (w * effectiveProgress.coerceIn(0f, 1f))
         if (playedWidth > 0f) {
             clipRect(left = 0f, top = 0f, right = playedWidth, bottom = h) {
                 drawRect(

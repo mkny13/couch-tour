@@ -57,6 +57,8 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
     val lastSyncedAt by SyncSession.lastSyncedAt.collectAsState()
     val isSyncing by SyncSession.syncing.collectAsState()
     val username by Session.username.collectAsState()
+    val skipFiller by PlaybackSettings.skipFiller.collectAsState()
+    var showSignOutDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -77,20 +79,22 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
 
         // PLAYBACK Section
         SectionEyebrow("PLAYBACK")
+        SettingsToggleRow(
+            label = "Skip filler tracks",
+            checked = skipFiller,
+            onCheckedChange = { PlaybackSettings.setSkipFiller(it) }
+        )
         SettingsValueRow(
             label = "Audio quality",
-            value = "FLAC over Wi-Fi",
+            value = "FLAC / MP3",
+            showChevron = false,
             onClick = {}
         )
         SettingsValueRow(
             label = "Crossfade",
-            value = "Off",
+            value = "Off (Coming soon)",
+            showChevron = false,
             onClick = {}
-        )
-        SettingsToggleRow(
-            label = "Gapless playback",
-            checked = gaplessEnabled,
-            onCheckedChange = { gaplessEnabled = it }
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -99,7 +103,8 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
         SectionEyebrow("DOWNLOADS & STORAGE")
         SettingsValueRow(
             label = "Downloaded shows",
-            value = "0 shows · 0 MB",
+            value = "0 shows (Coming soon)",
+            showChevron = false,
             onClick = {}
         )
         SettingsToggleRow(
@@ -170,7 +175,11 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             label = if (!username.isNullOrEmpty()) "Signed in" else "phish.in Account",
             value = username ?: "Sign in",
             onClick = {
-                if (username.isNullOrEmpty()) nav.navigate("login")
+                if (username.isNullOrEmpty()) {
+                    nav.navigate("login")
+                } else {
+                    showSignOutDialog = true
+                }
             }
         )
 
@@ -189,6 +198,29 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             value = "phish.in · relisten.net",
             showChevron = false,
             onClick = {}
+        )
+    }
+
+    if (showSignOutDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = { Text("Log out") },
+            text = { Text("Signed in as $username. Do you want to log out of your phish.in account?") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showSignOutDialog = false
+                        Session.logout()
+                    }
+                ) {
+                    Text("Log out")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showSignOutDialog = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }
