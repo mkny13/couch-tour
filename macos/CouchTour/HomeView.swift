@@ -646,9 +646,11 @@ struct HomeView: View {
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
                 Spacer()
-                Image(systemName: "bookmark.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                if appModel.savedShows.contains(show.date) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                }
             }
 
             Text(formatShowDate(show.date))
@@ -667,6 +669,10 @@ struct HomeView: View {
                     Text(String(format: "★ %.1f", show.rating))
                         .font(.system(size: 12))
                         .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                } else if show.likesCount > 0 {
+                    Text("♥ \(show.likesCount)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
                 }
                 Spacer()
                 Button {

@@ -4013,3 +4013,41 @@ Comprehensive comparison between the running app and the design docs (`design/ha
 9. **Unit Testing & Documentation Updates** (`FormatTest.kt`, `README.md`, `UAT.md`):
    - Added unit tests for compact duration formatting in `FormatTest.kt` (501 Android unit tests total).
    - Added UAT test items `uat-034` (macOS light mode player contrast and search filters) and `uat-035` (Android show action pills & tour stop navigation).
+
+## Iteration 78 — Design Docs Comparison Audit Round 2 (D220)
+
+### D220 — Show bookmarking parity, player transport light-mode contrast, dynamic tape metadata, and library row alignment
+
+A second exhaustive screen-by-screen audit against `design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html` addressed 7 remaining discrepancies and wiring bugs across macOS and Android:
+
+1. **macOS Show Detail "Saved" Button Logic Inversion Fixed** (`Browse/ShowDetailView.swift`, `SavedShows.swift`, `AppModel.swift`):
+   - Resolved bug where the "Saved" pill on Show Detail called `appModel.favorites.toggle(show.artist.key)`, which toggled the *favorite artist* rather than bookmarking the *show*.
+   - Introduced `SavedShows` in `CouchTourKit` (`UserDefaults`-backed `Set<String>`, mirroring `Favorites` and `LikedTracks`), added `savedShows` to `AppModel`, and updated `ShowDetailView` to toggle `appModel.savedShows.toggle(show.date)`.
+
+2. **macOS Home Screen "On This Date" Conditional Bookmark & Likes Fallback** (`HomeView.swift`):
+   - Corrected `onThisDateCard` to conditionally render `Image(systemName: "bookmark.fill")` only when the show is in the user's library (`appModel.savedShows.contains(show.date)`), rather than unconditionally on every card.
+   - Fall back to `♥ \(show.likesCount)` when `show.rating <= 0`.
+
+3. **macOS Player Transport Controls Contrast in Light Mode** (`PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - Replaced hardcoded `#E9E9ED` skip button colors and `#F3F5FE` play circle fills with adaptive theme colors (`colors.textPrimary` for skip buttons, high-contrast dark circle `#20222C` with white icon in light mode, off-white circle `#F3F5FE` with dark icon in dark mode).
+
+4. **Android Now Playing Tape Header Show Rating & Dynamic Lineage** (`NowPlaying.kt`, `PlayerViewModel.kt`, `MediaItems.kt`, `PlaybackService.kt`):
+   - Added `SHOW_RATING` and `TAPE_LINEAGE` keys to `PlaybackService.Keys` and attached rating and tape lineage in `MediaItems.kt` (`showTrackItems` and `recordingTrackItems`).
+   - Exposed `showRating: Double` and `tapeLineage: String?` in `PlayerState` and populated them in `PlayerViewModel`.
+   - In `NowPlaying.kt`, rendered the `SHOW RATING ★ 4.6` column in the tape header row when `state.showRating > 0.0`, and displayed dynamic tape lineage rather than static placeholder text.
+
+5. **Android Show Detail & Recording Detail Header Action Pills** (`MainActivity.kt`, `SavedShows.kt`, `CouchTourApp.kt`):
+   - Created `SavedShows.kt` (`SharedPreferences`-backed `Set<String>`) and initialized it on application launch.
+   - Updated `ShowHeader` and `RecordingHeader` action pills: dynamically labeled "Play" vs "Resume" based on whether progress exists (`hasProgress`), wired the "Save" / "Saved" pill with reactive `Icons.Default.Bookmark` / `BookmarkBorder` and highlight border, and removed duplicate trailing `LikeButton` on `ShowHeader`.
+
+6. **Android Home Screen "On This Date" Row Likes Fallback & Bottom Divider** (`MainActivity.kt`):
+   - In `OnThisDateLedgerRow`, displayed `♥ ${show.likesCount}` when `show.rating <= 0.0` and `show.likesCount > 0`.
+   - Added a 1px `HorizontalDivider(color = ledger.listDivider)` below each row to match design spec.
+
+7. **Android Library Screen SHOW Row Trailing Rating/Elapsed Alignment** (`LibraryScreen.kt`):
+   - Replaced circular play button in `SHOW` rows with trailing elapsed/duration text (`trailingText`), aligning with the design specification (circular play buttons reserved for `LIST` rows).
+
+8. **Automated Unit Testing & UAT Updates** (`SavedShowsTest.kt`, `SavedShowsTests.swift`, `README.md`, `UAT.md`):
+   - Added unit test suites for `SavedShows` on both Android (`SavedShowsTest.kt`, 503 passing tests total) and macOS (`SavedShowsTests.swift`, 418 passing tests total).
+   - Added `uat-036` (Saved Shows & Library Bookmark Parity) and `uat-037` (Now Playing Tape Lineage & Show Rating) to `UAT.md`.
+

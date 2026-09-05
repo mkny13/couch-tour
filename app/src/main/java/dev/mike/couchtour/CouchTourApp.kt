@@ -13,6 +13,7 @@ class CouchTourApp : Application() {
         Session.init(this)
         Favorites.init(this)
         LikedTracks.init(this)
+        SavedShows.init(this)
         PlaybackSettings.init(this)
         ThemeSettings.init(this)
         // Asynchronous and best-effort: the playback service picks Cast up whenever it

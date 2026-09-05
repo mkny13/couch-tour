@@ -102,18 +102,16 @@ Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
 501 Android unit tests, no device or emulator required:
 
+503 Android unit tests, no device or emulator required:
+
 ```bash
-./gradlew testDebugUnitTest
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
 ```
 
-They cover JSON parsing against trimmed real API responses from both phish.in and Relisten,
-outgoing request shape via MockWebServer (auth header, query params, path encoding), the
-Room queries, every database migration, the Android Auto browse-tree media IDs, and the
-parts of casting that don't need a Chromecast — that queue items declare a MIME type, and
-that the queue survives the round trip through a receiver. Report lands at
+Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML report lands in
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-415 macOS package tests under `macos/Packages/CouchTourKit`:
+418 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test

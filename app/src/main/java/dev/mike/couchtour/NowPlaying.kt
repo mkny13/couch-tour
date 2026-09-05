@@ -285,7 +285,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                             modifier = Modifier.padding(top = 3.dp)
                         ) {
                             Text(
-                                text = if (state.isFlac) "SBD · Paluska transfer" else "Audience recording",
+                                text = state.tapeLineage ?: (if (state.isFlac) "SBD · Soundboard" else "Audience recording"),
                                 fontSize = 14.sp,
                                 color = ledger.textPrimary,
                                 maxLines = 1,
@@ -317,7 +317,24 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                         }
                     }
 
-                    // Show rating (shown only if available)
+                    if (state.showRating > 0.0) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "SHOW RATING",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.4.sp,
+                                color = ledger.textMuted
+                            )
+                            Text(
+                                text = "★ " + "%.1f".format(java.util.Locale.US, state.showRating),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ledger.ratingAmber,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
 

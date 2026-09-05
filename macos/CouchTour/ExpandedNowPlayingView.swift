@@ -317,7 +317,7 @@ struct ExpandedNowPlayingView: View {
                     } label: {
                         Image(systemName: "backward.fill")
                             .font(.system(size: 26))
-                            .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                            .foregroundStyle(colors.textPrimary)
                             .frame(width: 64, height: 64)
                     }
                     .buttonStyle(.plain)
@@ -326,12 +326,12 @@ struct ExpandedNowPlayingView: View {
                         player.togglePlayPause()
                     } label: {
                         Circle()
-                            .fill(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                            .fill(colors.isDark ? Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0) : Color(red: 0x20 / 255.0, green: 0x22 / 255.0, blue: 0x2C / 255.0))
                             .frame(width: 82, height: 82)
                             .overlay(
                                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 30))
-                                    .foregroundStyle(Color(red: 0x16 / 255.0, green: 0x18 / 255.0, blue: 0x26 / 255.0))
+                                    .foregroundStyle(colors.isDark ? Color(red: 0x16 / 255.0, green: 0x18 / 255.0, blue: 0x26 / 255.0) : Color.white)
                             )
                     }
                     .buttonStyle(.plain)
@@ -342,7 +342,7 @@ struct ExpandedNowPlayingView: View {
                     } label: {
                         Image(systemName: "forward.fill")
                             .font(.system(size: 26))
-                            .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                            .foregroundStyle(colors.textPrimary)
                             .frame(width: 64, height: 64)
                     }
                     .buttonStyle(.plain)

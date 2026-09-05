@@ -97,5 +97,7 @@ Long-standing items that predate this sprint.
 - [ ] `uat-033` **Desktop Library Table** (macOS) — Category filter tabs (All, Playlists, Shows, Tracks), sort chips ("Recently added", "Artist"), fixed-column table (`TYPE`, `NAME`, `ARTIST`, `RATING`, `LENGTH`, `ADDED`, play, dots menu), and "New playlist +" creation sheet.
 - [ ] `uat-034` **macOS Light Mode Player Contrast & Search Filters** (macOS) — Expanded Now Playing and Player Rail have dark, high-contrast text (`#20222C`) in Light mode; search filter pills (Sort, Artist, Soundboard, Jam chart) dynamically filter and sort search results.
 - [ ] `uat-035` **Show Detail Action Pills & Next Tour Stop Tap** (Android) — ShowHeader and RecordingHeader action pills (Resume, Saved, Add) respond to touch; tapping Next Tour Stop card navigates to show details.
+- [ ] `uat-036` **Saved Shows & Library Bookmark Parity** (macOS & Android) — On Show Detail, tapping "Saved" toggles bookmark state for the show (not the artist). Saved shows display bookmark icons on Home "On This Date" cards. On Android Show/Recording header, pills dynamically toggle between Play/Resume and Save/Saved.
+- [ ] `uat-037` **Now Playing Tape Lineage & Show Rating** (Android) — Now Playing screen tape header displays dynamic tape lineage (SBD / AUD / taper details) and renders "SHOW RATING ★ 4.6" when a rating is present.
 
 

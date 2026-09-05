@@ -22,7 +22,7 @@ struct ShowDetailView: View {
     @Environment(\.ledgerColors) private var colors
 
     private var isSaved: Bool {
-        appModel.favorites.keys.contains(show.artist.key)
+        appModel.savedShows.contains(show.date)
     }
 
     private var yearString: String {
@@ -289,7 +289,7 @@ struct ShowDetailView: View {
 
             // Saved Toggle
             Button {
-                appModel.favorites.toggle(show.artist.key)
+                appModel.savedShows.toggle(show.date)
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
@@ -299,10 +299,10 @@ struct ShowDetailView: View {
                 }
                 .frame(height: 38)
                 .padding(.horizontal, 14)
-                .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                .foregroundStyle(isSaved ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                        .stroke(isSaved ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0) : Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
