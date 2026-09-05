@@ -93,6 +93,9 @@ final class ArtworkTests: XCTestCase {
         XCTAssertEqual(ShowArtworkGenerator.monogram(for: "King Gizzard & The Lizard Wizard"), "KGLW")
         XCTAssertEqual(ShowArtworkGenerator.monogram(for: "The Disco Biscuits"), "tDB")
         XCTAssertEqual(ShowArtworkGenerator.monogram(for: "Umphrey's McGee"), "UM")
+        XCTAssertEqual(ShowArtworkGenerator.monogram(for: "moe."), "moe.")
+        XCTAssertEqual(ShowArtworkGenerator.monogram(for: "Moe"), "moe.")
+        XCTAssertEqual(ShowArtworkGenerator.monogram(for: "MOE."), "moe.")
 
         // Arbitrary multi-word
         XCTAssertEqual(ShowArtworkGenerator.monogram(for: "My Morning Jacket"), "MMJ")

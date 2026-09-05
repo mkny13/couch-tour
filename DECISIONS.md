@@ -4087,4 +4087,18 @@ A third exhaustive screen-by-screen audit against `design/handoff/README.md`, `C
    - Added unit tests for `formatSetRoman`, `formatSetAndTrackEyebrow`, and `formatSetColumn` in `FormatTests.swift` (421 macOS package tests total).
    - Added UAT items `uat-038` and `uat-039` to `UAT.md`.
 
+## Iteration 80 — Procedural Artwork Styling for moe. (D222)
 
+### D222 — Procedural artwork styling for moe. (uat-005)
+
+Under `uat-005`, the universal styling convention for the artist "moe." requires lowercase rendering with a trailing period (`moe.`) across all screens, labels, abbreviations, and artwork. While `ArtistAbbreviations.kt` and `ArtistAbbreviations.swift` previously enforced this rule for table rows and labels, procedural artwork monogram generation still fell back to uppercase abbreviations (`MOE` or `MO`).
+
+1. **macOS Procedural Monogram Generation** (`Artwork.swift`):
+   - In `ShowArtworkGenerator.monogram(for artist: String?)`, added explicit case handling for `"moe."` / `"moe"`, returning `"moe."` directly instead of falling through to letter truncation and `.uppercased()`.
+   - Verified via unit test assertions in `ArtworkTests.swift` for `"moe."`, `"Moe"`, and `"MOE."` (421 tests passing).
+
+2. **Android Procedural Monogram and Label Overlays** (`Artwork.kt`):
+   - In `deriveArtistMonogram(artistName: String?)`, added case handling for `"moe."` / `"moe"` to return `"moe."` rather than the default two-character uppercase slice `"MO"`.
+   - In `LargeArtworkOverlay`, preserved `"moe."` when formatting the artist header text instead of unconditionally calling `artistName.uppercase()`.
+   - In `MediumArtworkOverlay`, routed `artistName` through `ArtistAbbreviations.artistLabel(...)` to ensure standard lowercase period formatting.
+   - Updated unit tests in `ArtworkTest.kt` verifying `deriveArtistMonogram` outputs `"moe."` across casing variations (505 tests passing).
