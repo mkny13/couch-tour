@@ -6,6 +6,14 @@
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
+            <title>0.75-beta</title>
+            <pubDate>Sun, 06 Sep 2026 12:25:00 +0000</pubDate>
+            <sparkle:version>31</sparkle:version>
+            <sparkle:shortVersionString>0.75-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.75/CouchTourBeta-v0.75.zip" length="7654843" type="application/octet-stream" sparkle:edSignature="VPuiDOaKUnzSpGcL8Kw4ePXOvWZZI8iz7vKVMpszF6V034V4sqUE7AdZ37I/XPE9C2XNxtsuHBTBc7EiZtJZBQ=="/>
+        </item>
+        <item>
             <title>0.74-beta</title>
             <pubDate>Sat, 05 Sep 2026 23:51:14 +0000</pubDate>
             <sparkle:version>30</sparkle:version>
@@ -20,14 +28,6 @@
             <sparkle:shortVersionString>0.73-beta</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.73/CouchTourBeta-v0.73.zip" length="7641379" type="application/octet-stream" sparkle:edSignature="dw62Fb/nc0o00F1sr9/WK+lqBBgvonvIqomIJOJIyIsXD6SWtsSJqVBXzrUZGXfocjj6QAfgenSd747Eh8q1Cg=="/>
-        </item>
-        <item>
-            <title>0.72-beta</title>
-            <pubDate>Sat, 05 Sep 2026 18:25:44 +0000</pubDate>
-            <sparkle:version>28</sparkle:version>
-            <sparkle:shortVersionString>0.72-beta</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.72/CouchTourBeta-v0.72.zip" length="7639814" type="application/octet-stream" sparkle:edSignature="7QqnhGhKSwUV0ziJNlI8lJQ8p8LwYFCMPmJNtWvJUjtojvDoNRtxzvUDNhB15FWJ7YxMIY3wAAA8OD/EpBe1Dg=="/>
         </item>
         <item>
             <title>Version 0.53-beta</title>
