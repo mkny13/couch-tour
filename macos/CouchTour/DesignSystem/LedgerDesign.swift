@@ -35,8 +35,11 @@ public extension Color {
     static let ledgerDarkControlOutline = Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0)
     static let ledgerDarkTextPrimary = Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0)
     static let ledgerDarkTextSecondary = Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0)
+    static let ledgerDarkTextSubtle = Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0)
     static let ledgerDarkTextMuted = Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0)
     static let ledgerDarkAccent = Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0)
+    static let ledgerDarkAccentIcon = Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0)
+    static let ledgerDarkAccentTintText = Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0)
     static let ledgerDarkRatingAmber = Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0)
 
     static let ledgerLightBackground = Color(red: 1.0, green: 1.0, blue: 1.0)
@@ -44,10 +47,14 @@ public extension Color {
     static let ledgerLightSurface = Color(red: 0xF0 / 255.0, green: 0xF1 / 255.0, blue: 0xF7 / 255.0)
     static let ledgerLightDivider = Color(red: 0xE4 / 255.0, green: 0xE7 / 255.0, blue: 0xF5 / 255.0)
     static let ledgerLightPanelBorder = Color(red: 0xD7 / 255.0, green: 0xDA / 255.0, blue: 0xE8 / 255.0)
+    static let ledgerLightControlOutline = Color(red: 0xD7 / 255.0, green: 0xDA / 255.0, blue: 0xE8 / 255.0)
     static let ledgerLightTextPrimary = Color(red: 0x20 / 255.0, green: 0x22 / 255.0, blue: 0x2C / 255.0)
     static let ledgerLightTextSecondary = Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0)
+    static let ledgerLightTextSubtle = Color(red: 0x5A / 255.0, green: 0x5E / 255.0, blue: 0x70 / 255.0)
     static let ledgerLightTextMuted = Color(red: 0x76 / 255.0, green: 0x7A / 255.0, blue: 0x8C / 255.0)
     static let ledgerLightAccent = Color(red: 0x6F / 255.0, green: 0x62 / 255.0, blue: 0xC7 / 255.0)
+    static let ledgerLightAccentIcon = Color(red: 0x5D / 255.0, green: 0x52 / 255.0, blue: 0x94 / 255.0)
+    static let ledgerLightAccentTintText = Color(red: 0x5D / 255.0, green: 0x52 / 255.0, blue: 0x94 / 255.0)
     static let ledgerLightRatingAmber = Color(red: 0xA0 / 255.0, green: 0x66 / 255.0, blue: 0x15 / 255.0)
 }
 
@@ -60,11 +67,14 @@ public struct LedgerColors {
     public var surface: Color { isDark ? .ledgerDarkSurface : .ledgerLightSurface }
     public var divider: Color { isDark ? .ledgerDarkDivider : .ledgerLightDivider }
     public var panelBorder: Color { isDark ? .ledgerDarkPanelBorder : .ledgerLightPanelBorder }
-    public var controlOutline: Color { isDark ? .ledgerDarkControlOutline : .ledgerLightPanelBorder }
+    public var controlOutline: Color { isDark ? .ledgerDarkControlOutline : .ledgerLightControlOutline }
     public var textPrimary: Color { isDark ? .ledgerDarkTextPrimary : .ledgerLightTextPrimary }
     public var textSecondary: Color { isDark ? .ledgerDarkTextSecondary : .ledgerLightTextSecondary }
+    public var textSubtle: Color { isDark ? .ledgerDarkTextSubtle : .ledgerLightTextSubtle }
     public var textMuted: Color { isDark ? .ledgerDarkTextMuted : .ledgerLightTextMuted }
     public var accent: Color { isDark ? .ledgerDarkAccent : .ledgerLightAccent }
+    public var accentIcon: Color { isDark ? .ledgerDarkAccentIcon : .ledgerLightAccentIcon }
+    public var accentTintText: Color { isDark ? .ledgerDarkAccentTintText : .ledgerLightAccentTintText }
     public var ratingAmber: Color { isDark ? .ledgerDarkRatingAmber : .ledgerLightRatingAmber }
 }
 
@@ -87,21 +97,21 @@ public struct TypeBadge: View {
         switch type {
         case "PLAYLIST", "LIST":
             return (
-                Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.18),
-                Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45),
-                Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0)
+                colors.accent.opacity(colors.isDark ? 0.18 : 0.12),
+                colors.accentIcon.opacity(colors.isDark ? 0.45 : 0.40),
+                colors.accentTintText
             )
         case "SHOW":
             return (
-                Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.18),
-                Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0).opacity(0.45),
-                Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0)
+                colors.ratingAmber.opacity(colors.isDark ? 0.18 : 0.12),
+                colors.ratingAmber.opacity(colors.isDark ? 0.45 : 0.40),
+                colors.ratingAmber
             )
         default:
             return (
-                Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0).opacity(0.12),
-                Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0),
-                Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0)
+                colors.textMuted.opacity(0.12),
+                colors.controlOutline,
+                colors.textMuted
             )
         }
     }

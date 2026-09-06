@@ -58,7 +58,7 @@ struct LocalPlaylistsView: View {
 
                 // Divider line
                 Rectangle()
-                    .fill(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0))
+                    .fill(colors.divider)
                     .frame(height: 1)
                     .padding(.horizontal, 24)
 
@@ -88,7 +88,7 @@ struct LocalPlaylistsView: View {
             Text("YOUR LIBRARY")
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1.8)
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
 
             Text("Playlists, shows and tracks")
                 .font(.system(size: 20, weight: .medium))
@@ -108,7 +108,7 @@ struct LocalPlaylistsView: View {
             HStack(spacing: 9) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 15))
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(colors.textMuted)
 
                 TextField("Search your library", text: $query)
                     .textFieldStyle(.plain)
@@ -120,18 +120,18 @@ struct LocalPlaylistsView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            .foregroundStyle(colors.textMuted)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 12)
             .frame(height: 34)
-            .background(Color(red: 0x1C / 255.0, green: 0x1E / 255.0, blue: 0x2C / 255.0))
+            .background(colors.surface)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .stroke(colors.controlOutline, lineWidth: 1)
             )
 
             // Recently added sort pill
@@ -143,10 +143,10 @@ struct LocalPlaylistsView: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 34)
-            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
-            .background(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14))
+            .foregroundStyle(colors.accentTintText)
+            .background(colors.accentTintText.opacity(colors.isDark ? 0.14 : 0.10))
             .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1))
+            .overlay(Capsule().stroke(colors.accentIcon, lineWidth: 1))
 
             // Artist sort pill
             HStack(spacing: 5) {
@@ -157,10 +157,10 @@ struct LocalPlaylistsView: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 34)
-            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+            .foregroundStyle(colors.textSubtle)
             .background(Color.clear)
             .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1))
+            .overlay(Capsule().stroke(colors.controlOutline, lineWidth: 1))
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 12)
@@ -191,7 +191,7 @@ struct LocalPlaylistsView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .semibold))
                 }
-                .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                .foregroundStyle(colors.accentTintText)
             }
             .buttonStyle(.plain)
             .disabled(appModel.localPlaylistStore == nil)
@@ -211,12 +211,12 @@ struct LocalPlaylistsView: View {
                 .font(.system(size: 13, weight: isSelected ? .medium : .regular))
                 .padding(.horizontal, 13)
                 .frame(height: 30)
-                .foregroundStyle(isSelected ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
-                .background(isSelected ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.16) : Color.clear)
+                .foregroundStyle(isSelected ? colors.accentTintText : colors.textSubtle)
+                .background(isSelected ? (colors.isDark ? colors.accent.opacity(0.16) : colors.accentTintText.opacity(0.12)) : Color.clear)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(isSelected ? Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0) : Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                        .stroke(isSelected ? colors.accentIcon : colors.controlOutline, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -246,7 +246,7 @@ struct LocalPlaylistsView: View {
         }
         .font(.system(size: 11, weight: .semibold))
         .tracking(1.3)
-        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+        .foregroundStyle(colors.textMuted)
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
     }
@@ -286,7 +286,7 @@ struct LocalPlaylistsView: View {
                     if !item.subtitle.isEmpty {
                         Text(item.subtitle)
                             .font(.system(size: 12))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            .foregroundStyle(colors.textMuted)
                             .lineLimit(1)
                     }
                 }
@@ -298,27 +298,28 @@ struct LocalPlaylistsView: View {
             // ARTIST
             Text(item.artist)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                .foregroundStyle(colors.textSubtle)
                 .frame(width: 112, alignment: .leading)
                 .lineLimit(1)
 
             // RATING / TRACKS
             Text(item.rating)
                 .font(.system(size: 13))
-                .foregroundStyle(item.rating.contains("★") ? Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                .foregroundStyle(item.rating.contains("★") ? colors.ratingAmber : colors.textSubtle)
                 .frame(width: 74, alignment: .trailing)
                 .lineLimit(1)
 
             // LENGTH
             Text(item.length)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                .foregroundStyle(colors.textSubtle)
                 .frame(width: 64, alignment: .trailing)
+                .lineLimit(1)
 
             // ADDED
             Text(item.added)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .frame(width: 86, alignment: .trailing)
 
             // Play Button
@@ -326,12 +327,12 @@ struct LocalPlaylistsView: View {
                 handleItemClick(item)
             } label: {
                 Circle()
-                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .stroke(colors.accentIcon, lineWidth: 1)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "play.fill")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                            .foregroundStyle(colors.accentTintText)
                     )
             }
             .buttonStyle(.plain)
@@ -351,7 +352,7 @@ struct LocalPlaylistsView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    .foregroundStyle(colors.textMuted)
                     .frame(width: 26, height: 30, alignment: .trailing)
             }
             .menuStyle(.borderlessButton)
@@ -360,7 +361,7 @@ struct LocalPlaylistsView: View {
         .overlay(
             VStack {
                 Spacer()
-                Divider().overlay(Color(red: 0x23 / 255.0, green: 0x25 / 255.0, blue: 0x32 / 255.0))
+                Divider().overlay(colors.divider)
             }
         )
     }

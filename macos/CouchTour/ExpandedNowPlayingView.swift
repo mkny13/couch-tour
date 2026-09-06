@@ -56,7 +56,7 @@ struct ExpandedNowPlayingView: View {
                     Text("NOW PLAYING")
                         .font(.system(size: 11, weight: .semibold))
                         .tracking(1.4)
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
 
                     Spacer()
 
@@ -69,11 +69,11 @@ struct ExpandedNowPlayingView: View {
                             Text("Collapse")
                                 .font(.system(size: 12))
                         }
-                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                        .foregroundStyle(colors.textSubtle)
                         .padding(.horizontal, 10)
                         .frame(height: 28)
                         .overlay(
-                            Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            Capsule().stroke(colors.controlOutline, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -111,15 +111,15 @@ struct ExpandedNowPlayingView: View {
                         HStack(spacing: 14) {
                             Text(artistName)
                                 .font(.system(size: 34, weight: .medium))
-                                .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                .foregroundStyle(colors.textPrimary)
                             Text(formatShowDate(showDate))
                                 .font(.system(size: 34, weight: .medium))
-                                .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                .foregroundStyle(colors.textPrimary)
                         }
 
                         Text(venueName)
                             .font(.system(size: 17))
-                            .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                            .foregroundStyle(colors.textSecondary)
                             .padding(.top, 7)
 
                         // Tape / Show Rating / Set Row
@@ -128,14 +128,14 @@ struct ExpandedNowPlayingView: View {
                                 Text("TAPE")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
-                                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                                 HStack(spacing: 6) {
                                     Text("SBD · Paluska · FLAC")
                                         .font(.system(size: 15))
-                                        .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                                        .foregroundStyle(colors.textPrimary)
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 10))
-                                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                        .foregroundStyle(colors.textMuted)
                                 }
                             }
 
@@ -153,16 +153,16 @@ struct ExpandedNowPlayingView: View {
                                 Text("SET")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
-                                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                                 Text("II · Track 4")
                                     .font(.system(size: 15))
-                                    .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                                    .foregroundStyle(colors.textPrimary)
                             }
                         }
                         .padding(.top, 20)
                         .overlay(
                             Rectangle()
-                                .fill(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0).opacity(0.14))
+                                .fill(colors.divider)
                                 .frame(height: 1),
                             alignment: .top
                         )
@@ -172,7 +172,7 @@ struct ExpandedNowPlayingView: View {
                             HStack(spacing: 12) {
                                 Text(trackTitle)
                                     .font(.system(size: 44, weight: .medium))
-                                    .foregroundStyle(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                                    .foregroundStyle(colors.textPrimary)
 
                                 Text("FLAC")
                                     .font(.system(size: 11, weight: .semibold))
@@ -199,10 +199,10 @@ struct ExpandedNowPlayingView: View {
                                     }
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
-                                    .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                    .foregroundStyle(colors.accentTintText)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
+                                            .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -210,12 +210,12 @@ struct ExpandedNowPlayingView: View {
                                 Text(formatCompactDuration(ms: player.currentTrack?.durationMs ?? 764_000))
                                     .font(.system(size: 11, weight: .semibold))
                                     .tracking(1.0)
-                                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                                    .foregroundStyle(colors.textSubtle)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                                            .stroke(colors.controlOutline, lineWidth: 1)
                                     )
                             }
                             .padding(.top, 14)
@@ -250,12 +250,12 @@ struct ExpandedNowPlayingView: View {
                 HStack {
                     Text(fmt(Int64(currentPos)))
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
                     Spacer()
                     let remaining = max(Int64(duration - currentPos), 0)
                     Text("-\(fmt(remaining))")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
                 }
                 .padding(.horizontal, 72)
                 .padding(.top, 8)
@@ -265,10 +265,10 @@ struct ExpandedNowPlayingView: View {
                     VStack(spacing: 2) {
                         Image(systemName: "heart")
                             .font(.system(size: 24))
-                            .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                            .foregroundStyle(colors.accentIcon)
                         Text("268")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .foregroundStyle(colors.textMuted)
                     }
                     .frame(width: 64, height: 64)
 
@@ -277,7 +277,7 @@ struct ExpandedNowPlayingView: View {
                     } label: {
                         Image(systemName: "backward.fill")
                             .font(.system(size: 26))
-                            .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                            .foregroundStyle(colors.textPrimary)
                             .frame(width: 64, height: 64)
                     }
                     .buttonStyle(.plain)
@@ -286,12 +286,12 @@ struct ExpandedNowPlayingView: View {
                         player.togglePlayPause()
                     } label: {
                         Circle()
-                            .fill(Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0))
+                            .fill(colors.textPrimary)
                             .frame(width: 82, height: 82)
                             .overlay(
                                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 30))
-                                    .foregroundStyle(Color(red: 0x16 / 255.0, green: 0x18 / 255.0, blue: 0x26 / 255.0))
+                                    .foregroundStyle(colors.background)
                             )
                     }
                     .buttonStyle(.plain)
@@ -302,7 +302,7 @@ struct ExpandedNowPlayingView: View {
                     } label: {
                         Image(systemName: "forward.fill")
                             .font(.system(size: 26))
-                            .foregroundStyle(Color(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xED / 255.0))
+                            .foregroundStyle(colors.textPrimary)
                             .frame(width: 64, height: 64)
                     }
                     .buttonStyle(.plain)
@@ -310,7 +310,7 @@ struct ExpandedNowPlayingView: View {
                     Button {} label: {
                         Image(systemName: "text.badge.plus")
                             .font(.system(size: 24))
-                            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                            .foregroundStyle(colors.textSubtle)
                             .frame(width: 64, height: 64)
                     }
                     .buttonStyle(.plain)

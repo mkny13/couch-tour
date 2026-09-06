@@ -92,26 +92,27 @@ struct ShowDetailView: View {
                 }
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                Text("Shows")
             }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(colors.textSubtle)
             .buttonStyle(.plain)
 
             Text(ArtistAbbreviations.label(for: show.artist.name))
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                .foregroundStyle(colors.textSubtle)
 
             Text("/")
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0))
+                .foregroundStyle(colors.controlOutline)
 
             Text(yearString)
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                .foregroundStyle(colors.textSubtle)
 
             Text("/")
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0))
+                .foregroundStyle(colors.controlOutline)
 
             Text(formatShowDate(show.date))
                 .font(.system(size: 12))
@@ -158,7 +159,7 @@ struct ShowDetailView: View {
                 // Venue & Location
                 Text(detail.tracks.first?.venueName ?? show.where_)
                     .font(.system(size: 15))
-                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .foregroundStyle(colors.textSecondary)
                     .padding(.top, 5)
 
                 // Stats row
@@ -189,12 +190,12 @@ struct ShowDetailView: View {
             let countStr = "\(groups.count) \(plural(groups.count, "set")) · \(detail.tracks.count) tracks · \(formatCompactDuration(ms: totalDurationMs))"
             Text(countStr)
                 .font(.system(size: 14))
-                .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                .foregroundStyle(colors.textSubtle)
 
             // Tour Name
             Text("Fall Tour \(yearString)")
                 .font(.system(size: 14))
-                .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                .foregroundStyle(colors.textSubtle)
 
             // Tape Source Pill
             sourceBadgeButton(detail)
@@ -214,12 +215,12 @@ struct ShowDetailView: View {
             HStack(spacing: 5) {
                 Text(label)
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    .foregroundStyle(colors.textSubtle)
 
                 if hasRealAlternates(detail) {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
                 }
             }
         }
@@ -252,10 +253,10 @@ struct ShowDetailView: View {
                     }
                     .frame(height: 38)
                     .padding(.horizontal, 16)
-                    .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                    .foregroundStyle(colors.accentTintText)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0), lineWidth: 1)
+                            .stroke(colors.accentIcon, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -271,10 +272,10 @@ struct ShowDetailView: View {
                     }
                     .frame(height: 38)
                     .padding(.horizontal, 16)
-                    .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                    .foregroundStyle(colors.accentTintText)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0), lineWidth: 1)
+                            .stroke(colors.accentIcon, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -292,10 +293,10 @@ struct ShowDetailView: View {
                 }
                 .frame(height: 38)
                 .padding(.horizontal, 14)
-                .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                .foregroundStyle(colors.textSubtle)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                        .stroke(colors.controlOutline, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -331,10 +332,10 @@ struct ShowDetailView: View {
             }
             .frame(height: 38)
             .padding(.horizontal, 14)
-            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+            .foregroundStyle(colors.textSubtle)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .stroke(colors.controlOutline, lineWidth: 1)
             )
         }
     }
@@ -370,13 +371,13 @@ struct ShowDetailView: View {
                 Text(setName)
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.3)
-                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    .foregroundStyle(colors.textMuted)
 
                 Spacer()
 
                 Text(formatCompactDuration(ms: setMs))
                     .font(.system(size: 12))
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(colors.textMuted)
             }
             .padding(.bottom, 8)
 
@@ -590,26 +591,26 @@ private struct TrackTableRow: View {
                 // Track Number
                 Text("\(trackNumber)")
                     .font(.system(size: 13))
-                    .foregroundStyle(isPlaying ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(isPlaying ? colors.accent : colors.textMuted)
                     .frame(width: 26, alignment: .trailing)
 
                 // Track Title + Badges
                 HStack(spacing: 8) {
                     Text(track.title)
                         .font(.system(size: 15, weight: isPlaying ? .medium : .regular))
-                        .foregroundStyle(isPlaying ? Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0) : colors.textPrimary)
+                        .foregroundStyle(isPlaying ? colors.accent : colors.textPrimary)
                         .lineLimit(1)
 
                     if isJamChart {
                         Text("JAM CHART")
                             .font(.system(size: 9, weight: .semibold))
                             .tracking(0.9)
-                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                            .foregroundStyle(colors.accentTintText)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
+                                    .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
                             )
                     }
 
@@ -626,7 +627,7 @@ private struct TrackTableRow: View {
                 // Duration
                 Text(fmt(track.durationMs))
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    .foregroundStyle(colors.textSubtle)
                     .frame(width: 52, alignment: .trailing)
 
                 // Dots Menu
@@ -643,7 +644,7 @@ private struct TrackTableRow: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        .foregroundStyle(colors.textMuted)
                         .frame(width: 30, height: 30, alignment: .trailing)
                 }
                 .menuStyle(.borderlessButton)
@@ -654,9 +655,9 @@ private struct TrackTableRow: View {
                 Group {
                     if isPlaying {
                         ZStack(alignment: .leading) {
-                            Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.28)
+                            colors.accent.opacity(colors.isDark ? 0.28 : 0.12)
                             Rectangle()
-                                .fill(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                                .fill(colors.accent)
                                 .frame(width: 3)
                         }
                         .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -668,7 +669,7 @@ private struct TrackTableRow: View {
             .overlay(
                 VStack {
                     Spacer()
-                    Divider().overlay(Color(red: 0x23 / 255.0, green: 0x25 / 255.0, blue: 0x32 / 255.0))
+                    Divider().overlay(colors.divider)
                 }
             )
         }
