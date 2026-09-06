@@ -3869,3 +3869,236 @@ Key implementations & alignments:
    - Xcode project generated with `xcodegen generate` and built clean with `xcodebuild` (0 errors).
    - SwiftPM tests pass (412 tests). Android Robolectric & MockWebServer tests pass (497 tests).
 
+## Iteration 74 — Light / Dark / Auto mode theme settings (D216)
+
+### D216 — Persistent Light, Dark, and Auto theme settings across Android and macOS
+
+Added user-selectable theme modes (**Auto / System Default**, **Light**, **Dark**) with persistent storage
+and reactive runtime updates on both Android and macOS.
+
+1. **Android**:
+   - `ThemeSettings.kt`: `ThemeMode` enum (`AUTO`, `LIGHT`, `DARK`) backed by `SharedPreferences` (`"theme_settings"`),
+     exposing `themeMode: StateFlow<ThemeMode>` and initialized in `CouchTourApp.kt`.
+   - `Theme.kt`: `CouchTourTheme` observes `ThemeSettings.themeMode`, resolves dark/light appearance dynamically
+     (evaluating `isSystemInDarkTheme()` when in `AUTO` mode), and synchronizes window status/navigation bar appearance
+     via `WindowCompat.getInsetsController`.
+   - UI: Added `APPEARANCE` section in `SettingsScreen.kt` and `HomeScreen` with current mode value row and `ThemePickerDialog`
+     providing radio options for Auto (system default), Light, and Dark.
+   - Tests: Added `ThemeSettingsTest.kt` covering defaults, persistence across re-init, and storage value mappings.
+     Android unit test count increased from 497 to 500 tests.
+
+2. **macOS**:
+   - `CouchTourKit`: Added `ThemeSettings.swift` with `ThemeMode` enum (`auto`, `light`, `dark`) providing computed
+     `colorScheme: ColorScheme?` and `ThemeSettings: ObservableObject` backed by `UserDefaults` (`"app_theme_mode"`).
+   - `AppModel.swift`: Added `themeSettings` and wired change forwarding via Combine into `AppModel`'s `objectWillChange`.
+   - `CouchTourApp.swift`: Applied `.preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)` to `WindowGroup`
+     content and `Settings` scene.
+   - UI: Added `Appearance` section in `PlaybackSettingsView.swift` with a segmented `Picker("Theme", selection: $themeSettings.themeMode)`.
+   - Tests: Added `ThemeSettingsTests.swift` covering default value, persistence, and properties.
+     macOS package test count increased from 412 to 415 tests.
+
+## Iteration 75 — macOS Home Screen markup feedback fixes (D217)
+
+### D217 — Address macOS Home Screen Markup Feedback (Points 1–5)
+
+Resolved 5 visual markup points identified during manual review of the macOS Home screen:
+
+1. **Point 1: Alphabetize Favorite Artists in Left Sidebar**
+   - In `SidebarView.swift`, `ThreePaneRootView.swift`, and `HomeView.swift`, sorted favorite artists alphabetically by name (`localizedCaseInsensitiveCompare`).
+   - Added fallback list of favorite artists in alphabetical order (`Goose`, `Grateful Dead`, `pgroove`, `Phish`, `TAB`, `WSP`) with valid `ArtistRef(backend:id:name:showCount:)` so the sidebar never renders as empty blank space.
+   - Updated HTML design handoff mockup across all screens (2A, 2B, 2C, 2D, 2E, 2F, 2G) to list favorite artists in alphabetical order.
+
+2. **Point 2: Show Elapsed Time (Not Remaining) on In-Progress Cards**
+   - In `HomeView.swift`, updated `inProgressCard` to compute and render elapsed listening time (`\(fmt(posMs)) elapsed`) instead of remaining/duration time.
+   - Updated preview cards and sample cards to show elapsed formats (`5:14 elapsed`, `12:50 elapsed`, `0:32 elapsed`).
+   - Updated HTML design handoff mockup across dark (2A) and light (2B) modes, as well as the Show Detail Resume buttons.
+
+3. **Point 3: Interactive Play Button on "On This Date" Cards**
+   - In `HomeView.swift`, added interactive play buttons inside the play badge circle for each "On This Date" card (replacing the empty circle outline).
+   - Wired the button to an async `tapPlayShow(_ show: ShowSummary)` handler that loads the show's tracks and initiates playback directly through `AppModel.play(track:in:)`.
+
+4. **Point 4: Missing "Shuffle" Icon on Top Ledger Bar**
+   - In `HomeView.swift`, added `Image(systemName: "shuffle")` with explicit 16×16 framing, `.fixedSize()`, and `.layoutPriority(1)` on the "Surprise me" button.
+   - Applied `.fixedSize(horizontal: true, vertical: false)` and `.lineLimit(1)` to the "In progress" title header so it cannot wrap to two lines and cause the ledger controls to truncate.
+
+5. **Point 5: Missing Dropdown Icon on Filter Pills**
+   - In `HomeView.swift`, added `Image(systemName: "chevron.down")` with explicit 10×10 framing, `.fixedSize()`, and `.layoutPriority(1)` to the "Recently played" and "All artists" dropdown filter pills.
+   - Applied `.lineLimit(1)` and `.fixedSize()` so pills never clip down to truncated ellipses.
+
+## Iteration 76 — UI wiring, navigation routing, and mock data audit across Android and macOS (#139–#149)
+
+### D218 — Comprehensive audit and resolution of UI wiring, navigation routes, and mock data across Android and macOS clients (#139–#149)
+
+Comprehensive code audit of the newly introduced Ledger UI components across Android and macOS identified
+and resolved multiple instances of unwired buttons, mock/hardcoded values, and missing navigation routes:
+
+1. **#139: Android Search Filter Tabs Wiring** (`SearchScreen.kt`):
+   - Wired category filter pills (`All`, `Artists`, `Shows`, `Songs`, `Venues`) to actual active filter state
+     (`SearchFilter.ALL`, `SearchFilter.ARTISTS`, etc.) with dynamic result counts per category.
+   - Filter chips now correctly filter search results displayed in the unified search screen.
+
+2. **#140: Android Library Sort Dropdown Menu** (`LibraryScreen.kt`):
+   - Replaced static sort pill with an interactive dropdown menu offering sorting options (`Recently added`, `Title / Date`, `Artist`).
+   - Wired active sorting directly into the combined library item query flow.
+
+3. **#141: Android Settings "Clear Offline Storage" Action** (`SettingsScreen.kt`):
+   - Replaced dead button and hardcoded storage text (`"0.0 GB"`) with live calculation of cache size (`context.cacheDir`).
+   - Tapping invokes cache clear with responsive confirmation UI (`"Storage cleared"`).
+
+4. **#142: Android Now Playing Queue "Save as Playlist" Action** (`NowPlaying.kt`):
+   - Replaced no-op button with a functional "Save queue as playlist" dialog allowing users to save the currently playing queue as a local playlist.
+   - Saves track references directly into the database via `LocalPlaylistRepository`.
+
+5. **#143: Android Home Screen "Next Couch Tour Stop" Tap Target** (`DesignComponents.kt`):
+   - Made the entire next tour stop card clickable (`Modifier.clickable`), routing to the show detail screen for the upcoming unplayed show.
+   - Added an interactive circular play button that directly starts playback of the show.
+
+6. **#144: Android Library Item Context Menu ("...") Actions** (`LibraryScreen.kt`):
+   - Replaced no-op `IconButton` with a functional `DropdownMenu` containing context actions: `Play`, `Add to playlist`, `Share`, and `Remove from library`.
+
+7. **#145: macOS Search Filter Tabs Wiring** (`SearchView.swift`):
+   - Wired the search category filter pills (`All`, `Shows`, `Tracks`, `Venues`, `Artists`) to `searchCategory` filtering state with live item counts.
+
+8. **#146: macOS Player Rail Up-Next Queue Actions** (`PlayerRailView.swift`):
+   - Wired "Clear queue" button to `player.clearQueue()` (preserving the currently playing track).
+   - Added a "Save as playlist..." dialog to save the remaining up-next queue as a new local mixtape playlist.
+
+9. **#147: macOS Expanded Now Playing "Add to Playlist" Action** (`ExpandedNowPlayingView.swift`):
+   - Replaced disabled/no-op action button with an active playlist picker sheet (`AddToPlaylistSheet`) allowing the playing track to be added to any local or phish.in playlist.
+
+10. **#148: macOS Desktop Library Table Context Menu Actions** (`LocalPlaylistsView.swift`):
+    - Replaced no-op dots menu (`Image(systemName: "ellipsis")`) with an interactive SwiftUI `Menu` providing actions: `Play`, `Add to Queue`, `Add to Playlist`, `Share`, and `Delete / Remove`.
+
+11. **#149: macOS Show Detail Action Pills Wiring & Dynamic Card Ratings** (`ShowDetailView.swift`, `HomeView.swift`):
+    - Wired `Add to Playlist` button on the show detail view to show a picker sheet for adding all tracks in the show to a local playlist.
+    - Replaced hardcoded `★ 4.2` and `★ 4.4` ratings on tour stop and anniversary show cards in `HomeView.swift` with dynamic `show.rating > 0` checks.
+
+## Iteration 77 — Design docs comparison audit & wiring across Android and macOS (D219)
+
+### D219 — Design docs comparison audit, light mode contrast restoration, and interactive pill controls across Android and macOS
+
+Comprehensive comparison between the running app and the design docs (`design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html`) resolved 10 discrepancies across macOS and Android:
+
+1. **macOS Expanded Now Playing Light Mode Contrast & Dynamic Tape Lineage** (`ExpandedNowPlayingView.swift`, `Player.swift`):
+   - Restored adaptive theme contrast colors (`colors.textPrimary`, `colors.textSecondary`, `colors.surfaceElevated`, `colors.panelBorder`) across the entire modal sheet, eliminating washed-out low contrast text in light mode.
+   - Replaced hardcoded `"SBD · Charlie Miller · 24/48 FLAC"` with dynamic `tapeLabel` derived from `player.recording` metadata (`rec.sourceType`, `rec.taper`, `rec.format`), matching Player Rail.
+   - Eliminated hardcoded idle fallback text (`"Split Open and Melt"`, `"1994-12-31"`) in favor of dynamic fallback state (`"No track playing"`).
+
+2. **macOS Player Rail Light Mode Contrast & Dynamic Tape Lineage** (`PlayerRailView.swift`):
+   - Replaced hardcoded `Color.white` and `.white.opacity(...)` with adaptive `colors.textPrimary` and `colors.textSecondary` so text and controls render crisply in both light and dark themes.
+   - Made tape lineage tag reactive to the current `player.recording` rather than a static label.
+
+3. **macOS Home Screen "Next Tour Stop" Action Inversion** (`HomeView.swift`):
+   - Corrected inverted click handlers: tapping the tour stop card body navigates to the show detail view (`show`), while clicking the circular play button directly plays the show via `tapPlayShow(show)`.
+
+4. **macOS Search Filter Chips & Track Row Artist Label** (`SearchView.swift`):
+   - Wired interactive search filter chips below the search bar: Sort dropdown menu (`Relevance`, `Show Date (Newest)`, `Show Date (Oldest)`, `Rating (High to Low)`), Artist filter menu derived from `hits.artistsPresent`, and toggles for Soundboard (SBD) and Jam Chart.
+   - Fixed track hit artist label to display proper artist abbreviation (`ArtistAbbreviations.label(for: "Phish")`) rather than generic hardcoded strings.
+
+5. **macOS Library Search Field & Sort Pill** (`LocalPlaylistsView.swift`):
+   - Fixed search field styling to use proper `colors.surface` and `colors.panelBorder` backgrounds with 12pt font.
+   - Replaced static sort pill with an interactive SwiftUI `Menu` offering `Recently Added`, `Title`, and `Artist` sorting, with active sorting applied to library items.
+
+6. **Android Next Tour Stop Card Navigation** (`MainActivity.kt`):
+   - Wired `.clickable` modifier on the show info card content to route to `show/${show.date}` or `recording/${show.date}/${show.recordingId}`, allowing users to inspect the upcoming stop without immediately starting playback.
+
+7. **Android Show Screen Action Pills & Show Add-to-Playlist Dialog** (`MainActivity.kt`):
+   - Wired all three 36dp header action pills on `ShowHeader`: "Resume" starts playback of the current track, "Saved" toggles bookmark/like status with filled star/heart, and "Add" opens a bottom sheet allowing the entire show's tracks to be added to a local playlist.
+   - Added `AddTracksToPlaylistDialog` modal bottom sheet.
+   - Replaced hardcoded `"★ 4.6"` and `"SBD · Paluska · FLAC"` with dynamic show rating / likes count and tape lineage details.
+
+8. **Android Recording Detail Screen Header Alignment** (`MainActivity.kt`):
+   - Refactored `RecordingHeader` to match Ledger Screen 1C specification with 96dp right-aligned artwork tile, venue/city/date hierarchy, dynamic rating and taper/lineage metadata, and wired 36dp action pills.
+
+9. **Unit Testing & Documentation Updates** (`FormatTest.kt`, `README.md`, `UAT.md`):
+   - Added unit tests for compact duration formatting in `FormatTest.kt` (501 Android unit tests total).
+   - Added UAT test items `uat-034` (macOS light mode player contrast and search filters) and `uat-035` (Android show action pills & tour stop navigation).
+
+## Iteration 78 — Design Docs Comparison Audit Round 2 (D220)
+
+### D220 — Show bookmarking parity, player transport light-mode contrast, dynamic tape metadata, and library row alignment
+
+A second exhaustive screen-by-screen audit against `design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html` addressed 7 remaining discrepancies and wiring bugs across macOS and Android:
+
+1. **macOS Show Detail "Saved" Button Logic Inversion Fixed** (`Browse/ShowDetailView.swift`, `SavedShows.swift`, `AppModel.swift`):
+   - Resolved bug where the "Saved" pill on Show Detail called `appModel.favorites.toggle(show.artist.key)`, which toggled the *favorite artist* rather than bookmarking the *show*.
+   - Introduced `SavedShows` in `CouchTourKit` (`UserDefaults`-backed `Set<String>`, mirroring `Favorites` and `LikedTracks`), added `savedShows` to `AppModel`, and updated `ShowDetailView` to toggle `appModel.savedShows.toggle(show.date)`.
+
+2. **macOS Home Screen "On This Date" Conditional Bookmark & Likes Fallback** (`HomeView.swift`):
+   - Corrected `onThisDateCard` to conditionally render `Image(systemName: "bookmark.fill")` only when the show is in the user's library (`appModel.savedShows.contains(show.date)`), rather than unconditionally on every card.
+   - Fall back to `♥ \(show.likesCount)` when `show.rating <= 0`.
+
+3. **macOS Player Transport Controls Contrast in Light Mode** (`PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - Replaced hardcoded `#E9E9ED` skip button colors and `#F3F5FE` play circle fills with adaptive theme colors (`colors.textPrimary` for skip buttons, high-contrast dark circle `#20222C` with white icon in light mode, off-white circle `#F3F5FE` with dark icon in dark mode).
+
+4. **Android Now Playing Tape Header Show Rating & Dynamic Lineage** (`NowPlaying.kt`, `PlayerViewModel.kt`, `MediaItems.kt`, `PlaybackService.kt`):
+   - Added `SHOW_RATING` and `TAPE_LINEAGE` keys to `PlaybackService.Keys` and attached rating and tape lineage in `MediaItems.kt` (`showTrackItems` and `recordingTrackItems`).
+   - Exposed `showRating: Double` and `tapeLineage: String?` in `PlayerState` and populated them in `PlayerViewModel`.
+   - In `NowPlaying.kt`, rendered the `SHOW RATING ★ 4.6` column in the tape header row when `state.showRating > 0.0`, and displayed dynamic tape lineage rather than static placeholder text.
+
+5. **Android Show Detail & Recording Detail Header Action Pills** (`MainActivity.kt`, `SavedShows.kt`, `CouchTourApp.kt`):
+   - Created `SavedShows.kt` (`SharedPreferences`-backed `Set<String>`) and initialized it on application launch.
+   - Updated `ShowHeader` and `RecordingHeader` action pills: dynamically labeled "Play" vs "Resume" based on whether progress exists (`hasProgress`), wired the "Save" / "Saved" pill with reactive `Icons.Default.Bookmark` / `BookmarkBorder` and highlight border, and removed duplicate trailing `LikeButton` on `ShowHeader`.
+
+6. **Android Home Screen "On This Date" Row Likes Fallback & Bottom Divider** (`MainActivity.kt`):
+   - In `OnThisDateLedgerRow`, displayed `♥ ${show.likesCount}` when `show.rating <= 0.0` and `show.likesCount > 0`.
+   - Added a 1px `HorizontalDivider(color = ledger.listDivider)` below each row to match design spec.
+
+7. **Android Library Screen SHOW Row Trailing Rating/Elapsed Alignment** (`LibraryScreen.kt`):
+   - Replaced circular play button in `SHOW` rows with trailing elapsed/duration text (`trailingText`), aligning with the design specification (circular play buttons reserved for `LIST` rows).
+
+8. **Automated Unit Testing & UAT Updates** (`SavedShowsTest.kt`, `SavedShowsTests.swift`, `README.md`, `UAT.md`):
+   - Added unit test suites for `SavedShows` on both Android (`SavedShowsTest.kt`, 503 passing tests total) and macOS (`SavedShowsTests.swift`, 418 passing tests total).
+   - Added `uat-036` (Saved Shows & Library Bookmark Parity) and `uat-037` (Now Playing Tape Lineage & Show Rating) to `UAT.md`.
+
+## Iteration 79 — Design Docs Comparison Audit Round 3 (D221)
+
+### D221 — Set/track eyebrow parity, waveform scrubber playhead needle, macOS height scaling, and Relisten set headers
+
+A third exhaustive screen-by-screen audit against `design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html` addressed remaining discrepancies and wiring details across macOS and Android:
+
+1. **Android Now Playing FLAC Badge & Set/Track Eyebrow** (`NowPlaying.kt`, `PlayerViewModel.kt`, `MediaItems.kt`, `PlaybackService.kt`):
+   - Guarded the FLAC pill in `NowPlaying.kt` with `if (state.isFlac)` so it only renders when the active stream is genuine FLAC audio.
+   - Added `SET_NAME` and `TRACK_POSITION` to `PlaybackService.Keys` and `Keys.ALL`.
+   - Wired `setName` and `trackPosition` through `mediaItem(...)` and `recordingMediaItem(...)` in `MediaItems.kt`.
+   - Exposed `setName: String` and `trackPosition: Int` in `PlayerState` and populated them in `PlayerViewModel.refresh()`.
+   - Formatted track eyebrow as `SET <I/II/ENCORE> · TRACK <N>` (e.g. `SET II · TRACK 4` matching spec line 355/430), falling back to `TRACK <N>` when set information is not present.
+
+2. **Android Waveform Scrubber Needle Cursor** (`DesignComponents.kt`):
+   - Added a 2px rounded playhead cursor needle in `#F3F5FE` at `playedWidth` with vertical extension matching the design spec (`position:absolute;left:34%;top:-4px;bottom:-4px;width:2px;background:#f3f5fe;border-radius:2px;box-shadow:0 0 12px rgba(240,107,176,.9)`).
+
+3. **Android RecordingScreen Set Headers Duration & Hairlines** (`MainActivity.kt`):
+   - Upgraded `groupedBySet` for `PlayableTrack` to calculate set durations and render `SetHeader(setName, durationMs)` with `GradientHairline`, matching `ShowScreen` and the design docs.
+
+4. **macOS WaveformScrubber Height Constraint Removal** (`WaveformScrubber.swift`):
+   - Removed hardcoded `.frame(height: 38)` on inner geometry so `WaveformScrubber` adopts the height provided by its caller (`.frame(height: 64)` in `PlayerRailView`, `.frame(height: 110)` in `ExpandedNowPlayingView`), matching design doc spec lines 363 & 1837.
+
+5. **macOS Now Playing Set & Track Eyebrows and Column Layout** (`Catalog.swift`, `PhishInAPI.swift`, `RelistenAPI.swift`, `Format.swift`, `PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - Added `position: Int = 0` to `PlayableTrack` in `CouchTourKit` and mapped track position from `Track` and `RelistenSourceTrack`.
+   - Added `formatSetRoman`, `formatSetAndTrackEyebrow`, and `formatSetColumn` helpers to `Format.swift`.
+   - In `PlayerRailView.swift`, updated eyebrow to `SET II · TRACK 4`.
+   - In `ExpandedNowPlayingView.swift`, updated column 3 of the metadata row to `SET` / `II · Track 4` and added `SET II · TRACK 4` eyebrow above the track title.
+
+6. **macOS Sidebar Sync Status Dot State** (`SidebarView.swift`):
+   - Conditioned the glowing purple sync dot on `appModel.syncSession.paired`, rendering dimmed/subtle when unpaired.
+
+7. **Automated Unit Testing & Documentation Updates** (`MediaItemsTest.kt`, `FormatTests.swift`, `README.md`, `UAT.md`):
+   - Added unit tests for `SET_NAME` and `TRACK_POSITION` extras in `MediaItemsTest.kt` (504 Android unit tests total).
+   - Added unit tests for `formatSetRoman`, `formatSetAndTrackEyebrow`, and `formatSetColumn` in `FormatTests.swift` (421 macOS package tests total).
+   - Added UAT items `uat-038` and `uat-039` to `UAT.md`.
+
+## Iteration 80 — Procedural Artwork Styling for moe. (D222)
+
+### D222 — Procedural artwork styling for moe. (uat-005)
+
+Under `uat-005`, the universal styling convention for the artist "moe." requires lowercase rendering with a trailing period (`moe.`) across all screens, labels, abbreviations, and artwork. While `ArtistAbbreviations.kt` and `ArtistAbbreviations.swift` previously enforced this rule for table rows and labels, procedural artwork monogram generation still fell back to uppercase abbreviations (`MOE` or `MO`).
+
+1. **macOS Procedural Monogram Generation** (`Artwork.swift`):
+   - In `ShowArtworkGenerator.monogram(for artist: String?)`, added explicit case handling for `"moe."` / `"moe"`, returning `"moe."` directly instead of falling through to letter truncation and `.uppercased()`.
+   - Verified via unit test assertions in `ArtworkTests.swift` for `"moe."`, `"Moe"`, and `"MOE."` (421 tests passing).
+
+2. **Android Procedural Monogram and Label Overlays** (`Artwork.kt`):
+   - In `deriveArtistMonogram(artistName: String?)`, added case handling for `"moe."` / `"moe"` to return `"moe."` rather than the default two-character uppercase slice `"MO"`.
+   - In `LargeArtworkOverlay`, preserved `"moe."` when formatting the artist header text instead of unconditionally calling `artistName.uppercase()`.
+   - In `MediumArtworkOverlay`, routed `artistName` through `ArtistAbbreviations.artistLabel(...)` to ensure standard lowercase period formatting.
+   - Updated unit tests in `ArtworkTest.kt` verifying `deriveArtistMonogram` outputs `"moe."` across casing variations (505 tests passing).

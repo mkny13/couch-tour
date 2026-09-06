@@ -13,6 +13,20 @@ struct SidebarView: View {
     let favoritedArtists: [ArtistRef]
     let onSelectArtist: (ArtistRef) -> Void
 
+    private static let fallbackFavoriteArtists: [ArtistRef] = [
+        ArtistRef(backend: .relisten, id: "goose", name: "Goose", showCount: 412),
+        ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead", showCount: 2313),
+        ArtistRef(backend: .relisten, id: "perpetual-groove", name: "pgroove", showCount: 276),
+        ArtistRef(backend: .phishin, id: "phish", name: "Phish", showCount: 1884),
+        ArtistRef(backend: .relisten, id: "trey-anastasio", name: "TAB", showCount: 308),
+        ArtistRef(backend: .relisten, id: "widespread-panic", name: "WSP", showCount: 1102)
+    ]
+
+    private var sortedArtists: [ArtistRef] {
+        let list = favoritedArtists.isEmpty ? Self.fallbackFavoriteArtists : favoritedArtists
+        return list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     private static let countFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .decimal
@@ -92,7 +106,7 @@ struct SidebarView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(favoritedArtists, id: \.key) { artist in
+                    ForEach(sortedArtists, id: \.key) { artist in
                         Button {
                             onSelectArtist(artist)
                         } label: {
@@ -121,37 +135,45 @@ struct SidebarView: View {
             // SYNC STATUS Footer
             Divider().overlay(colors.divider)
 
-            HStack(spacing: 9) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 15))
-                    .foregroundStyle(colors.accent)
+            Button {
+                appModel.settingsTab = .sync
+                openSettings()
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 15))
+                        .foregroundStyle(colors.accent)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(appModel.syncSession.paired ? "Synced with phone" : "Not paired")
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.textSubtle)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(appModel.syncSession.paired ? "Synced with phone" : "Not paired")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colors.textSecondary)
+                            .lineLimit(1)
 
-                    if let lastSynced = appModel.syncSession.lastSyncedAt, lastSynced > 0 {
-                        Text(relativeTime(lastSynced))
-                            .font(.system(size: 11))
-                            .foregroundStyle(colors.textMuted)
-                    } else {
-                        Text("Ready to sync")
-                            .font(.system(size: 11))
-                            .foregroundStyle(colors.textMuted)
+                        if let lastSynced = appModel.syncSession.lastSyncedAt, lastSynced > 0 {
+                            Text(relativeTime(lastSynced))
+                                .font(.system(size: 11))
+                                .foregroundStyle(colors.textMuted)
+                        } else {
+                            Text("Ready to sync")
+                                .font(.system(size: 11))
+                                .foregroundStyle(colors.textMuted)
+                        }
                     }
+
+                    Spacer()
+
+                    let isPaired = appModel.syncSession.paired
+                    Circle()
+                        .fill(isPaired ? colors.accent : Color.gray.opacity(0.35))
+                        .frame(width: 6, height: 6)
+                        .shadow(color: isPaired ? colors.accent.opacity(0.9) : Color.clear, radius: 4)
                 }
-
-                Spacer()
-
-                Circle()
-                    .fill(colors.accent)
-                    .frame(width: 6, height: 6)
-                    .shadow(color: colors.accent.opacity(0.9), radius: 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .buttonStyle(.plain)
         }
         .frame(width: 236)
         .background(colors.elevated)

@@ -25,7 +25,9 @@ struct CouchTourApp: App {
                 .environmentObject(appModel.favorites)
                 .environmentObject(appModel.likedTracks)
                 .environmentObject(appModel.playbackSettings)
+                .environmentObject(appModel.themeSettings)
                 .environmentObject(appModel.phishInSession)
+                .preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)
         }
         .commands {
             CommandGroup(after: .appInfo) {
@@ -119,7 +121,11 @@ struct CouchTourApp: App {
         // the duplicate Account and Sync sheets Home used to carry (superseding D197).
         Settings {
             TabView(selection: $appModel.settingsTab) {
-                PlaybackSettingsView(settings: appModel.playbackSettings, updater: appModel.updater)
+                PlaybackSettingsView(
+                    settings: appModel.playbackSettings,
+                    updater: appModel.updater,
+                    themeSettings: appModel.themeSettings
+                )
                     .tabItem { Label("Playback", systemImage: "play.circle") }
                     .tag(SettingsTab.playback)
                 AccountView(session: appModel.phishInSession)
@@ -130,6 +136,7 @@ struct CouchTourApp: App {
                     .tag(SettingsTab.sync)
             }
             .frame(width: 450)
+            .preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)
         }
     }
 }

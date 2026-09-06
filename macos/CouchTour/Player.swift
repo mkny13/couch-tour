@@ -16,6 +16,7 @@ private let volumeDefaultsKey = "playerVolume"
 @MainActor
 final class Player: NSObject, ObservableObject {
     @Published private(set) var show: ShowSummary?
+    @Published private(set) var recording: RecordingRef?
     @Published private(set) var tracks: [PlayableTrack] = []
     @Published private(set) var queueKey: String?
     @Published private(set) var currentIndex: Int?
@@ -198,6 +199,7 @@ final class Player: NSObject, ObservableObject {
     /// applied once the starting track is actually ready — see `pendingResumeMs`.
     func play(detail: ShowDetail, startIndex: Int = 0, resumePositionMs: Int64 = 0) {
         show = detail.summary
+        recording = detail.recording
         queueKey = detail.queueKey
         artURL = detail.summary.artURL ?? detail.tracks.first?.artURL
         loadArtwork(for: artURL)

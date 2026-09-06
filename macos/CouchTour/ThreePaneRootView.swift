@@ -76,6 +76,13 @@ struct ThreePaneRootView: View {
         .onChange(of: appModel.favorites.keys) { _, _ in
             Task { await loadFavorites() }
         }
+        .onChange(of: appModel.searchQuery) { _, newQuery in
+            if !newQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if appModel.path.last != .search {
+                    appModel.path.append(.search)
+                }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             appModel.syncNow()
         }
@@ -87,6 +94,7 @@ struct ThreePaneRootView: View {
         }
         let merged = mergeArtists(relistenArtists: relistenArtists, favorites: appModel.favorites.keys)
         favoritedArtists = merged.filter { appModel.favorites.keys.contains($0.key) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     @ViewBuilder

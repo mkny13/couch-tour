@@ -151,7 +151,13 @@ class ArtworkTest {
     fun `deriveArtistMonogram extracts first two characters for single-word artists`() {
         assertEquals("PH", deriveArtistMonogram("Phish"))
         assertEquals("GO", deriveArtistMonogram("Goose"))
-        assertEquals("MO", deriveArtistMonogram("Moe"))
+    }
+
+    @Test
+    fun `deriveArtistMonogram formats moe as lowercase with period per uat-005`() {
+        assertEquals("moe.", deriveArtistMonogram("moe."))
+        assertEquals("moe.", deriveArtistMonogram("Moe"))
+        assertEquals("moe.", deriveArtistMonogram("MOE."))
     }
 
     @Test

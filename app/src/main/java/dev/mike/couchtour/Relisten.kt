@@ -283,6 +283,7 @@ internal fun RelistenSourceTrack.toPlayableTrack(
     // Suppressed for an artist without real sets (D-verified: Dead sources carry one
     // wrapper set literally named "Set") rather than every screen re-checking hasSets.
     setName = if (artist.hasSets) setName else "",
+    position = trackPosition,
     durationMs = duration * 1000,
     url = mp3Url.orEmpty(),
     showDate = showDate,

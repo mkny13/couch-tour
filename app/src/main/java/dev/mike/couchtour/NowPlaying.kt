@@ -285,7 +285,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                             modifier = Modifier.padding(top = 3.dp)
                         ) {
                             Text(
-                                text = if (state.isFlac) "SBD · Paluska transfer" else "Audience recording",
+                                text = state.tapeLineage ?: (if (state.isFlac) "SBD · Soundboard" else "Audience recording"),
                                 fontSize = 14.sp,
                                 color = ledger.textPrimary,
                                 maxLines = 1,
@@ -297,41 +297,45 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 tint = ledger.textSubtle,
                                 modifier = Modifier.size(14.dp)
                             )
-                            Box(
-                                modifier = Modifier
-                                    .border(
-                                        1.dp,
-                                        if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615),
-                                        RoundedCornerShape(4.dp)
+                            if (state.isFlac) {
+                                Box(
+                                    modifier = Modifier
+                                        .border(
+                                            1.dp,
+                                            if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615),
+                                            RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "FLAC",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 1.sp,
+                                        color = ledger.ratingAmber
                                     )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "FLAC",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.sp,
-                                    color = ledger.ratingAmber
-                                )
+                                }
                             }
                         }
                     }
 
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "SHOW RATING",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.4.sp,
-                            color = ledger.textMuted
-                        )
-                        Text(
-                            text = "★ 4.6",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = ledger.ratingAmber,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
+                    if (state.showRating > 0.0) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "SHOW RATING",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.4.sp,
+                                color = ledger.textMuted
+                            )
+                            Text(
+                                text = "★ " + "%.1f".format(java.util.Locale.US, state.showRating),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = ledger.ratingAmber,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -345,15 +349,32 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 12.dp)
             ) {
+                val eyebrow = buildString {
+                    if (state.setName.isNotBlank()) {
+                        val romanSet = when (state.setName.trim().lowercase()) {
+                            "set 1", "set1", "1", "s1" -> "SET I"
+                            "set 2", "set2", "2", "s2" -> "SET II"
+                            "set 3", "set3", "3", "s3" -> "SET III"
+                            "set 4", "set4", "4", "s4" -> "SET IV"
+                            "encore", "e" -> "ENCORE"
+                            "soundcheck" -> "SOUNDCHECK"
+                            else -> state.setName.trim().uppercase()
+                        }
+                        append(romanSet)
+                        append(" · ")
+                    }
+                    val trackNum = if (state.trackPosition > 0) state.trackPosition else (state.trackIndex + 1)
+                    append("TRACK $trackNum")
+                }
                 Text(
-                    text = "SET II · TRACK ${state.trackIndex + 1}",
+                    text = eyebrow,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.6.sp,
                     color = ledger.textSubtle
                 )
                 Text(
-                    text = state.trackTitle.ifEmpty { "Bathtub Gin" },
+                    text = state.trackTitle.ifEmpty { "Track" },
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = (-0.015).sp,
@@ -364,55 +385,61 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     modifier = Modifier.padding(top = 4.dp)
                 )
 
-                // Tags row: JAM CHART badge + Duration chip
+                // Tags row: JAM CHART badge (if phish track) + Duration chip
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    if (state.backend == Backend.PHISHIN.id || state.backend == null) {
+                        Box(
+                            modifier = Modifier
+                                .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { showJamChartNote = !showJamChartNote }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "JAM CHART",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.sp,
+                                    color = ledger.accentTintText
+                                )
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = ledger.accentTintText,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
+                        }
+                    }
+                    if (state.durationMs > 0) {
+                        Box(
+                            modifier = Modifier
+                                .border(1.dp, ledger.controlOutline, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "JAM CHART",
+                                text = fmt(state.durationMs),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 letterSpacing = 1.sp,
-                                color = ledger.accentTintText
-                            )
-                            Icon(
-                                Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = ledger.accentTintText,
-                                modifier = Modifier.size(11.dp)
+                                color = ledger.textSecondary
                             )
                         }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .border(1.dp, ledger.controlOutline, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 7.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = if (state.durationMs > 0) fmt(state.durationMs) else "12:44",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp,
-                            color = ledger.textSecondary
-                        )
                     }
                 }
 
                 // Expandable Jam Chart Note Card
-                if (showJamChartNote) {
+                if (showJamChartNote && (state.backend == Backend.PHISHIN.id || state.backend == null)) {
                     JamChartNoteCard(
-                        noteText = "The jam chart entry for this version loads here from phish.in, describing what makes the take notable and where it goes.",
+                        noteText = "Notable version from phish.in archive records.",
                         onDismiss = { showJamChartNote = false },
                         modifier = Modifier.padding(top = 10.dp)
                     )
@@ -585,11 +612,13 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 )
                             }
                         }
-                        Text(
-                            text = "268",
-                            fontSize = 11.sp,
-                            color = ledger.textMuted
-                        )
+                        if (state.likesCount > 0) {
+                            Text(
+                                text = "${state.likesCount}",
+                                fontSize = 11.sp,
+                                color = ledger.textMuted
+                            )
+                        }
                     }
                 }
             }

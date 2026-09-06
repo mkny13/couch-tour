@@ -105,6 +105,26 @@ struct PlayerRailView: View {
                             .foregroundStyle(colors.textSecondary)
                             .padding(.top, 5)
 
+                        let tapeLabel: String = {
+                            if let rec = player.recording {
+                                var parts: [String] = []
+                                parts.append(rec.isSoundboard ? "SBD" : "AUD")
+                                if let taper = rec.taper, !taper.isEmpty {
+                                    parts.append(taper)
+                                }
+                                if rec.hasFlac {
+                                    parts.append("FLAC")
+                                }
+                                return parts.joined(separator: " · ")
+                            }
+                            let isSbd = show.tags.contains { $0.name.localizedCaseInsensitiveContains("sbd") }
+                            let hasFlac = player.currentTrack?.flacUrl?.isEmpty == false
+                            var parts: [String] = []
+                            parts.append(isSbd ? "SBD" : "AUD")
+                            if hasFlac { parts.append("FLAC") }
+                            return parts.joined(separator: " · ")
+                        }()
+
                         // TAPE & SHOW RATING Row
                         HStack(alignment: .center, spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -114,7 +134,7 @@ struct PlayerRailView: View {
                                     .foregroundStyle(colors.textMuted)
 
                                 HStack(spacing: 6) {
-                                    Text("SBD · Paluska · FLAC")
+                                    Text(tapeLabel)
                                         .font(.system(size: 14))
                                         .foregroundStyle(colors.textPrimary)
                                         .lineLimit(1)
@@ -132,9 +152,15 @@ struct PlayerRailView: View {
                                     .tracking(1.4)
                                     .foregroundStyle(colors.textMuted)
 
-                                Text("★ 4.6")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(colors.ratingAmber)
+                                if show.rating > 0 {
+                                    Text(String(format: "★ %.1f", show.rating))
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(colors.ratingAmber)
+                                } else {
+                                    Text("—")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(colors.textMuted)
+                                }
                             }
                         }
                         .padding(.top, 14)
@@ -153,54 +179,65 @@ struct PlayerRailView: View {
                     // Track Block (Eyebrow, Title, Jam Chart Pill, Note Card)
                     VStack(alignment: .leading, spacing: 0) {
                         let currentIdx = (player.currentIndex ?? 0) + 1
-                        Text("SET II · TRACK \(currentIdx)")
+                        let eyebrow = formatSetAndTrackEyebrow(
+                            setName: player.currentTrack?.setName,
+                            trackPosition: player.currentTrack?.position,
+                            fallbackIndex: currentIdx
+                        )
+                        Text(eyebrow)
                             .font(.system(size: 10, weight: .semibold))
                             .tracking(1.6)
                             .foregroundStyle(colors.textMuted)
 
-                        Text(player.currentTrack?.title ?? "Bathtub Gin")
+                        Text(player.currentTrack?.title ?? "—")
                             .font(.system(size: 23, weight: .medium))
                             .foregroundStyle(colors.textPrimary)
                             .padding(.top, 4)
                             .lineLimit(1)
 
-                        HStack(spacing: 6) {
-                            Button {
-                                showJamChartNote.toggle()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text("JAM CHART")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .tracking(1.0)
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 8))
-                                }
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .foregroundStyle(colors.accentTintText)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
+                        let isJamChart = player.currentTrack?.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") } == true
 
-                            Text(formatCompactDuration(ms: player.currentTrack?.durationMs ?? 764_000))
-                                .font(.system(size: 10, weight: .semibold))
-                                .tracking(1.0)
-                                .foregroundStyle(colors.textSubtle)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(colors.controlOutline, lineWidth: 1)
-                                )
+                        HStack(spacing: 6) {
+                            if isJamChart {
+                                Button {
+                                    showJamChartNote.toggle()
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text("JAM CHART")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .tracking(1.0)
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 8))
+                                    }
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .foregroundStyle(colors.accentTintText)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if let dur = player.currentTrack?.durationMs, dur > 0 {
+                                Text(formatCompactDuration(ms: dur))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .tracking(1.0)
+                                    .foregroundStyle(colors.textSubtle)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .stroke(colors.controlOutline, lineWidth: 1)
+                                    )
+                            }
                         }
                         .padding(.top, 10)
 
-                        if showJamChartNote {
+                        if isJamChart && showJamChartNote {
                             JamChartNoteCard(
-                                note: "The jam chart entry for this version loads here from phish.in, describing what makes the take notable and where it goes.",
+                                note: "Jam chart entry available for this track.",
                                 onDismiss: { showJamChartNote = false }
                             )
                             .padding(.top, 10)
@@ -210,7 +247,7 @@ struct PlayerRailView: View {
                     .padding(.bottom, 16)
 
                     // Waveform Scrubber
-                    let duration = Double(player.currentTrack?.durationMs ?? 764_000)
+                    let duration = Double(player.currentTrack?.durationMs ?? 0)
                     let currentPos = dragPositionMs ?? Double(player.positionMs)
                     let progressFrac = duration > 0 ? (currentPos / duration) : 0.0
 
@@ -222,7 +259,7 @@ struct PlayerRailView: View {
                     .frame(height: 64)
                     .padding(.horizontal, 24)
 
-                    // Timestamps: 5:12 and -7:32
+                    // Timestamps
                     HStack {
                         Text(fmt(Int64(currentPos)))
                             .font(.system(size: 12))
@@ -238,16 +275,17 @@ struct PlayerRailView: View {
 
                     // 5-Item Transport Controls
                     HStack(spacing: 10) {
-                        // Heart with like count 268 underneath
-                        VStack(spacing: 2) {
-                            Image(systemName: "heart")
-                                .font(.system(size: 22))
-                                .foregroundStyle(colors.accentIcon)
-                            Text("268")
-                                .font(.system(size: 11))
-                                .foregroundStyle(colors.textMuted)
+                        if let currentTrack = player.currentTrack {
+                            TrackLikeButton(
+                                backend: show.artist.backend,
+                                trackID: currentTrack.id,
+                                likesCount: currentTrack.likesCount,
+                                likedByUser: currentTrack.likedByUser
+                            )
+                            .frame(width: 58, height: 58)
+                        } else {
+                            Spacer().frame(width: 58, height: 58)
                         }
-                        .frame(width: 58, height: 58)
 
                         // Previous button
                         Button {
@@ -265,7 +303,7 @@ struct PlayerRailView: View {
                             player.togglePlayPause()
                         } label: {
                             Circle()
-                                .fill(colors.isDark ? Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0) : colors.accent)
+                                .fill(colors.isDark ? Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0) : Color(red: 0x20 / 255.0, green: 0x22 / 255.0, blue: 0x2C / 255.0))
                                 .frame(width: 72, height: 72)
                                 .overlay(
                                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
@@ -288,13 +326,25 @@ struct PlayerRailView: View {
                         .buttonStyle(.plain)
 
                         // Add to playlist button
-                        Button {} label: {
-                            Image(systemName: "text.badge.plus")
-                                .font(.system(size: 22))
-                                .foregroundStyle(colors.textSubtle)
-                                .frame(width: 58, height: 58)
+                        if let currentTrack = player.currentTrack {
+                            AddToPlaylistButton {
+                                LocalPlaylistTrack(
+                                    playlistId: "",
+                                    backend: show.artist.backend.rawValue,
+                                    trackId: currentTrack.id,
+                                    showDate: show.date,
+                                    artistSlug: show.artist.backend == .relisten ? show.artist.id : nil,
+                                    recordingId: nil,
+                                    title: currentTrack.title,
+                                    durationMs: currentTrack.durationMs,
+                                    venueName: show.where_,
+                                    artUrl: currentTrack.artURL
+                                )
+                            }
+                            .frame(width: 58, height: 58)
+                        } else {
+                            Spacer().frame(width: 58, height: 58)
                         }
-                        .buttonStyle(.plain)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
@@ -313,180 +363,22 @@ struct PlayerRailView: View {
 
     @ViewBuilder
     private var fallbackRailContent: some View {
-        VStack(spacing: 0) {
-            // Artwork placeholder
-            ConicGlowArtwork(
-                url: nil,
-                artist: "Phish",
-                date: "1997-11-17",
-                size: 344,
-                cornerRadius: 14,
-                glowPadding: 14,
-                blurRadius: 24
-            )
-            .padding(.horizontal, 24)
-            .padding(.top, 22)
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "music.note")
+                .font(.system(size: 40))
+                .foregroundStyle(colors.textMuted)
 
-            // Metadata Block
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    Text("Phish")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("1997-11-17")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(colors.textPrimary)
-                }
+            Text("Nothing playing")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
 
-                Text("Thomas & Mack Center, Las Vegas, NV")
-                    .font(.system(size: 14))
-                    .foregroundStyle(colors.textSecondary)
-                    .padding(.top, 5)
-
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("TAPE")
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.4)
-                            .foregroundStyle(colors.textMuted)
-                        HStack(spacing: 6) {
-                            Text("SBD · Paluska · FLAC")
-                                .font(.system(size: 14))
-                                .foregroundStyle(colors.textPrimary)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10))
-                                .foregroundStyle(colors.textMuted)
-                        }
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("SHOW RATING")
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.4)
-                            .foregroundStyle(colors.textMuted)
-                        Text("★ 4.6")
-                            .font(.system(size: 14))
-                            .foregroundStyle(colors.ratingAmber)
-                    }
-                }
-                .padding(.top, 14)
-                .overlay(
-                    Rectangle()
-                        .fill(colors.divider)
-                        .frame(height: 1),
-                    alignment: .top
-                )
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 22)
-
-            Spacer(minLength: 16)
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text("SET II · TRACK 4")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.6)
-                    .foregroundStyle(colors.textMuted)
-
-                Text("Bathtub Gin")
-                    .font(.system(size: 23, weight: .medium))
-                    .foregroundStyle(colors.textPrimary)
-                    .padding(.top, 4)
-
-                HStack(spacing: 6) {
-                    HStack(spacing: 4) {
-                        Text("JAM CHART")
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.0)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8))
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .foregroundStyle(colors.accentTintText)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
-                    )
-
-                    Text("12:44")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(1.0)
-                        .foregroundStyle(colors.textSubtle)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(colors.controlOutline, lineWidth: 1)
-                        )
-                }
-                .padding(.top, 10)
-
-                if showJamChartNote {
-                    JamChartNoteCard(
-                        note: "The jam chart entry for this version loads here from phish.in, describing what makes the take notable and where it goes.",
-                        onDismiss: { showJamChartNote = false }
-                    )
-                    .padding(.top, 10)
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
-
-            WaveformScrubber(progressFraction: 0.41) { _ in }
-                .frame(height: 64)
-                .padding(.horizontal, 24)
-
-            HStack {
-                Text("5:12")
-                    .font(.system(size: 12))
-                    .foregroundStyle(colors.textMuted)
-                Spacer()
-                Text("-7:32")
-                    .font(.system(size: 12))
-                    .foregroundStyle(colors.textMuted)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 6)
-
-            HStack(spacing: 10) {
-                VStack(spacing: 2) {
-                    Image(systemName: "heart")
-                        .font(.system(size: 22))
-                        .foregroundStyle(colors.accentIcon)
-                    Text("268")
-                        .font(.system(size: 11))
-                        .foregroundStyle(colors.textMuted)
-                }
-                .frame(width: 58, height: 58)
-
-                Image(systemName: "backward.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 58, height: 58)
-
-                Circle()
-                    .fill(colors.isDark ? Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0) : colors.accent)
-                    .frame(width: 72, height: 72)
-                    .overlay(
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 26))
-                            .foregroundStyle(colors.isDark ? Color(red: 0x16 / 255.0, green: 0x18 / 255.0, blue: 0x26 / 255.0) : Color.white)
-                    )
-
-                Image(systemName: "forward.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 58, height: 58)
-
-                Image(systemName: "text.badge.plus")
-                    .font(.system(size: 22))
-                    .foregroundStyle(colors.textSubtle)
-                    .frame(width: 58, height: 58)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 16)
-            .padding(.bottom, 26)
+            Text("Select a show or track to start listening.")
+                .font(.system(size: 13))
+                .foregroundStyle(colors.textMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Spacer()
         }
     }
 }

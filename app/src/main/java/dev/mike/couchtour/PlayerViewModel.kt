@@ -44,6 +44,10 @@ data class PlayerState(
     val likesCount: Int = 0,
     val audioFormat: String = "MP3",
     val isFlac: Boolean = false,
+    val showRating: Double = 0.0,
+    val tapeLineage: String? = null,
+    val setName: String = "",
+    val trackPosition: Int = 0,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -154,6 +158,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             likesCount = extras?.getInt(Keys.LIKES_COUNT, 0) ?: 0,
             audioFormat = audioFormat,
             isFlac = isFlac,
+            showRating = extras?.getDouble(Keys.SHOW_RATING, 0.0) ?: 0.0,
+            tapeLineage = extras?.getString(Keys.TAPE_LINEAGE),
+            setName = extras?.getString(Keys.SET_NAME).orEmpty(),
+            trackPosition = extras?.getInt(Keys.TRACK_POSITION, 0) ?: 0,
         )
 
         // When playback reaches the end of the show (after encore), prompt for next tour stop (#85)

@@ -92,3 +92,48 @@ public func formatShowDate(_ raw: String) -> String {
     }
     return trimmed
 }
+
+/// Formats Roman numeral or uppercase set name, e.g. "Set 1" -> "SET I", "Set 2" -> "SET II", "Encore" -> "ENCORE".
+public func formatSetRoman(_ setName: String) -> String {
+    let lower = setName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    switch lower {
+    case "set 1", "set1", "1", "s1": return "SET I"
+    case "set 2", "set2", "2", "s2": return "SET II"
+    case "set 3", "set3", "3", "s3": return "SET III"
+    case "set 4", "set4", "4", "s4": return "SET IV"
+    case "encore", "e": return "ENCORE"
+    case "soundcheck": return "SOUNDCHECK"
+    default: return setName.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+}
+
+/// Formats the track eyebrow for Player views, e.g. "SET II · TRACK 4" or "TRACK 4".
+public func formatSetAndTrackEyebrow(setName: String?, trackPosition: Int?, fallbackIndex: Int) -> String {
+    let num = (trackPosition ?? 0) > 0 ? (trackPosition ?? 0) : fallbackIndex
+    let cleanSet = setName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if !cleanSet.isEmpty {
+        let setLabel = formatSetRoman(cleanSet)
+        return "\(setLabel) · TRACK \(num)"
+    }
+    return "TRACK \(num)"
+}
+
+/// Formats the 3-column SET value for Expanded Now Playing, e.g. "II · Track 4" or "Set 1 · Track 4" or "Track 4".
+public func formatSetColumn(setName: String?, trackPosition: Int?, fallbackIndex: Int) -> String {
+    let num = (trackPosition ?? 0) > 0 ? (trackPosition ?? 0) : fallbackIndex
+    let cleanSet = setName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if !cleanSet.isEmpty {
+        let lower = cleanSet.lowercased()
+        let roman: String
+        switch lower {
+        case "set 1", "set1", "1", "s1": roman = "I"
+        case "set 2", "set2", "2", "s2": roman = "II"
+        case "set 3", "set3", "3", "s3": roman = "III"
+        case "set 4", "set4", "4", "s4": roman = "IV"
+        case "encore", "e": roman = "E"
+        default: roman = cleanSet
+        }
+        return "\(roman) · Track \(num)"
+    }
+    return "Track \(num)"
+}

@@ -291,6 +291,7 @@ data class PlayableTrack(
     val id: String,
     val title: String,
     val setName: String = "",
+    val position: Int = 0,
     /** Milliseconds. Relisten reports seconds and is converted on the way in. */
     val durationMs: Long = 0,
     val url: String,
@@ -626,6 +627,7 @@ internal fun Track.toPlayableTrack(showArt: String?) = PlayableTrack(
     id = id.toString(),
     title = title,
     setName = setName,
+    position = position,
     // Already milliseconds. Relisten's are seconds — see RelistenTrack.toPlayableTrack.
     durationMs = duration,
     url = mp3Url.orEmpty(),

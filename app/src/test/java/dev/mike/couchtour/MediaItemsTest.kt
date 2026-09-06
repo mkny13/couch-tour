@@ -215,4 +215,35 @@ class MediaItemsTest {
         assertEquals("Grateful Dead", rExtras?.getString(Keys.ARTIST_NAME))
         assertEquals("grateful-dead", rExtras?.getString(Keys.ARTIST_ID))
     }
+
+    @Test
+    fun `media items carry set name and track position in extras`() {
+        val phishTrack = Track(
+            id = 8435,
+            title = "Bathtub Gin",
+            setName = "Set 2",
+            position = 4,
+            showDate = "1997-11-17",
+            venueName = "McNichols Arena"
+        )
+        val phishInfo = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "McNichols Arena", art = null)
+        val phishItem = mediaItem(phishTrack, phishInfo)
+        val pExtras = phishItem.mediaMetadata.extras
+
+        assertEquals("Set 2", pExtras?.getString(Keys.SET_NAME))
+        assertEquals(4, pExtras?.getInt(Keys.TRACK_POSITION))
+
+        val relistenTrack = PlayableTrack(
+            id = "t1",
+            title = "Jack Straw",
+            setName = "Set 1",
+            position = 3,
+            url = "https://archive.org/jack.mp3"
+        )
+        val relistenItem = recordingMediaItem(relistenTrack, phishInfo)
+        val rExtras = relistenItem.mediaMetadata.extras
+
+        assertEquals("Set 1", rExtras?.getString(Keys.SET_NAME))
+        assertEquals(3, rExtras?.getInt(Keys.TRACK_POSITION))
+    }
 }
