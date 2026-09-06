@@ -4102,3 +4102,36 @@ Under `uat-005`, the universal styling convention for the artist "moe." requires
    - In `LargeArtworkOverlay`, preserved `"moe."` when formatting the artist header text instead of unconditionally calling `artistName.uppercase()`.
    - In `MediumArtworkOverlay`, routed `artistName` through `ArtistAbbreviations.artistLabel(...)` to ensure standard lowercase period formatting.
    - Updated unit tests in `ArtworkTest.kt` verifying `deriveArtistMonogram` outputs `"moe."` across casing variations (505 tests passing).
+
+## Iteration 81 — Light Mode Readability & Sidebar Settings on macOS (D223)
+
+### D223 — Light mode secondary text color readability and sidebar settings button (#154, #155)
+
+Addresses two macOS client issues logged under #154 (poor text contrast in light mode) and #155 (sidebar settings button not opening settings).
+
+1. **Adaptive Color System for Secondary & Subtle Text** (`LedgerDesign.swift`):
+   - In light mode, secondary text hardcoded to dark-mode values like `#75798C` or `#B2B6CA` resulted in low contrast ratios against white or light backgrounds.
+   - Introduced dynamic Ledger tokens via `NSColor(name:dynamicProvider:)`:
+     - `LedgerColors.textSubtle`: `#5A5E70` in light mode, `#75798C` in dark mode.
+     - `LedgerColors.textSecondary`: `#3F424D` in light mode, `#B2B6CA` in dark mode.
+     - `LedgerColors.accentIcon`: `#5845C2` in light mode, `#B5ABFC` in dark mode.
+     - `LedgerColors.accentTintText`: `#5845C2` in light mode, `#D2CEFD` in dark mode.
+     - `LedgerColors.controlOutline`: `Color.black.opacity(0.12)` in light mode, `Color.white.opacity(0.10)` in dark mode.
+   - Replaced hardcoded dark mode colors across macOS views:
+     - `HomeView.swift`: Section headers, card subtitles, dates, venue metadata, and recent track subtext.
+     - `LocalPlaylistsView.swift`: Playlist subtitle counts and track count labels.
+     - `SearchView.swift`: Search results track subtitle, venue, and date metadata.
+     - `PlayerRailView.swift`: Now playing artist/venue labels, duration indicators, waveform timestamp counter.
+     - `ShowDetailView.swift`: Breadcrumb trail, venue/city/duration subheaders, set track number and duration columns.
+     - `ExpandedNowPlayingView.swift`: Eyebrow labels, set/track indicators, tape metadata column labels and values.
+
+2. **Sidebar Settings Button Action** (`SidebarView.swift`):
+   - The settings gear button in `SidebarView` previously attempted to trigger settings via `NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)`, which fails or is ignored in SwiftUI scenes without standard legacy menu hookups.
+   - Replaced with the standard SwiftUI `@Environment(\.openSettings) private var openSettings` action, cleanly opening the macOS Settings window when clicked.
+   - Also updated the sidebar bottom section labels, sync status text, and icon colors to use the new adaptive `LedgerColors` tokens.
+
+**Testing:**
+- Package tests: `cd macos/Packages/CouchTourKit && swift test` (421 tests passed).
+- macOS app build: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
+- Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (505 tests passed).
+- Added `uat-040` to `UAT.md`.
