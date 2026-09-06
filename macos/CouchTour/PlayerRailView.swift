@@ -49,7 +49,7 @@ struct PlayerRailView: View {
                     Text("NOW PLAYING")
                         .font(.system(size: 11, weight: .semibold))
                         .tracking(1.4)
-                        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        .foregroundStyle(colors.textMuted)
 
                     Spacer()
 
@@ -62,11 +62,11 @@ struct PlayerRailView: View {
                             Text("Expand")
                                 .font(.system(size: 12))
                         }
-                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                        .foregroundStyle(colors.textSubtle)
                         .padding(.horizontal, 10)
                         .frame(height: 28)
                         .overlay(
-                            Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            Capsule().stroke(colors.controlOutline, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -131,7 +131,7 @@ struct PlayerRailView: View {
                                 Text("TAPE")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
-                                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                    .foregroundStyle(colors.textMuted)
 
                                 HStack(spacing: 6) {
                                     Text(tapeLabel)
@@ -140,7 +140,7 @@ struct PlayerRailView: View {
                                         .lineLimit(1)
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 10))
-                                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                        .foregroundStyle(colors.textMuted)
                                 }
                             }
 
@@ -150,16 +150,16 @@ struct PlayerRailView: View {
                                 Text("SHOW RATING")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
-                                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                    .foregroundStyle(colors.textMuted)
 
                                 if show.rating > 0 {
                                     Text(String(format: "★ %.1f", show.rating))
                                         .font(.system(size: 14))
-                                        .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                                        .foregroundStyle(colors.ratingAmber)
                                 } else {
                                     Text("—")
                                         .font(.system(size: 14))
-                                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                        .foregroundStyle(colors.textMuted)
                                 }
                             }
                         }
@@ -187,7 +187,7 @@ struct PlayerRailView: View {
                         Text(eyebrow)
                             .font(.system(size: 10, weight: .semibold))
                             .tracking(1.6)
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            .foregroundStyle(colors.textMuted)
 
                         Text(player.currentTrack?.title ?? "—")
                             .font(.system(size: 23, weight: .medium))
@@ -211,10 +211,10 @@ struct PlayerRailView: View {
                                     }
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 3)
-                                    .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                    .foregroundStyle(colors.accentTintText)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
+                                            .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -224,12 +224,12 @@ struct PlayerRailView: View {
                                 Text(formatCompactDuration(ms: dur))
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.0)
-                                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                                    .foregroundStyle(colors.textSubtle)
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 3)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 4)
-                                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                                            .stroke(colors.controlOutline, lineWidth: 1)
                                     )
                             }
                         }
@@ -263,12 +263,12 @@ struct PlayerRailView: View {
                     HStack {
                         Text(fmt(Int64(currentPos)))
                             .font(.system(size: 12))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .foregroundStyle(colors.textMuted)
                         Spacer()
                         let remaining = max(Int64(duration - currentPos), 0)
                         Text("-\(fmt(remaining))")
                             .font(.system(size: 12))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .foregroundStyle(colors.textMuted)
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 6)
@@ -309,7 +309,7 @@ struct PlayerRailView: View {
                                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                                         .font(.system(size: 26))
                                         .foregroundStyle(colors.isDark ? Color(red: 0x16 / 255.0, green: 0x18 / 255.0, blue: 0x26 / 255.0) : Color.white)
-                                 )
+                                )
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
@@ -367,7 +367,7 @@ struct PlayerRailView: View {
             Spacer()
             Image(systemName: "music.note")
                 .font(.system(size: 40))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
 
             Text("Nothing playing")
                 .font(.system(size: 16, weight: .medium))
@@ -375,7 +375,7 @@ struct PlayerRailView: View {
 
             Text("Select a show or track to start listening.")
                 .font(.system(size: 13))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
             Spacer()

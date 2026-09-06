@@ -8,6 +8,7 @@ struct SidebarView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
     @Environment(\.ledgerColors) private var colors
+    @Environment(\.openSettings) private var openSettings
 
     let favoritedArtists: [ArtistRef]
     let onSelectArtist: (ArtistRef) -> Void
@@ -85,7 +86,7 @@ struct SidebarView: View {
                     icon: "gearshape",
                     isSelected: false
                 ) {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                    openSettings()
                 }
             }
             .padding(.horizontal, 8)
@@ -94,7 +95,7 @@ struct SidebarView: View {
             Text("FAVORITE ARTISTS")
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1.4)
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .padding(.horizontal, 18)
                 .padding(.top, 26)
                 .padding(.bottom, 8)
@@ -117,7 +118,7 @@ struct SidebarView: View {
                                 Spacer()
                                 Text(Self.countFormatter.string(from: NSNumber(value: artist.showCount)) ?? "\(artist.showCount)")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                             }
                             .frame(height: 32)
                             .padding(.horizontal, 10)
@@ -136,12 +137,12 @@ struct SidebarView: View {
 
             Button {
                 appModel.settingsTab = .sync
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                openSettings()
             } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 15))
-                        .foregroundStyle(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0))
+                        .foregroundStyle(colors.accent)
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(appModel.syncSession.paired ? "Synced with phone" : "Not paired")
@@ -152,11 +153,11 @@ struct SidebarView: View {
                         if let lastSynced = appModel.syncSession.lastSyncedAt, lastSynced > 0 {
                             Text(relativeTime(lastSynced))
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                .foregroundStyle(colors.textMuted)
                         } else {
                             Text("Ready to sync")
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                .foregroundStyle(colors.textMuted)
                         }
                     }
 
@@ -164,9 +165,9 @@ struct SidebarView: View {
 
                     let isPaired = appModel.syncSession.paired
                     Circle()
-                        .fill(isPaired ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0) : Color.gray.opacity(0.35))
+                        .fill(isPaired ? colors.accent : Color.gray.opacity(0.35))
                         .frame(width: 6, height: 6)
-                        .shadow(color: isPaired ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.9) : Color.clear, radius: 4)
+                        .shadow(color: isPaired ? colors.accent.opacity(0.9) : Color.clear, radius: 4)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -193,18 +194,18 @@ private struct SidebarNavItem: View {
                 Image(systemName: icon)
                     .font(.system(size: 16))
                     .frame(width: 18)
-                    .foregroundStyle(isSelected ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    .foregroundStyle(isSelected ? colors.accentTintText : colors.textSubtle)
 
                 Text(title)
                     .font(.system(size: 14, weight: isSelected ? .medium : .regular))
-                    .foregroundStyle(isSelected ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    .foregroundStyle(isSelected ? colors.accentTintText : colors.textSubtle)
 
                 Spacer()
             }
             .frame(height: 34)
             .padding(.horizontal, 10)
             .background(
-                isSelected ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.16) : Color.clear,
+                isSelected ? (colors.isDark ? colors.accent.opacity(0.16) : colors.accentTintText.opacity(0.12)) : Color.clear,
                 in: RoundedRectangle(cornerRadius: 7)
             )
         }

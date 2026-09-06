@@ -56,7 +56,7 @@ struct ExpandedNowPlayingView: View {
                     Text("NOW PLAYING")
                         .font(.system(size: 11, weight: .semibold))
                         .tracking(1.4)
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
 
                     Spacer()
 
@@ -69,11 +69,11 @@ struct ExpandedNowPlayingView: View {
                             Text("Collapse")
                                 .font(.system(size: 12))
                         }
-                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                        .foregroundStyle(colors.textSubtle)
                         .padding(.horizontal, 10)
                         .frame(height: 28)
                         .overlay(
-                            Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            Capsule().stroke(colors.controlOutline, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -151,14 +151,14 @@ struct ExpandedNowPlayingView: View {
                                 Text("TAPE")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
-                                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                                 HStack(spacing: 6) {
                                     Text(tapeLabel)
                                         .font(.system(size: 15))
                                         .foregroundStyle(colors.textPrimary)
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 10))
-                                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                        .foregroundStyle(colors.textMuted)
                                 }
                             }
 
@@ -182,7 +182,7 @@ struct ExpandedNowPlayingView: View {
                                 Text("SET")
                                     .font(.system(size: 10, weight: .semibold))
                                     .tracking(1.4)
-                                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                                 let currentIdx = (player.currentIndex ?? 0) + 1
                                 let setCol = formatSetColumn(
                                     setName: player.currentTrack?.setName,
@@ -251,10 +251,10 @@ struct ExpandedNowPlayingView: View {
                                         }
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
-                                        .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                        .foregroundStyle(colors.accentTintText)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 4)
-                                                .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0).opacity(0.45), lineWidth: 1)
+                                                .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -264,12 +264,12 @@ struct ExpandedNowPlayingView: View {
                                     Text(formatCompactDuration(ms: dur))
                                         .font(.system(size: 11, weight: .semibold))
                                         .tracking(1.0)
-                                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                                        .foregroundStyle(colors.textSubtle)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 4)
-                                                .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                                                .stroke(colors.controlOutline, lineWidth: 1)
                                         )
                                 }
                             }
@@ -305,12 +305,12 @@ struct ExpandedNowPlayingView: View {
                 HStack {
                     Text(fmt(Int64(currentPos)))
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
                     Spacer()
                     let remaining = max(Int64(duration - currentPos), 0)
                     Text("-\(fmt(remaining))")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
                 }
                 .padding(.horizontal, 72)
                 .padding(.top, 8)
@@ -343,12 +343,12 @@ struct ExpandedNowPlayingView: View {
                         player.togglePlayPause()
                     } label: {
                         Circle()
-                            .fill(colors.isDark ? Color(red: 0xF3 / 255.0, green: 0xF5 / 255.0, blue: 0xFE / 255.0) : Color(red: 0x20 / 255.0, green: 0x22 / 255.0, blue: 0x2C / 255.0))
+                            .fill(colors.textPrimary)
                             .frame(width: 82, height: 82)
                             .overlay(
                                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 30))
-                                    .foregroundStyle(colors.isDark ? Color(red: 0x16 / 255.0, green: 0x18 / 255.0, blue: 0x26 / 255.0) : Color.white)
+                                    .foregroundStyle(colors.background)
                             )
                     }
                     .buttonStyle(.plain)

@@ -66,7 +66,7 @@ struct SearchView: View {
             HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 18))
-                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    .foregroundStyle(colors.textMuted)
 
                 TextField("Search artists, shows, tracks…", text: $appModel.searchQuery)
                     .textFieldStyle(.plain)
@@ -79,7 +79,7 @@ struct SearchView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            .foregroundStyle(colors.textMuted)
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
@@ -198,12 +198,12 @@ struct SearchView: View {
             }
             .font(.system(size: 11, weight: .semibold))
             .tracking(1.4)
-            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+            .foregroundStyle(colors.textMuted)
             .padding(.horizontal, 24)
             .padding(.bottom, 8)
 
             Divider()
-                .overlay(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0))
+                .overlay(colors.divider)
                 .padding(.horizontal, 24)
 
             // Results List
@@ -213,10 +213,10 @@ struct SearchView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 32))
-                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                .foregroundStyle(colors.textMuted)
                             Text("Type at least 3 characters to search artists, shows, and tracks")
                                 .font(.system(size: 14))
-                                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                .foregroundStyle(colors.textMuted)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 60)
@@ -226,10 +226,10 @@ struct SearchView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
                                     .font(.system(size: 32))
-                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                                 Text("No results found for \"\(term)\"")
                                     .font(.system(size: 14))
-                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.top, 60)
@@ -283,10 +283,10 @@ struct SearchView: View {
             VStack(spacing: 6) {
                 Text("\(title) \(count)")
                     .font(.system(size: 13, weight: selectedTab == tab ? .medium : .regular))
-                    .foregroundStyle(selectedTab == tab ? colors.textPrimary : Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    .foregroundStyle(selectedTab == tab ? colors.textPrimary : colors.textMuted)
 
                 Rectangle()
-                    .fill(selectedTab == tab ? Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0) : Color.clear)
+                    .fill(selectedTab == tab ? colors.accentIcon : Color.clear)
                     .frame(height: 2)
             }
         }
@@ -298,10 +298,10 @@ struct SearchView: View {
             .font(.system(size: 13))
             .padding(.horizontal, 12)
             .frame(height: 30)
-            .foregroundStyle(isSelected ? Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
-            .background(isSelected ? Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14) : Color.clear, in: Capsule())
+            .foregroundStyle(isSelected ? colors.accentTintText : colors.textSubtle)
+            .background(isSelected ? (colors.isDark ? colors.accent.opacity(0.14) : colors.accentTintText.opacity(0.10)) : Color.clear, in: Capsule())
             .overlay(
-                Capsule().stroke(isSelected ? Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0) : Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                Capsule().stroke(isSelected ? colors.accentIcon : colors.controlOutline, lineWidth: 1)
             )
     }
 
@@ -332,7 +332,7 @@ struct SearchView: View {
 
                 Text(track.venueLocation ?? "")
                     .font(.system(size: 12))
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(colors.textMuted)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -340,7 +340,7 @@ struct SearchView: View {
             HStack(spacing: 6) {
                 Text(fmt(track.duration))
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    .foregroundStyle(colors.textSubtle)
 
                 if track.likesCount > 0 {
                     HStack(spacing: 3) {
@@ -349,7 +349,7 @@ struct SearchView: View {
                             .foregroundStyle(Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
                         Text("\(track.likesCount)")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .foregroundStyle(colors.textMuted)
                     }
                 }
             }
@@ -368,12 +368,12 @@ struct SearchView: View {
                 }
             } label: {
                 Circle()
-                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .stroke(colors.accentIcon, lineWidth: 1)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "play.fill")
                             .font(.system(size: 12))
-                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                            .foregroundStyle(colors.accentTintText)
                     )
             }
             .buttonStyle(.plain)
@@ -412,12 +412,12 @@ struct SearchView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(show.venue ?? "Live Venue")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .foregroundStyle(colors.textSecondary)
                     .lineLimit(1)
 
                 Text(show.location ?? "")
                     .font(.system(size: 12))
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(colors.textMuted)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -426,7 +426,7 @@ struct SearchView: View {
                 if show.rating > 0 {
                     Text(String(format: "★ %.1f", show.rating))
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                        .foregroundStyle(colors.ratingAmber)
                 }
 
                 if show.likesCount > 0 {
@@ -436,7 +436,7 @@ struct SearchView: View {
                             .foregroundStyle(Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
                         Text("\(show.likesCount)")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .foregroundStyle(colors.textMuted)
                     }
                 }
             }
@@ -452,12 +452,12 @@ struct SearchView: View {
                 }
             } label: {
                 Circle()
-                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .stroke(colors.accentIcon, lineWidth: 1)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "play.fill")
                             .font(.system(size: 12))
-                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                            .foregroundStyle(colors.accentTintText)
                     )
             }
             .buttonStyle(.plain)
@@ -481,7 +481,7 @@ struct SearchView: View {
 
             Text(slice.kind.heading)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .frame(width: 100, alignment: .leading)
 
             Text(slice.period.label)
@@ -492,7 +492,7 @@ struct SearchView: View {
 
             Text("\(slice.period.showCount) \(plural(slice.period.showCount, "show"))")
                 .font(.system(size: 14))
-                .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                .foregroundStyle(colors.textSecondary)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -501,7 +501,7 @@ struct SearchView: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .frame(width: 34, alignment: .trailing)
         }
         .contentShape(Rectangle())

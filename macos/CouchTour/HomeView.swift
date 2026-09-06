@@ -105,7 +105,7 @@ struct HomeView: View {
                 Text(formattedLedgerDate)
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.4)
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(colors.textMuted)
                     .lineLimit(1)
 
                 Button {
@@ -119,7 +119,7 @@ struct HomeView: View {
 
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .foregroundStyle(colors.textMuted)
                     }
                 }
                 .buttonStyle(.plain)
@@ -147,10 +147,10 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 38)
-                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                .foregroundStyle(colors.accentTintText)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0), lineWidth: 1)
+                        .stroke(colors.accent, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -169,9 +169,9 @@ struct HomeView: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 30)
-            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
-            .background(Color(red: 0x91 / 255.0, green: 0x84 / 255.0, blue: 0xD9 / 255.0).opacity(0.14), in: Capsule())
-            .overlay(Capsule().stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1))
+            .foregroundStyle(colors.accentTintText)
+            .background(colors.accentTintText.opacity(colors.isDark ? 0.14 : 0.10), in: Capsule())
+            .overlay(Capsule().stroke(colors.accentIcon, lineWidth: 1))
             .fixedSize(horizontal: true, vertical: false)
             .layoutPriority(1)
 
@@ -186,29 +186,29 @@ struct HomeView: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 30)
-            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
-            .overlay(Capsule().stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1))
+            .foregroundStyle(colors.textSubtle)
+            .overlay(Capsule().stroke(colors.controlOutline, lineWidth: 1))
             .fixedSize(horizontal: true, vertical: false)
             .layoutPriority(1)
 
             // Arrow circle buttons
             HStack(spacing: 6) {
                 Circle()
-                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .stroke(colors.controlOutline, lineWidth: 1)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "chevron.left")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                            .foregroundStyle(colors.textMuted)
                     )
 
                 Circle()
-                    .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                    .stroke(colors.controlOutline, lineWidth: 1)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                            .foregroundStyle(colors.textSubtle)
                     )
             }
             .fixedSize(horizontal: true, vertical: false)
@@ -274,7 +274,7 @@ struct HomeView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 13))
-                            .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                            .foregroundStyle(colors.textMuted)
                             .frame(width: 26, height: 26)
                     }
                     .menuStyle(.borderlessButton)
@@ -284,14 +284,14 @@ struct HomeView: View {
                 // Track Title
                 Text(item.trackTitle.isEmpty ? "Track" : item.trackTitle)
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .foregroundStyle(colors.textSecondary)
                     .padding(.top, 8)
                     .lineLimit(1)
 
                 // Venue
                 Text("Live recording")
                     .font(.system(size: 12))
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(colors.textMuted)
                     .padding(.top, 2)
                     .lineLimit(1)
 
@@ -301,7 +301,7 @@ struct HomeView: View {
                     let timeLabel = "\(fmt(posMs)) elapsed"
                     Text(timeLabel)
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                        .foregroundStyle(colors.textSubtle)
 
                     Spacer()
 
@@ -309,12 +309,12 @@ struct HomeView: View {
                         Task { await tapResume(item) }
                     } label: {
                         Circle()
-                            .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                            .stroke(colors.accentIcon, lineWidth: 1)
                             .frame(width: 30, height: 30)
                             .overlay(
                                 Image(systemName: "play.fill")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                    .foregroundStyle(colors.accentTintText)
                             )
                     }
                     .buttonStyle(.plain)
@@ -362,32 +362,32 @@ struct HomeView: View {
                     Spacer()
                     Image(systemName: "ellipsis")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                        .foregroundStyle(colors.textMuted)
                         .frame(width: 26, height: 26)
                 }
 
                 Text(track)
                     .font(.system(size: 14))
-                    .foregroundStyle(Color(red: 0xCF / 255.0, green: 0xD3 / 255.0, blue: 0xE5 / 255.0))
+                    .foregroundStyle(colors.textSecondary)
                     .padding(.top, 8)
 
                 Text(venue)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                    .foregroundStyle(colors.textMuted)
                     .padding(.top, 2)
 
                 HStack {
                     Text(elapsed)
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                        .foregroundStyle(colors.textSubtle)
                     Spacer()
                     Circle()
-                        .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                        .stroke(colors.accentIcon, lineWidth: 1)
                         .frame(width: 30, height: 30)
                         .overlay(
                             Image(systemName: "play.fill")
                                 .font(.system(size: 12))
-                                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                .foregroundStyle(colors.accentTintText)
                         )
                 }
                 .padding(.top, 12)
@@ -429,7 +429,7 @@ struct HomeView: View {
                 Text("NEXT TOUR STOPS")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.4)
-                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    .foregroundStyle(colors.textMuted)
 
                 Spacer()
 
@@ -440,7 +440,7 @@ struct HomeView: View {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 10))
                     }
-                    .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                    .foregroundStyle(colors.accentTintText)
                 }
                 .buttonStyle(.plain)
             }
@@ -490,14 +490,14 @@ struct HomeView: View {
                         .joined(separator: " · ")
                     Text(subtitle)
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        .foregroundStyle(colors.textMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .lineLimit(1)
 
                     if show.rating > 0 {
                         Text(String(format: "★ %.1f", show.rating))
                             .font(.system(size: 13))
-                            .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                            .foregroundStyle(colors.ratingAmber)
                             .frame(width: 64, alignment: .trailing)
                     } else {
                         Spacer().frame(width: 64)
@@ -512,12 +512,12 @@ struct HomeView: View {
                 }
             } label: {
                 Circle()
-                    .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                    .stroke(colors.accentIcon, lineWidth: 1)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Image(systemName: "play.fill")
                             .font(.system(size: 12))
-                            .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                            .foregroundStyle(colors.accentTintText)
                     )
             }
             .buttonStyle(.plain)
@@ -543,22 +543,22 @@ struct HomeView: View {
 
             Text(loc)
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
 
             Text(rating)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                .foregroundStyle(colors.ratingAmber)
                 .frame(width: 64, alignment: .trailing)
 
             Circle()
-                .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                .stroke(colors.accentIcon, lineWidth: 1)
                 .frame(width: 30, height: 30)
                 .overlay(
                     Image(systemName: "play.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                        .foregroundStyle(colors.accentTintText)
                 )
                 .frame(width: 40, alignment: .trailing)
         }
@@ -576,32 +576,32 @@ struct HomeView: View {
                 Text("ON THIS DATE")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.4)
-                    .foregroundStyle(Color(red: 0x93 / 255.0, green: 0x97 / 255.0, blue: 0xAB / 255.0))
+                    .foregroundStyle(colors.textMuted)
 
                 Spacer()
 
                 HStack(spacing: 10) {
                     Text("\(onThisDateShows.isEmpty ? 7 : onThisDateShows.count) shows")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                        .foregroundStyle(colors.textMuted)
 
                     HStack(spacing: 6) {
                         Circle()
-                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            .stroke(colors.controlOutline, lineWidth: 1)
                             .frame(width: 30, height: 30)
                             .overlay(
                                 Image(systemName: "chevron.left")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                                    .foregroundStyle(colors.textMuted)
                             )
 
                         Circle()
-                            .stroke(Color(red: 0x3F / 255.0, green: 0x42 / 255.0, blue: 0x4D / 255.0), lineWidth: 1)
+                            .stroke(colors.controlOutline, lineWidth: 1)
                             .frame(width: 30, height: 30)
                             .overlay(
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                                    .foregroundStyle(colors.textSubtle)
                             )
                     }
                 }
@@ -649,7 +649,7 @@ struct HomeView: View {
                 if appModel.savedShows.contains(show.date) {
                     Image(systemName: "bookmark.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                        .foregroundStyle(colors.accentIcon)
                 }
             }
 
@@ -660,7 +660,7 @@ struct HomeView: View {
 
             Text(show.where_.isEmpty ? "Live Venue" : show.where_)
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .padding(.top, 8)
                 .lineLimit(1)
 
@@ -668,7 +668,7 @@ struct HomeView: View {
                 if show.rating > 0 {
                     Text(String(format: "★ %.1f", show.rating))
                         .font(.system(size: 12))
-                        .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+                        .foregroundStyle(colors.ratingAmber)
                 } else if show.likesCount > 0 {
                     Text("♥ \(show.likesCount)")
                         .font(.system(size: 12))
@@ -679,12 +679,12 @@ struct HomeView: View {
                     Task { await tapPlayShow(show) }
                 } label: {
                     Circle()
-                        .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                        .stroke(colors.accentIcon, lineWidth: 1)
                         .frame(width: 30, height: 30)
                         .overlay(
                             Image(systemName: "play.fill")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                .foregroundStyle(colors.accentTintText)
                         )
                 }
                 .buttonStyle(.plain)
@@ -714,7 +714,7 @@ struct HomeView: View {
                 if hasBookmark {
                     Image(systemName: "bookmark.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0))
+                        .foregroundStyle(colors.accentIcon)
                 }
             }
 
@@ -725,25 +725,25 @@ struct HomeView: View {
 
             Text(venue)
                 .font(.system(size: 12))
-                .foregroundStyle(Color(red: 0x75 / 255.0, green: 0x79 / 255.0, blue: 0x8C / 255.0))
+                .foregroundStyle(colors.textMuted)
                 .padding(.top, 8)
                 .lineLimit(1)
 
             HStack {
                 Text(rating)
                     .font(.system(size: 12))
-                    .foregroundStyle(rating.starts(with: "★") ? Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0) : Color(red: 0xB2 / 255.0, green: 0xB6 / 255.0, blue: 0xCA / 255.0))
+                    .foregroundStyle(rating.starts(with: "★") ? colors.ratingAmber : colors.textSubtle)
                 Spacer()
                 Button {
                     // Fallback sample card
                 } label: {
                     Circle()
-                        .stroke(Color(red: 0xB5 / 255.0, green: 0xAB / 255.0, blue: 0xFC / 255.0), lineWidth: 1)
+                        .stroke(colors.accentIcon, lineWidth: 1)
                         .frame(width: 30, height: 30)
                         .overlay(
                             Image(systemName: "play.fill")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color(red: 0xD2 / 255.0, green: 0xCE / 255.0, blue: 0xFD / 255.0))
+                                .foregroundStyle(colors.accentTintText)
                         )
                 }
                 .buttonStyle(.plain)
