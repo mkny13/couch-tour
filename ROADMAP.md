@@ -139,7 +139,7 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 | **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS | Shipped (D205, D210, verified in UAT `uat-011`) |
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS | Shipped (D207, verified in UAT `uat-014`, `uat-015`) |
 | **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS | Shipped (D206, D214, D215; procedural covers, conic glow artwork, strict YYYY-MM-DD formatting, and moe. casing) |
-| **#86** | **Waveform Scrubber Visualization** | Dual-layer vector waveform scrubber with live seek/drag interaction across Now Playing surfaces. | Android, macOS | Shipped (D214, D215) |
+| **#86** | **Waveform Scrubber Visualization** | Dual-layer vector waveform scrubber with dynamic audio peak extraction from phish.in and archive.org (Relisten), live seek/drag interaction across Now Playing surfaces. | Android, macOS | Shipped (D214, D215, D224) |
 
 ---
 
@@ -166,7 +166,7 @@ before that question has an answer.
 ## Product Principles & Resolved Decisions
 
 - **Show End Behavior**: Playback stops at the end of the show/encore rather than silently auto-advancing into the next show. An actionable prompt/banner is presented to start the next show on the tour/run.
-- **Waveform Scrubber**: Dual-layer vector waveform scrubber is implemented across Android and macOS Now Playing surfaces (D214, D215) with live drag/seek scrubbing, matching the design handoff spec while keeping audio rendering responsive and lightweight.
+- **Waveform Scrubber**: Dual-layer vector waveform scrubber with dynamic audio peak extraction from phish.in and archive.org (Relisten) is implemented across Android and macOS Now Playing surfaces (D214, D215, D224) with live drag/seek scrubbing, polarity auto-detection, and memory caching.
 
 ---
 
