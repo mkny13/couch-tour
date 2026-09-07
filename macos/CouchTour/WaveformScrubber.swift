@@ -1,18 +1,21 @@
 import SwiftUI
+import CouchTourKit
 
 /// Vector waveform scrubber for macOS SwiftUI.
-/// Renders the dual-layer waveform bars from the design handoff SVG (#wave-np / #wave-pl).
+/// Renders dynamic audio waveform bars when available, falling back to a default waveform.
 /// Supports drag-to-seek and tap-to-seek.
 public struct WaveformScrubber: View {
     public let progressFraction: Double // 0.0 .. 1.0
+    public let waveformURL: String?
     public let onSeek: (Double) -> Void
 
     @Environment(\.ledgerColors) private var colors
     @State private var isDragging: Bool = false
     @State private var dragFraction: Double?
+    @State private var dynamicHeights: [CGFloat]?
 
-    // Sampled normalized waveform peak heights (0.1 .. 1.0) across 95 sample points
-    private static let waveformHeights: [CGFloat] = [
+    // Sampled normalized fallback heights (0.1 .. 1.0) across 95 sample points
+    private static let fallbackHeights: [CGFloat] = [
         0.18, 0.28, 0.42, 0.35, 0.58, 0.72, 0.85, 0.65, 0.45, 0.38,
         0.52, 0.68, 0.90, 0.95, 0.80, 0.60, 0.42, 0.30, 0.48, 0.62,
         0.75, 0.88, 0.70, 0.55, 0.40, 0.35, 0.50, 0.65, 0.82, 0.92,
@@ -25,13 +28,22 @@ public struct WaveformScrubber: View {
         0.40, 0.52, 0.65, 0.48, 0.32
     ]
 
-    public init(progressFraction: Double, onSeek: @escaping (Double) -> Void) {
+    public init(
+        progressFraction: Double,
+        waveformURL: String? = nil,
+        onSeek: @escaping (Double) -> Void
+    ) {
         self.progressFraction = max(0.0, min(1.0, progressFraction))
+        self.waveformURL = waveformURL
         self.onSeek = onSeek
     }
 
     private var activeFraction: Double {
         dragFraction ?? progressFraction
+    }
+
+    private var currentHeights: [CGFloat] {
+        dynamicHeights ?? Self.fallbackHeights
     }
 
     public var body: some View {
@@ -41,12 +53,12 @@ public struct WaveformScrubber: View {
 
             ZStack(alignment: .leading) {
                 // Background unplayed waveform
-                WaveformBarsShape(heights: Self.waveformHeights)
+                WaveformBarsShape(heights: currentHeights)
                     .fill(colors.textPrimary.opacity(0.18))
                     .frame(width: width, height: height)
 
                 // Played waveform clipped to progress
-                WaveformBarsShape(heights: Self.waveformHeights)
+                WaveformBarsShape(heights: currentHeights)
                     .fill(LedgerTheme.specGradient)
                     .frame(width: width, height: height)
                     .mask(
@@ -77,6 +89,17 @@ public struct WaveformScrubber: View {
                         onSeek(frac)
                     }
             )
+        }
+        .task(id: waveformURL) {
+            guard let urlString = waveformURL, let url = URL(string: urlString) else {
+                dynamicHeights = nil
+                return
+            }
+            if let heights = await WaveformLoader.shared.loadWaveform(from: url, barCount: 95) {
+                dynamicHeights = heights
+            } else {
+                dynamicHeights = nil
+            }
         }
     }
 }

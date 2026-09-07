@@ -577,6 +577,7 @@ extension RelistenSourceTrack {
             position: trackPosition,
             durationMs: duration * 1000,
             url: mp3Url ?? "",
+            waveformURL: mp3Url.flatMap(WaveformLoader.archiveOrgWaveformURL),
             showDate: showDate,
             venueName: venueName,
             flacUrl: flacUrl,

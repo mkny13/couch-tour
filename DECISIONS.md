@@ -4135,3 +4135,35 @@ Addresses two macOS client issues logged under #154 (poor text contrast in light
 - macOS app build: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
 - Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (505 tests passed).
 - Added `uat-040` to `UAT.md`.
+
+## Iteration 82 — Dynamic Waveform Visualization (D224)
+
+### D224 — Dynamic waveform visualization from phish.in and archive.org (Relisten)
+
+Replaced static, hardcoded waveform visualization (which previously rendered an invariant diamond-shaped 95-point peak profile across all tracks) with dynamic track waveform peak extraction from both phish.in and archive.org across macOS and Android Couch Tour clients.
+
+1. **Archive.org Waveform Derivation**:
+   - Audio tracks on Relisten are hosted on archive.org (`https://archive.org/download/{id}/{track}.mp3`). Archive.org automatically creates derivative 800×200 waveform PNGs with an identical file stem (`{track}.png`).
+   - Added `WaveformLoader.archiveOrgWaveformURL(from:)` in `CouchTourKit` and populated `waveformURL` in `RelistenSourceTrack.toPlayableTrack(...)` across both Swift (`RelistenAPI.swift`) and Kotlin (`Relisten.kt`).
+
+2. **Polarity Auto-Detection & Normalized Peak Extraction**:
+   - phish.in waveform PNGs (1100×70) feature an opaque signal (`alpha > 0.5`) on a transparent background (`alpha == 0`).
+   - archive.org waveform PNGs (800×200) feature an inverted silhouette: an opaque black background (`alpha > 0.5`) with a transparent cutout signal (`alpha == 0`).
+   - `WaveformLoader` (macOS `CouchTourKit`) and `WaveformExtractor` (Android `Waveform.kt`) auto-detect polarity by sampling the corner pixel: if opaque, the signal is `alpha < 0.5`; if transparent, `alpha > 0.5`.
+   - Amplitudes are extracted across slices matching the bar pitch and normalized so peaks scale to `[0.08, 0.95]`, preserving track dynamics while comfortably fitting player bounds.
+
+3. **macOS Scrubber Integration** (`WaveformScrubber.swift`, `PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - `WaveformScrubber` accepts `waveformURL: String? = nil` and loads dynamic peak heights asynchronously in `.task(id: waveformURL)` via `WaveformLoader.shared.loadWaveform(...)`.
+   - In-memory caching ensures instantaneous rendering on subsequent visits or seeks.
+   - Connected `player.currentTrack?.waveformURL` in both `PlayerRailView` and `ExpandedNowPlayingView`.
+
+4. **Android Scrubber Integration** (`DesignComponents.kt`, `NowPlaying.kt`, `Waveform.kt`):
+   - Created `WaveformHeights(val top: FloatArray, val bottom: FloatArray)` and `WaveformExtractor` caching decoded peak profiles with an LRU cache.
+   - Updated `WaveformScrubber` in `DesignComponents.kt` to load dynamic bar heights via `LaunchedEffect(waveformUrl)` and render the Ledger spec-gradient vector bars with the track's real waveform peaks.
+   - Connected `state.waveformUrl` in `NowPlaying.kt`.
+
+**Testing & Validation:**
+- macOS package tests: `cd macos/Packages/CouchTourKit && swift test` (425 tests passed). Added `WaveformLoaderTests.swift` covering archive.org derivation, phish.in extraction, archive.org extraction, and playable track mapping.
+- macOS app target: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
+- Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (508 tests passed). Added `WaveformExtractorTest.kt` and `CatalogTest` relisten waveform derivation test.
+- Added `uat-041` in `UAT.md`.

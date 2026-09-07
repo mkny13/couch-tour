@@ -286,6 +286,9 @@ internal fun RelistenSourceTrack.toPlayableTrack(
     position = trackPosition,
     durationMs = duration * 1000,
     url = mp3Url.orEmpty(),
+    waveformUrl = if (mp3Url?.contains("archive.org/download/") == true && mp3Url.endsWith(".mp3")) {
+        mp3Url.removeSuffix(".mp3") + ".png"
+    } else null,
     showDate = showDate,
     venueName = venueName,
     flacUrl = flacUrl,

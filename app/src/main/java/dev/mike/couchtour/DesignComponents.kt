@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -197,8 +198,25 @@ private val WAVEFORM_BOTTOM = floatArrayOf(
 fun WaveformScrubber(
     progress: Float,
     onSeek: (Float) -> Unit,
+    waveformUrl: String? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var dynamicHeights by remember(waveformUrl) {
+        mutableStateOf<WaveformHeights?>(null)
+    }
+
+    LaunchedEffect(waveformUrl) {
+        dynamicHeights = if (waveformUrl != null) {
+            WaveformExtractor.loadHeights(context, waveformUrl, WAVEFORM_TOP.size)
+        } else {
+            null
+        }
+    }
+
+    val topBars = dynamicHeights?.top ?: WAVEFORM_TOP
+    val bottomBars = dynamicHeights?.bottom ?: WAVEFORM_BOTTOM
+
     val ledger = LocalLedgerColors.current
     val specBrush = ledger.specGradient
     val unplayedColor = ledger.textMuted.copy(alpha = 0.45f)
@@ -233,7 +251,7 @@ fun WaveformScrubber(
                 )
             }
     ) {
-        val totalBars = WAVEFORM_TOP.size
+        val totalBars = topBars.size
         val w = size.width
         val h = size.height
         val barPitch = w / totalBars
@@ -251,13 +269,13 @@ fun WaveformScrubber(
         )
         for (i in 0 until totalBars) {
             val x = i * barPitch
-            val topH = WAVEFORM_TOP[i] * scaleY
+            val topH = topBars[i] * scaleY
             drawRect(
                 color = unplayedColor,
                 topLeft = Offset(x, centerTop - topH),
                 size = Size(barWidth, topH)
             )
-            val botH = WAVEFORM_BOTTOM[i] * scaleY
+            val botH = bottomBars[i] * scaleY
             drawRect(
                 color = unplayedColor,
                 topLeft = Offset(x, centerTop + centerBarHeight),
@@ -277,13 +295,13 @@ fun WaveformScrubber(
                 for (i in 0 until totalBars) {
                     val x = i * barPitch
                     if (x > playedWidth) break
-                    val topH = WAVEFORM_TOP[i] * scaleY
+                    val topH = topBars[i] * scaleY
                     drawRect(
                         brush = specBrush,
                         topLeft = Offset(x, centerTop - topH),
                         size = Size(barWidth, topH)
                     )
-                    val botH = WAVEFORM_BOTTOM[i] * scaleY
+                    val botH = bottomBars[i] * scaleY
                     drawRect(
                         brush = specBrush,
                         topLeft = Offset(x, centerTop + centerBarHeight),

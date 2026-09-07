@@ -251,7 +251,10 @@ struct PlayerRailView: View {
                     let currentPos = dragPositionMs ?? Double(player.positionMs)
                     let progressFrac = duration > 0 ? (currentPos / duration) : 0.0
 
-                    WaveformScrubber(progressFraction: progressFrac) { seekFrac in
+                    WaveformScrubber(
+                        progressFraction: progressFrac,
+                        waveformURL: player.currentTrack?.waveformURL
+                    ) { seekFrac in
                         dragPositionMs = nil
                         let targetMs = Int64(seekFrac * duration)
                         player.seek(toMs: targetMs)
