@@ -4167,3 +4167,41 @@ Replaced static, hardcoded waveform visualization (which previously rendered an 
 - macOS app target: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
 - Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (508 tests passed). Added `WaveformExtractorTest.kt` and `CatalogTest` relisten waveform derivation test.
 - Added `uat-041` in `UAT.md`.
+
+## Iteration 83 — Smooth Continuous Waveform Visualization (D225)
+
+### D225 — Continuous solid silhouette waveform rendering across Android and macOS (Option 1)
+
+Follow-up to D224 based on user visual feedback and review of reference web players on phish.in and relisten.net. While D224 successfully made waveform heights dynamic to each track, discrete vertical bars appeared stark and coarse compared to the smooth, organic silhouette waveforms on the web players.
+
+An interactive visual prototype (`waveform_smoothing_mockup.html`) was provided with 4 design options: Option 1 (Continuous Solid Silhouette / Web Parity), Option 2 (High-Density Micro-Bars with Gaussian Smoothing), Option 3 (Hybrid Silhouette + Needles), and Option 4 (Previous 95 Coarse Bars). The user selected **Option 1**.
+
+1. **Envelope Extraction & Backwards Compatibility** (`WaveformLoader.swift` on macOS, `Waveform.kt` on Android):
+   - Defined `WaveformEnvelope` on macOS (with `top: [CGFloat]` and `bottom: [CGFloat]`) and updated `WaveformHeights` on Android.
+   - Enhanced `WaveformLoader` with `loadEnvelope(from:sampleCount:)` and `extractEnvelope(from:sampleCount:)` (sampling 400 points across the track width) while preserving `extractHeights(...)` for backward compatibility.
+   - Added `testExtractEnvelopeFromPhishInFixture` and `testExtractEnvelopeFromArchiveOrgFixture` in `WaveformLoaderTests.swift`.
+
+2. **macOS Continuous Waveform Shape & Vector Path** (`WaveformScrubber.swift`):
+   - Replaced discrete bar rendering (`WaveformBarsShape`) with a custom SwiftUI `ContinuousWaveformShape` conformant to `Shape`.
+   - Constructs a closed continuous 2D `Path`:
+     - Starts at `(0, centerY - top[0] * maxAmplitude)`.
+     - Traces line segments across all sample points on the upper contour `(x_i, centerY - top[i] * maxAmplitude)`.
+     - Extends to `(width, centerY)`.
+     - Traces line segments in reverse along the lower contour `(x_i, centerY + bottom[i] * maxAmplitude)`.
+     - Closes back to the starting point.
+   - Renders the full unplayed silhouette with subtle opacity (`textPrimary.opacity(0.18)`), an unplayed 1.5px center hairline for track continuity across quiet passages, played audio masked to `activeFraction` with `LedgerTheme.specGradient` and a 2px played hairline, and a 2px playhead needle cursor (`Color(red: 0.95, green: 0.96, blue: 0.99)`).
+
+3. **Android Continuous Silhouette Path** (`DesignComponents.kt`, `Waveform.kt`):
+   - Updated `WaveformExtractor.extractHeights` to sample 400 points and normalize amplitude bounds to `[0.04f, 0.96f]`.
+   - Updated `WaveformScrubber` in `DesignComponents.kt` using Jetpack Compose `Path`:
+     - Traces top contour `0 until count` with `moveTo` and `lineTo`.
+     - Connects to `(width, centerY)`.
+     - Traces bottom contour `(count - 1) downTo 0` with `lineTo`.
+     - Closes the path cleanly.
+   - Draws unplayed `drawPath` and 1.5dp hairline, played audio with `clipRect(right = playedWidth)` using `specBrush` and 2dp hairline, and the 2dp playhead needle cursor.
+
+**Testing & Validation:**
+- macOS package tests: `cd macos/Packages/CouchTourKit && swift test` (427 tests passed, 0 failures).
+- macOS app target: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
+- Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (508 tests passed, 0 failures).
+- Added `uat-042` in `UAT.md`.

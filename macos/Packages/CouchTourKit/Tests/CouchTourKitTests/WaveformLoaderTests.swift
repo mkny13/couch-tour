@@ -61,4 +61,38 @@ final class WaveformLoaderTests: XCTestCase {
 
         XCTAssertEqual(playable.waveformURL, "https://archive.org/download/gd75-08-13.sbd/track01.png")
     }
+
+    func testExtractEnvelopeFromPhishInFixture() throws {
+        let data = try fixtureData("phishin_waveform.png")
+        guard let envelope = WaveformLoader.extractEnvelope(from: data, sampleCount: 200) else {
+            XCTFail("Failed to extract envelope from phish.in fixture")
+            return
+        }
+
+        XCTAssertEqual(envelope.top.count, 200)
+        XCTAssertEqual(envelope.bottom.count, 200)
+        for val in envelope.top + envelope.bottom {
+            XCTAssertGreaterThanOrEqual(val, 0.04)
+            XCTAssertLessThanOrEqual(val, 0.96)
+        }
+        let maxPeak = max(envelope.top.max() ?? 0, envelope.bottom.max() ?? 0)
+        XCTAssertGreaterThan(maxPeak, 0.8)
+    }
+
+    func testExtractEnvelopeFromArchiveOrgFixture() throws {
+        let data = try fixtureData("archive_waveform.png")
+        guard let envelope = WaveformLoader.extractEnvelope(from: data, sampleCount: 200) else {
+            XCTFail("Failed to extract envelope from archive.org fixture")
+            return
+        }
+
+        XCTAssertEqual(envelope.top.count, 200)
+        XCTAssertEqual(envelope.bottom.count, 200)
+        for val in envelope.top + envelope.bottom {
+            XCTAssertGreaterThanOrEqual(val, 0.04)
+            XCTAssertLessThanOrEqual(val, 0.96)
+        }
+        let maxPeak = max(envelope.top.max() ?? 0, envelope.bottom.max() ?? 0)
+        XCTAssertGreaterThan(maxPeak, 0.8)
+    }
 }
