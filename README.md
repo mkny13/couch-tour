@@ -136,7 +136,7 @@ Install to a connected device or running emulator:
 | `Cast.kt` | Cast options, the session state, and the queue-item converter |
 | `CastButton.kt` | Cast button and device picker, driving `MediaRouter` directly |
 | `Progress.kt` | Room table of per-queue playback positions |
-| `Waveform.kt` | Waveform scrubber — tints the phish.in waveform PNG by play position |
+| `Waveform.kt` | Waveform peak & envelope extraction and caching from phish.in and archive.org |
 | `DesignComponents.kt` | Ledger design tokens and reusable components (hairlines, badges, waveform scrubber, play buttons) |
 | `NowPlaying.kt` | Full-screen Now Playing sheet with ambient artwork glow, tape specs, waveform scrubber, and transport controls |
 | `Format.kt` | Formatting helpers for durations, progress fractions, timestamps, and show dates |
