@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -148,51 +149,33 @@ fun CircularPlayButton(
 }
 
 private val WAVEFORM_TOP = floatArrayOf(
-    22.3f, 22.2f, 15.2f, 20.8f, 20.5f, 24.8f, 23.6f, 15.6f, 23.5f, 29.6f,
-    26.1f, 28.4f, 15.2f, 17.0f, 14.0f, 13.2f, 15.6f, 14.8f, 26.1f, 20.2f,
-    17.6f, 17.4f, 15.7f, 15.3f, 28.5f, 30.0f, 29.3f, 17.9f, 17.0f, 30.0f,
-    24.2f, 21.4f, 29.3f, 17.2f, 20.7f, 18.6f, 21.1f, 21.5f, 15.2f, 18.2f,
-    17.2f, 15.9f, 24.8f, 18.7f, 15.1f, 14.5f, 18.6f, 18.9f, 21.5f, 21.8f,
-    21.0f, 21.0f, 25.1f, 13.3f, 21.9f, 16.9f, 12.9f, 12.7f, 19.5f, 13.0f,
-    14.8f, 13.1f, 12.1f, 10.4f, 7.5f, 11.9f, 9.6f, 12.2f, 15.1f, 11.8f,
-    17.4f, 15.7f, 10.7f, 17.5f, 13.0f, 21.9f, 18.2f, 13.5f, 11.4f, 8.1f,
-    6.4f, 12.7f, 13.5f, 12.3f, 8.5f, 7.8f, 9.0f, 6.9f, 6.5f, 9.1f,
-    9.9f, 15.0f, 20.5f, 22.1f, 10.6f, 11.4f, 18.3f, 16.7f, 22.3f, 18.1f,
-    20.9f, 21.8f, 16.6f, 9.7f, 10.5f, 15.1f, 11.8f, 17.3f, 14.5f, 11.2f,
-    10.7f, 13.6f, 14.8f, 16.6f, 21.3f, 23.6f, 24.3f, 19.7f, 18.2f, 15.5f,
-    22.4f, 14.2f, 14.5f, 20.7f, 22.3f, 18.5f, 23.0f, 23.7f, 19.4f, 11.8f,
-    13.7f, 13.1f, 17.9f, 17.8f, 19.7f, 19.5f, 24.9f, 22.6f, 20.3f, 21.8f,
-    19.9f, 25.9f, 17.2f, 22.4f, 26.7f, 23.5f, 17.1f, 20.0f, 14.8f, 21.4f,
-    12.6f, 20.9f, 12.6f, 9.9f, 14.2f, 18.3f, 16.0f, 23.0f, 23.0f, 22.5f,
-    20.0f, 14.8f, 17.9f, 19.3f, 26.2f, 18.8f, 19.9f, 21.3f, 11.1f, 11.4f,
-    16.3f, 12.0f, 10.9f, 16.3f, 11.7f, 13.9f, 6.5f, 9.6f, 8.2f, 9.7f,
-    10.0f, 16.2f, 17.9f, 10.8f, 15.2f, 17.5f, 12.1f, 14.0f, 19.8f, 14.6f
+    0.22f, 0.28f, 0.42f, 0.35f, 0.58f, 0.72f, 0.85f, 0.65f, 0.45f, 0.38f,
+    0.52f, 0.68f, 0.90f, 0.95f, 0.80f, 0.60f, 0.42f, 0.30f, 0.48f, 0.62f,
+    0.75f, 0.88f, 0.70f, 0.55f, 0.40f, 0.35f, 0.50f, 0.65f, 0.82f, 0.92f,
+    0.85f, 0.68f, 0.52f, 0.38f, 0.45f, 0.60f, 0.78f, 0.86f, 0.74f, 0.58f,
+    0.42f, 0.32f, 0.50f, 0.68f, 0.85f, 0.94f, 0.88f, 0.72f, 0.54f, 0.40f,
+    0.48f, 0.64f, 0.80f, 0.89f, 0.76f, 0.60f, 0.45f, 0.35f, 0.52f, 0.70f,
+    0.86f, 0.95f, 0.82f, 0.65f, 0.48f, 0.36f, 0.50f, 0.66f, 0.84f, 0.90f,
+    0.78f, 0.62f, 0.44f, 0.32f, 0.46f, 0.62f, 0.79f, 0.88f, 0.75f, 0.58f,
+    0.40f, 0.30f, 0.45f, 0.60f, 0.76f, 0.85f, 0.72f, 0.55f, 0.38f, 0.28f,
+    0.40f, 0.52f, 0.65f, 0.48f, 0.32f
 )
 
 private val WAVEFORM_BOTTOM = floatArrayOf(
-    19.8f, 12.8f, 13.5f, 19.1f, 21.5f, 15.3f, 15.7f, 18.4f, 24.8f, 29.7f,
-    29.7f, 25.5f, 14.0f, 11.9f, 17.6f, 15.4f, 20.5f, 14.1f, 24.5f, 17.1f,
-    12.6f, 16.7f, 25.1f, 14.8f, 24.4f, 29.9f, 30.0f, 28.2f, 30.0f, 24.6f,
-    22.8f, 26.5f, 21.2f, 21.4f, 27.8f, 15.2f, 19.6f, 22.9f, 19.9f, 11.9f,
-    15.6f, 21.1f, 19.1f, 18.2f, 18.5f, 23.4f, 11.9f, 21.0f, 17.4f, 18.9f,
-    27.6f, 19.5f, 27.8f, 19.0f, 20.3f, 18.3f, 18.0f, 18.9f, 13.9f, 12.9f,
-    15.7f, 13.4f, 7.4f, 8.7f, 6.9f, 11.5f, 12.6f, 17.7f, 18.0f, 18.2f,
-    14.0f, 12.8f, 14.9f, 16.6f, 20.6f, 13.5f, 18.4f, 19.0f, 13.1f, 10.2f,
-    10.4f, 8.1f, 8.9f, 8.4f, 11.7f, 9.3f, 5.9f, 6.9f, 10.2f, 12.2f,
-    9.5f, 15.7f, 16.1f, 14.7f, 11.6f, 17.8f, 14.0f, 16.0f, 19.6f, 23.7f,
-    20.0f, 19.2f, 10.2f, 17.9f, 10.8f, 16.3f, 10.4f, 17.2f, 10.6f, 12.7f,
-    16.4f, 20.1f, 14.1f, 14.4f, 16.0f, 16.3f, 15.5f, 29.9f, 30.0f, 29.0f,
-    19.1f, 17.0f, 14.5f, 20.8f, 29.8f, 17.6f, 15.0f, 17.0f, 15.5f, 17.3f,
-    20.6f, 14.5f, 18.3f, 15.7f, 17.4f, 22.3f, 22.5f, 16.5f, 21.1f, 29.7f,
-    23.7f, 30.0f, 24.0f, 30.0f, 14.9f, 25.1f, 20.5f, 25.7f, 14.6f, 26.5f,
-    14.3f, 18.7f, 9.7f, 12.0f, 17.9f, 15.6f, 21.0f, 14.7f, 16.6f, 12.8f,
-    17.7f, 22.1f, 17.5f, 22.0f, 18.7f, 20.5f, 24.4f, 22.5f, 20.2f, 11.7f,
-    14.4f, 14.5f, 9.9f, 15.3f, 13.9f, 10.4f, 7.6f, 8.9f, 8.5f, 11.1f,
-    11.1f, 14.1f, 17.1f, 11.1f, 13.1f, 12.2f, 15.4f, 15.6f, 16.6f, 13.5f
+    0.20f, 0.26f, 0.38f, 0.32f, 0.54f, 0.68f, 0.80f, 0.60f, 0.42f, 0.35f,
+    0.48f, 0.64f, 0.84f, 0.90f, 0.75f, 0.56f, 0.38f, 0.28f, 0.44f, 0.58f,
+    0.70f, 0.82f, 0.65f, 0.50f, 0.36f, 0.32f, 0.46f, 0.60f, 0.76f, 0.86f,
+    0.80f, 0.62f, 0.48f, 0.35f, 0.40f, 0.55f, 0.72f, 0.80f, 0.68f, 0.54f,
+    0.38f, 0.28f, 0.46f, 0.62f, 0.79f, 0.88f, 0.82f, 0.66f, 0.50f, 0.36f,
+    0.44f, 0.58f, 0.74f, 0.82f, 0.70f, 0.55f, 0.40f, 0.32f, 0.48f, 0.64f,
+    0.80f, 0.88f, 0.76f, 0.60f, 0.44f, 0.32f, 0.46f, 0.60f, 0.78f, 0.84f,
+    0.72f, 0.56f, 0.40f, 0.28f, 0.42f, 0.56f, 0.72f, 0.82f, 0.70f, 0.54f,
+    0.36f, 0.26f, 0.40f, 0.55f, 0.70f, 0.79f, 0.66f, 0.50f, 0.35f, 0.25f,
+    0.36f, 0.48f, 0.60f, 0.44f, 0.28f
 )
 
 /**
- * Interactive, seekable waveform scrubber mapped to the handoff waveform SVG vectors.
+ * Interactive, seekable waveform scrubber rendering an organic continuous solid silhouette.
  */
 @Composable
 fun WaveformScrubber(
@@ -208,18 +191,18 @@ fun WaveformScrubber(
 
     LaunchedEffect(waveformUrl) {
         dynamicHeights = if (waveformUrl != null) {
-            WaveformExtractor.loadHeights(context, waveformUrl, WAVEFORM_TOP.size)
+            WaveformExtractor.loadHeights(context, waveformUrl, 400)
         } else {
             null
         }
     }
 
-    val topBars = dynamicHeights?.top ?: WAVEFORM_TOP
-    val bottomBars = dynamicHeights?.bottom ?: WAVEFORM_BOTTOM
+    val topEnvelope = dynamicHeights?.top ?: WAVEFORM_TOP
+    val bottomEnvelope = dynamicHeights?.bottom ?: WAVEFORM_BOTTOM
 
     val ledger = LocalLedgerColors.current
     val specBrush = ledger.specGradient
-    val unplayedColor = ledger.textMuted.copy(alpha = 0.45f)
+    val unplayedColor = ledger.textPrimary.copy(alpha = 0.20f)
     var dragFraction by remember { mutableStateOf<Float?>(null) }
     val effectiveProgress = dragFraction ?: progress
 
@@ -251,71 +234,63 @@ fun WaveformScrubber(
                 )
             }
     ) {
-        val totalBars = topBars.size
+        val count = topEnvelope.size
+        if (count == 0) return@Canvas
+
         val w = size.width
         val h = size.height
-        val barPitch = w / totalBars
-        val barWidth = (barPitch * 0.65f).coerceAtLeast(1.5f)
         val centerY = h / 2f
-        val centerBarHeight = (h * (8f / 70f)).coerceAtLeast(2f)
-        val centerTop = centerY - centerBarHeight / 2f
-        val scaleY = (h / 70f)
+        val maxAmplitude = h * 0.44f
+        val step = w / maxOf(1, count - 1).toFloat()
+
+        // Build continuous silhouette path
+        val path = Path().apply {
+            moveTo(0f, centerY - topEnvelope[0] * maxAmplitude)
+            for (i in 1 until count) {
+                val x = i * step
+                val y = centerY - topEnvelope[i] * maxAmplitude
+                lineTo(x, y)
+            }
+            lineTo(w, centerY)
+            for (i in (count - 1) downTo 0) {
+                val x = i * step
+                val bFrac = if (i < bottomEnvelope.size) bottomEnvelope[i] else topEnvelope[i]
+                val y = centerY + bFrac * maxAmplitude
+                lineTo(x, y)
+            }
+            close()
+        }
 
         // 1. Draw unplayed full waveform
+        drawPath(path = path, color = unplayedColor)
+
+        // Center hairline
+        val hairlineHeight = 1.5.dp.toPx()
         drawRect(
             color = unplayedColor,
-            topLeft = Offset(0f, centerTop),
-            size = Size(w, centerBarHeight)
+            topLeft = Offset(0f, centerY - hairlineHeight / 2f),
+            size = Size(w, hairlineHeight)
         )
-        for (i in 0 until totalBars) {
-            val x = i * barPitch
-            val topH = topBars[i] * scaleY
-            drawRect(
-                color = unplayedColor,
-                topLeft = Offset(x, centerTop - topH),
-                size = Size(barWidth, topH)
-            )
-            val botH = bottomBars[i] * scaleY
-            drawRect(
-                color = unplayedColor,
-                topLeft = Offset(x, centerTop + centerBarHeight),
-                size = Size(barWidth, botH)
-            )
-        }
 
         // 2. Draw played waveform with specGradient clipped to progress
         val playedWidth = (w * effectiveProgress.coerceIn(0f, 1f))
         if (playedWidth > 0f) {
             clipRect(left = 0f, top = 0f, right = playedWidth, bottom = h) {
+                drawPath(path = path, brush = specBrush)
+                val playedHairlineHeight = 2.dp.toPx()
                 drawRect(
                     brush = specBrush,
-                    topLeft = Offset(0f, centerTop),
-                    size = Size(w, centerBarHeight)
+                    topLeft = Offset(0f, centerY - playedHairlineHeight / 2f),
+                    size = Size(w, playedHairlineHeight)
                 )
-                for (i in 0 until totalBars) {
-                    val x = i * barPitch
-                    if (x > playedWidth) break
-                    val topH = topBars[i] * scaleY
-                    drawRect(
-                        brush = specBrush,
-                        topLeft = Offset(x, centerTop - topH),
-                        size = Size(barWidth, topH)
-                    )
-                    val botH = bottomBars[i] * scaleY
-                    drawRect(
-                        brush = specBrush,
-                        topLeft = Offset(x, centerTop + centerBarHeight),
-                        size = Size(barWidth, botH)
-                    )
-                }
             }
         }
 
         // 3. Draw playhead needle cursor matching design spec (#f3f5fe / 2px wide)
         if (playedWidth > 0f) {
             val needleWidth = 2.dp.toPx()
-            val needleTop = (centerTop - 4.dp.toPx()).coerceAtLeast(0f)
-            val needleHeight = (h - (needleTop * 2)).coerceAtLeast(centerBarHeight + 8.dp.toPx())
+            val needleTop = 0f
+            val needleHeight = h
             val needleX = (playedWidth - needleWidth / 2f).coerceIn(0f, w - needleWidth)
             drawRoundRect(
                 color = Color(0xFFF3F5FE),

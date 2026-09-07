@@ -135,7 +135,7 @@ data class WaveformHeights(val top: FloatArray, val bottom: FloatArray)
 object WaveformExtractor {
     private val cache = android.util.LruCache<String, WaveformHeights>(50)
 
-    fun extractHeights(bitmap: android.graphics.Bitmap, sampleCount: Int = 120): WaveformHeights? {
+    fun extractHeights(bitmap: android.graphics.Bitmap, sampleCount: Int = 400): WaveformHeights? {
         val width = bitmap.width
         val height = bitmap.height
         if (width <= 0 || height <= 0 || sampleCount <= 0) return null
@@ -179,20 +179,20 @@ object WaveformExtractor {
                     }
                 }
             }
-            topHeights[i] = maxTop.toFloat()
-            bottomHeights[i] = maxBottom.toFloat()
+            topHeights[i] = maxTop.toFloat() / maxOf(1, centerY).toFloat()
+            bottomHeights[i] = maxBottom.toFloat() / maxOf(1, centerY).toFloat()
         }
 
         val maxPeak = maxOf(topHeights.maxOrNull() ?: 1f, bottomHeights.maxOrNull() ?: 1f)
-        val targetScale = if (maxPeak > 0f) (28f / maxPeak) else 1f
+        val targetScale = if (maxPeak > 0.01f) (0.95f / maxPeak) else 1f
         for (i in 0 until sampleCount) {
-            topHeights[i] = (topHeights[i] * targetScale).coerceIn(4f, 28f)
-            bottomHeights[i] = (bottomHeights[i] * targetScale).coerceIn(4f, 28f)
+            topHeights[i] = (topHeights[i] * targetScale).coerceIn(0.04f, 0.96f)
+            bottomHeights[i] = (bottomHeights[i] * targetScale).coerceIn(0.04f, 0.96f)
         }
         return WaveformHeights(topHeights, bottomHeights)
     }
 
-    suspend fun loadHeights(context: android.content.Context, url: String, sampleCount: Int = 120): WaveformHeights? {
+    suspend fun loadHeights(context: android.content.Context, url: String, sampleCount: Int = 400): WaveformHeights? {
         cache.get(url)?.let { return it }
         val request = ImageRequest.Builder(context)
             .data(url)
