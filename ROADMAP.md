@@ -61,11 +61,12 @@ Historical implementation details and architectural choices are logged separatel
 ### 7. Desktop Power & Distribution (Shipped — Phase 2 Batch 3)
 - **Desktop Cast & AirPlay Sender Support**: Google Cast sender integration via Bonjour mDNS and TLS V2 channels with remote queue management, transport controls, and AirPlay output picker (#10, D196).
 
-### 8. Ledger Design System & Visual Handoff Parity (Shipped — D214, D215, D218)
+### 8. Ledger Design System & Visual Handoff Parity (Shipped — D214, D215, D218, D224, D225)
 - **Unified Design Tokens**: Dark (`#161826`) and light (`#ffffff` / `#f7f7fb`) token foundations, 4-stop stagelight hairline gradient, procedural cover-art gradient, and artist abbreviation helpers preserving `uat-005` ("moe." lowercase with period) and `uat-006` (`YYYY-MM-DD` date formatting).
 - **Android Client Parity (Screens 1A–1E)**: Top ledger bar with live date and "Surprise Me" shuffle, horizontal card shelves for In-Progress (with top 2px progress bar overlay), Next Tour Stops (with top gradient accent bar), and On This Date. Fixed-width 44dp type badges (`LIST`, `SHOW`, `TRACK`), search tabs with count pills, collapsible Jam Chart notes, ambient radial artwork glow, and vector dual-layer waveform scrubber (`DesignComponents.kt`, `NowPlaying.kt`, `MainActivity.kt`).
 - **macOS Desktop 3-Pane & Expanded Player (Screens 2A–2E)**: Window traffic lights chrome, left sidebar with active `#d2cefd` highlight and live favorite artist show counts, right player rail with 3-radial wash, conic glow artwork, Jam Chart note card, and 64px waveform scrubber. Expanded 1440×900 Now Playing modal with 440px artwork and 110px scrubber. 2-column show detail setlist layout with compact durations and active track highlight bar, and fixed-column desktop library table (`LedgerDesign.swift`, `SidebarView.swift`, `PlayerRailView.swift`, `ExpandedNowPlayingView.swift`, `ShowDetailView.swift`, `LocalPlaylistsView.swift`).
 - **UI Wiring, Navigation & Mock Data Audit (Shipped — D218, #139–#149)**: Comprehensive audit across Android and macOS wiring search filter categories with live item count pills, interactive library sort dropdowns, live offline storage clearance calculations, Now Playing queue "Save as playlist" dialogs, interactive Next Couch Tour Stop navigation and direct playback, library item "..." action menus, macOS Player Rail up-next queue management, expanded player and show detail "Add to playlist" sheets, and dynamic show ratings on discovery shelves.
+- **Dynamic Silhouette Waveform Visualization (Shipped — D224, D225)**: Real-time waveform peak and envelope extraction from phish.in and archive.org (Relisten) with automatic image polarity detection, in-memory caching, continuous solid silhouette vector rendering, center hairlines, and 2px playhead needle cursor across Android and macOS (#158, #159).
 
 ---
 
@@ -78,6 +79,7 @@ flowchart LR
         S1["macOS Desktop UX Polish (#97-#102, D200-D204)"]
         S2["Desktop Cast & AirPlay Sender (#10, D196)"]
         S3["Ledger Design System & Handoff Fidelity (#128, D214, D215)"]
+        S4["Dynamic Silhouette Waveforms (D224, D225)"]
     end
 
     subgraph NearTerm ["Phase 2: Discovery, Audio Fidelity & Media Power"]
