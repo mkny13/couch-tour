@@ -138,6 +138,19 @@ class CatalogTest {
         assertEquals("https://phish.in/w.png", t.waveformUrl)
     }
 
+    @Test
+    fun `relisten source track derives archive-org waveform url from mp3 url`() {
+        val track = RelistenSourceTrack(
+            uuid = "t1",
+            title = "Help on the Way",
+            duration = 300,
+            mp3Url = "https://archive.org/download/gd75-08-13.sbd/track01.mp3",
+        )
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val playable = track.toPlayableTrack(dead, "1975-08-13", "Great American", "Set 1")
+        assertEquals("https://archive.org/download/gd75-08-13.sbd/track01.png", playable.waveformUrl)
+    }
+
     // ----------------------------------------------------------- recordings
 
     @Test

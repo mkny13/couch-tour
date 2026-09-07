@@ -293,7 +293,10 @@ struct ExpandedNowPlayingView: View {
                 Spacer()
 
                 // Waveform Scrubber (110px tall)
-                WaveformScrubber(progressFraction: progressFrac) { seekFrac in
+                WaveformScrubber(
+                    progressFraction: progressFrac,
+                    waveformURL: player.currentTrack?.waveformURL
+                ) { seekFrac in
                     dragPositionMs = nil
                     let targetMs = Int64(seekFrac * duration)
                     player.seek(toMs: targetMs)
