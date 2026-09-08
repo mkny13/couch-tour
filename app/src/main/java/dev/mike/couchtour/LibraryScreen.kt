@@ -18,10 +18,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -127,25 +135,35 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
             .background(ledger.appBackground)
     ) {
         // Header
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 12.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "YOUR LIBRARY",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.6.sp,
-                color = ledger.textSubtle
-            )
-            Text(
-                text = "Playlists, shows & tracks",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = (-0.01).sp,
-                color = ledger.textPrimary,
-                modifier = Modifier.padding(top = 2.dp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "YOUR LIBRARY",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.6.sp,
+                    color = ledger.textSubtle
+                )
+                Text(
+                    text = "Playlists, shows & tracks",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = (-0.01).sp,
+                    color = ledger.textPrimary,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            FeedbackButton(
+                nav = nav,
+                modifier = Modifier.size(36.dp),
+                iconSize = 20.dp,
+                tint = ledger.textMuted
             )
         }
 
@@ -324,13 +342,63 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                     val showDate = item.queueKey.removePrefix("show:").removePrefix("recording:relisten:")
                     val subtitleText = listOfNotNull(item.artist.ifBlank { null }, item.title.ifBlank { null }).joinToString(" · ")
                     val trailing = if (item.positionMs > 0) "${fmt(item.positionMs)} elapsed" else null
-                    LibraryRowItem(
-                        badgeType = "SHOW",
-                        title = formatShowDate(showDate),
-                        subtitle = subtitleText.ifBlank { item.trackTitle },
-                        trailingText = trailing,
-                        onClick = { openQueueKey(item.queueKey, nav) }
-                    )
+                    var menuOpen by remember { mutableStateOf(false) }
+                    Box {
+                        LibraryRowItem(
+                            badgeType = "SHOW",
+                            title = formatShowDate(showDate),
+                            subtitle = subtitleText.ifBlank { item.trackTitle },
+                            trailingText = trailing,
+                            onClick = { openQueueKey(item.queueKey, nav) },
+                            onLongClick = { menuOpen = true }
+                        )
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false }
+                        ) {
+                            val isPlaylist = item.queueKey.startsWith("playlist:") || item.queueKey.startsWith("local-playlist:")
+                            DropdownMenuItem(
+                                text = { Text("Resume playback") },
+                                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    vm.resume(item)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (isPlaylist) "Open playlist" else "Open show") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    openQueueKey(item.queueKey, nav)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Mark completed") },
+                                leadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    vm.markCompleted(item)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Remove from In Progress") },
+                                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    vm.dismiss(item)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete from history") },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    vm.forget(item)
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -410,6 +478,7 @@ private fun LibraryChip(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibraryRowItem(
     badgeType: String,
@@ -418,13 +487,19 @@ private fun LibraryRowItem(
     trailingText: String? = null,
     trailingTextColor: Color = LocalLedgerColors.current.textSecondary,
     trailingAction: (@Composable () -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val ledger = LocalLedgerColors.current
+    val clickModifier = if (onLongClick != null) {
+        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    } else {
+        Modifier.clickable(onClick = onClick)
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(clickModifier)
     ) {
         Row(
             modifier = Modifier

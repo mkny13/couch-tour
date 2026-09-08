@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
@@ -345,6 +346,13 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                         color = ledger.textSubtle,
                         modifier = Modifier.weight(1f)
                     )
+                    FeedbackButton(
+                        nav = nav,
+                        modifier = Modifier.size(36.dp),
+                        iconSize = 20.dp,
+                        tint = ledger.textMuted
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     SurpriseMeChip(surpriseMeArtists(favoritedArtists, artists?.getOrNull().orEmpty()), nav)
                 }
             }
@@ -762,6 +770,7 @@ private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
     val ledger = LocalLedgerColors.current
@@ -775,10 +784,15 @@ private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: Na
     } else {
         0.05f
     }
+    var menuOpen by remember { mutableStateOf(false) }
+    val isPlaylist = progress.queueKey.startsWith("playlist:") || progress.queueKey.startsWith("local-playlist:")
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { openQueue(progress, nav) }
+            .combinedClickable(
+                onClick = { openQueue(progress, nav) },
+                onLongClick = { menuOpen = true }
+            )
             .padding(horizontal = 20.dp)
     ) {
         Row(
@@ -840,6 +854,48 @@ private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: Na
                     .fillMaxWidth(fraction)
                     .height(2.dp)
                     .background(Color(0xFFF06BB0))
+            )
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text("Resume playback") },
+                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    vm.resume(progress)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(if (isPlaylist) "Open playlist" else "Open show") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    openQueue(progress, nav)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Mark completed") },
+                leadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    vm.markCompleted(progress)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Remove from In Progress") },
+                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    vm.dismiss(progress)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Delete from history") },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    vm.forget(progress)
+                }
             )
         }
     }
@@ -2098,60 +2154,98 @@ private fun TourPickerDialog(
         val src = sourceFor(artist.backend)
         src.periods(artist).filter { it.id != POPULAR_PERIOD_ID }
     }
-    var selectedYear by rememberSaveable(currentPreference) { mutableStateOf(currentPreference?.year.orEmpty()) }
-    var tourNameInput by rememberSaveable(currentPreference) { mutableStateOf(currentPreference?.tourName.orEmpty()) }
-    var mode by rememberSaveable { mutableStateOf(if (currentPreference?.tourName != null && currentPreference.year == null) "tour" else "year") }
+    val validPeriods = periodsState.value?.getOrNull().orEmpty()
+    val validYears = remember(validPeriods) {
+        validPeriods.map { it.label }.filter { it.isNotBlank() }
+    }
+
+    var selectedYear by rememberSaveable(currentPreference) {
+        mutableStateOf(
+            currentPreference?.year
+                ?: currentPreference?.tourName?.let { name ->
+                    Regex("""\b(19\d\d|20\d\d)\b""").find(name)?.value
+                }.orEmpty()
+        )
+    }
+    var selectedTour by rememberSaveable(currentPreference) {
+        mutableStateOf(currentPreference?.tourName.orEmpty())
+    }
+    var pickingYear by rememberSaveable(currentPreference) {
+        mutableStateOf(selectedYear.isBlank())
+    }
+
+    val selectedPeriod = remember(validPeriods, selectedYear) {
+        validPeriods.firstOrNull { it.label == selectedYear || it.id == selectedYear }
+    }
+
+    val showsState = loadOnce(artist.key to (selectedPeriod?.id ?: "")) {
+        if (selectedPeriod == null) {
+            emptyList()
+        } else {
+            val src = sourceFor(artist.backend)
+            src.shows(artist, selectedPeriod)
+        }
+    }
+
+    val availableTours = remember(showsState.value) {
+        showsState.value?.getOrNull()
+            ?.mapNotNull { it.tourName }
+            ?.filter { it.isNotBlank() && it != NOT_PART_OF_A_TOUR }
+            ?.distinct()
+            ?.sorted()
+            .orEmpty()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Track tour for ${artist.name}") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 440.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "Choose a historical tour or specific year to track on your Next Stop shelf.",
+                    "Choose a year and select a tour to track on your Next Stop shelf.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = mode == "year",
-                        onClick = { mode = "year" },
-                        label = { Text("By Year") }
-                    )
-                    FilterChip(
-                        selected = mode == "tour",
-                        onClick = { mode = "tour" },
-                        label = { Text("By Tour Name") }
-                    )
-                }
-
-                if (mode == "year") {
-                    Loaded(periodsState.value) { periods ->
-                        val validYears = periods.map { it.label }.filter { it.isNotBlank() }
-                        Text("Select year:", style = MaterialTheme.typography.labelMedium)
-                        LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 240.dp)) {
+                if (pickingYear || selectedYear.isBlank()) {
+                    Text("Select a year:", style = MaterialTheme.typography.labelMedium)
+                    if (periodsState.value == null) {
+                        Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .heightIn(max = 260.dp)
+                        ) {
                             items(validYears) { yr ->
+                                val isSelected = selectedYear == yr
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { selectedYear = yr }
-                                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        .clickable {
+                                            if (selectedYear != yr) {
+                                                selectedYear = yr
+                                                selectedTour = ""
+                                            }
+                                            pickingYear = false
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
                                         yr,
                                         style = MaterialTheme.typography.bodyLarge,
-                                        color = if (selectedYear == yr) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                     )
-                                    if (selectedYear == yr) {
+                                    if (isSelected) {
                                         Icon(
                                             Icons.Default.Check,
                                             contentDescription = "Selected",
@@ -2164,32 +2258,138 @@ private fun TourPickerDialog(
                         }
                     }
                 } else {
-                    OutlinedTextField(
-                        value = tourNameInput,
-                        onValueChange = { tourNameInput = it },
-                        label = { Text("Tour Name (e.g. Europe '72, Spring 1977)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (selectedYear.isNotBlank()) {
-                        Text(
-                            "Optional Year filter: $selectedYear",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    // Header with selected year and "Change" action
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                "YEAR",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                selectedYear,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        TextButton(onClick = { pickingYear = true }) {
+                            Text("Change year")
+                        }
+                    }
+
+                    Text("Select a tour from $selectedYear:", style = MaterialTheme.typography.labelMedium)
+
+                    if (showsState.value == null) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(160.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .heightIn(max = 240.dp)
+                        ) {
+                            // Option 1: Entire Year (all shows in this year)
+                            item {
+                                val isEntireYear = selectedTour.isBlank()
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedTour = "" }
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            "All shows in $selectedYear",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = if (isEntireYear) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (isEntireYear) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "Track all shows from this year",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (isEntireYear) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            }
+
+                            // Option 2...N: Distinct tours in this year
+                            if (availableTours.isNotEmpty()) {
+                                items(availableTours) { tour ->
+                                    val isSelected = selectedTour == tour
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { selectedTour = tour }
+                                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            tour,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                item {
+                                    Text(
+                                        "No named tours listed for $selectedYear.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = (mode == "year" && selectedYear.isNotBlank()) || (mode == "tour" && tourNameInput.isNotBlank()),
+                enabled = selectedYear.isNotBlank(),
                 onClick = {
-                    if (mode == "year") {
-                        onSave(null, selectedYear.trim())
-                    } else {
-                        onSave(tourNameInput.trim(), selectedYear.takeIf { it.isNotBlank() })
-                    }
+                    onSave(selectedTour.trim().takeIf { it.isNotBlank() }, selectedYear.trim())
                 }
             ) {
                 Text("Save")

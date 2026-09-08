@@ -68,14 +68,27 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             .padding(bottom = 32.dp)
     ) {
         // Header
-        Text(
-            text = "Settings",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = (-0.01).sp,
-            color = ledger.textPrimary,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Settings",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = (-0.01).sp,
+                color = ledger.textPrimary,
+            )
+            FeedbackButton(
+                nav = nav,
+                modifier = Modifier.size(36.dp),
+                iconSize = 20.dp,
+                tint = ledger.textMuted
+            )
+        }
 
         // APPEARANCE Section
         SectionEyebrow("APPEARANCE")

@@ -76,7 +76,7 @@ internal fun playedShowIds(keys: Collection<String>): Set<String> = keys.mapNotN
 /** Both backends use this exact string as [ShowSummary.tourName] for a show that isn't part
  *  of a named tour (confirmed live against both APIs) rather than leaving the field blank —
  *  a sentinel, not a real tour, so it gets the same opt-out treatment a blank name would. */
-private const val NOT_PART_OF_A_TOUR = "Not Part of a Tour"
+internal const val NOT_PART_OF_A_TOUR = "Not Part of a Tour"
 
 /**
  * The shows in [shows] that share the tour of the most recent one — empty if that show
