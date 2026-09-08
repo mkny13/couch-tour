@@ -84,7 +84,7 @@ flowchart LR
 
     subgraph NearTerm ["Phase 2: Discovery, Audio Fidelity & Media Power"]
         direction TB
-        M1["#65 Offline Downloads"]
+        M1["Audio Quality Preference (#141)"]
         M2["#67 Browse & Filter by Tag"]
         M3["#21 Trending / Momentum Sort"]
         M4["#61 Multi-Level Catalog Cache"]
@@ -135,7 +135,8 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 
 | Issue | Feature | Description | Platforms | Status |
 |---|---|---|---|---|
-| **#65** | **Offline Downloads** | Download individual tracks or complete shows for local offline playback with storage management. | Android, macOS | Up next (Phase 2 primary remaining work) |
+| **#141** | **Audio Quality Preference** | Turn the Settings "Audio quality" row into a real, persisted preference driving FLAC/MP3 selection. The capability already ships (D187, D189 — FLAC preferred, MP3 rewritten at Cast time); only the user-facing control is missing. | Android, macOS | Up next (Phase 2 primary remaining work) |
+| **#65** | ~~Offline Downloads~~ | **Not planned** — closed 2026-09-05. Downloads are deliberately out of scope. The Settings "DOWNLOADS & STORAGE" section (dead "Downloaded shows" row and "Wi-Fi only downloads" toggle) is removed as part of #141. | — | Not planned |
 | **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS | Search filter shipped (D206, verified `uat-004`); show list interaction queued for UI revamp |
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS | Shipped (D206, verified in UAT `uat-001`, `uat-002`) |
 | **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS | Shipped (D205, D210, verified in UAT `uat-011`) |
@@ -150,10 +151,15 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 Longer-range exploration of new media surfaces and third-party streaming ecosystems.
 
 **#18 was deliberately deferred out of Phase 2** (audit closeout, 2026-08-31) — not an oversight.
-The loudness-normalization source is unsolved (no reliable per-track/per-show gain data across
-phish.in and Relisten today), and #65 (offline downloads) may change what's feasible once files
-are local rather than streamed. Revisit after #65 lands rather than pulling this back into Phase 2
-before that question has an answer.
+The loudness-normalization source is unsolved: there is no reliable per-track/per-show gain data
+across phish.in and Relisten today.
+
+**That deferral needs a new trigger (2026-09-05).** The original reasoning had a second leg —
+that #65 (offline downloads) might change what's feasible once files are local rather than
+streamed, so #18 should be revisited "after #65 lands." #65 is now closed as not planned, so
+that trigger will never fire. #18 now rests solely on the unsolved gain-data question: it stays
+deferred until there's an actual answer for where loudness data comes from (measure it on the
+client during playback, or find a source that publishes it), not until another issue ships.
 
 | Issue | Feature | Description | Platforms |
 |---|---|---|---|
@@ -168,6 +174,9 @@ before that question has an answer.
 ## Product Principles & Resolved Decisions
 
 - **Show End Behavior**: Playback stops at the end of the show/encore rather than silently auto-advancing into the next show. An actionable prompt/banner is presented to start the next show on the tour/run.
+- **No Offline Downloads, No Crossfade** (2026-09-05): Neither is a feature Couch Tour is building. #65 is closed as not planned. Settings must not advertise either — no "Coming soon" rows standing in for features that aren't coming.
+- **Two Ways to Mark a Show, Not Three** (2026-09-05): Like/Favorite and Add to Playlist are the show and track actions. The separate Save/bookmark concept is removed (#148) — it was a third, redundant marker with no meaning elsewhere in the product. Both surviving actions stay visible in the player bar on both platforms.
+- **No Fake Data in Empty States** (2026-09-05): An empty shelf renders an empty state, never fabricated sample shows. In an app whose premise is *your* listening history, inventing plausible-looking shows a user never played is actively misleading, not a placeholder. Tracked in #144.
 - **Waveform Scrubber**: Dual-layer vector waveform scrubber with dynamic audio peak extraction from phish.in and archive.org (Relisten) is implemented across Android and macOS Now Playing surfaces (D214, D215, D224) with live drag/seek scrubbing, polarity auto-detection, and memory caching.
 
 ---
