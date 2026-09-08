@@ -49,9 +49,10 @@ hosted on archive.org.
 
 ## Not in yet
 
-Offline downloads (#65) and volume leveling across sources (#18). See [ROADMAP.md](ROADMAP.md)
-for the full list and open questions, and [DECISIONS.md](DECISIONS.md) for why the app looks the
-way it does today.
+Volume leveling across sources (#18), deferred until there's a real answer for where per-show
+loudness data comes from. Offline downloads and crossfade are **not planned** — deliberately out
+of scope, not pending. See [ROADMAP.md](ROADMAP.md) for the full list and open questions, and
+[DECISIONS.md](DECISIONS.md) for why the app looks the way it does today.
 
 ## Casting
 
