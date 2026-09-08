@@ -4205,3 +4205,38 @@ An interactive visual prototype (`waveform_smoothing_mockup.html`) was provided 
 - macOS app target: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
 - Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (508 tests passed, 0 failures).
 - Added `uat-042` in `UAT.md`.
+
+## Iteration 74 — Feedback Restoration across all Screens, In-Progress Item Long-Press Menu, and Year-Based Tour Selection (D226)
+
+### D226 — Restore Feedback Button across Android Root Screens, In-Progress Long-Press Actions Menu, and Year-Based Tour Selection
+
+**Context:**
+Following recent Ledger redesign updates:
+1. The global feedback launcher button was inadvertently dropped from the top-level screens (`HomeScreen`, `LibraryScreen`, and `SettingsScreen`). While drilled-down screens with `Header` and the `NowPlaying` screen retained it, users on top-level screens had no direct feedback affordance.
+2. The "IN PROGRESS" shelf on the Home screen and in-progress items in the Library lacked an interactive options menu to manage listening state (resume, open show/playlist, mark completed, remove from in-progress, or delete from history).
+3. The Next Tour Stop dialog required typing tour names blindly into a text field rather than browsing by artist tour years and choosing from that year's list of tours.
+
+**Decisions:**
+1. **Restore Feedback Button across Android Root Screens**:
+   - Added `FeedbackButton(nav, modifier = Modifier.size(36.dp), iconSize = 20.dp, tint = ledger.textMuted)` to:
+     - `HomeScreen`: in the top date header row alongside the "Surprise me" chip.
+     - `LibraryScreen`: in the top header row opposite the "YOUR LIBRARY" headline.
+     - `SettingsScreen`: in the top header row alongside the "Settings" title.
+   - Combined with existing headers and `NowPlaying`, every screen across the Android client now has the feedback button restored.
+2. **Long-Press Context Menu for In-Progress Items**:
+   - Configured `Modifier.combinedClickable` on `InProgressLedgerRow` (Home) and `LibraryRowItem` (Library) with an interactive `DropdownMenu`:
+     - **Resume playback**: calls `vm.resume(progress)`.
+     - **Open show / playlist**: calls `openQueue(progress, nav)` or `openQueueKey(item.queueKey, nav)`.
+     - **Mark completed**: calls `vm.markCompleted(progress)`.
+     - **Remove from In Progress**: calls `vm.dismiss(progress)` to hide from in-progress while preserving history.
+     - **Delete from history**: calls `vm.forget(progress)` to remove the item completely.
+3. **Year-Based Tour Selection in Next Tour Stop Dialog** (`TourPickerDialog`):
+   - Redesigned `TourPickerDialog` to guide the user into a two-step flow:
+     - Select a year from the artist's historical years.
+     - Fetch that year's shows and display a selectable list of that year's distinct tours (filtering out sentinel values such as `Not Part of a Tour`), plus an option to track "All shows in [Year]".
+     - Shows checkmarks next to selected year and tour, with a "Change year" affordance to switch years easily.
+4. **Testing & Validation**:
+   - Added tests in `NextStopTest.kt` verifying tour and year preference resolution.
+   - All 510 Android unit tests pass cleanly: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest`.
+   - Updated test count in `README.md` and added manual verification checklist items `uat-043`, `uat-044`, and `uat-045` in `UAT.md`.
+

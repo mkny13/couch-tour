@@ -424,4 +424,48 @@ class NextStopTest {
         assertTrue(key1 != key2)
         assertTrue(key1 != keyEmpty)
     }
+
+    @Test
+    fun `tourFor filters to exact tour when both year and tourName preferences are supplied`() = runBlocking {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val p1977 = PeriodRef("uuid-1977", "1977")
+        val source = FakeSource(
+            Backend.RELISTEN,
+            periodsByArtist = mapOf("grateful-dead" to listOf(p1977)),
+            showsByPeriod = mapOf(
+                "uuid-1977" to listOf(
+                    ShowSummary(artist = dead, date = "1977-05-08", tourName = "Spring 1977"),
+                    ShowSummary(artist = dead, date = "1977-10-11", tourName = "Fall 1977"),
+                    ShowSummary(artist = dead, date = "1977-12-31", tourName = NOT_PART_OF_A_TOUR),
+                ),
+            ),
+        )
+
+        val pref = ArtistTourPreferenceEntity(artistKey = dead.key, tourName = "Spring 1977", year = "1977")
+        val result = tourFor(dead, preference = pref) { source }
+        assertEquals(1, result.size)
+        assertEquals("1977-05-08", result[0].date)
+        assertEquals("Spring 1977", result[0].tourName)
+    }
+
+    @Test
+    fun `tourFor returns all shows in year when year preference is supplied without tourName`() = runBlocking {
+        val dead = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead")
+        val p1977 = PeriodRef("uuid-1977", "1977")
+        val source = FakeSource(
+            Backend.RELISTEN,
+            periodsByArtist = mapOf("grateful-dead" to listOf(p1977)),
+            showsByPeriod = mapOf(
+                "uuid-1977" to listOf(
+                    ShowSummary(artist = dead, date = "1977-05-08", tourName = "Spring 1977"),
+                    ShowSummary(artist = dead, date = "1977-10-11", tourName = "Fall 1977"),
+                    ShowSummary(artist = dead, date = "1977-12-31", tourName = NOT_PART_OF_A_TOUR),
+                ),
+            ),
+        )
+
+        val pref = ArtistTourPreferenceEntity(artistKey = dead.key, tourName = null, year = "1977")
+        val result = tourFor(dead, preference = pref) { source }
+        assertEquals(3, result.size)
+    }
 }
