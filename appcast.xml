@@ -1,15 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
-  <channel>
-    <title>Couch Tour Changelog</title>
-    <link>https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml</link>
-    <description>Most recent changes with links to updates.</description>
-    <language>en</language>
-    <item>
-      <title>Version 0.51</title>
-      <sparkle:releaseNotesLink>https://github.com/mkny13/couch-tour/releases/tag/v0.51</sparkle:releaseNotesLink>
-      <pubDate>Wed, 26 Aug 2026 06:47:01 +0000</pubDate>
-      <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.51/CouchTour-v0.51.zip" sparkle:version="0.51" sparkle:shortVersionString="0.51" type="application/octet-stream" />
-    </item>
-  </channel>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+    <channel>
+        <title>Couch Tour Changelog</title>
+        <link>https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml</link>
+        <description>Most recent changes with links to updates.</description>
+        <language>en</language>
+        <item>
+            <title>0.78</title>
+            <pubDate>Tue, 08 Sep 2026 01:39:37 +0000</pubDate>
+            <sparkle:version>34</sparkle:version>
+            <sparkle:shortVersionString>0.78</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.78/CouchTour-v0.78.zip" length="7743226" type="application/octet-stream" sparkle:edSignature="nTkigaA5LqJ2gkfKCD+ozpWzIh3Ow7+2LMV4lGY6V2ebaRmvxwMFos0ncnmDKuUU3cL9HCpE2CJLFEMhIimIBA=="/>
+        </item>
+        <item>
+            <title>Version 0.51</title>
+            <sparkle:releaseNotesLink>https://github.com/mkny13/couch-tour/releases/tag/v0.51</sparkle:releaseNotesLink>
+            <pubDate>Wed, 26 Aug 2026 06:47:01 +0000</pubDate>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.51/CouchTour-v0.51.zip" sparkle:version="0.51" sparkle:shortVersionString="0.51" type="application/octet-stream"/>
+        </item>
+    </channel>
 </rss>
