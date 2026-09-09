@@ -4251,5 +4251,6 @@ fake "7 shows" header count when the shelf was empty. All deleted. Each shelf no
 standard ContentUnavailableView empty state instead of going quiet or showing fiction — On This
 Date with no matches is a common real state (most dates have no shows), so the shelf stays
 visible. Real rows render ShowSummary.rating only when a backend actually reports one (blank
-otherwise): a blank reads as "not rated" where a hardcoded number reads as fabricated.
-Visual verification is UAT (uat-034), on a fresh/empty-history launch.
+otherwise; the On This Date card falls back to a likes count when there is no average): a
+blank reads as "not rated" where a hardcoded number reads as fabricated. Visual verification
+is UAT (uat-046), on a fresh/empty-history launch.
