@@ -4240,3 +4240,16 @@ Following recent Ledger redesign updates:
    - All 510 Android unit tests pass cleanly: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest`.
    - Updated test count in `README.md` and added manual verification checklist items `uat-043`, `uat-044`, and `uat-045` in `UAT.md`.
 
+
+### D227 — Delete fabricated sample shows from macOS Home (#144)
+
+The Spec 2A sample data that D215's fidelity work carried over into HomeView shipped as
+production UI: three invented in-progress cards (Phish 1997-11-17 "Bathtub Gin", Grateful Dead
+1977-05-08, pgroove 2005-04-16), three invented 2026 tour stops, five invented On-This-Date
+shows, a hardcoded ★ 4.2 on every tour-stop row and ★ 4.4 on every On-This-Date card, and a
+fake "7 shows" header count when the shelf was empty. All deleted. Each shelf now shows the
+standard ContentUnavailableView empty state instead of going quiet or showing fiction — On This
+Date with no matches is a common real state (most dates have no shows), so the shelf stays
+visible. Real rows render ShowSummary.rating only when a backend actually reports one (blank
+otherwise): a blank reads as "not rated" where a hardcoded number reads as fabricated.
+Visual verification is UAT (uat-034), on a fresh/empty-history launch.
