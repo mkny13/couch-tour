@@ -176,7 +176,7 @@ client during playback, or find a source that publishes it), not until another i
 - **Show End Behavior**: Playback stops at the end of the show/encore rather than silently auto-advancing into the next show. An actionable prompt/banner is presented to start the next show on the tour/run.
 - **No Offline Downloads, No Crossfade** (2026-09-05): Neither is a feature Couch Tour is building. #65 is closed as not planned. Settings must not advertise either — no "Coming soon" rows standing in for features that aren't coming.
 - **Two Ways to Mark a Show, Not Three** (2026-09-05): Like/Favorite and Add to Playlist are the show and track actions. The separate Save/bookmark concept is removed (#148) — it was a third, redundant marker with no meaning elsewhere in the product. Both surviving actions stay visible in the player bar on both platforms.
-- **No Fake Data in Empty States** (2026-09-05): An empty shelf renders an empty state, never fabricated sample shows. In an app whose premise is *your* listening history, inventing plausible-looking shows a user never played is actively misleading, not a placeholder. Tracked in #144.
+- **No Fake Data in Empty States** (2026-09-05): An empty shelf renders an empty state, never fabricated sample shows. In an app whose premise is *your* listening history, inventing plausible-looking shows a user never played is actively misleading, not a placeholder. Tracked in #144, shipped in #163 (D227).
 - **Waveform Scrubber**: Dual-layer vector waveform scrubber with dynamic audio peak extraction from phish.in and archive.org (Relisten) is implemented across Android and macOS Now Playing surfaces (D214, D215, D224) with live drag/seek scrubbing, polarity auto-detection, and memory caching.
 
 ---
