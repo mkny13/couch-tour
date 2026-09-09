@@ -220,21 +220,27 @@ struct HomeView: View {
 
     // MARK: - In Progress Shelf
 
+    @ViewBuilder
     private var inProgressShelf: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 14) {
-                if !recent.isEmpty {
+        if recent.isEmpty {
+            ContentUnavailableView(
+                "Nothing in progress",
+                systemImage: "play.circle",
+                description: Text("Shows you start playing will show up here.")
+            )
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
                     ForEach(recent, id: \.queueKey) { item in
                         inProgressCard(item)
                     }
-                } else {
-                    // Fallback placeholder cards matching Screen 2A layout
-                    inProgressFallbackCards
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 2)
+                .padding(.bottom, 6)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 2)
-            .padding(.bottom, 6)
         }
     }
 
@@ -335,76 +341,6 @@ struct HomeView: View {
         )
     }
 
-    @ViewBuilder
-    private var inProgressFallbackCards: some View {
-        // Spec 2A mock sample in-progress cards when history is empty
-        Group {
-            sampleCard(artist: "Phish", date: "1997-11-17", track: "Bathtub Gin", venue: "Thomas & Mack, Las Vegas", elapsed: "5:14 elapsed", frac: 0.41, color: Color(red: 0xF0 / 255.0, green: 0x6B / 255.0, blue: 0xB0 / 255.0))
-            sampleCard(artist: "Grateful Dead", date: "1977-05-08", track: "Scarlet Begonias", venue: "Barton Hall, Ithaca", elapsed: "12:50 elapsed", frac: 0.62, color: Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0))
-            sampleCard(artist: "pgroove", date: "2005-04-16", track: "Three Weeks", venue: "Georgia Theatre, Athens", elapsed: "0:32 elapsed", frac: 0.24, color: Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
-        }
-    }
-
-    private func sampleCard(artist: String, date: String, track: String, venue: String, elapsed: String, frac: Double, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ProgressBarOverlay(fraction: frac, fillColor: color)
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(ArtistAbbreviations.label(for: artist))
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(colors.textPrimary)
-                        Text(date)
-                            .font(.system(size: 15))
-                            .foregroundStyle(colors.textPrimary)
-                    }
-                    Spacer()
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 13))
-                        .foregroundStyle(colors.textMuted)
-                        .frame(width: 26, height: 26)
-                }
-
-                Text(track)
-                    .font(.system(size: 14))
-                    .foregroundStyle(colors.textSecondary)
-                    .padding(.top, 8)
-
-                Text(venue)
-                    .font(.system(size: 12))
-                    .foregroundStyle(colors.textMuted)
-                    .padding(.top, 2)
-
-                HStack {
-                    Text(elapsed)
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.textSubtle)
-                    Spacer()
-                    Circle()
-                        .stroke(colors.accentIcon, lineWidth: 1)
-                        .frame(width: 30, height: 30)
-                        .overlay(
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(colors.accentTintText)
-                        )
-                }
-                .padding(.top, 12)
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 13)
-        }
-        .frame(width: 236)
-        .background(colors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(colors.panelBorder, lineWidth: 1)
-        )
-    }
-
     // MARK: - Next Tour Stops Card
 
     private var nextTourStopsCard: some View {
@@ -454,10 +390,12 @@ struct HomeView: View {
                     tourStopRow(show: show)
                 }
             } else {
-                // Fallback rows from Spec 2A
-                fallbackTourStopRow(artist: "Phish", date: "2026-07-24", loc: "Alpine Valley, WI · Summer Tour 2026", rating: "★ 4.2")
-                fallbackTourStopRow(artist: "Goose", date: "2026-08-02", loc: "The Anthem, Washington, DC · Summer 2026", rating: "")
-                fallbackTourStopRow(artist: "WSP", date: "2026-09-18", loc: "Red Rocks, Morrison, CO · Fall Tour", rating: "")
+                ContentUnavailableView(
+                    "No upcoming tour stops",
+                    systemImage: "mappin.and.ellipse",
+                    description: Text("Dates for your favorite artists will show up here.")
+                )
+                .padding(.vertical, 24)
             }
         }
         .padding(.horizontal, 0)
@@ -528,45 +466,6 @@ struct HomeView: View {
         .border(width: 1, edges: [.top], color: colors.divider)
     }
 
-    private func fallbackTourStopRow(artist: String, date: String, loc: String, rating: String) -> some View {
-        HStack(spacing: 16) {
-            Text(ArtistAbbreviations.label(for: artist))
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(colors.textPrimary)
-                .frame(width: 140, alignment: .leading)
-                .lineLimit(1)
-
-            Text(date)
-                .font(.system(size: 15))
-                .foregroundStyle(colors.textPrimary)
-                .frame(width: 110, alignment: .leading)
-
-            Text(loc)
-                .font(.system(size: 12))
-                .foregroundStyle(colors.textMuted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(1)
-
-            Text(rating)
-                .font(.system(size: 13))
-                .foregroundStyle(colors.ratingAmber)
-                .frame(width: 64, alignment: .trailing)
-
-            Circle()
-                .stroke(colors.accentIcon, lineWidth: 1)
-                .frame(width: 30, height: 30)
-                .overlay(
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.accentTintText)
-                )
-                .frame(width: 40, alignment: .trailing)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .border(width: 1, edges: [.top], color: colors.divider)
-    }
-
     // MARK: - On This Date Shelf
 
     private var onThisDateShelf: some View {
@@ -581,7 +480,7 @@ struct HomeView: View {
                 Spacer()
 
                 HStack(spacing: 10) {
-                    Text("\(onThisDateShows.isEmpty ? 7 : onThisDateShows.count) shows")
+                    Text("\(onThisDateShows.count) shows")
                         .font(.system(size: 12))
                         .foregroundStyle(colors.textMuted)
 
@@ -613,27 +512,28 @@ struct HomeView: View {
             GradientHairline(height: 1, opacity: 0.85)
                 .padding(.horizontal, 24)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    if !onThisDateShows.isEmpty {
+            if onThisDateShows.isEmpty {
+                ContentUnavailableView(
+                    "No shows on this date",
+                    systemImage: "calendar",
+                    description: Text("Favorites playing today will show up here.")
+                )
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
                         ForEach(onThisDateShows, id: \.date) { show in
                             NavigationLink(value: Route.show(show)) {
                                 onThisDateCard(show: show)
                             }
                             .buttonStyle(.plain)
                         }
-                    } else {
-                        // Spec 2A fallback on this date cards
-                        fallbackOnThisDateCard(artist: "Phish", date: "1993-09-03", venue: "Cabot Street Cinema, Beverly, MA", rating: "★ 4.4", hasBookmark: true)
-                        fallbackOnThisDateCard(artist: "Grateful Dead", date: "1988-09-03", venue: "Capital Centre, Landover, MD", rating: "2:48", hasBookmark: false)
-                        fallbackOnThisDateCard(artist: "WSP", date: "2011-09-03", venue: "Red Rocks, Morrison, CO", rating: "2:33", hasBookmark: false)
-                        fallbackOnThisDateCard(artist: "Goose", date: "2021-09-03", venue: "Whitewater Amphitheater, TX", rating: "★ 4.1", hasBookmark: false)
-                        fallbackOnThisDateCard(artist: "phil", date: "2003-09-03", venue: "Alpine Valley, East Troy, WI", rating: "2:56", hasBookmark: false)
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-                .padding(.bottom, 12)
             }
         }
     }
@@ -703,65 +603,6 @@ struct HomeView: View {
         )
     }
 
-    private func fallbackOnThisDateCard(artist: String, date: String, venue: String, rating: String, hasBookmark: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Text(ArtistAbbreviations.label(for: artist))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(colors.textPrimary)
-                    .lineLimit(1)
-                Spacer()
-                if hasBookmark {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(colors.accentIcon)
-                }
-            }
-
-            Text(date)
-                .font(.system(size: 15))
-                .foregroundStyle(colors.textPrimary)
-                .padding(.top, 1)
-
-            Text(venue)
-                .font(.system(size: 12))
-                .foregroundStyle(colors.textMuted)
-                .padding(.top, 8)
-                .lineLimit(1)
-
-            HStack {
-                Text(rating)
-                    .font(.system(size: 12))
-                    .foregroundStyle(rating.starts(with: "★") ? colors.ratingAmber : colors.textSubtle)
-                Spacer()
-                Button {
-                    // Fallback sample card
-                } label: {
-                    Circle()
-                        .stroke(colors.accentIcon, lineWidth: 1)
-                        .frame(width: 30, height: 30)
-                        .overlay(
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(colors.accentTintText)
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Play \(artist) \(date)")
-            }
-            .padding(.top, 12)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(width: 236)
-        .background(colors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(colors.panelBorder, lineWidth: 1)
-        )
-    }
-
     private func tapPlayShow(_ show: ShowSummary) async {
         do {
             let detail = try await sourceFor(show.artist.backend).show(
@@ -775,7 +616,6 @@ struct HomeView: View {
             alertMessage = "Couldn't play show: \(error.localizedDescription)"
         }
     }
-
     // MARK: - Actions & Data Loading
 
     private func surpriseMe() async {

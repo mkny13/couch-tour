@@ -110,3 +110,8 @@ Long-standing items that predate this sprint.
 - [ ] `uat-043` **Feedback button on every screen** (Android) — Verify Feedback icon button is present in the headers of Home, Library, Settings, drilled-down views (via Header), and Now Playing, and tapping it launches GitHub issues with pre-populated screen route and device metadata.
 - [ ] `uat-044` **Long-press on In-Progress items** (Android) — Long press on an item in the Home "IN PROGRESS" section or Library screen to bring up the context menu (Resume playback, Open show/playlist, Mark completed, Remove from In Progress, Delete from history), and confirm each action works as expected.
 - [ ] `uat-045` **Year-based Tour Selection in Next Stop** (Android) — Tap an artist chip in Next Stop to edit tracking; select a year to view all historical tours from that year, choose a specific tour (or all shows in that year), and verify Next Stop updates appropriately.
+
+
+## Home fake shows removed (#144)
+
+- [ ] `uat-046` **Home shelves are honest when empty** (macOS) — Launch with a fresh/empty history (no favorites, nothing in progress): In Progress shows a "Nothing in progress" empty state (no 1997-11-17 Bathtub Gin card), Next Tour Stops shows no invented 2026 dates, On This Date shows "No shows on this date" with the real show count (no ★ 4.4 cards). Then favorite an artist and play something: each shelf fills with real shows, ratings shown are real (blank if unrated).
