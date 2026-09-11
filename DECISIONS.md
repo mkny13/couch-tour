@@ -4254,3 +4254,47 @@ visible. Real rows render ShowSummary.rating only when a backend actually report
 otherwise; the On This Date card falls back to a likes count when there is no average): a
 blank reads as "not rated" where a hardcoded number reads as fabricated. Visual verification
 is UAT (uat-046), on a fresh/empty-history launch.
+
+
+## Iteration 55 — Settings: Audio Quality, Gapless & Account (#141, D228)
+
+### D228 — Audio quality is a preference over capability; gapless is preload-configuration; dead rows removed (#141)
+
+Per Issue #141, the Settings screen advertised features that don't exist and a preference
+that did nothing.
+
+**Audio quality (#141, D187/D189 follow-up):**
+- The "Audio quality" row becomes a real persisted preference (`PlaybackSettings.AudioQuality`:
+  `LOSSLESS` default / `COMPRESSED`), stored in the same `playback_settings` SharedPreferences
+  file as `skipFiller` — one mechanism for playback prefs, not two.
+- The choice is honoured in `MediaItems.coreMediaItem` at queue-build time: FLAC is used only
+  when the quality is `LOSSLESS` (or the track has no MP3 url at all — a preference must never
+  make a tape unplayable). Under `COMPRESSED`, `Keys.FLAC_URL` is dropped from the extras
+  along with the URI, because Cast's hand-back (`CastItemConverter.toMediaItem`) and the Now
+  Playing quality badge both read that key; leaving it behind would silently restore lossless
+  audio when playback returned from the TV and badge FLAC while MP3 played.
+- Applies to the next queue started (same as skipFiller); phish.in shows remain MP3-only — the
+  preference is "prefer lossless", not a guarantee, which the picker copy states.
+
+**Gapless (#141):**
+- The dead `gaplessEnabled` toggle (a `remember{}` nothing read) becomes a persisted
+  `PlaybackSettings.gapless` (default on), applied by `PlaybackService` to the local player as
+  `ExoPlayer.setPreloadConfiguration` (10s read-ahead of the next queue item) plus an explicit
+  `setPauseAtEndOfMediaItems(false)`, collected live so the toggle applies to a running queue.
+- Stated honestly: Media3's decoded playback has no sample-exact seam between separate items
+  (that exists only in audio-offload, which not every device/codec negotiates). What the
+  toggle controls is the two audible, controllable gaps — the buffering stall at the
+  transition (preload) and pause-at-end-of-items (never wanted mid-set). MP3 LAME
+  encoder-delay/padding trimming is already applied by the extractor where metadata exists.
+
+**Removed rather than built:** the Crossfade row and the entire DOWNLOADS & STORAGE section
+("Downloaded shows", "Wi-Fi only downloads" and its dead state) are deleted per the
+2026-09-05 product decision — no Settings row may advertise a feature that isn't coming.
+
+**Sign-out:** already wired by the earlier audit round (confirmation dialog →
+`Session.logout()`); verified surviving this change rather than rebuilt.
+
+**Testing:** new `PlaybackSettingsTest` (defaults, persistence, storage fallback) and
+`MediaItemsTest` quality cases (MP3 preferred → mp3 uri with no FLAC extra; MP3 with no mp3
+url → FLAC fallback); 516 Android unit tests pass. Manual verification is UAT
+(uat-047, uat-048, uat-049).
