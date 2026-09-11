@@ -31,7 +31,6 @@ final class AppModel: ObservableObject {
     /// need the explicit namespacing Keychain services and the GRDB file do (Player.swift's
     /// volume setting relies on the same fact).
     let favorites = Favorites()
-    let savedShows = SavedShows()
     let likedTracks = LikedTracks()
     let playbackSettings = PlaybackSettings()
     let themeSettings = ThemeSettings()

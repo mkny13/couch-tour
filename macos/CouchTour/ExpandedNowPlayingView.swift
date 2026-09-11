@@ -369,7 +369,7 @@ struct ExpandedNowPlayingView: View {
 
                     if let show = player.show, let currentTrack = player.currentTrack {
                         AddToPlaylistButton {
-                            LocalPlaylistTrack(
+                            [LocalPlaylistTrack(
                                 playlistId: "",
                                 backend: show.artist.backend.rawValue,
                                 trackId: currentTrack.id,
@@ -380,7 +380,7 @@ struct ExpandedNowPlayingView: View {
                                 durationMs: currentTrack.durationMs,
                                 venueName: show.where_,
                                 artUrl: currentTrack.artURL
-                            )
+                            )]
                         }
                         .frame(width: 64, height: 64)
                     } else {

@@ -1,15 +1,15 @@
 import CouchTourKit
 import SwiftUI
 
-/// Add-a-track-to-a-local-playlist affordance (#59) — the macOS analogue of Android's
+/// Add-to-a-local-playlist affordance (#59) — the macOS analogue of Android's
 /// `AddToPlaylistButton`: a `.popover` in place of its `ModalBottomSheet`, same "existing
 /// playlists + New Playlist" list. Sits next to the like button on every track row, same
-/// placement Android uses.
+/// placement Android uses. The closure supplies the row(s) to insert — since #148 it's an
+/// array, so the show-detail header can hand it a whole show while per-track surfaces pass
+/// a single-element one; `playlistId`/`position`/`rowId` are filled in by the store at
+/// add-time, so the drafts only need to know what track they are.
 struct AddToPlaylistButton: View {
-    /// Builds the row to insert — `playlistId`/`position`/`rowId` are filled in by
-    /// `LocalPlaylistStore.addTrack` at add-time, so the draft only needs to know what
-    /// track it is.
-    let draft: () -> LocalPlaylistTrack
+    let drafts: () -> [LocalPlaylistTrack]
 
     @EnvironmentObject private var appModel: AppModel
     @State private var showPicker = false
@@ -58,7 +58,7 @@ struct AddToPlaylistButton: View {
 
     private func add(to playlistId: String) {
         guard let store = appModel.localPlaylistStore else { return }
-        try? store.addTrack(draft(), toPlaylist: playlistId, now: nowMs())
+        try? store.addTracks(drafts(), toPlaylist: playlistId, now: nowMs())
         showPicker = false
     }
 
@@ -68,7 +68,7 @@ struct AddToPlaylistButton: View {
         guard !name.isEmpty else { return }
         let now = nowMs()
         if let playlist = try? store.createPlaylist(name: name, now: now) {
-            try? store.addTrack(draft(), toPlaylist: playlist.id, now: now)
+            try? store.addTracks(drafts(), toPlaylist: playlist.id, now: now)
         }
         newName = ""
         creatingNew = false

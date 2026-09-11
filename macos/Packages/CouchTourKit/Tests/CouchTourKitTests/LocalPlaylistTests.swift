@@ -41,6 +41,31 @@ final class LocalPlaylistStoreTests: XCTestCase {
         XCTAssertEqual(3_000, try store.playlist(id: playlist.id)!.updatedAt)
     }
 
+    func testAddTracksInsertsAWholeShowInOrderAfterExistingRows() throws {
+        // The show-detail header's Add pill (#148) hands the store every track of a show;
+        // the show's order must survive, continue past anything already in the playlist,
+        // and land in one pass.
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        try store.addTrack(row(playlistId: playlist.id, trackId: "old"), toPlaylist: playlist.id, now: 2_000)
+
+        let show = (1...3).map { row(playlistId: playlist.id, trackId: "\($0)") }
+        try store.addTracks(show, toPlaylist: playlist.id, now: 3_000)
+
+        let rows = try store.tracks(playlistId: playlist.id)
+        XCTAssertEqual(["old", "1", "2", "3"], rows.map(\.trackId))
+        XCTAssertEqual([0, 1, 2, 3], rows.map(\.position))
+        XCTAssertEqual(4, try store.playlist(id: playlist.id)!.trackCount)
+        XCTAssertEqual(3_000, try store.playlist(id: playlist.id)!.updatedAt)
+    }
+
+    func testAddTracksWithNothingToAddIsANoOp() throws {
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        try store.addTracks([], toPlaylist: playlist.id, now: 2_000)
+
+        XCTAssertEqual(0, try store.playlist(id: playlist.id)!.trackCount)
+        XCTAssertEqual(1_000, try store.playlist(id: playlist.id)!.updatedAt)
+    }
+
     func testRemoveTrackDropsItAndDecrementsCount() throws {
         let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
         try store.addTrack(row(playlistId: playlist.id, trackId: "1"), toPlaylist: playlist.id, now: 2_000)

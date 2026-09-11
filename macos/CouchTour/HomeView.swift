@@ -546,11 +546,6 @@ struct HomeView: View {
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
                 Spacer()
-                if appModel.savedShows.contains(show.date) {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(colors.accentIcon)
-                }
             }
 
             Text(formatShowDate(show.date))

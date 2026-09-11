@@ -182,6 +182,29 @@ public final class LocalPlaylistStore {
         }
     }
 
+    /// Whole-show add (#148): the show-detail header's Add pill inserts every track of a
+    /// show, so they land in one transaction — a failure halfway through must not leave a
+    /// half-show playlist, and the show's order must survive intact. Positions continue
+    /// sequentially from the playlist's current max, same rule `addTrack` follows.
+    public func addTracks(_ tracks: [LocalPlaylistTrack], toPlaylist playlistId: String, now: Int64) throws {
+        guard !tracks.isEmpty else { return }
+        try dbQueue.write { db in
+            var position = try Int.fetchOne(
+                db, sql: "SELECT MAX(position) FROM local_playlist_tracks WHERE playlistId = ?", arguments: [playlistId]
+            ) ?? -1
+            for var track in tracks {
+                position += 1
+                track.rowId = nil
+                track.position = position
+                try track.insert(db)
+            }
+            try db.execute(
+                sql: "UPDATE local_playlists SET trackCount = trackCount + ?, updatedAt = ? WHERE id = ?",
+                arguments: [tracks.count, now, playlistId]
+            )
+        }
+    }
+
     public func removeTrack(rowId: Int64, fromPlaylist playlistId: String, now: Int64) throws {
         try dbQueue.write { db in
             _ = try LocalPlaylistTrack.deleteOne(db, key: rowId)

@@ -4298,3 +4298,42 @@ that did nothing.
 `MediaItemsTest` quality cases (MP3 preferred → mp3 uri with no FLAC extra; MP3 with no mp3
 url → FLAC fallback); 516 Android unit tests pass. Manual verification is UAT
 (uat-047, uat-048, uat-049).
+
+
+## Iteration 56 — Show Detail: Save→Like Replacement (#148, D229)
+
+### D229 — The Save/bookmark concept is gone from macOS; the header's actions are a phish.in show Like and a whole-show Add (#148)
+
+Per Issue #148 and the ROADMAP decision "Two Ways to Mark a Show, Not Three" (2026-09-05), the
+Save/bookmark pill — a third, redundant way to mark a show with no meaning elsewhere in the
+product — is deleted from macOS rather than kept working.
+
+- **Removed:** the Save/Saved pill and `isSaved` on `ShowDetailView`; the `SavedShows` store
+  (package source + `SavedShowsTests`) and its `AppModel` property; the bookmark icon on
+  Home's On-This-Date cards. Nothing else referenced any of it, and `savedShows` was never
+  `.environmentObject`-injected, so removal is clean. **Android's own bookmark store is
+  deliberately untouched** — #148 is macOS-scoped; Android's removal is a separate change.
+- **Like:** the header gains a `ShowLikeButton` — a phish.in server-side show like, the same
+  POST a track row makes with `.track` (`Likable.show` existed in the API layer, unused until
+  now). Optimistic toggle with rollback on failure, signed-out gate matching
+  `TrackLikeButton`, hidden for Relisten tapes. Enabler: `ShowSummary` gains `id` and
+  `likedByUser` (defaulted, so Relisten/search constructors are untouched) — both were
+  already decoded on macOS's `Show` DTO and exist on Android's `Show` model; the shared
+  summary was simply dropping them. Artist-favorite was explicitly rejected as the
+  replacement — mis-toggling the artist favorite was D220's original bug.
+- **Add to Playlist:** the header's pill now adds the **whole show** — it used to insert only
+  `detail.tracks.first`, a plain bug. Mechanically: `AddToPlaylistButton`'s closure returns
+  `[LocalPlaylistTrack]` (per-track surfaces pass one-element arrays), and a new
+  `LocalPlaylistStore.addTracks` inserts them in a single transaction so a failure can't
+  strand a half-show playlist — mirroring Android's whole-show `AddTracksToPlaylistDialog`.
+- **Unlabeled sources render unlabeled:** the source pill's fallback
+  `"SBD · Paluska · FLAC"` — a real taper's credit stamped onto sources that never carried
+  it — is replaced with `"Unlabeled source"`.
+- **Player-bar parity confirmed, not assumed:** macOS's player rail already had
+  `TrackLikeButton` + `AddToPlaylistButton`; Android's Now Playing likewise has both, and
+  Android's MiniPlayer is transport-only — no regression to make on either side.
+
+**Testing:** package suite at 427 tests, 0 failures (3 `SavedShowsTests` deleted, 3 added:
+show-like `likable_type: "Show"` POST shape; `addTracks` order/continuation/no-op). App target
+builds clean after `xcodegen` (new file). Manual verification is UAT (uat-050); uat-036
+narrows to Android.

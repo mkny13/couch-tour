@@ -361,6 +361,11 @@ public struct ShowSummary: Hashable, Sendable {
     /// leaves this at the default 0, which is what lets `SearchSortMode.mostLiked` sort
     /// Relisten hits after every phish.in one with no special-cased branch.
     public let likesCount: Int
+    /// phish.in's numeric show id and `liked_by_user` flag (#148) — what the show-detail
+    /// header's Like pill toggles. Relisten has no show-like concept and leaves both at the
+    /// defaults, which is how the pill knows to hide itself (`id == 0`).
+    public let id: Int64
+    public let likedByUser: Bool
 
     public init(
         artist: ArtistRef,
@@ -374,7 +379,9 @@ public struct ShowSummary: Hashable, Sendable {
         rating: Double = 0.0,
         tags: [Tag] = [],
         popularity: RelistenPopularity? = nil,
-        likesCount: Int = 0
+        likesCount: Int = 0,
+        id: Int64 = 0,
+        likedByUser: Bool = false
     ) {
         self.artist = artist
         self.date = date
@@ -388,6 +395,8 @@ public struct ShowSummary: Hashable, Sendable {
         self.tags = tags
         self.popularity = popularity
         self.likesCount = likesCount
+        self.id = id
+        self.likedByUser = likedByUser
     }
 
     /// "McNichols Arena · Denver, CO"
@@ -869,7 +878,9 @@ extension Show {
             rating: Double(likesCount),
             tags: tags,
             popularity: nil,
-            likesCount: likesCount
+            likesCount: likesCount,
+            id: id,
+            likedByUser: likedByUser
         )
     }
 
