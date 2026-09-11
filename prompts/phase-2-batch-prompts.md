@@ -322,7 +322,11 @@ baseline, that's why — check whether those two files moved before assuming you
 
 ---
 
-## Batch 6 — Offline downloads (#65): needs its own planning pass
+## ~~Batch 6~~ — Offline downloads (#65) — **cancelled: not planned (2026-09-05)**
+
+**Do not start this.** Downloads are deliberately out of scope (#65 closed as not planned); the
+Settings rows advertising them were removed in #141 (D228). The planning thinking below is kept
+in case that decision is ever reversed.
 
 **Do not write a single prompt for this.** It is the largest item in Phase 2 by a wide margin and
 the only one that is a genuinely new subsystem rather than a change to an existing one: a download

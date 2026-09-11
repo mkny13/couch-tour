@@ -27,10 +27,11 @@ turned out to matter, because DECISIONS.md is wrong about three of them (see the
 | **#67** | Browse & filter by tag | **Android done. macOS: model only, no UI.** |
 | **#21** | Trending & momentum browse | **Android done. macOS: model only, no UI.** |
 | **#62** | Relisten show artwork | **Android done. macOS: model only, no UI.** |
-| **#65** | Offline downloads | **Not started.** Nothing on either platform. |
+| **#65** | Offline downloads | **Not planned** — closed 2026-09-05; the dead Settings rows advertising it were removed in #141 (D228). |
 | **#18** | Volume leveling | **Not started.** Nothing on either platform. |
-| **#91** | Sortable search results | **Not started.** Nothing on either platform. |
-| **#61** | Multi-level catalog cache | **Not started.** Still the single `@Volatile` artist list. |
+| **#91** | Sortable search results | **Shipped** (D205, D210). |
+| **#61** | Multi-level catalog cache | **Shipped** (D207, verified `uat-014`/`uat-015`). |
+| **#141** | Audio quality / Settings | **Android shipped** (D228): persisted FLAC/MP3 quality preference, gapless playback wiring, Crossfade and downloads dead rows removed. macOS control still open. |
 
 Evidence for the "done" rows:
 
@@ -92,9 +93,9 @@ Batch 0 (docs/closeout, no code) ── can run immediately, gates nothing
             macOS parity for #91/#116/#90
                 │
                 ▼
-            Batch 6
+            ~~Batch 6~~
             #65 offline downloads
-            (largest; own phase)
+            CANCELLED — not planned (2026-09-05)
 
 deferred out of the phase: #18 volume leveling
 ```
@@ -210,7 +211,8 @@ migration, and O4's original reasoning still holds.
 
 **Decided 2026-08-31: #18 is deferred out of Phase 2 entirely** and revisited after downloads
 (#65). The reasoning below is kept because it's the research this pass did and it should not have
-to be redone when #18 comes back.
+to be redone when #18 comes back. **Update 2026-09-11: #65 was later closed as not planned**, so
+#18's return is no longer sequenced behind anything.
 
 A useful consequence: the playback-pipeline collision this plan flagged between #18 and #65 is
 now moot, so **#65 no longer has to sequence around it** and owns `MediaItems.kt` / `Player.swift`
@@ -232,7 +234,12 @@ recommendation Mike picks from, then an implementation prompt: the two-step that
 Note also the issue's own framing: source/show-level matching, explicitly *not* per-track
 normalization.
 
-### Batch 6 — Offline downloads (#65) *(largest; treat as its own phase)*
+### ~~Batch 6~~ — Offline downloads (#65) — **cancelled: not planned (2026-09-05)**
+
+**Cancelled**: downloads are deliberately out of scope (#65 closed as not planned); the dead
+Settings rows advertising them were removed in #141 (D228). The text below is kept because the
+planning thought — schema ceilings on both platforms, playback resolution preferring a local
+file — may still matter if that decision is ever reversed.
 
 The biggest item in Phase 2 by a wide margin, and the only one that is genuinely a new subsystem:
 a download manager with queue and retry, a storage location with an eviction/management UI, a
