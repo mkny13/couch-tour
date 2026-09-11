@@ -135,7 +135,7 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 
 | Issue | Feature | Description | Platforms | Status |
 |---|---|---|---|---|
-| **#141** | **Audio Quality Preference** | Turn the Settings "Audio quality" row into a real, persisted preference driving FLAC/MP3 selection. The capability already ships (D187, D189 — FLAC preferred, MP3 rewritten at Cast time); only the user-facing control is missing. | Android, macOS | Up next (Phase 2 primary remaining work) |
+| **#141** | **Audio Quality Preference** | Turn the Settings "Audio quality" row into a real, persisted preference driving FLAC/MP3 selection. The capability already ships (D187, D189 — FLAC preferred, MP3 rewritten at Cast time); only the user-facing control is missing. | Android, macOS | Android shipped (D228: quality preference, gapless preload wiring, Crossfade row and DOWNLOADS & STORAGE section removed); macOS control still open |
 | **#65** | ~~Offline Downloads~~ | **Not planned** — closed 2026-09-05. Downloads are deliberately out of scope. The Settings "DOWNLOADS & STORAGE" section (dead "Downloaded shows" row and "Wi-Fi only downloads" toggle) is removed as part of #141. | — | Not planned |
 | **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS | Search filter shipped (D206, verified `uat-004`); show list interaction queued for UI revamp |
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS | Shipped (D206, verified in UAT `uat-001`, `uat-002`) |

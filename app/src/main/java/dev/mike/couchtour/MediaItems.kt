@@ -158,6 +158,19 @@ private fun coreMediaItem(
 ): MediaItem {
     val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
     val resolvedVenue = venueName ?: info.subtitle
+
+    // FLAC vs MP3 is a preference (#141), not a capability — a track carrying a flac_url
+    // can play either, so the choice is read here at queue-build time, like skipFiller.
+    // Under COMPRESSED, Keys.FLAC_URL is dropped from the extras too, not just the URI:
+    // Cast's hand-back (CastItemConverter.toMediaItem) and the Now Playing quality badge
+    // both read that key, so leaving it behind would quietly restore lossless audio the
+    // moment playback returned from the TV. A track with an flac_url but no mp3_url still
+    // plays FLAC — a preference must never make a tape unplayable.
+    val hasFlac = !flacUrl.isNullOrBlank() &&
+        (PlaybackSettings.audioQuality.value == AudioQuality.LOSSLESS || url.isBlank())
+    val playbackUri = if (hasFlac) flacUrl!! else url
+    val mimeType = if (hasFlac) MimeTypes.AUDIO_FLAC else MimeTypes.AUDIO_MPEG
+
     val extras = Bundle().apply {
         info.key?.let { putString(Keys.QUEUE_KEY, it) }
         putString(Keys.QUEUE_TITLE, info.title)
@@ -168,7 +181,7 @@ private fun coreMediaItem(
         backend?.let { putString(Keys.BACKEND, it) }
         putBoolean(Keys.LIKED, likedByUser)
         putInt(Keys.LIKES_COUNT, likesCount)
-        flacUrl?.let { putString(Keys.FLAC_URL, it) }
+        if (hasFlac) flacUrl?.let { putString(Keys.FLAC_URL, it) }
         if (url.isNotBlank()) putString(Keys.MP3_URL, url)
         resolvedDate?.let { putString(Keys.SHOW_DATE, it) }
         resolvedVenue?.let { putString(Keys.VENUE_NAME, it) }
@@ -195,10 +208,6 @@ private fun coreMediaItem(
         .setIsPlayable(true)
         .setExtras(extras)
         .build()
-
-    val hasFlac = !flacUrl.isNullOrBlank()
-    val playbackUri = if (hasFlac) flacUrl!! else url
-    val mimeType = if (hasFlac) MimeTypes.AUDIO_FLAC else MimeTypes.AUDIO_MPEG
 
     return MediaItem.Builder()
         .setMediaId(id)

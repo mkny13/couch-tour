@@ -115,3 +115,9 @@ Long-standing items that predate this sprint.
 ## Home fake shows removed (#144)
 
 - [ ] `uat-046` **Home shelves are honest when empty** (macOS) — Launch with a fresh/empty history (no favorites, nothing in progress): In Progress shows a "Nothing in progress" empty state (no 1997-11-17 Bathtub Gin card), Next Tour Stops shows no invented 2026 dates, On This Date shows "No shows on this date" with the real show count (no ★ 4.4 cards). Then favorite an artist and play something: each shelf fills with real shows, ratings shown are real (blank if unrated).
+
+## Settings: Audio Quality, Gapless & Account (#141)
+
+- [ ] `uat-047` **Audio quality preference** (Android) — Settings → PLAYBACK shows a real "Audio quality" row reading "FLAC (lossless)" by default; tapping it opens a FLAC/MP3 radio picker. Pick MP3, restart the app: the row still reads "MP3". Play a Relisten tape that has FLAC (e.g. a Grateful Dead soundboard) before and after the switch: the Now Playing quality badge shows FLAC first and MP3 after — the next queue you start plays the MP3 stream.
+- [ ] `uat-048` **Gapless playback toggle** (Android) — PLAYBACK has a "Gapless playback" switch, default on. During a segue of back-to-back tracks (e.g. any Relisten tape), the next track starts without a noticeable buffering stall while the toggle is on; the toggle's state persists across app restarts and applies live to the running queue.
+- [ ] `uat-049` **Dead rows removed & sign-out** (Android) — Settings has no "Crossfade" row and no "DOWNLOADS & STORAGE" section (nothing advertises a feature that isn't coming). Tapping the account row while signed in opens a "Log out" confirmation; confirming signs out (row returns to "phish.in Account / Sign in") without affecting device pairing or listening history.
