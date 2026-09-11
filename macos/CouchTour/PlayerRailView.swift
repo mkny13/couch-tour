@@ -331,7 +331,7 @@ struct PlayerRailView: View {
                         // Add to playlist button
                         if let currentTrack = player.currentTrack {
                             AddToPlaylistButton {
-                                LocalPlaylistTrack(
+                                [LocalPlaylistTrack(
                                     playlistId: "",
                                     backend: show.artist.backend.rawValue,
                                     trackId: currentTrack.id,
@@ -342,7 +342,7 @@ struct PlayerRailView: View {
                                     durationMs: currentTrack.durationMs,
                                     venueName: show.where_,
                                     artUrl: currentTrack.artURL
-                                )
+                                )]
                             }
                             .frame(width: 58, height: 58)
                         } else {

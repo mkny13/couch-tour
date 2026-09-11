@@ -64,6 +64,19 @@ final class PhishInAPILikesRequestTests: XCTestCase {
         XCTAssertEqual(42, body["likable_id"] as? Int)
     }
 
+    func testShowLikePostsTheShowLikableType() async throws {
+        // The show-detail header's Like pill (#148) — same endpoint, `Show` as the
+        // likable_type, mirroring Android's Show/Track/Playlist split.
+        server.enqueue("{}")
+
+        try await PhishInAPI.like(.show, 1997)
+
+        let request = server.takeRequest()!
+        let body = try JSONSerialization.jsonObject(with: Data(request.bodyString!.utf8)) as! [String: Any]
+        XCTAssertEqual("Show", body["likable_type"] as? String)
+        XCTAssertEqual(1997, body["likable_id"] as? Int)
+    }
+
     func testUnlikeSendsADeleteWithQueryParams() async throws {
         server.enqueue("{}")
 

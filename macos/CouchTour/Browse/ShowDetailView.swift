@@ -8,7 +8,7 @@ import SwiftUI
 /// - 160×160 artwork with conic glow blur
 /// - Show title & venue metadata
 /// - Stats row (ratings, sets/tracks/duration, tour name, tape/source picker)
-/// - Action pills (Resume with remaining time, Saved toggle, Add to playlist)
+/// - Action pills (Resume with remaining time, Like, Add to playlist)
 /// - Multi-column setlist with gradient hairlines, compact set durations, and active track highlight
 struct ShowDetailView: View {
     let show: ShowSummary
@@ -20,10 +20,6 @@ struct ShowDetailView: View {
     @EnvironmentObject private var player: Player
     @EnvironmentObject private var appModel: AppModel
     @Environment(\.ledgerColors) private var colors
-
-    private var isSaved: Bool {
-        appModel.savedShows.contains(show.date)
-    }
 
     private var yearString: String {
         String(show.date.prefix(4))
@@ -211,7 +207,10 @@ struct ShowDetailView: View {
 
     @ViewBuilder
     private func sourceBadgeButton(_ detail: ShowDetail) -> some View {
-        let label = detail.recording?.label ?? "SBD · Paluska · FLAC"
+        // A source with no label renders as unlabeled — this used to fall back to
+        // "SBD · Paluska · FLAC", stamping a real taper's credit onto sources that never
+        // carried it (#148).
+        let label = detail.recording?.label ?? "Unlabeled source"
         let sources = allSources(detail)
 
         Button {
@@ -288,54 +287,31 @@ struct ShowDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            // Saved Toggle
-            Button {
-                appModel.savedShows.toggle(show.date)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                        .font(.system(size: 14))
-                    Text(isSaved ? "Saved" : "Save")
-                        .font(.system(size: 14))
-                }
-                .frame(height: 38)
-                .padding(.horizontal, 14)
-                .foregroundStyle(isSaved ? colors.accentTintText : colors.textSubtle)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSaved ? colors.accent : colors.controlOutline, lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
+            // Like (#148) — the replacement for the removed Save/bookmark pill. A phish.in
+            // server-side show like; hidden for Relisten shows, which have none.
+            ShowLikeButton(
+                showID: detail.summary.id,
+                likesCount: detail.summary.likesCount,
+                likedByUser: detail.summary.likedByUser
+            )
 
-            // Add to Playlist
+            // Add to Playlist — the whole show (#148), not just its first track the way
+            // this used to. Individual tracks add themselves from their own dots menus.
             AddToPlaylistButton {
-                guard let firstTrack = detail.tracks.first else {
-                    return LocalPlaylistTrack(
+                detail.tracks.map { track in
+                    LocalPlaylistTrack(
                         playlistId: "",
                         backend: show.artist.backend.rawValue,
-                        trackId: "",
+                        trackId: track.id,
                         showDate: show.date,
                         artistSlug: show.artist.backend == .relisten ? show.artist.id : nil,
                         recordingId: detail.recording?.id,
-                        title: show.where_,
-                        durationMs: 0,
-                        venueName: show.where_,
-                        artUrl: nil
+                        title: track.title,
+                        durationMs: track.durationMs,
+                        venueName: track.venueName,
+                        artUrl: track.artURL
                     )
                 }
-                return LocalPlaylistTrack(
-                    playlistId: "",
-                    backend: show.artist.backend.rawValue,
-                    trackId: firstTrack.id,
-                    showDate: show.date,
-                    artistSlug: show.artist.backend == .relisten ? show.artist.id : nil,
-                    recordingId: detail.recording?.id,
-                    title: firstTrack.title,
-                    durationMs: firstTrack.durationMs,
-                    venueName: firstTrack.venueName,
-                    artUrl: firstTrack.artURL
-                )
             }
             .frame(height: 38)
             .padding(.horizontal, 14)
@@ -639,11 +615,11 @@ private struct TrackTableRow: View {
                     Button("Play Track", action: onTap)
                     TrackLikeButton(backend: backend, trackID: track.id, likesCount: track.likesCount, likedByUser: track.likedByUser)
                     AddToPlaylistButton {
-                        LocalPlaylistTrack(
+                        [LocalPlaylistTrack(
                             playlistId: "", backend: backend.rawValue, trackId: track.id,
                             showDate: track.showDate ?? "", artistSlug: artistSlug, recordingId: recordingId,
                             title: track.title, durationMs: track.durationMs, venueName: track.venueName, artUrl: track.artURL
-                        )
+                        )]
                     }
                 } label: {
                     Image(systemName: "ellipsis")
