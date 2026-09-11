@@ -68,6 +68,12 @@ Historical implementation details and architectural choices are logged separatel
 - **UI Wiring, Navigation & Mock Data Audit (Shipped — D218, #139–#149)**: Comprehensive audit across Android and macOS wiring search filter categories with live item count pills, interactive library sort dropdowns, live offline storage clearance calculations, Now Playing queue "Save as playlist" dialogs, interactive Next Couch Tour Stop navigation and direct playback, library item "..." action menus, macOS Player Rail up-next queue management, expanded player and show detail "Add to playlist" sheets, and dynamic show ratings on discovery shelves.
 - **Dynamic Silhouette Waveform Visualization (Shipped — D224, D225)**: Real-time waveform peak and envelope extraction from phish.in and archive.org (Relisten) with automatic image polarity detection, in-memory caching, continuous solid silhouette vector rendering, center hairlines, and 2px playhead needle cursor across Android and macOS (#158, #159).
 
+### 9. Settings: Audio Quality, Gapless & Dead-Row Removal (Shipped — #141, D228, Android)
+
+- **Audio Quality Preference**: persisted FLAC/MP3 choice (`PlaybackSettings.AudioQuality`) honoured at queue-build time in `MediaItems.coreMediaItem`; under MP3 the `Keys.FLAC_URL` extra is dropped too, so Cast hand-back and the Now Playing quality badge agree with what actually plays. A FLAC-only tape still plays FLAC. phish.in shows stay MP3-only — the preference is "prefer lossless", not a guarantee. **macOS control still open.**
+- **Gapless Playback**: the previously dead toggle became a real pref applied by `PlaybackService` as an `ExoPlayer.PreloadConfiguration` (10s next-item read-ahead) plus explicit `setPauseAtEndOfMediaItems(false)`, collected live so it applies to a running queue. Media3's decode path has no sample-exact cross-item seam (offload-only); this closes the buffering stall, which is the audible part of a segue.
+- **Dead rows removed**: the Crossfade row and the whole DOWNLOADS & STORAGE section deleted (#65 not planned) — no Settings row advertises a feature that isn't coming. Sign-out with confirmation was already wired and verified.
+
 ---
 
 ## Prioritized Product Roadmap
@@ -80,15 +86,14 @@ flowchart LR
         S2["Desktop Cast & AirPlay Sender (#10, D196)"]
         S3["Ledger Design System & Handoff Fidelity (#128, D214, D215)"]
         S4["Dynamic Silhouette Waveforms (D224, D225)"]
+        S5["Discovery: Tags, Momentum, Cache, Artwork (#67, #21, #61, #62; D206, D207)"]
+        S6["Settings Audio Quality & Gapless, Android (#141, D228)"]
     end
 
-    subgraph NearTerm ["Phase 2: Discovery, Audio Fidelity & Media Power"]
+    subgraph NearTerm ["Phase 2 Remaining"]
         direction TB
-        M1["Audio Quality Preference (#141)"]
-        M2["#67 Browse & Filter by Tag"]
-        M3["#21 Trending / Momentum Sort"]
-        M4["#61 Multi-Level Catalog Cache"]
-        M5["#62 Relisten Show Artwork"]
+        M1["macOS Audio Quality Control (#141)"]
+        M2["#67 Tag Browse UI: Show List & macOS"]
     end
 
     subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]

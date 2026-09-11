@@ -41,7 +41,7 @@ the issue bodies carry the real detail.
 
 | Issue | Feature | Platforms (per ROADMAP) |
 |---|---|---|
-| [#65](https://github.com/mkny13/couch-tour/issues/65) | Offline downloads | Android, macOS |
+| [~~#65~~](https://github.com/mkny13/couch-tour/issues/65) | ~~Offline downloads~~ — **not planned** (closed 2026-09-05; Settings rows removed in #141) | — |
 | [#18](https://github.com/mkny13/couch-tour/issues/18) | Source & show volume leveling | Android, macOS |
 | [#27](https://github.com/mkny13/couch-tour/issues/27) | FLAC streaming support | Android, macOS |
 | [#68](https://github.com/mkny13/couch-tour/issues/68) | "Next Stop" tour picker for defunct artists | Android, macOS |
