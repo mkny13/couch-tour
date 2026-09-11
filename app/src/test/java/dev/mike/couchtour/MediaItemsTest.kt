@@ -1,8 +1,11 @@
 package dev.mike.couchtour
 
+import androidx.test.core.app.ApplicationProvider
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -17,6 +20,19 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class MediaItemsTest {
+
+    // The audio-quality preference is a process-wide singleton read at queue-build time.
+    // Pin it at the default entering every test and restore it leaving, so quality tests
+    // below never leak a COMPRESSED setting into another test class in the same JVM.
+    @Before
+    fun resetAudioQuality() {
+        PlaybackSettings.setAudioQuality(AudioQuality.LOSSLESS)
+    }
+
+    @After
+    fun restoreAudioQuality() {
+        PlaybackSettings.setAudioQuality(AudioQuality.LOSSLESS)
+    }
 
     private val deadArtist = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", hasSets = false, hasMultipleSources = true)
 
@@ -191,6 +207,52 @@ class MediaItemsTest {
         assertEquals(androidx.media3.common.MimeTypes.AUDIO_FLAC, item.localConfiguration?.mimeType)
         assertEquals("https://archive.org/scarlet.flac", item.mediaMetadata.extras?.getString(Keys.FLAC_URL))
         assertEquals("https://archive.org/scarlet.mp3", item.mediaMetadata.extras?.getString(Keys.MP3_URL))
+    }
+
+    @Test
+    fun `the MP3 quality preference plays the mp3 stream and drops the flac extra`() {
+        PlaybackSettings.setAudioQuality(AudioQuality.COMPRESSED)
+        val info = QueueInfo(key = "k", title = "t", subtitle = "s", art = null, artist = "Grateful Dead")
+        val item = recordingMediaItem(
+            PlayableTrack(
+                id = "t-flac",
+                title = "Scarlet Begonias",
+                durationMs = 400_000,
+                url = "https://archive.org/scarlet.mp3",
+                flacUrl = "https://archive.org/scarlet.flac",
+                showDate = "1977-05-08",
+                venueName = "Barton Hall",
+            ),
+            info,
+        )
+
+        assertEquals("https://archive.org/scarlet.mp3", item.localConfiguration?.uri.toString())
+        assertEquals(androidx.media3.common.MimeTypes.AUDIO_MPEG, item.localConfiguration?.mimeType)
+        assertNull(item.mediaMetadata.extras?.getString(Keys.FLAC_URL))
+        assertEquals("https://archive.org/scarlet.mp3", item.mediaMetadata.extras?.getString(Keys.MP3_URL))
+    }
+
+    @Test
+    fun `the MP3 preference still falls back to FLAC when no mp3 url exists`() {
+        PlaybackSettings.setAudioQuality(AudioQuality.COMPRESSED)
+        val info = QueueInfo(key = "k", title = "t", subtitle = "s", art = null, artist = "Grateful Dead")
+        val item = recordingMediaItem(
+            PlayableTrack(
+                id = "t-flac-only",
+                title = "Scarlet Begonias",
+                durationMs = 400_000,
+                url = "",
+                flacUrl = "https://archive.org/scarlet.flac",
+                showDate = "1977-05-08",
+                venueName = "Barton Hall",
+            ),
+            info,
+        )
+
+        // A preference must never make a tape unplayable.
+        assertEquals("https://archive.org/scarlet.flac", item.localConfiguration?.uri.toString())
+        assertEquals(androidx.media3.common.MimeTypes.AUDIO_FLAC, item.localConfiguration?.mimeType)
+        assertEquals("https://archive.org/scarlet.flac", item.mediaMetadata.extras?.getString(Keys.FLAC_URL))
     }
 
     // ------------------------------------------------------- Show / Artist metadata

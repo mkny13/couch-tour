@@ -74,6 +74,13 @@ private data class Handoff(
 )
 
 /**
+ * How much of the next queue item to decode-buffer while the current one still plays
+ * (#141). One-sided tradeoff: a few seconds of extra read-ahead on the track that's about
+ * to start, against a multi-hundred-millisecond stall at every segue when there is none.
+ */
+private const val GAPLESS_PRELOAD_US = 10_000_000L
+
+/**
  * Foreground media service. This is the piece a WebView can't provide: it owns the
  * MediaSession that Android surfaces on the lockscreen, in the notification shade, and
  * to Bluetooth / headset buttons — and, as a [MediaLibraryService], the browse tree Android
@@ -169,6 +176,25 @@ class PlaybackService : MediaLibraryService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
         localPlayer = player
+
+        // Gapless (#141). Media3's decoded playback has no sample-exact seam between
+        // separate items — that only exists in audio-offload, which not every device or
+        // codec negotiates — but it does own the two gaps you can actually hear in a
+        // segue: the buffering stall at the transition, closed by preloading the next
+        // item while this one plays, and pause-at-end-of-items, which we never want
+        // between songs in one set (that's Media3's default; set explicitly so a future
+        // reader doesn't have to trust it). Collected live so flipping the toggle in
+        // Settings reconfigures the running player. Inert while casting — this isn't the
+        // session player then — and still the configuration when playback hands back.
+        scope.launch {
+            PlaybackSettings.gapless.collect { gapless ->
+                player.setPreloadConfiguration(
+                    if (gapless) ExoPlayer.PreloadConfiguration(GAPLESS_PRELOAD_US)
+                    else ExoPlayer.PreloadConfiguration.DEFAULT
+                )
+                player.setPauseAtEndOfMediaItems(false)
+            }
+        }
 
         // Tapping the notification opens the app, which then navigates to whatever is
         // playing at that moment. The PendingIntent is built once and the queue changes as

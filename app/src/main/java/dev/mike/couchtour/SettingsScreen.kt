@@ -14,12 +14,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Icon
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -34,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,7 +45,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Settings screen matching the Ledger handoff:
- * Grouped sections (PLAYBACK, DOWNLOADS & STORAGE, SYNC, ACCOUNT, ABOUT)
+ * Grouped sections (APPEARANCE, PLAYBACK, SYNC, ACCOUNT, ABOUT)
  * with toggle switches, value rows with chevron, and live sync status.
  */
 @Composable
@@ -51,8 +54,9 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
-    var gaplessEnabled by remember { mutableStateOf(true) }
-    var wifiOnlyDownloads by remember { mutableStateOf(true) }
+    val gapless by PlaybackSettings.gapless.collectAsState()
+    val currentQuality by PlaybackSettings.audioQuality.collectAsState()
+    var showQualityDialog by remember { mutableStateOf(false) }
     val isPaired by SyncSession.paired.collectAsState()
     val lastSyncedAt by SyncSession.lastSyncedAt.collectAsState()
     val isSyncing by SyncSession.syncing.collectAsState()
@@ -123,34 +127,29 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             checked = skipFiller,
             onCheckedChange = { PlaybackSettings.setSkipFiller(it) }
         )
+        SettingsToggleRow(
+            label = "Gapless playback",
+            checked = gapless,
+            onCheckedChange = { PlaybackSettings.setGapless(it) }
+        )
         SettingsValueRow(
             label = "Audio quality",
-            value = "FLAC / MP3",
-            showChevron = false,
-            onClick = {}
+            value = when (currentQuality) {
+                AudioQuality.LOSSLESS -> "FLAC (lossless)"
+                AudioQuality.COMPRESSED -> "MP3"
+            },
+            onClick = { showQualityDialog = true }
         )
-        SettingsValueRow(
-            label = "Crossfade",
-            value = "Off (Coming soon)",
-            showChevron = false,
-            onClick = {}
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // DOWNLOADS & STORAGE Section
-        SectionEyebrow("DOWNLOADS & STORAGE")
-        SettingsValueRow(
-            label = "Downloaded shows",
-            value = "0 shows (Coming soon)",
-            showChevron = false,
-            onClick = {}
-        )
-        SettingsToggleRow(
-            label = "Wi-Fi only downloads",
-            checked = wifiOnlyDownloads,
-            onCheckedChange = { wifiOnlyDownloads = it }
-        )
+        if (showQualityDialog) {
+            AudioQualityPickerDialog(
+                currentQuality = currentQuality,
+                onDismiss = { showQualityDialog = false },
+                onSelect = {
+                    PlaybackSettings.setAudioQuality(it)
+                    showQualityDialog = false
+                }
+            )
+        }
 
         Spacer(modifier = Modifier.height(14.dp))
 
@@ -262,6 +261,62 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
         )
     }
+}
+
+/**
+ * The audio-quality radio dialog (#141), mirroring [ThemePickerDialog]'s structure —
+ * pick on tap, no confirm button.
+ */
+@Composable
+private fun AudioQualityPickerDialog(
+    currentQuality: AudioQuality,
+    onDismiss: () -> Unit,
+    onSelect: (AudioQuality) -> Unit,
+) {
+    val ledger = LocalLedgerColors.current
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Audio quality") },
+        text = {
+            Column {
+                listOf(
+                    AudioQuality.LOSSLESS to "FLAC (lossless, where available)",
+                    AudioQuality.COMPRESSED to "MP3",
+                ).forEach { (quality, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = (quality == currentQuality),
+                                onClick = { onSelect(quality) },
+                                role = Role.RadioButton,
+                            )
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = (quality == currentQuality),
+                            onClick = null,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(text = label, fontSize = 15.sp, color = ledger.textPrimary)
+                    }
+                }
+                Text(
+                    text = "phish.in shows stream MP3; FLAC applies to tapes that provide it.",
+                    fontSize = 12.sp,
+                    color = ledger.textSubtle,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
