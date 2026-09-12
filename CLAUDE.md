@@ -274,6 +274,20 @@ autonomous by default, not a proposal he approves each time:
   it (plus the Feature ideas issue-number cross-references) when the picture changes enough to
   matter.
 
+## Session continuity (primary checkout only)
+
+These habits are about the **primary checkout** (`/Volumes/ExtSSD160/scripts/phish-in-app`), not
+per-card worktrees — a card worktree is throwaway and doesn't need them.
+
+- **Session start**: run `pickup` ("where was I") to reconstruct state from `TASKS.md` and git.
+- **Task done or stepping away**: run `handoff` ("wrapping up") to write `TASKS.md` and commit.
+- **Never cold-resume a big session, and never resume after switching tools** — run `pickup`
+  instead of guessing.
+
+`TASKS.md` here tracks primary-checkout state only (the kanban board and `ROADMAP.md`'s build
+order remain the plane of record for backlog and card work — see "Working under the Cline Kanban
+board" above), and its `## Now` section is also read by `~/ai-tools/thread.py`'s portfolio scan.
+
 ## Publishing constraints
 
 Being prepared for a Google Play release. Two constraints come from outside the code:
