@@ -112,9 +112,9 @@ Long-standing items that predate this sprint.
 - [ ] `uat-045` **Year-based Tour Selection in Next Stop** (Android) — Tap an artist chip in Next Stop to edit tracking; select a year to view all historical tours from that year, choose a specific tour (or all shows in that year), and verify Next Stop updates appropriately.
 
 
-## Home fake shows removed (#144)
+## Home fake shows & unwired elements removed (#144)
 
-- [ ] `uat-046` **Home shelves are honest when empty** (macOS) — Launch with a fresh/empty history (no favorites, nothing in progress): In Progress shows a "Nothing in progress" empty state (no 1997-11-17 Bathtub Gin card), Next Tour Stops shows no invented 2026 dates, On This Date shows "No shows on this date" with the real show count (no ★ 4.4 cards). Then favorite an artist and play something: each shelf fills with real shows, ratings shown are real (blank if unrated).
+- [ ] `uat-046` **Home shelves clean and honest (#144)** (macOS) — Launch Home: In Progress top ledger bar has no unwired "Recently played" / "All artists" pills or static arrow circles; On This Date header has no non-functional arrow circles. Fresh/empty history displays honest empty states ("Nothing in progress", "No shows on this date"), and playing/favoriting populates shelves with real shows and ratings. Horizontal scrolling operates smoothly via trackpad swipe or Shift+Scroll.
 
 ## Settings: Audio Quality, Gapless & Account (#141)
 

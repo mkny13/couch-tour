@@ -4337,3 +4337,24 @@ product — is deleted from macOS rather than kept working.
 show-like `likable_type: "Show"` POST shape; `addTracks` order/continuation/no-op). App target
 builds clean after `xcodegen` (new file). Manual verification is UAT (uat-050); uat-036
 narrows to Android.
+
+
+## Iteration 57 — Home Screen Unwired Elements Removed (#144, D230)
+
+### D230 — Remove unwired filter pills and static carousel buttons from macOS Home (#144)
+
+Completes the resolution of Issue #144 (following D227, which removed the fake mock show cards
+and replaced them with honest empty states).
+
+- **Removed unwired filter pills:** In `HomeView.swift`, the static "Recently played" and
+  "All artists" pills in the top ledger bar were static `HStack` mockups without actions,
+  menus, or bindings. They have been removed. The in-progress shelf represents active playback
+  and already links directly to `ListeningView` (which houses complete scope toggling and
+  artist filtering). Removing them creates an uncluttered header and prevents wrapping on narrow
+  window widths.
+- **Removed non-functional carousel arrows:** Static chevron circle buttons in `topLedgerBar`
+  and in the `onThisDateShelf` header have been removed. Horizontal shelf navigation on macOS
+  uses standard native trackpad two-finger swipes, Shift+Scroll, or Magic Mouse gestures.
+- **Verification:** `HomeView.swift` compiles cleanly in the app target, CouchTourKit package
+  tests pass (427 tests, 0 failures), and `uat-046` is updated in `UAT.md`.
+
