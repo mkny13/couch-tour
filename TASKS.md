@@ -5,11 +5,12 @@ Last updated by: Antigravity, 2026-09-12
 ## Now
 
 ## Status
-Show Detail Save→Like Replacement (#148, `405b20c`) docs, UAT entries, and macOS screenshots reconciled. Discarded uncommitted markup tool. Starting #144 (macOS Home screen UI fixes).
+#144 (macOS Home screen non-functional filter pills & carousel arrows) resolved and merged (PR #170, D230). Cut beta release `v0.82`. Primary checkout working tree clean.
 
 ## Next steps
-- Issue #144: macOS: Home screen non-functional filter pills, static carousel arrows, and fake empty states.
-- Follow CLAUDE.md: branch, commit, push, test, PR, merge, cut beta.
+- Check the Cline kanban board (`http://127.0.0.1:3484/phish-in-app`) and `ROADMAP.md` for what's next:
+  - #90: Feedback (Couch Tour v0.40-beta) — add search to playlist pages
+  - #67: Browse/filter by tag
 
 ## Context
 - **Scope of this file**: per-card work lives in throwaway git worktrees (`~/.cline/worktrees/<hash>/phish-in-app`), each owned by the Cline kanban board per `CLAUDE.md`'s existing convention. This `TASKS.md` tracks the **primary checkout** only — ad-hoc sessions here, not kanban-card work.
