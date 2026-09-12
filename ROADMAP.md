@@ -82,6 +82,12 @@ Historical implementation details and architectural choices are logged separatel
 - **Unlabeled sources render unlabeled** — the fabricated `"SBD · Paluska · FLAC"` fallback replaced with `"Unlabeled source"`.
 - **Player-bar parity confirmed on both platforms**: macOS player rail and Android Now Playing each carry Like + Add to Playlist; MiniPlayers are transport-only.
 
+### 11. Home: Unwired Filter Pills & Carousel Arrows Removed (Shipped — #144, D230, macOS)
+
+- **Unwired filter pills removed**: In `HomeView.swift`, the static "Recently played" and "All artists" pills in the top ledger bar were static mockups; they have been removed. In-progress items represent active playback and link directly to `ListeningView` (which handles complete scope and artist filtering).
+- **Non-functional carousel arrows removed**: Static chevron circle buttons in `topLedgerBar` and `onThisDateShelf` header removed; macOS horizontal scrolling relies on native trackpad/mouse gestures.
+- **Completes #144**: Builds on D227 (empty-state honest replacements) to resolve all remaining mockup elements on the Home screen.
+
 ---
 
 ## Prioritized Product Roadmap

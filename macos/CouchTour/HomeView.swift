@@ -157,61 +157,6 @@ struct HomeView: View {
             .disabled(isFindingSurprise || mergedArtists.isEmpty)
             .fixedSize(horizontal: true, vertical: false)
             .layoutPriority(1)
-
-            // Recently played filter pill
-            HStack(spacing: 6) {
-                Text("Recently played")
-                    .font(.system(size: 13))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .frame(width: 10, height: 10)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .foregroundStyle(colors.accentTintText)
-            .background(colors.accentTintText.opacity(colors.isDark ? 0.14 : 0.10), in: Capsule())
-            .overlay(Capsule().stroke(colors.accentIcon, lineWidth: 1))
-            .fixedSize(horizontal: true, vertical: false)
-            .layoutPriority(1)
-
-            // All artists filter pill
-            HStack(spacing: 6) {
-                Text("All artists")
-                    .font(.system(size: 13))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .frame(width: 10, height: 10)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .foregroundStyle(colors.textSubtle)
-            .overlay(Capsule().stroke(colors.controlOutline, lineWidth: 1))
-            .fixedSize(horizontal: true, vertical: false)
-            .layoutPriority(1)
-
-            // Arrow circle buttons
-            HStack(spacing: 6) {
-                Circle()
-                    .stroke(colors.controlOutline, lineWidth: 1)
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 11))
-                            .foregroundStyle(colors.textMuted)
-                    )
-
-                Circle()
-                    .stroke(colors.controlOutline, lineWidth: 1)
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11))
-                            .foregroundStyle(colors.textSubtle)
-                    )
-            }
-            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)
@@ -479,31 +424,9 @@ struct HomeView: View {
 
                 Spacer()
 
-                HStack(spacing: 10) {
-                    Text("\(onThisDateShows.count) shows")
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.textMuted)
-
-                    HStack(spacing: 6) {
-                        Circle()
-                            .stroke(colors.controlOutline, lineWidth: 1)
-                            .frame(width: 30, height: 30)
-                            .overlay(
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(colors.textMuted)
-                            )
-
-                        Circle()
-                            .stroke(colors.controlOutline, lineWidth: 1)
-                            .frame(width: 30, height: 30)
-                            .overlay(
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(colors.textSubtle)
-                            )
-                    }
-                }
+                Text("\(onThisDateShows.count) shows")
+                    .font(.system(size: 12))
+                    .foregroundStyle(colors.textMuted)
             }
             .padding(.horizontal, 24)
             .padding(.top, 22)
