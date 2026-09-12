@@ -1,17 +1,15 @@
 # TASKS.md
 
-Last updated by: Claude (ai-workflow-setup Phase 3), 2026-09-12
+Last updated by: Antigravity, 2026-09-12
 
 ## Now
-- [ ] 148-docs: reconcile `ROADMAP.md`/`UAT.md` wording and macOS screenshots for the already-merged Show Detail Save→Like Replacement (#148, `405b20c`) | next: review the pending diff and commit, or discard if superseded by later work
-- [ ] markup-tool: new `scripts/markup-tool.html` screen-annotation tool, currently untracked | next: decide whether to commit it or delete if it was a one-off
 
 ## Status
-Latest merged work: `405b20c` macOS Save→bookmark replaced with Like + whole-show Add to Playlist (#148, #168). The working tree has real pending changes from that batch's doc/screenshot wrap-up (see `## Now`) — this isn't a dead session, it's trailing bookkeeping that hasn't been committed yet.
+Show Detail Save→Like Replacement (#148, `405b20c`) docs, UAT entries, and macOS screenshots reconciled. Discarded uncommitted markup tool. Starting #144 (macOS Home screen UI fixes).
 
 ## Next steps
-- Check the Cline kanban board (`http://127.0.0.1:3484/phish-in-app`) and `ROADMAP.md`'s "Suggested build order" for what's next — those remain the plane of record for backlog and active card work (see `CLAUDE.md` → "Working under the Cline Kanban board" / "Working through open issues").
-- Clear the two `## Now` items above (commit or discard) before they go stale.
+- Issue #144: macOS: Home screen non-functional filter pills, static carousel arrows, and fake empty states.
+- Follow CLAUDE.md: branch, commit, push, test, PR, merge, cut beta.
 
 ## Context
 - **Scope of this file**: per-card work lives in throwaway git worktrees (`~/.cline/worktrees/<hash>/phish-in-app`), each owned by the Cline kanban board per `CLAUDE.md`'s existing convention. This `TASKS.md` tracks the **primary checkout** only — ad-hoc sessions here, not kanban-card work.

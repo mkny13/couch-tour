@@ -74,6 +74,14 @@ Historical implementation details and architectural choices are logged separatel
 - **Gapless Playback**: the previously dead toggle became a real pref applied by `PlaybackService` as an `ExoPlayer.PreloadConfiguration` (10s next-item read-ahead) plus explicit `setPauseAtEndOfMediaItems(false)`, collected live so it applies to a running queue. Media3's decode path has no sample-exact cross-item seam (offload-only); this closes the buffering stall, which is the audible part of a segue.
 - **Dead rows removed**: the Crossfade row and the whole DOWNLOADS & STORAGE section deleted (#65 not planned) — no Settings row advertises a feature that isn't coming. Sign-out with confirmation was already wired and verified.
 
+### 10. Show Detail: Save→Like Replacement (Shipped — #148, D229, macOS)
+
+- **Save/bookmark concept deleted**: the Save/Saved pill on Show Detail, the `SavedShows` store (package source + tests) and its `AppModel` property, and the bookmark icon on Home's On-This-Date cards. Android's own bookmark store is deliberately untouched — that removal is a separate change.
+- **Header Like**: a `ShowLikeButton` phish.in server-side show like (`Likable.show`, previously unused), optimistic with rollback, signed-out gated, hidden for Relisten tapes. Enabler: `ShowSummary` gained `id`/`likedByUser` (defaulted), matching Android's `Show` model.
+- **Header Add to Playlist adds the whole show** (was first-track-only): `AddToPlaylistButton` now takes `[LocalPlaylistTrack]` and `LocalPlaylistStore.addTracks` inserts in one transaction; per-track surfaces pass one-element arrays.
+- **Unlabeled sources render unlabeled** — the fabricated `"SBD · Paluska · FLAC"` fallback replaced with `"Unlabeled source"`.
+- **Player-bar parity confirmed on both platforms**: macOS player rail and Android Now Playing each carry Like + Add to Playlist; MiniPlayers are transport-only.
+
 ---
 
 ## Prioritized Product Roadmap
@@ -88,6 +96,7 @@ flowchart LR
         S4["Dynamic Silhouette Waveforms (D224, D225)"]
         S5["Discovery: Tags, Momentum, Cache, Artwork (#67, #21, #61, #62; D206, D207)"]
         S6["Settings Audio Quality & Gapless, Android (#141, D228)"]
+        S7["Show Detail: Save→Like Replacement, macOS (#148, D229)"]
     end
 
     subgraph NearTerm ["Phase 2 Remaining"]
