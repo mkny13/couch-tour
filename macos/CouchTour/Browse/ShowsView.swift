@@ -69,6 +69,11 @@ struct ShowsView: View {
                                                 .padding(.horizontal, 6)
                                                 .background(.orange.opacity(0.2), in: Capsule())
                                         }
+                                        ForEach(show.tags.sorted(by: { $0.priority > $1.priority }).prefix(2), id: \.name) { tag in
+                                            TagBadge(tag) {
+                                                selectedTag = tag.name
+                                            }
+                                        }
                                     }
                                     if !show.where_.isEmpty {
                                         Text(show.where_)

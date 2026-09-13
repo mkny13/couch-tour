@@ -323,6 +323,12 @@ struct SearchView: View {
                 .foregroundStyle(colors.textPrimary)
                 .frame(width: 150, alignment: .leading)
                 .lineLimit(1)
+                
+            ForEach(track.tags.sorted(by: { $0.priority > $1.priority }).prefix(2), id: \.name) { tag in
+                TagBadge(tag) {
+                    appModel.searchQuery = tag.name
+                }
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.venueName ?? "Live Venue")
@@ -408,6 +414,12 @@ struct SearchView: View {
                 .foregroundStyle(colors.textPrimary)
                 .frame(width: 150, alignment: .leading)
                 .lineLimit(1)
+                
+            ForEach(show.tags.sorted(by: { $0.priority > $1.priority }).prefix(2), id: \.name) { tag in
+                TagBadge(tag) {
+                    appModel.searchQuery = tag.name
+                }
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(show.venue ?? "Live Venue")
