@@ -1,0 +1,33 @@
+--- sync/src/index.ts
++++ sync/src/index.ts
+@@ -291,6 +291,11 @@
+ 
+   const now = Date.now();
+ 
++  // Determine if the client is using the previous token (meaning they missed a rotation response).
++  const authHeader = request.headers.get("Authorization");
++  const requestToken = authHeader ? authHeader.slice("Bearer ".length).trim() : "";
++  const requestTokenHash = await sha256Hex(requestToken);
++  const usingPreviousToken = device.previousTokenHash === requestTokenHash;
++
+   const cursor = await env.DB.prepare("SELECT next, retentionFloorSeq FROM seqs WHERE groupId = ?")
+     .bind(device.groupId)
+@@ -312,11 +317,11 @@
+ 
+   const responseHeaders: Record<string, string> = {};
+-  if (now - device.tokenIssuedAt > TOKEN_ROTATION_AGE_MS) {
++  if (now - device.tokenIssuedAt > TOKEN_ROTATION_AGE_MS || usingPreviousToken) {
+     const newToken = randomToken();
+     const newHash = await sha256Hex(newToken);
+     await env.DB.prepare(
+       `UPDATE devices
+-       SET previousTokenHash = tokenHash, previousTokenExpiresAt = ?,
++       SET previousTokenHash = ?, previousTokenExpiresAt = ?,
+            tokenHash = ?, tokenIssuedAt = ?
+        WHERE id = ?`
+     )
+-      .bind(now + TOKEN_GRACE_MS, newHash, now, device.id)
++      .bind(requestTokenHash, now + TOKEN_GRACE_MS, newHash, now, device.id)
+       .run();
+     responseHeaders["X-Sync-Token-Rotated"] = newToken;
+   }
