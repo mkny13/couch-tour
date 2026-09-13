@@ -1074,6 +1074,7 @@ fun ShowsScreen(period: String, nav: NavHostController) {
                             .joinToString(" · "),
                         artUrl = show.coverArtUrls?.small,
                         tags = show.tags.map { it.toTagRef() },
+                        onTagClick = { tag -> selectedTag = tag },
                         trailing = when {
                             isPopular -> "♥ ${show.likesCount}"
                             isPartial -> "partial"
@@ -1396,6 +1397,7 @@ fun ArtistShowsScreen(
                         subtitle = show.where,
                         artUrl = show.artUrl,
                         tags = show.tags,
+                        onTagClick = { tag -> selectedTag = tag },
                         show = show,
                         trailing = trailingText,
                         trailingSecondary = trailingSecondary,
@@ -1834,6 +1836,7 @@ private fun SourceBadge(text: String, color: Color) {
 fun TagBadge(
     tag: TagRef,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     val fallbackColor = when (tag.name.uppercase()) {
         "SBD", "SOUNDBOARD" -> MaterialTheme.colorScheme.primary
@@ -1846,11 +1849,12 @@ fun TagBadge(
         else -> MaterialTheme.colorScheme.outline
     }
     val badgeColor = parseTagColor(tag.color, fallbackColor)
+    val baseModifier = modifier.padding(end = 4.dp)
     Surface(
         color = badgeColor.copy(alpha = 0.18f),
         contentColor = badgeColor,
         shape = RoundedCornerShape(4.dp),
-        modifier = modifier.padding(end = 4.dp),
+        modifier = if (onClick != null) baseModifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = onClick) else baseModifier,
     ) {
         Text(
             text = tag.name,
@@ -2550,6 +2554,7 @@ internal fun SearchResultsList(
                         ).joinToString(" · "),
                         artUrl = show.artUrl,
                         tags = show.tags,
+                        onTagClick = { tag -> selectedTag = tag },
                         show = show,
                         onClick = {
                             when (show.artist.backend) {
@@ -2592,6 +2597,7 @@ internal fun SearchResultsList(
                         ).joinToString(" · "),
                         artUrl = track.showAlbumCoverUrl,
                         tags = track.tags.map { it.toTagRef() },
+                        onTagClick = { tag -> selectedTag = tag },
                         trailing = fmt(track.duration),
                         trailingContent = {
                             LikeButton(
@@ -4093,6 +4099,7 @@ private fun RowItem(
     subtitle: String,
     artUrl: String? = null,
     tags: List<TagRef> = emptyList(),
+    onTagClick: ((String) -> Unit)? = null,
     trailing: String? = null,
     /** A second, dimmer line under [trailing] — e.g. History's "last played" timestamp. */
     trailingSecondary: String? = null,
@@ -4130,7 +4137,7 @@ private fun RowItem(
                 if (tags.isNotEmpty()) {
                     Spacer(Modifier.width(6.dp))
                     tags.sortedByDescending { it.priority }.take(2).forEach { tag ->
-                        TagBadge(tag)
+                        TagBadge(tag, onClick = if (onTagClick != null) { { onTagClick(tag.name) } } else null)
                     }
                 }
             }
