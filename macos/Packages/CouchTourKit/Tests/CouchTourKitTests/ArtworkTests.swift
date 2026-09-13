@@ -107,13 +107,14 @@ final class ArtworkTests: XCTestCase {
     }
 
     func testDateExtractionAndBadging() {
+        // uat-006: the date badge on artwork must always read strict YYYY-MM-DD.
         XCTAssertEqual(ShowArtworkGenerator.year(from: "1977-05-08"), "1977")
         XCTAssertEqual(ShowArtworkGenerator.monthDay(from: "1977-05-08"), "05/08")
-        XCTAssertEqual(ShowArtworkGenerator.dateBadge(from: "1977-05-08"), "1977 · 05/08")
+        XCTAssertEqual(ShowArtworkGenerator.dateBadge(from: "1977-05-08"), "1977-05-08")
 
         XCTAssertEqual(ShowArtworkGenerator.year(from: "1997-12-07"), "1997")
         XCTAssertEqual(ShowArtworkGenerator.monthDay(from: "1997-12-07"), "12/07")
-        XCTAssertEqual(ShowArtworkGenerator.dateBadge(from: "1997-12-07"), "1997 · 12/07")
+        XCTAssertEqual(ShowArtworkGenerator.dateBadge(from: "1997-12-07"), "1997-12-07")
 
         XCTAssertEqual(ShowArtworkGenerator.year(from: "1989"), "1989")
         XCTAssertNil(ShowArtworkGenerator.monthDay(from: "1989"))

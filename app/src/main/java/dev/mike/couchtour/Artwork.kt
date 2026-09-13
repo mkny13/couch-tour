@@ -377,7 +377,8 @@ fun parseArtworkDateComponents(date: String?): ArtworkDateComponents {
         return ArtworkDateComponents(
             year = y,
             monthDay = "$monthStr $d",
-            fullBadge = "$y · $monthStr $d"
+            // uat-006: the date badge on artwork must always read strict YYYY-MM-DD.
+            fullBadge = date.trim(),
         )
     }
     return ArtworkDateComponents(year = date, monthDay = "", fullBadge = date)

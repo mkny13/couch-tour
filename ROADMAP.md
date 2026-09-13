@@ -161,7 +161,7 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS | Shipped (D206, verified in UAT `uat-001`, `uat-002`) |
 | **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS | Shipped (D205, D210, verified in UAT `uat-011`) |
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS | Shipped (D207, verified in UAT `uat-014`, `uat-015`) |
-| **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS | Shipped (D206, D214, D215; procedural covers, conic glow artwork, strict YYYY-MM-DD formatting, and moe. casing) |
+| **#62** | **Relisten Show Artwork & Graphic Placeholders** | Dynamic or procedural artwork generation for Relisten shows to replace placeholder icons across player and browse screens. | Android, macOS | Shipped (D206, D214, D215, D231; procedural covers, conic glow artwork, strict YYYY-MM-DD date badge, and moe. casing) |
 | **#86** | **Waveform Scrubber Visualization** | Dual-layer vector waveform scrubber with dynamic audio peak extraction from phish.in and archive.org (Relisten), live seek/drag interaction across Now Playing surfaces. | Android, macOS | Shipped (D214, D215, D224) |
 
 ---

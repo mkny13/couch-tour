@@ -4358,3 +4358,32 @@ and replaced them with honest empty states).
 - **Verification:** `HomeView.swift` compiles cleanly in the app target, CouchTourKit package
   tests pass (427 tests, 0 failures), and `uat-046` is updated in `UAT.md`.
 
+
+## Iteration 58 — Procedural Artwork Date Badge: Actually Strict YYYY-MM-DD (#62, D231)
+
+### D231 — Fix the procedural artwork date badge to render literal YYYY-MM-DD (#62)
+
+Issue #62 asked to verify that procedural artwork correctly shows `moe.` casing and strict
+`YYYY-MM-DD` date formatting before closing it. `moe.` casing checked out (D222). The date
+badge did not: despite `DECISIONS.md`/`ROADMAP.md` already crediting D214/D222 with "strict
+YYYY-MM-DD formatting" and `uat-006` being logged as addressed, the actual date badge drawn on
+procedural artwork was still a stylized, platform-inconsistent string —
+`ShowArtworkGenerator.dateBadge(from:)` on macOS returned `"1977 · 05/08"` and Android's
+`ArtworkDateComponents.fullBadge` (used by `LargeArtworkOverlay`, the Now Playing inspector
+badge `uat-006` calls out) returned `"1977 · MAY 08"`. Neither is `YYYY-MM-DD`; `formatShowDate`
+in `Format.kt`/`Format.swift` (general show date text elsewhere in the UI) was strict, but the
+artwork badge specifically — the one thing `uat-006`'s feedback was actually about — was not.
+
+- **macOS** (`Artwork.swift`): `dateBadge(from:)` now returns `"\(yr)-\(month)-\(day)"` when a
+  full date is present, falling back to just the year or the raw string otherwise. `year(from:)`
+  and `monthDay(from:)` are unchanged (still used internally and by other tests) — only the
+  composed badge string changed. Updated `ArtworkTests.swift` assertions from `"1977 · 05/08"` to
+  `"1977-05-08"`.
+- **Android** (`Artwork.kt`): `parseArtworkDateComponents`'s `fullBadge` (the field
+  `LargeArtworkOverlay` — the Now Playing screen's large artwork badge — renders) now returns the
+  trimmed input date verbatim (`"1977-05-08"`) instead of `"$y · $monthStr $d"`. `year` and
+  `monthDay` are unchanged, since `MediumArtworkOverlay` still uses them separately for its own
+  two-line year/month-day layout (a distinct design, not the single "date badge" `uat-006`
+  described). Updated `ArtworkTest.kt` accordingly.
+- **Verification:** 427 Swift package tests pass; Android `testDebugUnitTest` passes.
+  `uat-006` in `UAT.md` is updated to reflect the fix.

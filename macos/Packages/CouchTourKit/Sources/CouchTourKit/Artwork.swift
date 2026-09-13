@@ -260,11 +260,17 @@ public enum ShowArtworkGenerator {
         return nil
     }
 
-    /// Formatted date badge for display on show artwork (e.g. "1977 · 05/08" or "1977").
+    /// Formatted date badge for display on show artwork. Strictly `YYYY-MM-DD` when a full
+    /// date is available (uat-006: "date format must always be YYYY-MM-DD" on artwork), falling
+    /// back to just the year, or the raw string, when the date is partial.
     public static func dateBadge(from date: String?) -> String {
         let yr = year(from: date)
         let md = monthDay(from: date)
         if let yr, let md {
+            let parts = md.components(separatedBy: "/")
+            if parts.count == 2 {
+                return "\(yr)-\(parts[0])-\(parts[1])"
+            }
             return "\(yr) · \(md)"
         } else if let yr {
             return yr

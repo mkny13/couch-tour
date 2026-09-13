@@ -172,10 +172,11 @@ class ArtworkTest {
 
     @Test
     fun `parseArtworkDateComponents formats full ISO date strings correctly`() {
+        // uat-006: the date badge on artwork must always read strict YYYY-MM-DD.
         val parsed = parseArtworkDateComponents("1977-05-08")
         assertEquals("1977", parsed.year)
         assertEquals("MAY 08", parsed.monthDay)
-        assertEquals("1977 · MAY 08", parsed.fullBadge)
+        assertEquals("1977-05-08", parsed.fullBadge)
     }
 
     @Test
