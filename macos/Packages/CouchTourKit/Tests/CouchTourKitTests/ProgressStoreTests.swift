@@ -448,4 +448,18 @@ final class ProgressStoreTests: XCTestCase {
             XCTAssertEqual("Spring 1977", pref?.tourName)
         }
     }
+
+    // -------------------------------------------------------- backup exclusion (#192)
+
+    func testDefaultURLDirectoryIsExcludedFromBackup() throws {
+        // Use a unique subdirectory so the test never collides with the real app's data.
+        let testDir = "dev.mike.couchtour.test-backup-\(UUID().uuidString)"
+        let url = ProgressStore.defaultURL(appSupportDirName: testDir)
+        let dir = url.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let values = try dir.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        XCTAssertEqual(true, values.isExcludedFromBackup,
+                       "Database directory should be excluded from Time Machine backup")
+    }
 }

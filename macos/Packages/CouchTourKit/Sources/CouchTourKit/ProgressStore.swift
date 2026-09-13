@@ -98,6 +98,15 @@ public final class ProgressStore {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let dir = appSupport.appendingPathComponent(appSupportDirName, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // Exclude the whole directory from Time Machine so the database, WAL, and SHM
+        // sidecar files are all covered. The listening history can be rebuilt from sync or
+        // reimported from a device; backing it up risks restoring stale progress that
+        // conflicts with what the sync server considers current (same reasoning as
+        // Android's allowBackup="false").
+        var dirResource = URLResourceValues()
+        dirResource.isExcludedFromBackup = true
+        var mutableDir = dir
+        try? mutableDir.setResourceValues(dirResource)
         return dir.appendingPathComponent("phishin.db")
     }
 
