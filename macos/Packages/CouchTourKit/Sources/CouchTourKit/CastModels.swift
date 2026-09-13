@@ -50,8 +50,9 @@ public enum CastItemConverter {
         queueKey: String?
     ) -> [String: Any] {
         let isFlac = (track.flacUrl?.isEmpty == false) || track.url.lowercased().hasSuffix(".flac")
-        let streamUrl = isFlac ? track.url : (track.flacUrl?.isEmpty == false ? track.flacUrl! : track.url)
-        let fallbackMp3Url = track.url
+        let rawStreamUrl = isFlac ? track.url : (track.flacUrl?.isEmpty == false ? track.flacUrl! : track.url)
+        let streamUrl = rawStreamUrl.lowercased().hasPrefix("https://") ? rawStreamUrl : "https://invalid.local/blocked"
+        let fallbackMp3Url = track.url.lowercased().hasPrefix("https://") ? track.url : "https://invalid.local/blocked"
 
         var metadata: [String: Any] = [
             "metadataType": 3, // MUSIC_TRACK

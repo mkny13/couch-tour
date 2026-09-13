@@ -166,7 +166,7 @@ class CastItemConverter : MediaItemConverter {
         val rawUrl = local.uri.toString()
         val mp3Fallback = extras?.getString(Keys.MP3_URL)
         val isFlac = local.mimeType == MimeTypes.AUDIO_FLAC || rawUrl.endsWith(".flac", ignoreCase = true)
-        val castUrl = if (isFlac && !mp3Fallback.isNullOrBlank()) mp3Fallback else rawUrl
+        val castUrl = (if (isFlac && !mp3Fallback.isNullOrBlank()) mp3Fallback else rawUrl).requireHttps()
 
         // Same shape as media3's own converter: the track id identifies the queue item,
         // the URL is what gets fetched.
