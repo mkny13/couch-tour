@@ -16,7 +16,7 @@ public actor WaveformLoader {
     /// Derive the archive.org derivative waveform URL from an archive.org MP3 audio URL.
     /// E.g. https://archive.org/download/{id}/{track}.mp3 -> https://archive.org/download/{id}/{track}.png
     public static func archiveOrgWaveformURL(from mp3URLString: String) -> String? {
-        guard mp3URLString.contains("archive.org/download/"), mp3URLString.hasSuffix(".mp3") else {
+        guard mp3URLString.lowercased().hasPrefix("https://"), mp3URLString.contains("archive.org/download/"), mp3URLString.hasSuffix(".mp3") else {
             return nil
         }
         return String(mp3URLString.dropLast(4)) + ".png"

@@ -168,7 +168,7 @@ private fun coreMediaItem(
     // plays FLAC — a preference must never make a tape unplayable.
     val hasFlac = !flacUrl.isNullOrBlank() &&
         (PlaybackSettings.audioQuality.value == AudioQuality.LOSSLESS || url.isBlank())
-    val playbackUri = if (hasFlac) flacUrl!! else url
+    val playbackUri = (if (hasFlac) flacUrl!! else url).requireHttps()
     val mimeType = if (hasFlac) MimeTypes.AUDIO_FLAC else MimeTypes.AUDIO_MPEG
 
     val extras = Bundle().apply {
@@ -302,4 +302,10 @@ internal fun localPlaylistTrackItems(playlistId: String, name: String, resolved:
             flacUrl = it.flacUrl,
         )
     }
+}
+
+internal fun String.requireHttps(): String {
+    if (this.isBlank()) return this
+    if (this.startsWith("https://", ignoreCase = true)) return this
+    return "https://invalid"
 }

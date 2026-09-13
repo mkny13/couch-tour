@@ -315,7 +315,8 @@ final class Player: NSObject, ObservableObject {
         queuePlayer.removeAllItems()
         items = filtered.tracks.map { track in
             let playURL = (track.flacUrl?.isEmpty == false) ? track.flacUrl! : track.url
-            return AVPlayerItem(url: URL(string: playURL) ?? URL(fileURLWithPath: "/dev/null"))
+            let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
+            return AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
         }
         for item in items[filtered.startIndex...] {
             queuePlayer.insert(item, after: nil)
