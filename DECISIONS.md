@@ -4387,3 +4387,74 @@ artwork badge specifically — the one thing `uat-006`'s feedback was actually a
   described). Updated `ArtworkTest.kt` accordingly.
 - **Verification:** 427 Swift package tests pass; Android `testDebugUnitTest` passes.
   `uat-006` in `UAT.md` is updated to reflect the fix.
+
+
+## Iteration 59 — Local Storage & Sandbox Permissions Audit (#192, D232)
+
+### D232 — Local storage security audit: plaintext SQLite is acceptable; macOS backup exclusion added (#192)
+
+Full audit of local storage and sandbox permissions on both platforms (part of #175).
+
+**Android — verified, no code changes needed:**
+- `android:allowBackup="false"` confirmed in `AndroidManifest.xml` (line 19) — all app data,
+  including `EncryptedSharedPreferences`, is excluded from cloud backup.
+- Room database (`PhishInDb`): entities are `Progress`, `LocalPlaylistEntity`,
+  `LocalPlaylistTrackEntity`, `ArtistTourPreferenceEntity` — listening history, queue
+  positions, local playlists, and artist tour prefs. No credentials or tokens are stored.
+- Auth token (phish.in JWT, username): `EncryptedSharedPreferences` with `AES256_SIV` key
+  encryption and `AES256_GCM` value encryption, backed by Android Keystore (`Auth.kt:54-59`).
+  Falls back to in-memory-only when the keystore is unavailable — never writes plaintext.
+- Sync token (device token, device ID): `EncryptedSharedPreferences` with the same AES256
+  scheme (`Sync.kt:242-247`). Cursors (`lastSeq`, `lastPushWatermark`, `lastSyncedAt`) are
+  non-sensitive integers in the same encrypted store.
+- Plain `SharedPreferences`: `Favorites`, `LikedTracks`, `ThemeSettings`, `PlaybackSettings`,
+  `SavedShows` — all store non-sensitive display/preference data (show IDs, enum values,
+  volume, theme mode). None contain credentials.
+- Password: used once in `Session.login()` (Auth.kt:101), passed directly to the API call
+  and never persisted. The Compose `mutableStateOf` holding it (MainActivity.kt:2619) is
+  UI-layer only; `rememberSaveable` survives config changes but not process death, and the
+  password is never written to `SharedPreferences` or the database.
+
+**macOS — one code change, rest verified:**
+- **Added**: `ProgressStore.defaultURL()` now sets `isExcludedFromBackup = true` on the
+  `~/Library/Application Support/dev.mike.couchtour/` directory. This covers `phishin.db` and
+  its WAL/SHM sidecars. Same reasoning as Android's `allowBackup=false`: the listening history
+  can be rebuilt from sync; restoring stale progress from a Time Machine backup risks
+  conflicting with the sync server's state.
+- GRDB database: `progress` and `artist_tour_preferences` tables — listening history, queue
+  positions, and tour prefs. No credentials or tokens.
+- Keychain: `SystemKeychain` uses `kSecAttrAccessibleAfterFirstUnlock` (Keychain.swift:42) and
+  `kSecAttrSynchronizable = false` (Keychain.swift:43). Phish.in JWT and sync device token are
+  both stored via this path (PhishInAuth.swift:19, Sync.swift:279-286). `kSecAttrSynchronizable
+  = false` prevents iCloud Keychain from silently sharing device identity across Macs — pairing
+  is an explicit per-device act.
+- `UserDefaults`: sync cursors (`lastSeq`, `lastPushWatermark`, `lastSyncedAt` — plain
+  integers), volume level, favorites (show IDs), liked tracks (track IDs), theme mode.
+  None contain credentials.
+- Password: used once in `PhishInSession.login()` (PhishInAuth.swift:72), passed to the API
+  and never stored. `AccountView.swift:61` clears the `@State` `password` property immediately
+  after a successful login.
+
+**Rationale for plaintext SQLite (applies to both platforms):**
+Neither database is encrypted with SQLCipher or equivalent, and this is acceptable:
+- Both databases store only non-sensitive listening history and preference data — never
+  credentials, tokens, or PII beyond what the user typed (show titles, artist names).
+- **Android 9+** (minSdk 26, file-based encryption enabled by default on 9+): app-private
+  files in `/data/data/<package>/` are encrypted at rest by the OS; `allowBackup=false` blocks
+  cloud extraction. On pre-9 devices without FBE, the tradeoff is that a rooted device could
+  read "mike listened to 1997-11-17" — the same information visible on his phish.in profile.
+- **macOS**: FileVault full-disk encryption (enabled by default since macOS Ventura on Apple
+  Silicon) protects data at rest. Without App Sandbox (disabled — `project.yml:56`), the app
+  relies on macOS file permissions rather than sandbox isolation; enabling the sandbox would
+  break the network-client-without-prompts flow the app depends on for streaming. A local
+  attacker with user-level access could already read UserDefaults and Keychain via
+  `security find-generic-password`, so encrypting just the SQLite file would add deployment
+  complexity (SQLCipher dependency, key management) without materially raising the bar.
+- The sync tokens that would be high-value targets are already in `EncryptedSharedPreferences`
+  (Android) and Keychain (macOS), never in the database.
+- Adding SQLCipher later is a forward-compatible change — it encrypts the existing file
+  in-place on first open and doesn't require a schema migration.
+
+**Verification:** 428 Swift package tests pass (including the new
+`testDefaultURLDirectoryIsExcludedFromBackup`); Android `testDebugUnitTest` passes.
+`uat-051` added for runtime verification of the macOS backup exclusion.

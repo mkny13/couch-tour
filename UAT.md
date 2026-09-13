@@ -128,3 +128,7 @@ Long-standing items that predate this sprint.
 ## Show Detail: Like + Add to Playlist Replace Save (#148, macOS)
 
 - [ ] `uat-050` **Show header Like & whole-show Add** (macOS) — Show Detail header shows a Like pill carrying the show's like count: tapping it toggles the phish.in show like (requires sign-in; the pill is hidden entirely on Relisten tapes, which have no show-like concept). The "Add to Playlist" pill adds **every track of the show** to the chosen playlist, in set order — not just the first track. No Save/Saved pill anywhere on macOS (Show Detail header, Home On-This-Date cards). Unlabeled tape sources read "Unlabeled source" on the source pill — never a fabricated taper name.
+
+## Local Storage Security Audit (#192)
+
+- [ ] `uat-051` **macOS database excluded from Time Machine** (macOS) — After running Couch Tour at least once (so the database exists), verify the Application Support directory is excluded from backup: `mdls -name com_apple_backup_excludeItem ~/Library/Application\ Support/dev.mike.couchtour/` should show `com_apple_backup_excludeItem = "com.apple.metadata:com_apple_backup_excludeItem"`, or `xattr -l ~/Library/Application\ Support/dev.mike.couchtour/` should include `com.apple.metadata:com_apple_backup_excludeItem`.
