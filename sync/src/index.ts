@@ -154,20 +154,24 @@ async function handlePairClaim(request: Request, env: Env): Promise<Response> {
   if (!pairing) return json({ error: "incorrect code" }, 401);
 
   const now = Date.now();
-  if (pairing.claimedAt !== null) return json({ error: "pairing already claimed" }, 410);
   if (now > pairing.expiresAt) return json({ error: "pairing expired" }, 410);
+
+  const claimResult = await env.DB.prepare(
+    "UPDATE pairings SET claimedAt = ? WHERE id = ? AND claimedAt IS NULL RETURNING id"
+  )
+    .bind(now, pairing.id)
+    .first<{ id: string }>();
+
+  if (!claimResult) return json({ error: "pairing already claimed" }, 410);
 
   const deviceId = randomId();
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
 
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO devices (id, groupId, name, platform, tokenHash, tokenIssuedAt, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(deviceId, pairing.groupId, body.deviceName, body.platform, tokenHash, now, now),
-    env.DB.prepare("UPDATE pairings SET claimedAt = ? WHERE id = ?").bind(now, pairing.id),
-  ]);
+  await env.DB.prepare(
+    `INSERT INTO devices (id, groupId, name, platform, tokenHash, tokenIssuedAt, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(deviceId, pairing.groupId, body.deviceName, body.platform, tokenHash, now, now).run();
 
   return json({ deviceId, deviceToken: token });
 }
@@ -291,6 +295,12 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
 
   const now = Date.now();
 
+  // If the client is using the previous token, they missed the response containing the new one.
+  const authHeader = request.headers.get("Authorization");
+  const requestToken = authHeader ? authHeader.slice("Bearer ".length).trim() : "";
+  const requestTokenHash = await sha256Hex(requestToken);
+  const usingPreviousToken = device.previousTokenHash === requestTokenHash;
+
   const cursor = await env.DB.prepare("SELECT next, retentionFloorSeq FROM seqs WHERE groupId = ?")
     .bind(device.groupId)
     .first<{ next: number; retentionFloorSeq: number }>();
@@ -311,16 +321,16 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   }
 
   const responseHeaders: Record<string, string> = {};
-  if (now - device.tokenIssuedAt > TOKEN_ROTATION_AGE_MS) {
+  if (now - device.tokenIssuedAt > TOKEN_ROTATION_AGE_MS || usingPreviousToken) {
     const newToken = randomToken();
     const newHash = await sha256Hex(newToken);
     await env.DB.prepare(
       `UPDATE devices
-       SET previousTokenHash = tokenHash, previousTokenExpiresAt = ?,
+       SET previousTokenHash = ?, previousTokenExpiresAt = ?,
            tokenHash = ?, tokenIssuedAt = ?
        WHERE id = ?`
     )
-      .bind(now + TOKEN_GRACE_MS, newHash, now, device.id)
+      .bind(requestTokenHash, now + TOKEN_GRACE_MS, newHash, now, device.id)
       .run();
     responseHeaders["X-Sync-Token-Rotated"] = newToken;
   }
