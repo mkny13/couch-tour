@@ -37,8 +37,11 @@ whole run, so nothing below has ever been exercised by anyone.
 - [x] `uat-004` **Tag filter on search** (macOS) — Search something broad ("dark star"). Tag picker narrows results. Then change the query so the selected tag no longer exists in the results — it must fall back to "All", not show an empty list.
 - [!] `uat-005` **Procedural artwork** (macOS) — Find a Relisten (non-Phish) show, which has no artwork. Home cards and the player show a coloured gradient with the artist's monogram, not a grey music-note box. The same show always gets the same colours.
   > not really a bug but note in all situations, it's always properly displayed as "moe." with lowercase and period. This is th eonly band with this rule
-- [!] `uat-006` **Artwork date badge** (macOS) — On the large artwork (Now Playing inspector), a date badge appears; on the small mini-player thumbnail it does not.
+- [ ] `uat-006` **Artwork date badge** (macOS) — On the large artwork (Now Playing inspector), a date badge appears; on the small mini-player thumbnail it does not.
   > shows but date format must always be YYYY-MM-DD
+  > D231 (#62): the badge was still a stylized `"1977 · 05/08"` (macOS) / `"1977 · MAY 08"`
+  > (Android) despite earlier notes claiming this was fixed. Now renders literal `YYYY-MM-DD`
+  > on both platforms — needs a fresh look to confirm.
 - [x] `uat-007` **Continue Listening context menu — Home** (macOS) — Right-click a Continue Listening card on Home. Open / Mark Completed / Remove all appear and all three do what they say.
 - [x] `uat-008` **Continue Listening context menu — Listening screen** (macOS) — Same three actions on a row in the full Listening screen, behaving identically to the Home shelf.
 
