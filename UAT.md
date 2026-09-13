@@ -30,8 +30,8 @@ Add new items when finishing a batch. Keep the `uat-NNN` ids stable and never re
 Zero click-through happened for this batch — the machine's display session was locked for its
 whole run, so nothing below has ever been exercised by anyone.
 
-- [x] `uat-001` **Show sort control** (macOS) — Artist → a year → shows. Change the toolbar sort to "Top Rated", then "Trending (48h)". List reorders each time, with no spinner and no refetch.
-- [x] `uat-002` **Sort survives nothing it shouldn't** (macOS) — With a non-default sort applied, navigate into a show and back. Confirm what happens to the sort is sane (either preserved or reset — just not a crash or an empty list).
+- [ ] `uat-001` **Show sort control** (macOS) — Artist → a year → shows. Change the toolbar sort to "Top Rated", then "Trending (48h)". List reorders each time, with no spinner and no refetch.
+- [ ] `uat-002` **Sort survives nothing it shouldn't** (macOS) — With a non-default sort applied, navigate into a show and back. Confirm what happens to the sort is sane (either preserved or reset — just not a crash or an empty list).
 - [!] `uat-003` **Tag filter on a show list** (macOS) — Same screen. The tag picker appears only when the shows actually carry tags; picking one narrows the list; picking "All" restores it.
   > give me some examples to try. clicking the one I found, "partial" in the phish list has no different effect than clicking anywhere else on that item
 - [x] `uat-004` **Tag filter on search** (macOS) — Search something broad ("dark star"). Tag picker narrows results. Then change the query so the selected tag no longer exists in the results — it must fall back to "All", not show an empty list.
@@ -132,3 +132,8 @@ Long-standing items that predate this sprint.
 ## Local Storage Security Audit (#192)
 
 - [ ] `uat-051` **macOS database excluded from Time Machine** (macOS) — After running Couch Tour at least once (so the database exists), verify the Application Support directory is excluded from backup: `mdls -name com_apple_backup_excludeItem ~/Library/Application\ Support/dev.mike.couchtour/` should show `com_apple_backup_excludeItem = "com.apple.metadata:com_apple_backup_excludeItem"`, or `xattr -l ~/Library/Application\ Support/dev.mike.couchtour/` should include `com.apple.metadata:com_apple_backup_excludeItem`.
+
+## Browse shows by top rated / popular / trending (#21)
+
+- [ ] `uat-052` **Show sort control** (Android) — Open Artist → Year → Shows, cycle through all 7 sort options, confirm list reorders correctly, badges appear, selection persists on back/forward navigation.
+
