@@ -263,7 +263,9 @@ class SyncSessionTest {
     @After
     fun tearDown() {
         SyncSession.unlink()
-        db.close()
+        // Guarded: if setUp throws before `db` is initialized, tearDown still runs — an
+        // UninitializedPropertyAccessException here would mask the real failure.
+        if (::db.isInitialized) db.close()
         server.shutdown()
         SyncApi.baseUrl = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
     }
