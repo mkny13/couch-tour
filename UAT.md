@@ -137,3 +137,7 @@ Long-standing items that predate this sprint.
 
 - [ ] `uat-052` **Show sort control** (Android) — Open Artist → Year → Shows, cycle through all 7 sort options, confirm list reorders correctly, badges appear, selection persists on back/forward navigation.
 
+## Google TV App Foundation (#182, Part 1 of #9)
+
+- [ ] `uat-053` **TV app appears as a Leanback launcher entry** (Android TV) — On a physical Android TV / Google TV device (or a TV emulator image, not a phone/tablet), install the app and confirm it shows up as its own row entry on the TV home screen (not just in the phone app drawer). Opening it launches `TvMainActivity` — distinct from the phone's `MainActivity` — into the placeholder browse screen, which briefly proves out the shared `Catalog`/`PlaybackService` wiring with an artist count. No playable rows yet; that's Part 2 (#182 is foundation only).
+
