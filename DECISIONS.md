@@ -4458,3 +4458,55 @@ Neither database is encrypted with SQLCipher or equivalent, and this is acceptab
 **Verification:** 428 Swift package tests pass (including the new
 `testDefaultURLDirectoryIsExcludedFromBackup`); Android `testDebugUnitTest` passes.
 `uat-051` added for runtime verification of the macOS backup exclusion.
+
+## Iteration 60 — Google TV App Foundation (#182, D233)
+
+### D233 — Google TV foundation is a second Activity in the existing `:app` module, not a new Gradle module
+
+#182 (Part 1 of #9) asked for a TV app entry point, Leanback support, and the existing
+`Catalog`/`PlaybackService` reachable from it. The repo has one Gradle module (`:app`); there
+was no existing precedent (module, flavor, or product-flavor split) for a "TV variant" to slot
+into.
+
+**Chose: a second `ComponentActivity` (`TvMainActivity`) in the same module, same package,
+alongside `MainActivity`, rather than a new `:tv` Gradle module or a build-variant split.**
+`Catalog.kt`'s `MusicSource`s and `loadArtistsByBackend()` are free functions/objects, and
+`PlayerViewModel` is a plain `AndroidViewModel` that connects to `PlaybackService` over a
+media3 `MediaController`/`SessionToken` — none of that is gated behind `MainActivity` or any
+phone-specific wiring, so "shared module or dependency injection" from the issue's Done-when
+list is satisfied for free by same-module visibility. A new module would have meant either
+duplicating those types behind an `:app`-owned interface or extracting a `:core` module neither
+platform currently needs — real work Part 1 doesn't require and Parts 2/3 don't obviously need
+either, since TV browse/playback screens can keep reading the same `Catalog`/`PlayerViewModel`
+directly.
+
+- **Manifest**: `android.software.leanback` and `android.hardware.touchscreen` are declared
+  `android:required="false"` — this is one APK installed on phones, tablets, and TVs alike (no
+  separate TV APK/flavor), so a `required="true"` leanback feature would make Play Store and
+  sideloading refuse the app everywhere else. `TvMainActivity` carries its own
+  `LEANBACK_LAUNCHER` intent-filter (`MainActivity` keeps the phone `LAUNCHER` one) and an
+  `android:banner` — required for the entry to render as more than a bare icon in a TV
+  launcher row; reused `@mipmap/${appIcon}` rather than commissioning TV-specific 320×180 art
+  for a placeholder screen Part 2 will visually replace anyway.
+- **UI**: Compose for TV (`androidx.tv:tv-foundation:1.0.0`, `androidx.tv:tv-material:1.1.0` —
+  both current stable, not alpha) over legacy Leanback fragments/rows, per the issue's stated
+  preference since the rest of the app is already Compose. `TvBrowseScreen` is intentionally
+  thin: it calls `loadArtistsByBackend()` and reads `PlayerViewModel.state` and renders the
+  result as plain text (an artist count, a "playback connected" flag once the
+  `MediaController` attaches) rather than building real rows — that's explicitly Part 2's job
+  (issue's "Out of scope"), and the point of Part 1 is proving both are reachable from the TV
+  process, not rendering them.
+- No new unit tests: the repo has no existing `MainActivity`/Activity-level Robolectric tests
+  to extend the pattern from, and the Done-when checklist here is manifest/build-shaped
+  (verified by `assembleDebug` and inspecting the merged manifest for the `LEANBACK_LAUNCHER`
+  intent-filter and feature declarations) rather than logic that unit tests would exercise.
+  The one item genuinely unverifiable without hardware — the app appearing as a launchable
+  Leanback entry on a physical Android TV / Google TV home screen — is `uat-053`.
+
+**Verification:** Android `testDebugUnitTest` and `assembleDebug` pass; merged manifest
+inspected directly for the `LEANBACK_LAUNCHER` intent-filter and `leanback`/`touchscreen`
+feature declarations. `swift test --package-path macos/Packages/CouchTourKit` could not run in
+this worktree — `xcodebuild` fails with "You have not agreed to the Xcode license agreements,"
+an environment issue predating this change (this branch touches no macOS files; `git diff
+origin/main -- macos/` is empty) that needs an interactive `sudo xcodebuild -license accept` on
+this machine, not something fixable from an unattended session.
