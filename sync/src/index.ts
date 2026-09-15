@@ -462,6 +462,21 @@ async function applyIncomingChanges(
   await env.DB.batch(statements);
 }
 
+// ------------------------------------------------------------------ health
+
+/**
+ * Unauthenticated on purpose: the smoke-test gate (issue #249) calls this right after
+ * deploying to staging, before any device token exists there. The `SELECT 1` is what makes
+ * this worth more than the platform's own health check — a Worker can boot and answer 200
+ * with a dead D1 binding, and that's exactly the failure mode a deploy gate exists to catch.
+ */
+async function handleHealth(env: Env): Promise<Response> {
+  await env.DB.prepare("SELECT 1").first();
+  return json({ status: "ok" });
+}
+
+// -------------------------------------------------------------- retention
+
 // -------------------------------------------------------------- retention
 
 /**
@@ -553,6 +568,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   const { pathname } = url;
   const { method } = request;
 
+  if (method === "GET" && pathname === "/health") return handleHealth(env);
   if (method === "POST" && pathname === "/pair/start") return handlePairStart(request, env);
   if (method === "POST" && pathname === "/pair/claim") return handlePairClaim(request, env);
   if (method === "POST" && pathname === "/sync") return handleSync(request, env);
