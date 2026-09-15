@@ -477,8 +477,6 @@ async function handleHealth(env: Env): Promise<Response> {
 
 // -------------------------------------------------------------- retention
 
-// -------------------------------------------------------------- retention
-
 /**
  * Raises `retentionFloorSeq` before deleting the tombstones it covers, per group, in one
  * `env.DB.batch()` each — never the other order. A client that read the old floor and is

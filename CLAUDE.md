@@ -110,17 +110,22 @@ npm run dev                 # wrangler dev on http://localhost:8787
 
 `wrangler dev`'s local mode never contacts Cloudflare's API. `npm run typecheck` runs
 `tsc --noEmit`; there's no automated test suite yet — the endpoints were verified by hand
-against `wrangler dev` locally, then smoke-tested against the real deployment (D124-D127).
+against `wrangler dev` locally (D124-D127).
 
-Redeploying after a change to `src/` or `schema.sql`:
-
-```
-npm run db:migrate:remote   # only if schema.sql changed
-npm run deploy
-```
+**Deploying happens through the merge-gate pipeline, not by hand** (D234, `.github/workflows/sync-deploy.yml`):
+any push to `main` that touches `sync/**` typechecks, deploys to the staging Worker
+(`couch-tour-sync-staging`, its own D1 database via `[env.staging]` in `wrangler.toml`), runs a
+smoke test against it — `GET /health` (a real `SELECT 1`, so a dead D1 binding fails the gate)
+plus a full `/pair/start` → `/pair/claim` round trip — and only then deploys to production. A
+red smoke test stops the pipeline before prod; the failed workflow run is the notification.
+Migrations against staging/prod (`npm run db:migrate:staging` / `db:migrate:remote`) run inside
+the workflow automatically when `schema.sql` changed, so there is no manual deploy step to
+remember. To run the pipeline on demand (e.g. after editing only the workflow itself), dispatch
+it with `gh workflow run sync-deploy.yml`.
 
 `wrangler login` is already done on this machine (`~/Library/Preferences/.wrangler/config/`);
-`wrangler.toml`'s `database_id` points at the real database, not a placeholder.
+`wrangler.toml`'s `database_id`s point at the real databases, not placeholders. CI
+authenticates with a scoped `CLOUDFLARE_API_TOKEN` repo secret (Workers Scripts:Edit + D1:Edit).
 
 ## Names that look wrong and are not
 
