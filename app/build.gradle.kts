@@ -163,6 +163,11 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Google TV / Android TV foundation (#182): the Leanback-launched entry point renders
+    // with Compose for TV, not the phone's material3 screens.
+    implementation(libs.androidx.tv.foundation)
+    implementation(libs.androidx.tv.material)
+
     implementation(libs.zxing.core)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

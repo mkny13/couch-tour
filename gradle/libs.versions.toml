@@ -23,6 +23,10 @@ workManager = "2.11.2"
 zxingCore = "3.5.3"
 camerax = "1.4.1"
 mlkitBarcode = "17.3.0"
+# Google TV / Android TV foundation (#182): Compose for TV, not the phone's material3 —
+# focus-driven D-pad navigation and TV-scaled components need their own theme and widgets.
+tvFoundation = "1.0.0"
+tvMaterial = "1.1.0"
 junit = "4.13.2"
 robolectric = "4.14.1"
 coroutinesTest = "1.9.0"
@@ -71,6 +75,9 @@ androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", 
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
+
+androidx-tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "tvFoundation" }
+androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
