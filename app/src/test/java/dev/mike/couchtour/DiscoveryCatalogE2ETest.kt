@@ -39,6 +39,9 @@ class DiscoveryCatalogE2ETest {
     private lateinit var dbFile: File
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+    /** Every raw database opened this test, so [tearDown] can close them even on failure. */
+    private val openDbs = mutableListOf<SQLiteDatabase>()
+
     // -------------------------------------------------------------------------
     // Test Models & Schemas for E2E Contract Verification
     // -------------------------------------------------------------------------
@@ -120,14 +123,33 @@ class DiscoveryCatalogE2ETest {
         context = ApplicationProvider.getApplicationContext()
         dbFile = context.getDatabasePath("e2e_discovery_test.db")
         dbFile.parentFile?.mkdirs()
-        dbFile.delete()
+        deleteDbFiles()
     }
 
     @After
     fun tearDown() {
-        if (dbFile.exists()) {
-            dbFile.delete()
-        }
+        // The tests close the databases they open inline, after their assertions — a failed
+        // assert skips that close and leaves an open handle. Closing everything this test
+        // opened (close() is idempotent) before deleting the file underneath it keeps one
+        // test's failure from leaking a handle — and SQLite's -wal/-shm state — into the next.
+        openDbs.forEach { runCatching { it.close() } }
+        openDbs.clear()
+        deleteDbFiles()
+    }
+
+    /**
+     * Opens a raw database and remembers it for [tearDown]'s failure-safe close.
+     */
+    private fun openDb(): SQLiteDatabase =
+        SQLiteDatabase.openOrCreateDatabase(dbFile, null).also { openDbs.add(it) }
+
+    /**
+     * Deletes the database file and its SQLite sidecars — a stale `-wal`/`-shm` pair
+     * surviving the main file's delete would resurrect the previous test's rows here.
+     */
+    private fun deleteDbFiles() {
+        listOf(dbFile, File(dbFile.path + "-wal"), File(dbFile.path + "-shm"), File(dbFile.path + "-journal"))
+            .forEach { it.delete() }
     }
 
     // -------------------------------------------------------------------------
@@ -351,7 +373,7 @@ class DiscoveryCatalogE2ETest {
 
     @Test
     fun `T1_F3_migration8To9CreatesArtistTourPreferencesTable`() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openDb()
         db.execSQL("""
             CREATE TABLE IF NOT EXISTS `progress` (
                 `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
@@ -383,7 +405,7 @@ class DiscoveryCatalogE2ETest {
 
     @Test
     fun `T1_F3_artistTourPreferenceInsertAndQueryByKey`() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openDb()
         db.execSQL("""
             CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
                 `artistKey` TEXT NOT NULL PRIMARY KEY,
@@ -406,7 +428,7 @@ class DiscoveryCatalogE2ETest {
 
     @Test
     fun `T1_F3_artistTourPreferenceUpdateExisting`() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openDb()
         db.execSQL("""
             CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
                 `artistKey` TEXT NOT NULL PRIMARY KEY,
@@ -432,7 +454,7 @@ class DiscoveryCatalogE2ETest {
 
     @Test
     fun `T1_F3_artistTourPreferenceDelete`() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openDb()
         db.execSQL("""
             CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
                 `artistKey` TEXT NOT NULL PRIMARY KEY,
@@ -455,7 +477,7 @@ class DiscoveryCatalogE2ETest {
 
     @Test
     fun `T1_F3_migration8To9PreservesProgressAndPlaylists`() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openDb()
         db.execSQL("""
             CREATE TABLE `progress` (
                 `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
@@ -1033,7 +1055,7 @@ class DiscoveryCatalogE2ETest {
         // 3. Verify listening history is preserved
         // 4. Write tour preference and verify roundtrip
 
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openDb()
         db.execSQL("""
             CREATE TABLE `progress` (
                 `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,

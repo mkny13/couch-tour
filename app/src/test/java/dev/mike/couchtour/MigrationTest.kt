@@ -30,6 +30,9 @@ class MigrationTest {
     private lateinit var context: Context
     private lateinit var dbFile: File
 
+    /** Every raw database opened this test, so [tearDown] can close them even on failure. */
+    private val rawDbs = mutableListOf<SQLiteDatabase>()
+
     // Straight from app/schemas/dev.mike.couchtour.PhishInDb/1.json.
     private val v1CreateTable = """
         CREATE TABLE IF NOT EXISTS `progress` (
@@ -131,16 +134,39 @@ class MigrationTest {
         context = ApplicationProvider.getApplicationContext()
         dbFile = context.getDatabasePath("migration-test.db")
         dbFile.parentFile?.mkdirs()
-        dbFile.delete()
+        deleteDbFiles()
     }
 
     @After
     fun tearDown() {
-        dbFile.delete()
+        // The helpers each close the database they open, but only on their happy path — a
+        // helper that throws halfway leaves an open handle. Closing everything we opened
+        // (close() is idempotent) before deleting the file underneath it keeps one test's
+        // failure from leaking into the next.
+        rawDbs.forEach { runCatching { it.close() } }
+        rawDbs.clear()
+        deleteDbFiles()
+    }
+
+    /**
+     * Opens a raw database and remembers it for [tearDown]'s failure-safe close.
+     */
+    private fun openRawDb(): SQLiteDatabase =
+        SQLiteDatabase.openOrCreateDatabase(dbFile, null).also { rawDbs.add(it) }
+
+    /**
+     * Deletes the database file and its SQLite sidecars. Deleting only the main file would
+     * let a leftover `-wal`/`-shm` pair from an earlier test resurrect stale rows into the
+     * next test's "fresh" v1 database — exactly the cross-test state leak this suite cannot
+     * afford, since every test asserts on the exact contents it just inserted.
+     */
+    private fun deleteDbFiles() {
+        listOf(dbFile, File(dbFile.path + "-wal"), File(dbFile.path + "-shm"), File(dbFile.path + "-journal"))
+            .forEach { it.delete() }
     }
 
     private fun createV1DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openRawDb()
         db.execSQL(v1CreateTable)
         // Room's own bookkeeping, so it recognises this as a genuine v1 database.
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
@@ -163,7 +189,7 @@ class MigrationTest {
     }
 
     private fun createV2DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openRawDb()
         db.execSQL(v2CreateTable)
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
         db.execSQL(
@@ -185,7 +211,7 @@ class MigrationTest {
     }
 
     private fun createV4DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openRawDb()
         db.execSQL(v4CreateTable)
         db.execSQL(v4PendingScrobblesTable)
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
@@ -212,7 +238,7 @@ class MigrationTest {
     }
 
     private fun createV5DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openRawDb()
         db.execSQL(v5CreateTable)
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
         db.execSQL(
@@ -234,7 +260,7 @@ class MigrationTest {
     }
 
     private fun createV6DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openRawDb()
         db.execSQL(v6CreateTable)
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
         db.execSQL(
@@ -256,7 +282,7 @@ class MigrationTest {
     }
 
     private fun createV7DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openRawDb()
         db.execSQL(v7CreateTable)
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
         db.execSQL(
@@ -278,7 +304,7 @@ class MigrationTest {
     }
 
     private fun createV8DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        val db = openRawDb()
         db.execSQL(v8CreateTable)
         db.execSQL(v8LocalPlaylistsTable)
         db.execSQL(v8LocalPlaylistTracksTable)
