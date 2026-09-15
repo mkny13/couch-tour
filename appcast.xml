@@ -6,6 +6,14 @@
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
+            <title>0.83</title>
+            <pubDate>Tue, 15 Sep 2026 22:58:48 +0000</pubDate>
+            <sparkle:version>38</sparkle:version>
+            <sparkle:shortVersionString>0.83</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.83/CouchTour-v0.83.zip" length="7728230" type="application/octet-stream" sparkle:edSignature="mUbXQhHdUKZQG1VO01Tm2DWkPu4OCPg9gVSfxBb0MGcD3J5gdw9+l8zo7jImKmJGj3E1iVYSz5+zc5qXxwMBDg=="/>
+        </item>
+        <item>
             <title>0.78</title>
             <pubDate>Tue, 08 Sep 2026 01:39:37 +0000</pubDate>
             <sparkle:version>34</sparkle:version>
