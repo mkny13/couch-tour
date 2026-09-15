@@ -109,18 +109,34 @@ npm run dev                 # wrangler dev on http://localhost:8787
 ```
 
 `wrangler dev`'s local mode never contacts Cloudflare's API. `npm run typecheck` runs
-`tsc --noEmit`; there's no automated test suite yet — the endpoints were verified by hand
-against `wrangler dev` locally, then smoke-tested against the real deployment (D124-D127).
+`tsc --noEmit`; there's no automated test suite yet — endpoints are verified by hand against
+`wrangler dev` locally, and the merge pipeline below smoke-tests the real pairing path against
+a live deployment before anything reaches production.
 
-Redeploying after a change to `src/` or `schema.sql`:
+**Every merge to `main` touching `sync/**` deploys itself**
+(`.github/workflows/sync-deploy.yml`, D233) — no manual `npm run deploy` step in the normal
+flow: typecheck, deploy to a separate `couch-tour-sync-staging` Worker + D1 database
+(`[env.staging]` in `wrangler.toml`), smoke-test it (`GET /health` — an unauthenticated `SELECT
+1` proving the D1 binding is actually live, not just that the Worker booted — then a full
+`/pair/start` → `/pair/claim` round trip), and only on success deploy the same commit to
+production. A failed smoke test stops before touching prod; the workflow going red on GitHub
+*is* the failure notification, same as `main`'s other CI. Unlike the native apps' beta-gate
+release flow, there's no manual promotion step here — this is a stateless API with existing
+typecheck coverage and no UI a human needs to click through, so auto-deploy-on-green is the
+right default (owner confirmed 2026-09-13).
+
+Manual escape hatches, for a change that needs deploying outside the `main` pipeline:
 
 ```
+npm run deploy:staging      # wrangler deploy --env staging
+npm run db:migrate:staging  # only if schema.sql changed
+npm run deploy              # wrangler deploy (prod) — the merge pipeline normally does this
 npm run db:migrate:remote   # only if schema.sql changed
-npm run deploy
 ```
 
 `wrangler login` is already done on this machine (`~/Library/Preferences/.wrangler/config/`);
-`wrangler.toml`'s `database_id` points at the real database, not a placeholder.
+`wrangler.toml`'s `database_id` points at the real database, not a placeholder. CI
+authenticates with its own scoped `CLOUDFLARE_API_TOKEN` repo secret instead of this login.
 
 ## Names that look wrong and are not
 

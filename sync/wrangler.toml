@@ -27,3 +27,26 @@ namespace_id = "1001"
   [ratelimits.simple]
   limit = 5
   period = 10
+
+# Staging deploy target for the merge-gate pipeline (issue #249): `wrangler deploy --env
+# staging` ships to its own Worker + D1 database first, so a broken deploy 500s a throwaway
+# database instead of the one real devices sync through. Named environments don't inherit
+# bindings from the top-level config, so everything prod has above — D1, the rate limiter —
+# is redeclared here rather than assumed shared. `[triggers]`'s cron *does* inherit (unlike
+# bindings) and runs the daily purge against staging's own database too; harmless, since a
+# database that only ever holds smoke-test rows has nothing old enough to purge.
+[env.staging]
+name = "couch-tour-sync-staging"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "couch-tour-sync-staging"
+database_id = "97e24b89-1f80-4e53-b035-9fb043fda8f3"
+
+[[env.staging.ratelimits]]
+name = "PAIR_START_LIMITER"
+namespace_id = "1002"
+
+  [env.staging.ratelimits.simple]
+  limit = 5
+  period = 10

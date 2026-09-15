@@ -4458,3 +4458,51 @@ Neither database is encrypted with SQLCipher or equivalent, and this is acceptab
 **Verification:** 428 Swift package tests pass (including the new
 `testDefaultURLDirectoryIsExcludedFromBackup`); Android `testDebugUnitTest` passes.
 `uat-051` added for runtime verification of the macOS backup exclusion.
+
+### D233 — sync/: staging Worker + smoke-test gate, auto-promote to prod on merge (#249)
+
+`sync/` used to deploy straight to the one production Worker via a manual `npm run deploy` —
+CLAUDE.md described the first real test as happening *in* production. Unlike the native apps
+(which keep a manual beta gate — see the companion issue), this is a stateless API with
+existing `tsc --noEmit` coverage and no UI a human needs to click through, so the owner
+confirmed (2026-09-13) auto-deploy-on-green over a manual gate: every merge to `main` touching
+`sync/**` now deploys to staging, smoke-tests it, and only then promotes to production, with no
+human step in between.
+
+- **`wrangler.toml`**: added `[env.staging]` with its own D1 database
+  (`couch-tour-sync-staging`, created via `wrangler d1 create` and migrated from `schema.sql`)
+  and its own Worker name (`couch-tour-sync-staging`), separate from prod's bindings. Named
+  environments don't inherit `d1_databases`/`ratelimits` bindings from the top-level config —
+  each had to be redeclared under `[env.staging]` rather than assumed shared — but `[triggers]`
+  *does* inherit, so the daily tombstone-purge cron runs against staging too. Harmless: a
+  database that only ever holds smoke-test rows has nothing old enough to purge.
+- **`src/index.ts`**: added `GET /health`, unauthenticated, doing a trivial `SELECT 1` against
+  `env.DB` — proves the D1 binding is actually live, not just that the Worker booted. No CORS
+  headers, matching the no-CORS policy for every other endpoint (D149).
+- **`.github/workflows/sync-deploy.yml`** (new): triggered on push to `main` touching
+  `sync/**`. `npm ci && npm run typecheck` → deploy to staging (`wrangler deploy --env
+  staging`, plus a staging schema migration if `schema.sql` changed) → smoke test (`GET
+  /health`, then a full `/pair/start` → `/pair/claim` round trip against the live staging
+  Worker, not just a reachability check) → only on success, deploy to prod the same way. A
+  failed smoke test stops before the prod deploy step ever runs; the workflow going red on
+  GitHub is the failure notification, matching the "no manual step" goal — there's no separate
+  alert to wire up.
+- **`CLAUDE.md`**: the sync-backend section now describes the pipeline as the normal path and
+  keeps `npm run deploy`/`deploy:staging`/`db:migrate:*` as manual escape hatches for
+  out-of-band work.
+
+**Left for the owner:** the workflow authenticates with `secrets.CLOUDFLARE_API_TOKEN`, which
+does not exist as a repo secret yet, and creating a scoped one (Workers Scripts:Edit + D1:Edit,
+not the account-wide OAuth token already on this machine) needs the Cloudflare dashboard — the
+OAuth session available to this agent has no "API Tokens: Edit" permission, so it can create
+Cloudflare resources (the `couch-tour-sync-staging` D1 database and Worker were created and
+smoke-tested by hand from this session) but not mint a new API token for CI to use. Until that
+secret is added, pushes touching `sync/**` will deploy to staging and fail at the smoke-test or
+deploy step for lack of credentials rather than silently reaching prod — the gate fails closed.
+
+**Verification:** `npm run typecheck` passes; the full smoke-test sequence (`GET /health`, then
+`/pair/start` → `/pair/claim`) was run by hand against the real
+`couch-tour-sync-staging.mkastellec.workers.dev` deployment and succeeded end-to-end before
+being wired into the workflow. Android `testDebugUnitTest` passes; `swift test` could not be
+verified in this worktree — Xcode's license hasn't been accepted on this machine (`sudo
+xcodebuild -license`), and this batch touches no macOS/Swift code.
