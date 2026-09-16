@@ -65,7 +65,12 @@ final class PhishInAPIAuthRequestTests: XCTestCase {
         PhishInAPI.onUnauthorized = { fired = true }
         server.enqueue("", code: 401)
 
-        _ = try? await PhishInAPI.showsForPeriod("1997")
+        do {
+            _ = try await PhishInAPI.showsForPeriod("1997")
+            XCTFail("expected the 401 to rethrow")
+        } catch {
+            // expected
+        }
 
         XCTAssertTrue(fired)
     }
@@ -175,7 +180,12 @@ final class PhishInSessionTests: XCTestCase {
         try await session.login(email: "mike@example.com", password: "hunter2")
 
         server.enqueue("", code: 401)
-        _ = try? await PhishInAPI.showsForPeriod("1997")
+        do {
+            _ = try await PhishInAPI.showsForPeriod("1997")
+            XCTFail("expected the 401 to rethrow")
+        } catch {
+            // expected
+        }
 
         XCTAssertNil(session.username)
         XCTAssertNil(store.jwt)

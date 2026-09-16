@@ -120,9 +120,11 @@ final class Milestone1StressTests: XCTestCase {
             ShowSummary(artist: phishArtist, date: "1998-04-03", tags: [Tag(name: "Bustout*")]),
         ]
 
+        // The production filter, not a local reimplementation — a copy here would go
+        // false-green in exactly the way #245 documented: production could change and this
+        // suite would stay green.
         func filterShows(_ list: [ShowSummary], by tag: String) -> [ShowSummary] {
-            if tag.isEmpty || tag.caseInsensitiveCompare("all") == .orderedSame { return list }
-            return list.filter { show in show.tags.contains { $0.name.caseInsensitiveCompare(tag) == .orderedSame } }
+            filterShowsByTag(list, tagName: tag)
         }
 
         XCTAssertEqual(1, filterShows(shows, by: "Type-II (Extended)").count)
