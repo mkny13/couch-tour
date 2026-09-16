@@ -4558,3 +4558,57 @@ Android `testDebugUnitTest` passes. `swift test` hits the same pre-existing, env
 Xcode license blocker as D233/D234 — this change touches only `macos/scripts/install.sh`, not
 `CouchTourKit` or the Swift app target.
 
+
+## Iteration 61 — Volume leveling strategy (#18, D237)
+
+### D237 — Volume leveling measures loudness on the device, per source, with one static gain (#18)
+
+Supersedes the "deferred until there's a loudness source" status that ROADMAP.md, the README,
+and `prompts/phase-2-batches.md` gave #18 (2026-08-31, restated 2026-09-05/09-11). Mike picked
+option (a) on the issue: **client-side decode-ahead loudness measurement, cached per
+source**. The other options were a manual per-source trim knob, and waiting for an upstream
+ReplayGain/R128 source. None exists today: the phish.in and Relisten payloads carry only
+URLs and durations.
+
+**What the strategy is:**
+- **Granularity is the source.** The unit is a phish.in show (a single mix, key `show:<date>`)
+  or a Relisten tape (`relisten:<artist>/<date>/<sourceId>`). This is the issue's own framing,
+  and it's why this isn't per-track normalization: a quiet ballad stays quiet next to a loud
+  jam on the same tape. The key has to be derivable per *track*, not just per queue, because
+  playlists mix sources.
+- **Measure a sample, not the whole show.** BS.1770-4 gated integrated loudness plus sample
+  peak, over 30 s from the middle of up to 3 tracks, fetched with HTTP Range from the MP3 URL
+  and decoded in the background. That's roughly 1.5 MB of transfer per source, and about a
+  second of decode on a phone. Measuring whole shows would cost hundreds of MB per source,
+  and that's the mobile battery and data cost that made this look infeasible before. A 90 s
+  sample is enough to separate an AUD tape from an SBD tape, which is the problem the issue
+  describes; the goal isn't mastering-grade accuracy.
+- **One static gain per source:** `clamp(-18 LUFS - measured, ±12 dB)`, capped so the sample
+  peak stays under -1 dBFS. There's no compressor or limiter, so dynamic range is preserved.
+  That requirement is also why Android's `LoudnessEnhancer`/`DynamicsProcessing` stay
+  rejected, and AVFoundation has no equivalent anyway. The ReplayGain-style peak cap means a
+  hot-peaked quiet tape may get less boost than it "should". That's the accepted price of
+  never clipping without a limiter.
+- **Gain has to be a real DSP stage.** `player.volume` (Android) and `AVPlayer.volume` (macOS)
+  both cap at 1.0, so they can only attenuate, and the quiet AUD tapes are exactly the ones
+  that need a boost. Android gets a Media3 `AudioProcessor`, and macOS gets an
+  `MTAudioProcessingTap` on each item's `AVAudioMix`.
+- **The cache is local, versioned, and never synced.** A new `source_loudness` table (Room
+  v10, GRDB v10) holds derived data that can always be re-measured. An `algorithmVersion`
+  column makes a meter change invalidate old rows instead of leaving them wrong. Keeping it
+  out of `sync/` avoids growing the wire format for something each device can recompute.
+- **No leveling while casting.** The Cast receiver decodes the audio, so the app has no stage
+  to apply gain in. The Settings help text says so.
+- **Off by default for the first beta**, so Mike can A/B it on real tapes. Whether it's on by
+  default is a UAT decision (#269), not something to decide now.
+
+**Split** into #265 (meter, gain rule, and per-track key; pure, both platforms), #266 (cache
+table and migrations), #267 (Android measurement, gain, and toggle), #268 (macOS
+measurement, gain, and toggle), and #269 (post-UAT defaults, a clear-cache action, and docs).
+#265 and #266 are independent. #267 and #268 each depend on both but not on each other. The
+shared design is repeated in every issue body, so each one can be handed to a worktree as its
+own prompt.
+
+**Verification:** docs and issue split only. No code changed. Android `testDebugUnitTest`
+passes. `swift test` hits the same pre-existing Xcode license blocker as D233-D235, and this
+change touches no Swift.

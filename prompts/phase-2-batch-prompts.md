@@ -13,7 +13,9 @@ Working prompts for the batches approved in [phase-2-batches.md](phase-2-batches
 | **6** | #65 | Android + macOS | **Needs its own planning pass** — see the note at the bottom |
 
 **#18 (volume leveling) is deferred out of Phase 2** and has no prompt here, by decision on
-2026-08-31. See phase-2-batches.md's "Decisions taken".
+2026-08-31. See phase-2-batches.md's "Decisions taken". **Update 2026-09-16:** it now has a
+direction (on-device measurement cached per source, D237) and its own issues, #265-#269. Each
+issue body is its prompt.
 
 ---
 
