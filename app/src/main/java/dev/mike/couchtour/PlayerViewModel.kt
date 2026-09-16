@@ -59,6 +59,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _postShowPrompt = MutableStateFlow<ShowSummary?>(null)
     val postShowPrompt: StateFlow<ShowSummary?> = _postShowPrompt.asStateFlow()
 
+    private val _compareState = MutableStateFlow<CompareSourcesState?>(null)
+    val compareState: StateFlow<CompareSourcesState?> = _compareState.asStateFlow()
+
     private var activeShowSummary: ShowSummary? = null
     private var lastResolvedEndedShowDate: String? = null
 
@@ -445,6 +448,82 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun previous() = controller?.seekToPreviousMediaItem()
     fun seekTo(ms: Long) {
         controller?.seekTo(ms)
+    }
+
+    // -------------------------------------------------------- comparison (#235)
+
+    fun enterCompareSourcesMode(detail: ShowDetail) {
+        val c = controller ?: return
+        val currentItems = (0 until c.mediaItemCount).map { c.getMediaItemAt(it) }
+        val activeRecordingId = detail.recording?.id ?: return
+        val currentTrackTitle = state.value.trackTitle
+        val artist = detail.summary.artist
+
+        val originalState = CompareSourcesState(
+            detail = detail,
+            activeRecordingId = activeRecordingId,
+            isComparing = true,
+            originalQueue = currentItems,
+            originalTrackIndex = c.currentMediaItemIndex,
+            originalPositionMs = c.currentPosition,
+            originalPlayWhenReady = c.playWhenReady,
+            comparisonItems = emptyMap()
+        )
+        _compareState.value = originalState
+
+        viewModelScope.launch {
+            val items = mutableMapOf<String, MediaItem>()
+            val sources = listOfNotNull(detail.recording) + detail.alternates
+            for (source in sources) {
+                runCatching {
+                    val sourceDetail = if (artist.backend == Backend.PHISHIN) {
+                        detail
+                    } else {
+                        RelistenApi.show(artist.id, detail.summary.date).toShowDetail(artist, source.id)
+                    }
+                    val matchedTrack = sourceDetail.tracks.find { it.title == currentTrackTitle }
+                    if (matchedTrack != null) {
+                        val info = QueueInfo(
+                            key = sourceDetail.queueKey,
+                            title = sourceDetail.summary.date,
+                            subtitle = sourceDetail.summary.where,
+                            art = sourceDetail.summary.artUrl ?: sourceDetail.tracks.firstOrNull()?.artUrl,
+                            artist = artist.name,
+                            artistId = artist.id,
+                        )
+                        items[source.id] = recordingMediaItem(matchedTrack, info)
+                    }
+                }
+            }
+            _compareState.value = originalState.copy(comparisonItems = items)
+        }
+    }
+
+    fun switchComparisonSource(recordingId: String) {
+        val st = _compareState.value ?: return
+        val c = controller ?: return
+        if (st.activeRecordingId == recordingId) return
+        val item = st.comparisonItems[recordingId] ?: return
+        
+        val pos = c.currentPosition
+        c.pause()
+        c.setMediaItem(item)
+        c.prepare()
+        c.seekTo(pos)
+        c.play()
+
+        _compareState.value = st.copy(activeRecordingId = recordingId)
+    }
+
+    fun exitCompareSourcesMode() {
+        val st = _compareState.value ?: return
+        val c = controller ?: return
+        _compareState.value = null
+
+        c.pause()
+        c.setMediaItems(st.originalQueue, st.originalTrackIndex, st.originalPositionMs)
+        c.prepare()
+        if (st.originalPlayWhenReady) c.play()
     }
 
     override fun onCleared() {

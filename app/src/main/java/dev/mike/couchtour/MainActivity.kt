@@ -1752,6 +1752,7 @@ private fun recordingLabel(rec: RecordingRef): String {
 @Composable
 private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String, date: String, vm: PlayerViewModel, nav: NavHostController) {
     var open by remember { mutableStateOf(false) }
+    var compareOpen by remember { mutableStateOf(false) }
     val sources = listOfNotNull(detail.recording) + detail.alternates
 
     Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -1764,6 +1765,18 @@ private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String
         if (open) {
             ModalBottomSheet(onDismissRequest = { open = false }) {
                 LazyColumn {
+                    item {
+                        RowItem(
+                            title = "Compare sources",
+                            subtitle = "Listen to snippets of this track side by side",
+                            artUrl = null,
+                            onClick = {
+                                open = false
+                                compareOpen = true
+                            }
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    }
                     items(sources, key = { it.id }) { source ->
                         val current = source.id == detail.recording?.id
                         SourceRow(source, current) {
@@ -1784,11 +1797,22 @@ private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String
                 }
             }
         }
+        if (compareOpen) {
+            CompareSourcesSheet(
+                detail = detail,
+                backendId = backendId,
+                artistId = artistId,
+                date = date,
+                vm = vm,
+                nav = nav,
+                onDismiss = { compareOpen = false }
+            )
+        }
     }
 }
 
 @Composable
-private fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Unit) {
+internal fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -1834,7 +1858,7 @@ private fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Uni
 }
 
 @Composable
-private fun SourceBadge(text: String, color: Color) {
+internal fun SourceBadge(text: String, color: Color) {
     Surface(
         color = color.copy(alpha = 0.15f),
         contentColor = color,
