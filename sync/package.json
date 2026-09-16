@@ -7,8 +7,10 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
     "db:migrate:local": "wrangler d1 execute couch-tour-sync --local --file=schema.sql",
     "db:migrate:remote": "wrangler d1 execute couch-tour-sync --remote --file=schema.sql",
+    "db:migrate:staging": "wrangler d1 execute couch-tour-sync-staging --remote --file=schema.sql",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

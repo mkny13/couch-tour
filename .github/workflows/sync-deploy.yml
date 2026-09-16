@@ -1,0 +1,90 @@
+name: Deploy sync backend
+
+# Every merge to main touching sync/** deploys to staging, smoke-tests the real pairing path
+# against it, and only on success promotes the same commit to production (issue #249) — no
+# manual step, unlike the native apps' beta-gate release flow (CLAUDE.md). This is a stateless
+# API with existing typecheck coverage and no UI a human needs to click through, which is why
+# it gets auto-deploy-on-green instead of a beta channel: a red smoke test against staging is
+# the entire gate, and the workflow going red *is* the failure notification (no prod deploy
+# step runs after it).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sync/**"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: sync
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # HEAD^ has to exist for the schema-change check below; a squash-merged PR is a
+          # single new commit on main, so depth 2 is enough to diff it against what main was
+          # before the merge.
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm ci
+      - run: npm run typecheck
+
+      - name: Check whether schema.sql changed
+        id: schema
+        run: |
+          if git diff --name-only HEAD^ HEAD -- schema.sql | grep -qx schema.sql; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Migrate staging schema
+        if: steps.schema.outputs.changed == 'true'
+        run: npm run db:migrate:staging
+
+      - name: Deploy to staging
+        run: npm run deploy:staging
+
+      # A full /pair/start -> /pair/claim round trip, not just GET /health: /health only
+      # proves the Worker booted and the D1 binding answers a query, not that the actual
+      # auth/pairing path devices depend on still works. Each run leaves one throwaway
+      # group+device pair in the staging database — negligible growth for a database that
+      # only ever exists to be smoke-tested against.
+      - name: Smoke test staging
+        run: |
+          set -euo pipefail
+          base="https://couch-tour-sync-staging.mkastellec.workers.dev"
+
+          health_status=$(curl -s -o /dev/null -w "%{http_code}" "$base/health")
+          if [ "$health_status" != "200" ]; then
+            echo "GET /health returned $health_status"
+            exit 1
+          fi
+
+          start=$(curl -sf -X POST "$base/pair/start" \
+            -H "content-type: application/json" \
+            -d '{"deviceName":"ci-smoke-test","platform":"ci"}')
+          code=$(echo "$start" | jq -er '.code')
+
+          claim=$(curl -sf -X POST "$base/pair/claim" \
+            -H "content-type: application/json" \
+            -d "{\"code\":\"$code\",\"deviceName\":\"ci-smoke-test-claim\",\"platform\":\"ci\"}")
+          echo "$claim" | jq -er '.deviceId' > /dev/null
+
+          echo "Staging smoke test passed."
+
+      - name: Migrate production schema
+        if: steps.schema.outputs.changed == 'true'
+        run: npm run db:migrate:remote
+
+      - name: Deploy to production
+        run: npm run deploy
