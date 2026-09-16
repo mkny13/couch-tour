@@ -344,6 +344,33 @@ extension Array where Element == Track {
     }
 }
 
+public enum ExternalReleasePlatform: String, Codable, Sendable, Hashable {
+    case spotify
+    case tidal
+}
+
+public struct ExternalRelease: Codable, Hashable, Sendable {
+    public let platform: ExternalReleasePlatform
+    public let url: String
+    
+    public init(platform: ExternalReleasePlatform, url: String) {
+        self.platform = platform
+        self.url = url
+    }
+
+    /// Returns the app-specific URL scheme (e.g., spotify:// or tidal://) derived from the web URL.
+    public var appURL: URL? {
+        if platform == .spotify, url.hasPrefix("https://open.spotify.com/") {
+            let path = url.dropFirst("https://open.spotify.com/".count)
+            return URL(string: "spotify://\(path)")
+        } else if platform == .tidal, url.hasPrefix("https://tidal.com/browse/") {
+            let path = url.dropFirst("https://tidal.com/browse/".count)
+            return URL(string: "tidal://\(path)")
+        }
+        return nil
+    }
+}
+
 public struct ShowSummary: Hashable, Sendable {
     public let artist: ArtistRef
     public let date: String
@@ -366,6 +393,7 @@ public struct ShowSummary: Hashable, Sendable {
     /// defaults, which is how the pill knows to hide itself (`id == 0`).
     public let id: Int64
     public let likedByUser: Bool
+    public let externalRelease: ExternalRelease?
 
     public init(
         artist: ArtistRef,
@@ -381,7 +409,8 @@ public struct ShowSummary: Hashable, Sendable {
         popularity: RelistenPopularity? = nil,
         likesCount: Int = 0,
         id: Int64 = 0,
-        likedByUser: Bool = false
+        likedByUser: Bool = false,
+        externalRelease: ExternalRelease? = nil
     ) {
         self.artist = artist
         self.date = date
@@ -397,6 +426,7 @@ public struct ShowSummary: Hashable, Sendable {
         self.likesCount = likesCount
         self.id = id
         self.likedByUser = likedByUser
+        self.externalRelease = externalRelease
     }
 
     /// "McNichols Arena · Denver, CO"

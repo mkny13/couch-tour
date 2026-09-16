@@ -6,6 +6,39 @@ import XCTest
 /// a network call.
 final class CatalogTests: XCTestCase {
 
+    func testExternalReleaseModel() throws {
+        // App URL construction
+        let spotify = ExternalRelease(platform: .spotify, url: "https://open.spotify.com/album/43YxZcUDU4EaJ3i4k9Iub6")
+        XCTAssertEqual(spotify.appURL?.absoluteString, "spotify://album/43YxZcUDU4EaJ3i4k9Iub6")
+        
+        let tidal = ExternalRelease(platform: .tidal, url: "https://tidal.com/browse/album/12345")
+        XCTAssertEqual(tidal.appURL?.absoluteString, "tidal://album/12345")
+        
+        let invalidSpotify = ExternalRelease(platform: .spotify, url: "https://example.com")
+        XCTAssertNil(invalidSpotify.appURL)
+        
+        // Encoding / Decoding round trip
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        
+        let encodedSpotify = try encoder.encode(spotify)
+        let decodedSpotify = try decoder.decode(ExternalRelease.self, from: encodedSpotify)
+        XCTAssertEqual(decodedSpotify, spotify)
+    }
+    
+    func testShowSummaryCarriesExternalRelease() {
+        let release = ExternalRelease(platform: .spotify, url: "https://open.spotify.com/album/123")
+        let summary = ShowSummary(artist: ArtistRef(backend: .phishin, id: "phish", name: "Phish"), date: "1997-11-17", externalRelease: release)
+        
+        XCTAssertNotNil(summary.externalRelease)
+        XCTAssertEqual(summary.externalRelease?.platform, ExternalReleasePlatform.spotify)
+        XCTAssertEqual(summary.externalRelease?.url, "https://open.spotify.com/album/123")
+        
+        // ShowDetail carries it via summary
+        let detail = ShowDetail(summary: summary, tracks: [], tags: [])
+        XCTAssertNotNil(detail.summary.externalRelease)
+    }
+
     private func track(
         id: Int64 = 1,
         title: String = "Tweezer",
