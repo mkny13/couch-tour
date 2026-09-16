@@ -65,6 +65,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val progressDao = PhishInDb.get(app).progressDao()
     val localPlaylistDao = PhishInDb.get(app).localPlaylistDao()
     val artistTourPreferenceDao = PhishInDb.get(app).artistTourPreferenceDao()
+    val externalReleaseDao = PhishInDb.get(app).externalReleaseDao()
 
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))

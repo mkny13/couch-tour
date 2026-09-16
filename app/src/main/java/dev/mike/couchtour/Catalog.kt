@@ -227,6 +227,16 @@ data class PeriodRef(
     val artUrl: String? = null,
 )
 
+enum class ExternalReleasePlatform {
+    SPOTIFY, TIDAL
+}
+
+@Serializable
+data class ExternalRelease(
+    val platform: ExternalReleasePlatform,
+    val url: String
+)
+
 data class ShowSummary(
     val artist: ArtistRef,
     val date: String,
@@ -247,6 +257,7 @@ data class ShowSummary(
      *  leaves this at the default 0, which is what lets [SearchSortMode.MOST_LIKED] sort
      *  Relisten hits after every phish.in one without a special-cased branch. */
     val likesCount: Int = 0,
+    val externalRelease: ExternalRelease? = null,
 ) {
     /** "McNichols Arena · Denver, CO" */
     val where: String get() = listOfNotNull(venue, location).joinToString(" · ")
@@ -309,6 +320,7 @@ data class ShowDetail(
     val recording: RecordingRef? = null,
     val alternates: List<RecordingRef> = emptyList(),
     val tracks: List<PlayableTrack> = emptyList(),
+    val externalRelease: ExternalRelease? = null,
 ) {
     /**
      * Where this queue's progress is stored, or null if it isn't resumable.
@@ -605,6 +617,14 @@ internal fun Show.toShowSummary() = ShowSummary(
     recordingCount = 1,
     tags = tags.map { it.toTagRef() },
     likesCount = likesCount,
+    externalRelease = if (externalReleasePlatform != null && externalReleaseUrl != null) {
+        runCatching {
+            ExternalRelease(
+                platform = ExternalReleasePlatform.valueOf(externalReleasePlatform!!.uppercase()),
+                url = externalReleaseUrl!!
+            )
+        }.getOrNull()
+    } else null,
 )
 
 internal fun Show.toShowDetail(): ShowDetail {
