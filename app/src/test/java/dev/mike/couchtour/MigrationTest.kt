@@ -322,6 +322,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_6_7,
                 PhishInDb.MIGRATION_7_8,
                 PhishInDb.MIGRATION_8_9,
+                PhishInDb.MIGRATION_9_10,
             )
             .allowMainThreadQueries()
             .build()
@@ -643,6 +644,33 @@ class MigrationTest {
 
             prefDao.deletePreference("relisten:grateful-dead")
             assertNull(prefDao.getPreference("relisten:grateful-dead"))
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `a database migrated from v8 accepts taper preferences`() = runBlocking {
+        createV8DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val prefDao = db.taperPreferenceDao()
+            val pref = TaperPreferenceEntity(
+                taperName = "Charlie Miller",
+                preference = "PREFERRED",
+                updatedAt = 123456789L,
+            )
+            prefDao.upsertPreference(pref)
+
+            val retrieved = prefDao.getPreferenceFlow("Charlie Miller").first()
+            assertEquals(pref, retrieved)
+
+            val all = prefDao.getAllPreferences().first()
+            assertEquals(listOf(pref), all)
+
+            prefDao.deletePreference("Charlie Miller")
+            assertNull(prefDao.getPreferenceFlow("Charlie Miller").first())
         } finally {
             db.close()
         }

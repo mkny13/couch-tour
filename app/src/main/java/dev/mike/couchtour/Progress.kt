@@ -141,15 +141,38 @@ interface ArtistTourPreferenceDao {
     suspend fun clearAll()
 }
 
+@Entity(tableName = "taper_preferences")
+data class TaperPreferenceEntity(
+    @PrimaryKey @ColumnInfo(name = "taper_name") val taperName: String,
+    @ColumnInfo(name = "preference") val preference: String, // "PREFERRED", "AVOIDED"
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface TaperPreferenceDao {
+    @Query("SELECT * FROM taper_preferences WHERE taper_name = :taperName")
+    fun getPreferenceFlow(taperName: String): Flow<TaperPreferenceEntity?>
+
+    @Query("SELECT * FROM taper_preferences")
+    fun getAllPreferences(): Flow<List<TaperPreferenceEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPreference(preference: TaperPreferenceEntity)
+
+    @Query("DELETE FROM taper_preferences WHERE taper_name = :taperName")
+    suspend fun deletePreference(taperName: String)
+}
+
 @Database(
-    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class],
-    version = 9,
+    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class, TaperPreferenceEntity::class],
+    version = 10,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
     abstract fun localPlaylistDao(): LocalPlaylistDao
     abstract fun artistTourPreferenceDao(): ArtistTourPreferenceDao
+    abstract fun taperPreferenceDao(): TaperPreferenceDao
 
     companion object {
         /**
@@ -256,6 +279,15 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /** Adds taper preferences (#173). */
+        internal val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `taper_preferences` (`taper_name` TEXT NOT NULL, `preference` TEXT NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`taper_name`))"
+                )
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -268,7 +300,7 @@ abstract class PhishInDb : RoomDatabase() {
                 "phishin.db"
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10
             )
                 .build().also { instance = it }
         }

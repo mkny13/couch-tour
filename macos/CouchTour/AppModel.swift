@@ -62,6 +62,7 @@ final class AppModel: ObservableObject {
     /// Which tab ⌘, opens on. Home's Settings & status tiles set this before opening the
     /// window, so a tile lands on the form it names.
     @Published var settingsTab: SettingsTab = .playback
+    @Published var taperPreferences: [String: String] = [:]
     private var themeCancellable: AnyCancellable?
 
     init() {
@@ -79,6 +80,18 @@ final class AppModel: ObservableObject {
         localPlaylistStore = progressStore.flatMap { try? LocalPlaylistStore(sharing: $0) }
         themeCancellable = themeSettings.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
+        }
+        reloadTaperPreferences()
+    }
+
+    func reloadTaperPreferences() {
+        guard let progressStore else { return }
+        if let list = try? progressStore.getTaperPreferences() {
+            var map: [String: String] = [:]
+            for pref in list {
+                map[pref.taperName] = pref.preference
+            }
+            self.taperPreferences = map
         }
     }
 

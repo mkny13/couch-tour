@@ -35,6 +35,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.material.icons.rounded.ThumbDown
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -1734,7 +1738,21 @@ private fun recordingLabel(rec: RecordingRef): String {
 @Composable
 private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String, date: String, vm: PlayerViewModel, nav: NavHostController) {
     var open by remember { mutableStateOf(false) }
-    val sources = listOfNotNull(detail.recording) + detail.alternates
+    
+    val taperPreferences by vm.getTaperPreferencesFlow().collectAsState(initial = emptyMap())
+    val sources = remember(detail, taperPreferences) {
+        (listOfNotNull(detail.recording) + detail.alternates).sortedWith(Comparator { a, b ->
+            val aTaper = a.taper ?: a.label
+            val bTaper = b.taper ?: b.label
+            val aPref = taperPreferences[aTaper]
+            val bPref = taperPreferences[bTaper]
+            
+            val aScore = if (aPref == "PREFERRED") -1 else if (aPref == "AVOIDED") 1 else 0
+            val bScore = if (bPref == "PREFERRED") -1 else if (bPref == "AVOIDED") 1 else 0
+            
+            aScore.compareTo(bScore)
+        })
+    }
 
     Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
         RowItem(
@@ -1748,20 +1766,35 @@ private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String
                 LazyColumn {
                     items(sources, key = { it.id }) { source ->
                         val current = source.id == detail.recording?.id
-                        SourceRow(source, current) {
-                            open = false
-                            if (!current) {
-                                // If this show is playing (or paused) right now, carry the
-                                // position into the same track index on the new source — an
-                                // approximation, since tapers split tracks differently (#17).
-                                // Waveform-matched resume is future work, not attempted here.
-                                val playing = vm.state.value
-                                val resume = "&resumeIndex=${playing.trackIndex}&resumeMs=${playing.positionMs}"
-                                    .takeIf { detail.queueKey != null && playing.queueKey == detail.queueKey }
-                                    .orEmpty()
-                                nav.navigate("recording/$backendId/$artistId/$date?src=${source.id}$resume")
+                        val taperName = source.taper ?: source.label
+                        val pref = taperPreferences[taperName]
+                        SourceRow(
+                            source = source,
+                            current = current,
+                            preference = pref,
+                            onCyclePreference = {
+                                val nextPref = when (pref) {
+                                    "PREFERRED" -> "AVOIDED"
+                                    "AVOIDED" -> null
+                                    else -> "PREFERRED"
+                                }
+                                if (nextPref == null) {
+                                    vm.clearTaperPreference(taperName)
+                                } else {
+                                    vm.setTaperPreference(taperName, nextPref)
+                                }
+                            },
+                            onClick = {
+                                open = false
+                                if (!current) {
+                                    val playing = vm.state.value
+                                    val resume = "&resumeIndex=${playing.trackIndex}&resumeMs=${playing.positionMs}"
+                                        .takeIf { detail.queueKey != null && playing.queueKey == detail.queueKey }
+                                        .orEmpty()
+                                    nav.navigate("recording/$backendId/$artistId/$date?src=${source.id}$resume")
+                                }
                             }
-                        }
+                        )
                     }
                 }
             }
@@ -1770,30 +1803,62 @@ private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String
 }
 
 @Composable
-private fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Unit) {
+private fun SourceRow(
+    source: RecordingRef,
+    current: Boolean,
+    preference: String?,
+    onCyclePreference: () -> Unit,
+    onClick: () -> Unit
+) {
+    val isPreferred = preference == "PREFERRED"
+    val isAvoided = preference == "AVOIDED"
+    val bgColor = if (isPreferred) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent
+
     Column(
         Modifier
             .fillMaxWidth()
+            .background(bgColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 12.dp)
+            .alpha(if (isAvoided) 0.5f else 1f)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 (if (current) "✓ " else "") + source.label,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = if (isPreferred) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isPreferred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            
+            IconButton(
+                onClick = onCyclePreference,
+                modifier = Modifier.size(32.dp).padding(end = 8.dp)
+            ) {
+                Icon(
+                    imageVector = when (preference) {
+                        "PREFERRED" -> Icons.Rounded.ThumbUp
+                        "AVOIDED" -> Icons.Rounded.ThumbDown
+                        else -> Icons.Outlined.ThumbUp
+                    },
+                    contentDescription = "Toggle taper preference",
+                    modifier = Modifier.size(20.dp),
+                    tint = when (preference) {
+                        "PREFERRED" -> MaterialTheme.colorScheme.primary
+                        "AVOIDED" -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    }
+                )
+            }
+
             if (source.hasFlac) {
                 SourceBadge("FLAC", MaterialTheme.colorScheme.secondary)
             } else {
                 SourceBadge("MP3", MaterialTheme.colorScheme.outline)
             }
             if (source.isSoundboard) SourceBadge("SBD", MaterialTheme.colorScheme.primary)
-            // Heuristic, not a real field — see RecordingRef.looksLikeMatrix. Labelled with
-            // a "?" so it reads as a guess rather than a confirmed fact.
             if (source.looksLikeMatrix) SourceBadge("Matrix?", MaterialTheme.colorScheme.tertiary)
         }
         if (source.rating > 0) {
@@ -1804,8 +1869,6 @@ private fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Uni
                 fontSize = 13.sp,
             )
         }
-        // Redundant when the label already is the taper's name (RelistenSource.toRecordingRef
-        // defaults label to taper) — only shown when it adds information the title didn't.
         if (source.taper != null && source.taper != source.label) {
             Text("Taper: ${source.taper}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         }

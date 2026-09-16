@@ -78,6 +78,26 @@ public struct ArtistTourPreference: Codable, Equatable, Hashable, FetchableRecor
     }
 }
 
+/// Taper preferences (#173).
+/// Persisted in GRDB on macOS and Room on Android (MIGRATION_9_10).
+public struct TaperPreference: Codable, Equatable, Hashable, FetchableRecord, PersistableRecord, TableRecord, Sendable {
+    public static let databaseTableName = "taper_preferences"
+
+    public var taperName: String
+    public var preference: String // "PREFERRED", "AVOIDED"
+    public var updatedAt: Int64
+
+    public init(
+        taperName: String,
+        preference: String,
+        updatedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+    ) {
+        self.taperName = taperName
+        self.preference = preference
+        self.updatedAt = updatedAt
+    }
+}
+
 /// GRDB wrapper around the `progress` table. Query shapes mirror Android's `ProgressDao`
 /// one-for-one so the two clients' notions of "history" and "continue listening" never diverge.
 public final class ProgressStore {
@@ -159,6 +179,13 @@ public final class ProgressStore {
                 t.column("artistKey", .text).primaryKey()
                 t.column("tourName", .text)
                 t.column("year", .text)
+                t.column("updatedAt", .integer).notNull()
+            }
+        }
+        migrator.registerMigration("v10_taperPreferences") { db in
+            try db.create(table: "taper_preferences") { t in
+                t.column("taperName", .text).primaryKey()
+                t.column("preference", .text).notNull()
                 t.column("updatedAt", .integer).notNull()
             }
         }
@@ -303,6 +330,27 @@ public final class ProgressStore {
     public func deleteTourPreference(artistKey: String) throws {
         try dbQueue.write { db in
             _ = try ArtistTourPreference.deleteOne(db, key: artistKey)
+        }
+    }
+
+    // MARK: - Taper Preferences (#173)
+
+    public func saveTaperPreference(taperName: String, preference: String) throws {
+        let pref = TaperPreference(taperName: taperName, preference: preference)
+        try dbQueue.write { db in
+            try pref.save(db)
+        }
+    }
+
+    public func getTaperPreferences() throws -> [TaperPreference] {
+        try dbQueue.read { db in
+            try TaperPreference.fetchAll(db)
+        }
+    }
+
+    public func deleteTaperPreference(taperName: String) throws {
+        try dbQueue.write { db in
+            _ = try TaperPreference.deleteOne(db, key: taperName)
         }
     }
 }

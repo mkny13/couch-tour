@@ -232,7 +232,13 @@ struct ShowDetailView: View {
         }
         .buttonStyle(.plain)
         .popover(isPresented: $showSourcePicker) {
-            SourcePicker(sources: sources, currentID: detail.recording?.id, onSelect: selectSource)
+            SourcePicker(
+                sources: sources,
+                currentID: detail.recording?.id,
+                taperPreferences: appModel.taperPreferences,
+                onSelect: selectSource,
+                onCyclePreference: cyclePreference
+            )
         }
     }
 
@@ -421,7 +427,40 @@ struct ShowDetailView: View {
 
     private func allSources(_ detail: ShowDetail) -> [RecordingRef] {
         ([detail.recording].compactMap { $0 } + detail.alternates)
-            .sorted { $0.rating > $1.rating }
+            .sorted { a, b in
+                let aTaper = a.taper ?? a.label
+                let bTaper = b.taper ?? b.label
+                let aPref = appModel.taperPreferences[aTaper]
+                let bPref = appModel.taperPreferences[bTaper]
+                
+                let aScore = aPref == "PREFERRED" ? -1 : (aPref == "AVOIDED" ? 1 : 0)
+                let bScore = bPref == "PREFERRED" ? -1 : (bPref == "AVOIDED" ? 1 : 0)
+                
+                if aScore != bScore {
+                    return aScore < bScore
+                }
+                return a.rating > b.rating
+            }
+    }
+
+    private func cyclePreference(_ taperName: String) {
+        let current = appModel.taperPreferences[taperName]
+        let nextPref: String?
+        switch current {
+        case "PREFERRED": nextPref = "AVOIDED"
+        case "AVOIDED": nextPref = nil
+        default: nextPref = "PREFERRED"
+        }
+        do {
+            if let nextPref {
+                try appModel.progressStore?.saveTaperPreference(taperName: taperName, preference: nextPref)
+            } else {
+                try appModel.progressStore?.deleteTaperPreference(taperName: taperName)
+            }
+            appModel.reloadTaperPreferences()
+        } catch {
+            print("Failed to save taper preference: \(error)")
+        }
     }
 
     private func selectSource(_ recordingID: String) {
@@ -458,14 +497,22 @@ struct ShowDetailView: View {
 private struct SourcePicker: View {
     let sources: [RecordingRef]
     let currentID: String?
+    let taperPreferences: [String: String]
     let onSelect: (String) -> Void
+    let onCyclePreference: (String) -> Void
 
     var body: some View {
         List(sources, id: \.id) { source in
+            let taperName = source.taper ?? source.label
             Button {
                 onSelect(source.id)
             } label: {
-                SourceRow(source: source, isCurrent: source.id == currentID)
+                SourceRow(
+                    source: source,
+                    isCurrent: source.id == currentID,
+                    preference: taperPreferences[taperName],
+                    onCyclePreference: { onCyclePreference(taperName) }
+                )
             }
             .buttonStyle(.plain)
         }
@@ -478,8 +525,13 @@ private struct SourcePicker: View {
 private struct SourceRow: View {
     let source: RecordingRef
     let isCurrent: Bool
+    let preference: String?
+    let onCyclePreference: () -> Void
 
     var body: some View {
+        let isPreferred = preference == "PREFERRED"
+        let isAvoided = preference == "AVOIDED"
+        
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "checkmark")
                 .font(.caption)
@@ -491,8 +543,16 @@ private struct SourceRow: View {
                 HStack(spacing: 6) {
                     Text(source.label)
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(isPreferred ? .bold : .semibold)
+                        .foregroundStyle(isPreferred ? Color.accentColor : .primary)
                         .lineLimit(1)
+                    
+                    Button(action: onCyclePreference) {
+                        Image(systemName: isPreferred ? "hand.thumbsup.fill" : (isAvoided ? "hand.thumbsdown.fill" : "hand.thumbsup"))
+                            .foregroundStyle(isPreferred ? Color.accentColor : (isAvoided ? Color.red : Color.secondary.opacity(0.5)))
+                    }
+                    .buttonStyle(.plain)
+
                     if source.hasFlac {
                         sourceBadge("FLAC", color: .green)
                     } else {
@@ -501,8 +561,6 @@ private struct SourceRow: View {
                     if source.isSoundboard {
                         sourceBadge("SBD", color: .accentColor)
                     }
-                    // The "?" is deliberate — looksLikeMatrix is a text heuristic, not a
-                    // guaranteed signal (Relisten has no structured matrix flag).
                     if source.looksLikeMatrix {
                         sourceBadge("Matrix?", color: .purple)
                     }
@@ -512,8 +570,6 @@ private struct SourceRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                // Suppressed when it would just repeat the label — the label already
-                // defaults to the taper's name.
                 if let taper = source.taper, taper != source.label {
                     Text("Taper: \(taper)")
                         .font(.caption)
@@ -528,6 +584,12 @@ private struct SourceRow: View {
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .opacity(isAvoided ? 0.5 : 1.0)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isPreferred ? Color.accentColor.opacity(0.1) : Color.clear)
+                .padding(-4)
+        )
     }
 
     private var ratingLine: String {

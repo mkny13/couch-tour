@@ -13,6 +13,8 @@ import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -65,6 +67,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val progressDao = PhishInDb.get(app).progressDao()
     val localPlaylistDao = PhishInDb.get(app).localPlaylistDao()
     val artistTourPreferenceDao = PhishInDb.get(app).artistTourPreferenceDao()
+    val taperPreferenceDao = PhishInDb.get(app).taperPreferenceDao()
 
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
@@ -430,6 +433,24 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun clearArtistTourPreference(artistKey: String) {
         viewModelScope.launch {
             artistTourPreferenceDao.deletePreference(artistKey)
+        }
+    }
+
+    fun setTaperPreference(taperName: String, preference: String) {
+        viewModelScope.launch {
+            taperPreferenceDao.upsertPreference(TaperPreferenceEntity(taperName, preference))
+        }
+    }
+
+    fun clearTaperPreference(taperName: String) {
+        viewModelScope.launch {
+            taperPreferenceDao.deletePreference(taperName)
+        }
+    }
+
+    fun getTaperPreferencesFlow(): Flow<Map<String, String>> {
+        return taperPreferenceDao.getAllPreferences().map { list ->
+            list.associate { it.taperName to it.preference }
         }
     }
 
