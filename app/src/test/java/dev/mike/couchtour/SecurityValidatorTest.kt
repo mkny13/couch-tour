@@ -62,4 +62,41 @@ class SecurityValidatorTest {
         val castItem = CastItemConverter().toMediaQueueItem(item)
         assertEquals("https://invalid", castItem.media?.contentUrl)
     }
+
+    @Test
+    fun `requireHttps is idempotent on already-https input`() {
+        val validUrl = "https://example.com/image.png"
+        val normalizedOnce = validUrl.requireHttps()
+        val normalizedTwice = normalizedOnce.requireHttps()
+        assertEquals(validUrl, normalizedOnce)
+        assertEquals(validUrl, normalizedTwice)
+    }
+
+    @Test
+    fun `waveform URL is normalized to https`() {
+        val info = QueueInfo(key = "k", title = "t", subtitle = "s", art = null, artist = "Phish")
+        val track = Track(
+            id = 1,
+            title = "Dangerous",
+            mp3Url = "https://safe.com/audio.mp3",
+            waveformImageUrl = "file:///sdcard/waveform.png",
+            audioStatus = "complete"
+        )
+        val item = mediaItem(track, info)
+        assertEquals("https://invalid", item.mediaMetadata.extras?.getString(Keys.WAVEFORM))
+    }
+
+    @Test
+    fun `artwork URL is normalized to https`() {
+        val info = QueueInfo(key = "k", title = "t", subtitle = "s", art = "content://media/external/images/1", artist = "Phish")
+        val track = Track(
+            id = 1,
+            title = "Safe",
+            mp3Url = "https://safe.com/stream.mp3",
+            audioStatus = "complete"
+        )
+        val item = mediaItem(track, info)
+        assertEquals("https://invalid", item.mediaMetadata.artworkUri?.toString())
+        assertEquals("https://invalid", item.mediaMetadata.extras?.getString(Keys.QUEUE_ART))
+    }
 }

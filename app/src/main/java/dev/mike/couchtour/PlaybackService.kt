@@ -413,7 +413,7 @@ class PlaybackService : MediaLibraryService() {
         val meta = MediaMetadata.Builder()
             .setTitle(title)
             .apply { subtitle?.let { setSubtitle(it) } }
-            .apply { artUri?.let { setArtworkUri(Uri.parse(it)) } }
+            .apply { artUri?.let { setArtworkUri(Uri.parse(it.requireHttps())) } }
             .setIsBrowsable(true)
             .setIsPlayable(false)
             .build()
