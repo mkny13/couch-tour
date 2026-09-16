@@ -12,6 +12,7 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
+import androidx.room.Index
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
@@ -19,7 +20,15 @@ import kotlinx.coroutines.flow.Flow
  * One row per queue the user has listened to. [queueKey] is namespaced ("show:1997-11-17")
  * so playlists ("playlist:some-slug") can be stored in the same table later without a migration.
  */
-@Entity(tableName = "progress")
+@Entity(
+    tableName = "progress",
+    indices = [
+        Index("deletedAt"),
+        Index("updatedAt"),
+        Index("finished"),
+        Index("artist")
+    ]
+)
 data class Progress(
     @PrimaryKey val queueKey: String,
     val title: String,
@@ -163,7 +172,7 @@ interface ExternalReleaseDao {
 
 @Database(
     entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class, ExternalReleaseEntity::class],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
@@ -286,6 +295,18 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /** Adds indices to speed up common read queries on progress and local_playlist_tracks. */
+        internal val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_deletedAt` ON `progress` (`deletedAt`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_updatedAt` ON `progress` (`updatedAt`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_finished` ON `progress` (`finished`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_artist` ON `progress` (`artist`)")
+                db.execSQL("DROP INDEX IF EXISTS `index_local_playlist_tracks_playlistId`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId_position` ON `local_playlist_tracks` (`playlistId`, `position`)")
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -298,7 +319,7 @@ abstract class PhishInDb : RoomDatabase() {
                 "phishin.db"
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
             )
                 .build().also { instance = it }
         }
