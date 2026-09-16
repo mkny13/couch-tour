@@ -209,6 +209,13 @@ migration, and O4's original reasoning still holds.
 
 ### ~~Batch 5~~ — Volume leveling (#18) — **deferred out of Phase 2**
 
+**Update 2026-09-16: #18 has a direction (D237).** Mike picked real analysis: the app decodes
+samples from each source ahead of playback, measures their loudness, and caches the result per
+source. It then applies one static gain per source. The platform normalizers stay rejected
+because they're compressors. The work is split into #265 (meter), #266 (cache), #267 (Android),
+#268 (macOS), and #269 (post-UAT defaults). Work from those issues, not from this section. The
+research below still explains why the other options were rejected.
+
 **Decided 2026-08-31: #18 is deferred out of Phase 2 entirely** and revisited after downloads
 (#65). The reasoning below is kept because it's the research this pass did and it should not have
 to be redone when #18 comes back. **Update 2026-09-11: #65 was later closed as not planned**, so

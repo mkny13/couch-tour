@@ -113,7 +113,7 @@ flowchart LR
 
     subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]
         direction TB
-        L1["#18 Volume Leveling Across Sources (deferred from Phase 2)"]
+        L1["#18 Volume Leveling Across Sources (#265-#269)"]
         L2["#24 Taper Intelligence & Source Comparison"]
         L3["#9 Google TV App"]
         L4["#15 Spotify Live Releases"]
@@ -170,20 +170,24 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 
 Longer-range exploration of new media surfaces and third-party streaming ecosystems.
 
-**#18 was deliberately deferred out of Phase 2** (audit closeout, 2026-08-31) — not an oversight.
-The loudness-normalization source is unsolved: there is no reliable per-track/per-show gain data
-across phish.in and Relisten today.
+**#18 is no longer deferred (2026-09-16, D237).** It was deferred out of Phase 2 (2026-08-31)
+because no source of loudness data existed: phish.in and Relisten serve no ReplayGain/R128 tags.
+Mike answered that question on the issue: **measure it on the client**. The app decodes
+samples from each source ahead of playback, measures their loudness, and caches the result per
+source. It then applies one static gain per source, with no compressor, so dynamic range is
+preserved. The work is split into:
 
-**That deferral needs a new trigger (2026-09-05).** The original reasoning had a second leg —
-that #65 (offline downloads) might change what's feasible once files are local rather than
-streamed, so #18 should be revisited "after #65 lands." #65 is now closed as not planned, so
-that trigger will never fire. #18 now rests solely on the unsolved gain-data question: it stays
-deferred until there's an actual answer for where loudness data comes from (measure it on the
-client during playback, or find a source that publishes it), not until another issue ships.
+1. #265 — BS.1770 loudness meter, gain rule, and a per-track leveling key (both platforms)
+2. #266 — `source_loudness` cache table (Room `MIGRATION_9_10`, GRDB v10)
+3. #267 — Android: background measurement, `AudioProcessor` gain, and a Settings toggle
+4. #268 — macOS: background measurement, `MTAudioProcessingTap` gain, and a Settings toggle
+5. #269 — after beta UAT: decide whether it's on by default, add a clear-cache action, update docs
+
+#265 and #266 can be built in parallel. #267 and #268 both need them, but not each other.
 
 | Issue | Feature | Description | Platforms |
 |---|---|---|---|
-| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. | Android, macOS |
+| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. Strategy: on-device measurement cached per source (D237), split into #265-#269. | Android, macOS |
 | **#24** | **Advanced Source Selection & Taper Intelligence** | Side-by-side snippet comparisons across tapers, taper reputation scoring, and user-preferred / avoided taper filters. | Android, macOS |
 | **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation — Leanback launcher entry point, TV app manifest, `Catalog`/`PlaybackService` wired in) shipped, D233; Parts 2 (browse UI) and 3 (Now Playing / transport) still open. | Android TV |
 | **#15** | **Spotify/Tidal Live Release Links** | Where a show matches an officially released live album on Spotify or Tidal, surface a simple external link to it (in-app playback isn't feasible). | Cross-platform |
