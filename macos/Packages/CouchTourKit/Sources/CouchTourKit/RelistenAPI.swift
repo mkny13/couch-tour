@@ -534,7 +534,8 @@ extension RelistenShowSummary {
             recordingCount: max(sourceCount, 1),
             rating: avgRating,
             tags: tags,
-            popularity: popularity
+            popularity: popularity,
+            externalRelease: CuratedMatches.shared.match(backend: artist.backend, artistId: artist.id, date: displayDate)
         )
     }
 }
@@ -647,7 +648,8 @@ extension RelistenShowWithSources {
             recordingCount: max(sources.count, 1),
             rating: avgRating,
             tags: showTags,
-            popularity: popularity
+            popularity: popularity,
+            externalRelease: CuratedMatches.shared.match(backend: artist.backend, artistId: artist.id, date: displayDate)
         )
 
         return ShowDetail(

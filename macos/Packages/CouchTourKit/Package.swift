@@ -15,7 +15,8 @@ let package = Package(
             name: "CouchTourKit",
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
-            ]
+            ],
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "CouchTourKitTests",

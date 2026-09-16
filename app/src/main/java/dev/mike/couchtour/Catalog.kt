@@ -617,7 +617,7 @@ internal fun Show.toShowSummary() = ShowSummary(
     recordingCount = 1,
     tags = tags.map { it.toTagRef() },
     likesCount = likesCount,
-    externalRelease = if (externalReleasePlatform != null && externalReleaseUrl != null) {
+    externalRelease = CuratedMatches.match(Backend.PHISHIN, PHISH.id, date) ?: if (externalReleasePlatform != null && externalReleaseUrl != null) {
         runCatching {
             ExternalRelease(
                 platform = ExternalReleasePlatform.valueOf(externalReleasePlatform!!.uppercase()),
@@ -634,6 +634,7 @@ internal fun Show.toShowDetail(): ShowDetail {
         // Filtering here is what keeps the UI and the queue builder agreeing on what index
         // 4 means (D12) — they both read this list rather than filtering separately.
         tracks = tracks.filter { it.playable }.map { it.toPlayableTrack(summary.artUrl) },
+        externalRelease = summary.externalRelease,
     )
 }
 
