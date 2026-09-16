@@ -130,7 +130,7 @@ public struct SyncResponse: Decodable {
     public let changes: [SyncProgressWire]
 }
 
-public struct DeviceInfo: Decodable, Identifiable {
+public struct DeviceInfo: Decodable, Identifiable, Equatable {
     public let deviceId: String
     public let name: String
     public let platform: String
