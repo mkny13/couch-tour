@@ -153,7 +153,7 @@ def file_bug_report(item_id, title, area, note, linked_issue):
     issue is opened instead of reopening the old report.
     """
     if linked_issue is not None:
-        if issue_state(linked_issue) == "open":
+        if issue_state(linked_issue).lower() == "open":
             comment_on_issue(linked_issue, body=comment_body(note))
             return linked_issue
     return create_issue(title=f"UAT fail: {title} ({item_id})", body=bug_body(item_id, title, area, note))

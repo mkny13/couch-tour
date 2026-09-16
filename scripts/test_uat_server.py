@@ -55,7 +55,7 @@ class FilingTests(UatServerTestCase):
     def setUp(self):
         super().setUp()
         self.gh = mock.Mock(return_value=42)
-        self.state = mock.Mock(return_value="open")
+        self.state = mock.Mock(return_value="OPEN")  # gh reports state uppercase
         self.comment = mock.Mock()
         for name, fn in [("create_issue", self.gh), ("issue_state", self.state),
                          ("comment_on_issue", self.comment)]:
@@ -192,7 +192,7 @@ class CreateIssueTests(UatServerTestCase):
 class HttpTests(UatServerTestCase):
     def test_api_item_relays_filing_result(self):
         with mock.patch.object(uat_server, "create_issue", mock.Mock(return_value=42)), \
-             mock.patch.object(uat_server, "issue_state", mock.Mock(return_value="open")), \
+             mock.patch.object(uat_server, "issue_state", mock.Mock(return_value="OPEN")), \
              mock.patch.object(uat_server, "comment_on_issue", mock.Mock()):
             server = HTTPServer(("127.0.0.1", 0), uat_server.Handler)
             threading.Thread(target=server.serve_forever, daemon=True).start()
