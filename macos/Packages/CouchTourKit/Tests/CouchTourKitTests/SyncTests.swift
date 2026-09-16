@@ -295,6 +295,28 @@ final class SyncSessionTests: XCTestCase {
         XCTAssertTrue(pushed.contains(#""since":0"#))
     }
 
+    func testPushesPendingRowsInAscendingUpdatedAtOrder() async throws {
+        try await claim()
+        // Insert rows out of order
+        try store.put(PlaybackProgress(queueKey: "show:3", title: "t", subtitle: "s", trackIndex: 0, positionMs: 0, trackTitle: "Track", updatedAt: 300, artist: "Phish"))
+        try store.put(PlaybackProgress(queueKey: "show:1", title: "t", subtitle: "s", trackIndex: 0, positionMs: 0, trackTitle: "Track", updatedAt: 100, artist: "Phish"))
+        try store.put(PlaybackProgress(queueKey: "show:2", title: "t", subtitle: "s", trackIndex: 0, positionMs: 0, trackTitle: "Track", updatedAt: 200, artist: "Phish"))
+        
+        server.enqueue(#"{"seq":1,"changes":[]}"#)
+
+        try await session.sync(store)
+
+        let request = server.takeRequest()!
+        let body = request.bodyString!
+        // Body contains a JSON array of changes. Let's find the indices of the queue keys.
+        let pos1 = body.range(of: "\"show:1\"")!.lowerBound
+        let pos2 = body.range(of: "\"show:2\"")!.lowerBound
+        let pos3 = body.range(of: "\"show:3\"")!.lowerBound
+        
+        XCTAssertTrue(pos1 < pos2, "show:1 should appear before show:2 in the payload")
+        XCTAssertTrue(pos2 < pos3, "show:2 should appear before show:3 in the payload")
+    }
+
     func testSyncDoesNotRepushARowAlreadyAtTheWatermark() async throws {
         try await claim()
         try store.put(PlaybackProgress(

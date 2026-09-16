@@ -441,7 +441,6 @@ public final class SyncSession: ObservableObject {
     /// local rows are still waiting, so `sync` knows to come back for them.
     private func syncOnce(token: String, _ progressStore: ProgressStore) async throws -> Bool {
         let pending = try progressStore.changedSince(store.lastPushWatermark)
-            .sorted { $0.updatedAt < $1.updatedAt }
         let chunk = Self.chunkToPush(pending)
         let toPush = chunk.map { $0.toWire() }
 

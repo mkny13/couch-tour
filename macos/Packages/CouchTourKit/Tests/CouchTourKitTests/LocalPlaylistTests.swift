@@ -129,6 +129,32 @@ final class LocalPlaylistStoreTests: XCTestCase {
         XCTAssertEqual([0, 1, 2], reordered.map(\.position))
         XCTAssertEqual(6_000, try store.playlist(id: playlist.id)!.updatedAt)
     }
+
+    func testQueryPlanForPlaylistTracks() throws {
+        let playlist = try store.createPlaylist(name: "Mix", now: 1_000)
+        for i in 0..<100 {
+            try store.addTrack(row(playlistId: playlist.id, trackId: "\(i)"), toPlaylist: playlist.id, now: 2_000)
+        }
+        
+        let request = LocalPlaylistTrack
+            .filter(Column("playlistId") == playlist.id)
+            .order(Column("position"))
+        
+        try store.dbQueue.read { db in
+            let statement = try request.makePreparedRequest(db, forSingleResult: false).statement
+            let planRows = try Row.fetchAll(db, sql: "EXPLAIN QUERY PLAN " + statement.sql, arguments: statement.arguments)
+            let plan = planRows.compactMap { $0["detail"] as String? }.joined(separator: "\n")
+            
+            XCTAssertTrue(plan.contains("USING INDEX idx_local_playlist_tracks_playlist_position"), "Query plan should use index idx_local_playlist_tracks_playlist_position:\n\(plan)")
+            XCTAssertFalse(plan.contains("USE TEMP B-TREE FOR ORDER BY"), "Query plan should avoid temporary B-tree for sort:\n\(plan)")
+            let lines = plan.components(separatedBy: "\n")
+            for line in lines {
+                if line.contains("SCAN local_playlist_tracks") && !line.contains("USING INDEX") && !line.contains("USING COVERING INDEX") {
+                    XCTFail("Query plan should avoid bare table scan on local_playlist_tracks:\n\(plan)")
+                }
+            }
+        }
+    }
 }
 
 /// #90's search-within-a-playlist helper. Port of `Catalog.kt`'s

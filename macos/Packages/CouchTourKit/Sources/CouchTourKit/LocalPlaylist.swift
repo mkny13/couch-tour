@@ -77,7 +77,7 @@ public struct LocalPlaylistTrack: Codable, Equatable, FetchableRecord, MutablePe
 
 /// GRDB wrapper mirroring Android's `LocalPlaylistDao` one-for-one.
 public final class LocalPlaylistStore {
-    private let dbQueue: DatabaseQueue
+    let dbQueue: DatabaseQueue
 
     public init(sharing progressStore: ProgressStore) throws {
         dbQueue = progressStore.dbQueue
@@ -122,6 +122,9 @@ public final class LocalPlaylistStore {
                 t.column("venueName", .text)
                 t.column("artUrl", .text)
             }
+        }
+        migrator.registerMigration("v10_localPlaylistIndexes") { db in
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_local_playlist_tracks_playlist_position ON local_playlist_tracks(playlistId, position)")
         }
         return migrator
     }

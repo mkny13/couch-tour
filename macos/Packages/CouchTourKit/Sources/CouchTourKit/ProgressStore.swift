@@ -162,6 +162,12 @@ public final class ProgressStore {
                 t.column("updatedAt", .integer).notNull()
             }
         }
+        migrator.registerMigration("v10_progressIndexes") { db in
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_live_updated_at ON progress(updatedAt DESC) WHERE deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_in_progress_updated_at ON progress(updatedAt DESC) WHERE finished = 0 AND dismissed = 0 AND deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_artist_updated_at ON progress(artist, updatedAt DESC) WHERE deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_changed_since_updated_at ON progress(updatedAt)")
+        }
         return migrator
     }
 
@@ -266,6 +272,7 @@ public final class ProgressStore {
         try dbQueue.read { db in
             try PlaybackProgress
                 .filter(Column("updatedAt") > since)
+                .order(Column("updatedAt").asc)
                 .fetchAll(db)
         }
     }
