@@ -31,7 +31,9 @@ class LocalPlaylistDaoTest {
 
     @After
     fun tearDown() {
-        db.close()
+        // Guarded: if setUp throws before `db` is initialized, tearDown still runs — an
+        // UninitializedPropertyAccessException here would mask the real failure.
+        if (::db.isInitialized) db.close()
     }
 
     private fun track(playlistId: String, position: Int, backend: Backend, trackId: String, title: String) =
