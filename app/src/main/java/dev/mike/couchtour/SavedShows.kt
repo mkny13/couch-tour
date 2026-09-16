@@ -11,6 +11,9 @@ private const val KEY_SHOWS = "show_keys"
 /**
  * Saved/bookmarked shows — account-free local storage of saved show identifiers
  * (such as "1997-11-17" or relisten recording keys), mirroring [LikedTracks] and [Favorites].
+ * 
+ * Note: The Save/bookmark concept was removed on macOS (D229) in favor of Likes, 
+ * but Android's bookmark store is intentionally retained as deferred work (see ROADMAP.md).
  */
 object SavedShows {
 

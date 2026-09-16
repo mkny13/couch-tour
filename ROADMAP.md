@@ -76,7 +76,7 @@ Historical implementation details and architectural choices are logged separatel
 
 ### 10. Show Detail: Save→Like Replacement (Shipped — #148, D229, macOS)
 
-- **Save/bookmark concept deleted**: the Save/Saved pill on Show Detail, the `SavedShows` store (package source + tests) and its `AppModel` property, and the bookmark icon on Home's On-This-Date cards. Android's own bookmark store is deliberately untouched — that removal is a separate change.
+- **Save/bookmark concept deleted (macOS)**: the Save/Saved pill on Show Detail, the `SavedShows` store (package source + tests) and its `AppModel` property, and the bookmark icon on Home's On-This-Date cards. Android's own bookmark store is intentionally deferred — its removal is a separate planned change.
 - **Header Like**: a `ShowLikeButton` phish.in server-side show like (`Likable.show`, previously unused), optimistic with rollback, signed-out gated, hidden for Relisten tapes. Enabler: `ShowSummary` gained `id`/`likedByUser` (defaulted), matching Android's `Show` model.
 - **Header Add to Playlist adds the whole show** (was first-track-only): `AddToPlaylistButton` now takes `[LocalPlaylistTrack]` and `LocalPlaylistStore.addTracks` inserts in one transaction; per-track surfaces pass one-element arrays.
 - **Unlabeled sources render unlabeled** — the fabricated `"SBD · Paluska · FLAC"` fallback replaced with `"Unlabeled source"`.
@@ -199,7 +199,7 @@ preserved. The work is split into:
 
 - **Show End Behavior**: Playback stops at the end of the show/encore rather than silently auto-advancing into the next show. An actionable prompt/banner is presented to start the next show on the tour/run.
 - **No Offline Downloads, No Crossfade** (2026-09-05): Neither is a feature Couch Tour is building. #65 is closed as not planned. Settings must not advertise either — no "Coming soon" rows standing in for features that aren't coming.
-- **Two Ways to Mark a Show, Not Three** (2026-09-05): Like/Favorite and Add to Playlist are the show and track actions. The separate Save/bookmark concept is removed (#148) — it was a third, redundant marker with no meaning elsewhere in the product. Both surviving actions stay visible in the player bar on both platforms. macOS implementation shipped (D229); Android's own bookmark store is a separate removal.
+- **Two Ways to Mark a Show, Not Three** (2026-09-05): Like/Favorite and Add to Playlist are the show and track actions. The separate Save/bookmark concept is removed (#148) — it was a third, redundant marker with no meaning elsewhere in the product. Both surviving actions stay visible in the player bar on both platforms. macOS implementation shipped (D229); Android's own bookmark store removal is explicitly deferred as a future change.
 - **No Fake Data in Empty States** (2026-09-05): An empty shelf renders an empty state, never fabricated sample shows. In an app whose premise is *your* listening history, inventing plausible-looking shows a user never played is actively misleading, not a placeholder. Tracked in #144, shipped in #163 (D227).
 - **Waveform Scrubber**: Dual-layer vector waveform scrubber with dynamic audio peak extraction from phish.in and archive.org (Relisten) is implemented across Android and macOS Now Playing surfaces (D214, D215, D224) with live drag/seek scrubbing, polarity auto-detection, and memory caching.
 
