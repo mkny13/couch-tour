@@ -4624,3 +4624,11 @@ Added additive `CREATE INDEX IF NOT EXISTS` migrations (`v10_progressIndexes` an
 Added covering index for artists, indices for live progress and continue-listening lists, and for the sync queue.
 Modified `ProgressStore.changedSince` to return rows ordered by `updatedAt` ascending natively, removing the in-memory `.sorted` step in `SyncSession.syncOnce`.
 Test coverage asserts that the `EXPLAIN QUERY PLAN` output for these hot paths utilizes the indexes, avoids `USE TEMP B-TREE FOR ORDER BY`, and prevents full table scans.
+
+### D240 — macOS Security & Surface Area Audit (#248)
+
+- **Entitlements**: `ENABLE_HARDENED_RUNTIME` was set to `YES` and `com.apple.security.app-sandbox` set to `true` in `macos/project.yml` for tightened security, aligning with Apple platform best practices without losing access to necessary directories (GRDB SQLite storage continues functioning correctly in its App Sandbox container). `com.apple.security.cs.disable-library-validation` remains true as it is often required for linking non-framework third-party dependencies natively via XcodeGen without a strict matching team ID.
+- **Dependencies**: Bumping GRDB.swift to 6.29.3 and Sparkle to 2.10.0 to incorporate the latest patches and mitigate potential known older-version vulnerabilities.
+- **Credential Leaks**: Scanned `macos/` for `.env` files and hardcoded API tokens/passwords. None were found. Keychain is appropriately used for persisting JWT and Sync Device tokens (`SyncTokenStore.swift` and `PhishInTokenStore.swift`), and passwords are not stored in memory post-login.
+- **URL Pooling**: Scanned for unpooled `URLSession` usage. The app relies exclusively on `URLSession.shared`, pooling connections safely across network boundaries.
+- **Subshell Executions**: Scanned `macos/` for `Process()`, `NSTask()`, `system()`, and `popen()`. None exist.
