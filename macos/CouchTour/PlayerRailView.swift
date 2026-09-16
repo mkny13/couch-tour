@@ -12,6 +12,7 @@ struct PlayerRailView: View {
 
     @State private var dragPositionMs: Double?
     @State private var showJamChartNote: Bool = true
+    @State private var showComparePopover = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -141,6 +142,27 @@ struct PlayerRailView: View {
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 10))
                                         .foregroundStyle(colors.textMuted)
+
+                                    if player.hasRealAlternates {
+                                        Button {
+                                            if let currentTrack = player.currentTrack {
+                                                let allSources = ([player.recording].compactMap { $0 } + player.alternates).sorted { $0.rating > $1.rating }
+                                                player.enterCompareSourcesMode(sources: allSources, currentTrack: currentTrack, positionMs: player.positionMs)
+                                                showComparePopover = true
+                                            }
+                                        } label: {
+                                            Text("Compare")
+                                                .font(.system(size: 9, weight: .semibold))
+                                                .foregroundStyle(colors.accentTintText)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(colors.accentIcon.opacity(0.45), lineWidth: 1))
+                                        }
+                                        .buttonStyle(.plain)
+                                        .popover(isPresented: $showComparePopover) {
+                                            CompareSourcesView()
+                                        }
+                                    }
                                 }
                             }
 
