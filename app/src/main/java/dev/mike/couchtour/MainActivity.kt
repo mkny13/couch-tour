@@ -2703,6 +2703,7 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableIntStateOf(0) }
+    var devicesState by remember { mutableStateOf<Result<List<DeviceInfo>>?>(null) }
     val scope = rememberCoroutineScope()
 
     // Compose Navigation's standard way to get a result back from a pushed screen: the
@@ -2720,12 +2721,23 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
     }
 
-    // Live refresh the device list while this screen is open (#64).
-    LaunchedEffect(paired) {
+    // Live refresh the device list while this screen is open, with exponential backoff (#209).
+    LaunchedEffect(paired, refreshKey) {
         if (!paired) return@LaunchedEffect
+        devicesState = null
+        var intervalMs = 5_000L
+        val maxIntervalMs = 60_000L
         while (true) {
-            delay(5_000)
-            refreshKey++
+            val res = runCatching { SyncSession.devices() }
+            val newList = res.getOrNull()
+            
+            if (devicesState?.isSuccess == true && res.isSuccess && devicesState?.getOrNull() == newList) {
+                intervalMs = (intervalMs * 1.5).toLong().coerceAtMost(maxIntervalMs)
+            } else {
+                devicesState = res
+                intervalMs = 5_000L
+            }
+            delay(intervalMs)
         }
     }
 
@@ -2873,7 +2885,6 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
 
         if (paired) {
-            val devices = loadOnce(paired to refreshKey) { SyncSession.devices() }
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -2890,7 +2901,7 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
             HorizontalDivider()
-            Loaded(devices.value) { list ->
+            Loaded(devicesState) { list ->
                 list.forEach { device ->
                     RowItem(
                         title = device.name + if (device.isSelf) " (this device)" else "",

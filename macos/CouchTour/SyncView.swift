@@ -15,6 +15,7 @@ struct SyncView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var devices: [DeviceInfo] = []
+    @State private var refreshKey = 0
 
     var body: some View {
         Form {
@@ -119,7 +120,7 @@ struct SyncView: View {
                         Text("Devices")
                         Spacer()
                         Button {
-                            Task { await refreshDevices() }
+                            refreshKey += 1
                         } label: {
                             Image(systemName: "arrow.clockwise")
                                 .font(.caption)
@@ -146,12 +147,20 @@ struct SyncView: View {
         // NavigationStack — the Settings window titles itself, and navigationTitle isn't
         // guaranteed to render outside a NavigationStack (D167 hit the same thing with
         // .inspector).
-        // Live refresh the device list while this view is active (#64).
-        .task(id: syncSession.paired) {
+        // Live refresh the device list while this view is active, with exponential backoff (#209).
+        .task(id: "\(syncSession.paired)-\(refreshKey)") {
             guard syncSession.paired else { return }
+            var intervalMs: Double = 5000
+            let maxIntervalMs: Double = 60000
             while !Task.isCancelled {
+                let oldDevices = devices
                 await refreshDevices()
-                try? await Task.sleep(for: .seconds(5))
+                if oldDevices == devices && !oldDevices.isEmpty {
+                    intervalMs = min(intervalMs * 1.5, maxIntervalMs)
+                } else {
+                    intervalMs = 5000
+                }
+                try? await Task.sleep(for: .milliseconds(Int(intervalMs)))
             }
         }
     }
