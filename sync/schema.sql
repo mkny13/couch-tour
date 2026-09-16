@@ -29,6 +29,7 @@ CREATE TABLE devices (
     revokedAt INTEGER
 );
 CREATE INDEX devices_previousTokenHash ON devices(previousTokenHash);
+CREATE INDEX devices_group_revoked ON devices(groupId, revokedAt, id, name, platform, createdAt, lastSeenAt);
 
 -- A short-lived pairing code, single-use, looked up by the code alone (D127) — no separate
 -- pairing id, so a human can type the whole thing. codeHash is SHA-256 of the code shown on
@@ -69,6 +70,7 @@ CREATE TABLE progress (
     PRIMARY KEY (groupId, queueKey)
 );
 CREATE INDEX progress_seq ON progress(groupId, seq);
+CREATE INDEX progress_deletedAt_seq ON progress(deletedAt, groupId, seq);
 
 -- The seq counter itself, one row per group. Allocated with a single
 -- `UPDATE seqs SET next = next + ? WHERE groupId = ? RETURNING next` — D1 has no interactive

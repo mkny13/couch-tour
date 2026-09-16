@@ -335,8 +335,9 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     responseHeaders["X-Sync-Token-Rotated"] = newToken;
   }
 
+  let appliedCount = 0;
   if (incoming.length > 0) {
-    await applyIncomingChanges(env, device, incoming, now);
+    appliedCount = await applyIncomingChanges(env, device, incoming, now);
   }
 
   const rows = await env.DB.prepare(
@@ -345,10 +346,7 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     .bind(device.groupId, since)
     .all<ProgressRow>();
 
-  const head = await env.DB.prepare("SELECT next FROM seqs WHERE groupId = ?")
-    .bind(device.groupId)
-    .first<{ next: number }>();
-  const currentSeq = head ? head.next - 1 : since;
+  const currentSeq = cursor.next - 1 + appliedCount;
 
   return json(
     {
@@ -374,7 +372,7 @@ async function applyIncomingChanges(
   device: DeviceRow,
   incoming: ProgressFields[],
   now: number
-): Promise<void> {
+): Promise<number> {
   // Chunked because D1 allows at most 100 bound parameters per query and this binds one per
   // key plus the groupId. A single `IN (...)` over every incoming key 500'd the whole push
   // the moment a client had 100+ changed rows — which is exactly what a first pair with a
@@ -417,7 +415,7 @@ async function applyIncomingChanges(
       return existingUpdatedAt === undefined || change.updatedAt >= existingUpdatedAt;
     });
 
-  if (accepted.length === 0) return;
+  if (accepted.length === 0) return 0;
 
   const bumped = await env.DB.prepare(
     "UPDATE seqs SET next = next + ? WHERE groupId = ? RETURNING next"
@@ -460,6 +458,7 @@ async function applyIncomingChanges(
   );
 
   await env.DB.batch(statements);
+  return accepted.length;
 }
 
 // ------------------------------------------------------------------ health
