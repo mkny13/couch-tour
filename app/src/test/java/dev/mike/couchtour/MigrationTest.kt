@@ -323,6 +323,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_7_8,
                 PhishInDb.MIGRATION_8_9,
                 PhishInDb.MIGRATION_9_10,
+                PhishInDb.MIGRATION_10_11,
             )
             .allowMainThreadQueries()
             .build()
@@ -723,6 +724,76 @@ class MigrationTest {
 
             val retrieved = dao.get("phish", "1997-11-17")
             assertEquals(release, retrieved)
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v10 -> v11
+
+    private val v10ExternalReleaseTable = """
+        CREATE TABLE IF NOT EXISTS `external_releases` (`artist_key` TEXT NOT NULL, `date` TEXT NOT NULL, `platform` TEXT NOT NULL, `url` TEXT NOT NULL, PRIMARY KEY(`artist_key`, `date`))
+    """.trimIndent()
+    private val v10IdentityHash = "499647eb2dacb4c8e966e3ca5eebed41"
+
+    private fun createV10DatabaseWithRows() {
+        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        db.execSQL(v9CreateTable)
+        db.execSQL(v8LocalPlaylistsTable)
+        db.execSQL(v8LocalPlaylistTracksTable)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId` ON `local_playlist_tracks` (`playlistId`)")
+        db.execSQL(v9ArtistTourPreferenceTable)
+        db.execSQL(v10ExternalReleaseTable)
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+        db.execSQL(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            arrayOf(v10IdentityHash),
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+        )
+        db.execSQL(
+            """INSERT INTO local_playlists (id, name, trackCount, createdAt, updatedAt)
+               VALUES ('p1', 'Key Jams', 1, 1000, 1000)"""
+        )
+        db.execSQL(
+            """INSERT INTO local_playlist_tracks
+               (playlistId, position, backend, trackId, showDate, artistSlug, recordingId, title, durationMs, venueName, artUrl)
+               VALUES ('p1', 0, 'phishin', '42', '1997-11-17', NULL, NULL, 'Tweezer', 300000, 'McNichols', NULL)"""
+        )
+        db.version = 10
+        db.close()
+    }
+
+    @Test
+    fun `migrating from v10 creates new indices and drops the old playlist index`() = runBlocking {
+        createV10DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val progressDao = db.progressDao()
+            val playlistDao = db.localPlaylistDao()
+
+            assertEquals(1, progressDao.history().first().size)
+            assertEquals(1, playlistDao.tracksOnce("p1").size)
+
+            val indices = db.openHelper.readableDatabase.query(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+            ).use { cursor ->
+                val names = mutableListOf<String>()
+                while (cursor.moveToNext()) {
+                    names.add(cursor.getString(0))
+                }
+                names
+            }
+            assertTrue(indices.contains("index_progress_deletedAt"))
+            assertTrue(indices.contains("index_progress_updatedAt"))
+            assertTrue(indices.contains("index_progress_finished"))
+            assertTrue(indices.contains("index_progress_artist"))
+            assertTrue(indices.contains("index_local_playlist_tracks_playlistId_position"))
+            assertFalse(indices.contains("index_local_playlist_tracks_playlistId"))
         } finally {
             db.close()
         }

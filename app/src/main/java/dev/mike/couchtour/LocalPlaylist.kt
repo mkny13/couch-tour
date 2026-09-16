@@ -51,7 +51,7 @@ data class LocalPlaylistEntity(
         childColumns = ["playlistId"],
         onDelete = ForeignKey.CASCADE,
     )],
-    indices = [Index("playlistId")],
+    indices = [Index("playlistId", "position")],
 )
 data class LocalPlaylistTrackEntity(
     @PrimaryKey(autoGenerate = true) val rowId: Long = 0,
