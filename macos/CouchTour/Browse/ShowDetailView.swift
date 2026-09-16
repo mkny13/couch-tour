@@ -420,7 +420,8 @@ struct ShowDetailView: View {
     }
 
     private func allSources(_ detail: ShowDetail) -> [RecordingRef] {
-        [detail.recording].compactMap { $0 } + detail.alternates
+        ([detail.recording].compactMap { $0 } + detail.alternates)
+            .sorted { $0.rating > $1.rating }
     }
 
     private func selectSource(_ recordingID: String) {
