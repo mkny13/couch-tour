@@ -141,15 +141,36 @@ interface ArtistTourPreferenceDao {
     suspend fun clearAll()
 }
 
+@Entity(
+    tableName = "external_releases",
+    primaryKeys = ["artist_key", "date"]
+)
+data class ExternalReleaseEntity(
+    @ColumnInfo(name = "artist_key") val artistKey: String,
+    val date: String,
+    val platform: String,
+    val url: String,
+)
+
+@Dao
+interface ExternalReleaseDao {
+    @Query("SELECT * FROM external_releases WHERE artist_key = :artistKey AND date = :date")
+    suspend fun get(artistKey: String, date: String): ExternalReleaseEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun put(release: ExternalReleaseEntity)
+}
+
 @Database(
-    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class],
-    version = 9,
+    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class, ExternalReleaseEntity::class],
+    version = 10,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
     abstract fun progressDao(): ProgressDao
     abstract fun localPlaylistDao(): LocalPlaylistDao
     abstract fun artistTourPreferenceDao(): ArtistTourPreferenceDao
+    abstract fun externalReleaseDao(): ExternalReleaseDao
 
     companion object {
         /**
@@ -256,6 +277,15 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /** Adds external releases for shows. */
+        internal val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `external_releases` (`artist_key` TEXT NOT NULL, `date` TEXT NOT NULL, `platform` TEXT NOT NULL, `url` TEXT NOT NULL, PRIMARY KEY(`artist_key`, `date`))"
+                )
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -268,7 +298,7 @@ abstract class PhishInDb : RoomDatabase() {
                 "phishin.db"
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
             )
                 .build().also { instance = it }
         }
