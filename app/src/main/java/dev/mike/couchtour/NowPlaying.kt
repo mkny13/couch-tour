@@ -68,6 +68,8 @@ import androidx.navigation.NavHostController
 @Composable
 fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
     val state by vm.state.collectAsState()
+    val compareState by vm.compareState.collectAsState()
+    val isComparing = compareState?.isComparing == true
     val ledger = LocalLedgerColors.current
     var menuOpen by remember { mutableStateOf(false) }
     var showJamChartNote by remember { mutableStateOf(true) }
@@ -523,12 +525,13 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 // Previous button
                 IconButton(
                     onClick = { vm.previous() },
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(64.dp),
+                    enabled = !isComparing
                 ) {
                     Icon(
                         Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
-                        tint = ledger.textPrimary,
+                        tint = if (isComparing) ledger.textSubtle else ledger.textPrimary,
                         modifier = Modifier.size(36.dp)
                     )
                 }
@@ -543,10 +546,10 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                         .size(76.dp)
                         .clip(CircleShape)
                         .background(playButtonBg)
-                        .clickable { vm.togglePlayPause() },
+                        .clickable(enabled = !isComparing) { vm.togglePlayPause() },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (state.isBuffering) {
+                    if (state.isBuffering || isComparing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(34.dp),
                             strokeWidth = 3.dp,
@@ -567,12 +570,13 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 // Next button
                 IconButton(
                     onClick = { vm.next() },
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(64.dp),
+                    enabled = !isComparing
                 ) {
                     Icon(
                         Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        tint = ledger.textPrimary,
+                        tint = if (isComparing) ledger.textSubtle else ledger.textPrimary,
                         modifier = Modifier.size(36.dp)
                     )
                 }
