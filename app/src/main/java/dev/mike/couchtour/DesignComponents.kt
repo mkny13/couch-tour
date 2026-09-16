@@ -176,6 +176,8 @@ private val WAVEFORM_BOTTOM = floatArrayOf(
 
 /**
  * Interactive, seekable waveform scrubber rendering an organic continuous solid silhouette.
+ * Displays a procedural fallback or a dynamic envelope extracted via [WaveformExtractor] 
+ * depending on whether a valid [waveformUrl] is provided.
  */
 @Composable
 fun WaveformScrubber(
