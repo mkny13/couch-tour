@@ -7,7 +7,7 @@ struct TrackGroup {
 
 /// Preserves first-appearance order of set names, since sets already arrive in index order from
 /// the catalog layer (Catalog.swift / RelistenAPI.swift) — grouping here must not re-sort them.
-/// Shared by ShowDetailView and NowPlayingInspector so both group a show's tracks the same way.
+/// Shared by ShowDetailView and ExpandedNowPlayingView so both group a show's tracks the same way.
 func trackGroups(_ tracks: [PlayableTrack]) -> [TrackGroup] {
     var order: [String] = []
     var buckets: [String: [PlayableTrack]] = [:]

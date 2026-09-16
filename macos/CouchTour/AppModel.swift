@@ -41,11 +41,11 @@ final class AppModel: ObservableObject {
     #endif
     let updater = UpdaterViewModel()
     /// Whether the Now Playing inspector is open. Lives here, not as local `@State` in
-    /// RootView, because CouchTourApp's View-menu toggle needs to reach it too.
+    /// ThreePaneRootView, because CouchTourApp's View-menu toggle needs to reach it too.
     @Published var showNowPlaying = false
     /// The window's one navigation path (D203). Empty is Home. Lives here rather than as
-    /// `@State` in RootView for the same reason `showNowPlaying` does — the menu bar's ⌘1–⌘4
-    /// and the player bar both move the window from outside RootView.
+    /// `@State` in ThreePaneRootView for the same reason `showNowPlaying` does — the menu bar's ⌘1–⌘4
+    /// and the player bar both move the window from outside ThreePaneRootView.
     ///
     /// A typed `[Route]` rather than a `NavigationPath` because the toolbar breadcrumb has to
     /// read the trail back out, and `NavigationPath` is type-erased.

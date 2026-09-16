@@ -8,7 +8,7 @@ import SwiftUI
 /// desktop-specific environment fields Android's `Build`/`BuildConfig` don't have a macOS
 /// equivalent of.
 struct FeedbackButton: View {
-    /// The breadcrumb's leaf (RootView.swift). `SidebarSection` used to supply this and went
+    /// The breadcrumb's leaf (ThreePaneRootView.swift). `SidebarSection` used to supply this and went
     /// away with the sidebar (D203) — no loss: "1997-11-17" or "Grateful Dead" tells you far
     /// more about where a report came from than "Artists" ever did.
     let currentScreen: String

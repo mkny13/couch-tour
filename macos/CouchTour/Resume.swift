@@ -80,7 +80,7 @@ func resume(_ progress: PlaybackProgress, player: Player, localPlaylistStore: Lo
 /// A local playlist's tracks, wrapped in a `ShowDetail` so it can flow through the same
 /// `Player.play(detail:)`/resume path every other queue kind uses — `queueKey` is passed in
 /// explicitly since a playlist spans arbitrary shows, not one `summary.artist.backend`.
-/// `artist.name`/`date` here are what `MiniPlayerView`/`NowPlayingInspector`/History's artist
+/// `artist.name`/`date` here are what History's artist
 /// filter show for this queue, so the playlist's own name and track count stand in for a real
 /// show's artist and date (each local playlist becomes its own row in History's filter).
 func localPlaylistShowDetail(_ playlist: LocalPlaylist, store: LocalPlaylistStore) async throws -> ShowDetail {

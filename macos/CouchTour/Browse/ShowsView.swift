@@ -88,7 +88,7 @@ struct ShowsView: View {
             }
         }
         // A toolbar Picker, not Android's chip row — ShowsView already sits inside a window
-        // whose toolbar carries navigation chrome (RootView.swift), and a menu-style Picker is
+        // whose toolbar carries navigation chrome (ThreePaneRootView.swift), and a menu-style Picker is
         // the idiom the rest of this app already uses for inline filters (SearchView's artist
         // picker, ListeningView's scope/artist pickers) rather than introducing a second one.
         .toolbar {
