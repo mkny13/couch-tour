@@ -181,4 +181,11 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.room.testing)
+    // Compose UI tests (#250): Robolectric renders the real composables, so the golden-path
+    // flows UAT.md kept catching by hand run in the same local suite as everything else.
+    // Deliberately no debugImplementation(ui-test-manifest): beta builds are debug builds, and
+    // that artifact would ship an exported ComponentActivity in them. The tests register the
+    // host activity with Robolectric's package manager instead (ComposeUiTestSupport.kt).
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
 }

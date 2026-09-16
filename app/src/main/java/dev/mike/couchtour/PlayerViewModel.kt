@@ -3,6 +3,7 @@ package dev.mike.couchtour
 import android.app.Application
 import android.content.ComponentName
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -52,7 +53,11 @@ data class PlayerState(
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
-    private var controller: MediaController? = null
+    // Typed as the Player interface, not MediaController: every call below is plain Player
+    // API, and that is what lets the Compose UI tests (#250) drive the real screens against a
+    // fake player through [attach] instead of a MediaSession that never connects under
+    // Robolectric.
+    private var controller: Player? = null
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
@@ -70,14 +75,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
         val future = MediaController.Builder(app, token).buildAsync()
-        future.addListener({
-            val c = future.get()
-            controller = c
-            c.addListener(object : Player.Listener {
-                override fun onEvents(player: Player, events: Player.Events) = refresh()
-            })
-            refresh()
-        }, MoreExecutors.directExecutor())
+        future.addListener({ attach(future.get()) }, MoreExecutors.directExecutor())
+    }
+
+    @VisibleForTesting
+    internal fun attach(player: Player) {
+        controller = player
+        player.addListener(object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) = refresh()
+        })
+        refresh()
     }
 
     /** Called on a UI tick so the scrubber advances between player events. */

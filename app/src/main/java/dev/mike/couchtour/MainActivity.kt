@@ -770,9 +770,10 @@ private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
     }
 }
 
+// Internal rather than private so InProgressMenuUiTest can render it without the rest of Home.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
+internal fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
     val ledger = LocalLedgerColors.current
     val playerState by vm.state.collectAsState()
     val isCurrentlyPlaying = playerState.hasQueue && playerState.queueKey == progress.queueKey
@@ -3884,8 +3885,9 @@ private fun FavoriteButton(artist: ArtistRef) {
     }
 }
 
+// Internal rather than private so PlaybackControlsUiTest can render it on its own.
 @Composable
-private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
+internal fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
     val ledger = LocalLedgerColors.current
     Column(
         Modifier
