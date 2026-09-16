@@ -263,6 +263,7 @@ function parseProgressFields(value: unknown, index: number): ProgressFields {
  * own just-applied pushes, comes back in `changes`.
  */
 async function handleSync(request: Request, env: Env): Promise<Response> {
+  const startMs = Date.now();
   const device = await authenticate(request, env);
   if (!device) return json({ error: "unauthorized" }, 401);
 
@@ -347,6 +348,8 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     .all<ProgressRow>();
 
   const currentSeq = cursor.next - 1 + appliedCount;
+  const outCount = rows.results ? rows.results.length : 0;
+  console.log(`handleSync elapsed: ${Date.now() - startMs}ms (in: ${incoming.length}, out: ${outCount})`);
 
   return json(
     {

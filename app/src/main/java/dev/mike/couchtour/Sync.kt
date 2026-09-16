@@ -124,6 +124,7 @@ object SyncApi {
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .eventListenerFactory { TimingEventListener("SyncApi") }
         .build()
     // encodeDefaults matters here in a way it doesn't for PhishInApi, which only ever decodes:
     // without it, kotlinx.serialization omits any property still equal to its default, so a row
