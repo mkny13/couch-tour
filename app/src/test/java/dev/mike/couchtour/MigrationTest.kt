@@ -140,175 +140,182 @@ class MigrationTest {
     }
 
     private fun createV1DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
-        db.execSQL(v1CreateTable)
-        // Room's own bookkeeping, so it recognises this as a genuine v1 database.
-        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-        db.execSQL(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            arrayOf(v1IdentityHash),
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt)
-               VALUES ('show:1992-12-02','1992-12-02','Newport Music Hall',NULL,22,169397,'Rocky Top',200)"""
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt)
-               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100)"""
-        )
-        db.version = 1
-        db.close()
+SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.execSQL(v1CreateTable)
+            // Room's own bookkeeping, so it recognises this as a genuine v1 database.
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v1IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport Music Hall',NULL,22,169397,'Rocky Top',200)"""
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt)
+                   VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100)"""
+            )
+            db.version = 1
+
+        }
     }
 
     private fun createV2DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
-        db.execSQL(v2CreateTable)
-        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-        db.execSQL(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            arrayOf(v2IdentityHash),
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished)
-               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1)"""
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished)
-               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0)"""
-        )
-        db.version = 2
-        db.close()
+SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.execSQL(v2CreateTable)
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v2IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1)"""
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished)
+                   VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0)"""
+            )
+            db.version = 2
+
+        }
     }
 
     private fun createV4DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
-        db.execSQL(v4CreateTable)
-        db.execSQL(v4PendingScrobblesTable)
-        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-        db.execSQL(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            arrayOf(v4IdentityHash),
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
-               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0)"""
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
-               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0)"""
-        )
-        db.execSQL(
-            """INSERT INTO pending_scrobbles (artist, track, album, durationSec, timestampSec)
-               VALUES ('Phish','Tweezer','1997-11-17',300,1700000000)"""
-        )
-        db.version = 4
-        db.close()
+SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.execSQL(v4CreateTable)
+            db.execSQL(v4PendingScrobblesTable)
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v4IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0)"""
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+                   VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0)"""
+            )
+            db.execSQL(
+                """INSERT INTO pending_scrobbles (artist, track, album, durationSec, timestampSec)
+                   VALUES ('Phish','Tweezer','1997-11-17',300,1700000000)"""
+            )
+            db.version = 4
+
+        }
     }
 
     private fun createV5DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
-        db.execSQL(v5CreateTable)
-        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-        db.execSQL(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            arrayOf(v5IdentityHash),
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
-               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0)"""
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
-               VALUES ('playlist:key-jams','Key Jams','by mfhgreyboy',NULL,5,35342,'Taste',100,0,0)"""
-        )
-        db.version = 5
-        db.close()
+SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.execSQL(v5CreateTable)
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v5IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0)"""
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed)
+                   VALUES ('playlist:key-jams','Key Jams','by mfhgreyboy',NULL,5,35342,'Taste',100,0,0)"""
+            )
+            db.version = 5
+
+        }
     }
 
     private fun createV6DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
-        db.execSQL(v6CreateTable)
-        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-        db.execSQL(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            arrayOf(v6IdentityHash),
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist)
-               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish')"""
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist)
-               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish')"""
-        )
-        db.version = 6
-        db.close()
+SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.execSQL(v6CreateTable)
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v6IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish')"""
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist)
+                   VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish')"""
+            )
+            db.version = 6
+
+        }
     }
 
     private fun createV7DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
-        db.execSQL(v7CreateTable)
-        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-        db.execSQL(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            arrayOf(v7IdentityHash),
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
-               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
-               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish',NULL)"""
-        )
-        db.version = 7
-        db.close()
+SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.execSQL(v7CreateTable)
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v7IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+                   VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish',NULL)"""
+            )
+            db.version = 7
+
+        }
     }
 
     private fun createV8DatabaseWithRows() {
-        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
-        db.execSQL(v8CreateTable)
-        db.execSQL(v8LocalPlaylistsTable)
-        db.execSQL(v8LocalPlaylistTracksTable)
-        db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId` ON `local_playlist_tracks` (`playlistId`)")
-        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
-        db.execSQL(
-            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
-            arrayOf(v8IdentityHash),
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
-               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
-        )
-        db.execSQL(
-            """INSERT INTO progress
-               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
-               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish',NULL)"""
-        )
-        db.execSQL(
-            """INSERT INTO local_playlists (id, name, trackCount, createdAt, updatedAt)
-               VALUES ('p1', 'Key Jams', 1, 1000, 1000)"""
-        )
-        db.execSQL(
-            """INSERT INTO local_playlist_tracks
-               (playlistId, position, backend, trackId, showDate, artistSlug, recordingId, title, durationMs, venueName, artUrl)
-               VALUES ('p1', 0, 'phishin', '42', '1997-11-17', NULL, NULL, 'Tweezer', 300000, 'McNichols', NULL)"""
-        )
-        db.version = 8
-        db.close()
+SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.execSQL(v8CreateTable)
+            db.execSQL(v8LocalPlaylistsTable)
+            db.execSQL(v8LocalPlaylistTracksTable)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId` ON `local_playlist_tracks` (`playlistId`)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v8IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+                   VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish',NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlists (id, name, trackCount, createdAt, updatedAt)
+                   VALUES ('p1', 'Key Jams', 1, 1000, 1000)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlist_tracks
+                   (playlistId, position, backend, trackId, showDate, artistSlug, recordingId, title, durationMs, venueName, artUrl)
+                   VALUES ('p1', 0, 'phishin', '42', '1997-11-17', NULL, NULL, 'Tweezer', 300000, 'McNichols', NULL)"""
+            )
+            db.version = 8
+
+        }
     }
 
     private fun openWithCurrentSchema(): PhishInDb =
