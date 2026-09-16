@@ -417,7 +417,12 @@ final class SyncSessionTests: XCTestCase {
     func testASuccessfulSyncClearsAPriorError() async throws {
         try await claim()
         server.enqueue(#"{"error":"internal error"}"#, code: 500)
-        try? await session.sync(store)
+        do {
+            try await session.sync(store)
+            XCTFail("expected the 500 to rethrow")
+        } catch {
+            // expected
+        }
         XCTAssertNotNil(session.lastError)
 
         server.enqueue(#"{"seq":1,"changes":[]}"#)
@@ -429,7 +434,12 @@ final class SyncSessionTests: XCTestCase {
     func testClearErrorResetsLastError() async throws {
         try await claim()
         server.enqueue(#"{"error":"internal error"}"#, code: 500)
-        try? await session.sync(store)
+        do {
+            try await session.sync(store)
+            XCTFail("expected the 500 to rethrow")
+        } catch {
+            // expected
+        }
         XCTAssertNotNil(session.lastError)
 
         session.clearError()
