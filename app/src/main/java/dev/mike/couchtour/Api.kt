@@ -60,6 +60,8 @@ data class Show(
     val venue: Venue? = null,
     val tracks: List<Track> = emptyList(),
     val tags: List<Tag> = emptyList(),
+    @SerialName("external_release_platform") val externalReleasePlatform: String? = null,
+    @SerialName("external_release_url") val externalReleaseUrl: String? = null,
 ) {
     val location: String? get() = venue?.location
 }

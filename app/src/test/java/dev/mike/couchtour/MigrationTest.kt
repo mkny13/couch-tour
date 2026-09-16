@@ -322,6 +322,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_6_7,
                 PhishInDb.MIGRATION_7_8,
                 PhishInDb.MIGRATION_8_9,
+                PhishInDb.MIGRATION_9_10,
             )
             .allowMainThreadQueries()
             .build()
@@ -643,6 +644,85 @@ class MigrationTest {
 
             prefDao.deletePreference("relisten:grateful-dead")
             assertNull(prefDao.getPreference("relisten:grateful-dead"))
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v9 -> v10
+
+    private val v9CreateTable = v8CreateTable
+    private val v9ArtistTourPreferenceTable = """
+        CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
+            `artist_key` TEXT NOT NULL, `tour_name` TEXT, `year` TEXT, `updated_at` INTEGER NOT NULL,
+            PRIMARY KEY(`artist_key`)
+        )
+    """.trimIndent()
+    private val v9IdentityHash = "1f5c6b986e1e8ab1a129ef31d4576307" // This can be fake since we override identity_hash
+
+    private fun createV9DatabaseWithRows() {
+        val db = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        db.execSQL(v9CreateTable)
+        db.execSQL(v8LocalPlaylistsTable)
+        db.execSQL(v8LocalPlaylistTracksTable)
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId` ON `local_playlist_tracks` (`playlistId`)")
+        db.execSQL(v9ArtistTourPreferenceTable)
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+        db.execSQL(
+            "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+            arrayOf(v9IdentityHash),
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+               VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+        )
+        db.execSQL(
+            """INSERT INTO progress
+               (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+               VALUES ('show:1997-02-13','1997-02-13','Shepherd''s Bush',NULL,5,35342,'Taste',100,0,0,'Phish',NULL)"""
+        )
+        db.execSQL(
+            """INSERT INTO artist_tour_preferences (artist_key, tour_name, year, updated_at)
+               VALUES ('relisten:grateful-dead', 'Spring 1977', '1977', 123456789)"""
+        )
+        db.version = 9
+        db.close()
+    }
+
+    @Test
+    fun `migrating from v9 keeps existing tables untouched`() = runBlocking {
+        createV9DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val progressDao = db.progressDao()
+            val prefDao = db.artistTourPreferenceDao()
+
+            assertEquals(2, progressDao.history().first().size)
+            assertEquals("Spring 1977", prefDao.getPreference("relisten:grateful-dead")?.tourName)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `a database migrated from v9 accepts external releases`() = runBlocking {
+        createV9DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            val dao = db.externalReleaseDao()
+            val release = ExternalReleaseEntity(
+                artistKey = "phish",
+                date = "1997-11-17",
+                platform = "SPOTIFY",
+                url = "spotify://album/123",
+            )
+            dao.put(release)
+
+            val retrieved = dao.get("phish", "1997-11-17")
+            assertEquals(release, retrieved)
         } finally {
             db.close()
         }

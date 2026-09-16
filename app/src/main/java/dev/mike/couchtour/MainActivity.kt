@@ -1093,11 +1093,16 @@ fun ShowsScreen(period: String, nav: NavHostController) {
 fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
     val show = loadOnce(date) { PhishInApi.show(date) }
     val saved = loadOnce(date) { vm.progressFor(showQueueKey(date)) }
+    val localRelease = loadOnce(date) { vm.externalReleaseDao.get(PHISH.key, date) }
     var addingToPlaylist by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         Header(date, nav)
-        Loaded(show.value) { s ->
+        Loaded(show.value) { sRaw ->
+            val release = localRelease.value?.getOrNull()
+            val s = if (release != null && sRaw.externalReleasePlatform == null) {
+                sRaw.copy(externalReleasePlatform = release.platform, externalReleaseUrl = release.url)
+            } else sRaw
             val playable = s.tracks.filter { it.playable }
             // A finished show's stored position is the end of the encore, so
             // offering to resume it would just stop again immediately.
@@ -1431,7 +1436,16 @@ fun RecordingScreen(
     val loaded = loadOnce(Triple(artistId, date, recordingId)) {
         val source = sourceFor(backend ?: error("Unknown backend $backendId"))
         val artist = source.artists().firstOrNull { it.id == artistId } ?: error("Unknown artist $artistId")
-        val detail = source.show(artist, date, recordingId)
+        var detail = source.show(artist, date, recordingId)
+        
+        val release = vm.externalReleaseDao.get(artist.key, date)
+        if (release != null && detail.externalRelease == null) {
+            runCatching {
+                val rPlatform = ExternalReleasePlatform.valueOf(release.platform.uppercase())
+                detail = detail.copy(externalRelease = ExternalRelease(rPlatform, release.url))
+            }
+        }
+        
         // A finished show's stored position is the end of the encore, same reasoning
         // ShowScreen's resume banner uses (D22).
         detail to detail.queueKey?.let { vm.progressFor(it) }?.takeIf { !it.finished }
@@ -1693,6 +1707,10 @@ private fun RecordingHeader(
                     fontSize = 13.sp,
                     color = ledger.textSecondary
                 )
+            }
+
+            detail.externalRelease?.let { release ->
+                ExternalReleasePill(release)
             }
 
             Spacer(Modifier.weight(1f))
@@ -3486,6 +3504,15 @@ private fun ShowHeader(
                 )
             }
 
+            if (show.externalReleasePlatform != null && show.externalReleaseUrl != null) {
+                runCatching {
+                    val platform = ExternalReleasePlatform.valueOf(show.externalReleasePlatform.uppercase())
+                    ExternalRelease(platform, show.externalReleaseUrl)
+                }.getOrNull()?.let { release ->
+                    ExternalReleasePill(release)
+                }
+            }
+
             Spacer(Modifier.weight(1f))
             ShareButton(showShareText(PHISH, show.date))
         }
@@ -4303,3 +4330,43 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.groupedBySet(
     }
 }
 
+@Composable
+private fun ExternalReleasePill(release: ExternalRelease) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val ledger = LocalLedgerColors.current
+    
+    val label = when (release.platform) {
+        ExternalReleasePlatform.SPOTIFY -> "Spotify"
+        ExternalReleasePlatform.TIDAL -> "Tidal"
+    }
+
+    Row(
+        modifier = Modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+            .clickable {
+                val intent = ExternalReleaseHelper.buildIntent(release)
+                try {
+                    context.startActivity(intent)
+                } catch (e: android.content.ActivityNotFoundException) {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(ExternalReleaseHelper.getWebUrl(release))))
+                }
+            }
+            .padding(horizontal = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Icon(
+            Icons.AutoMirrored.Filled.OpenInNew,
+            contentDescription = null,
+            tint = ledger.textSecondary,
+            modifier = Modifier.size(15.dp)
+        )
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            color = ledger.textSecondary
+        )
+    }
+}
