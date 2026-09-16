@@ -19,7 +19,7 @@ struct CouchTourApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ThreePaneRootView()
+            ThreePaneThreePaneRootView()
                 .environmentObject(appModel)
                 .environmentObject(player)
                 .environmentObject(appModel.favorites)
@@ -45,7 +45,7 @@ struct CouchTourApp: App {
 
                 // Focuses the toolbar's search field. With the sidebar gone the field is
                 // always on screen, so this no longer has to navigate anywhere first — it
-                // just asks for focus (RootView consumes the flag; `Commands` can't reach a
+                // just asks for focus (ThreePaneRootView consumes the flag; `Commands` can't reach a
                 // `@FocusState` directly).
                 Button("Find") {
                     appModel.focusSearchField = true
@@ -111,7 +111,7 @@ struct CouchTourApp: App {
         }
 
         // ⌘, opens this — declaring the scene is all it takes, no Commands entry needed.
-        // Sync used to be a sidebar section (RootView.swift); it's the only settings-like
+        // Sync used to be a sidebar section (ThreePaneThreePaneRootView.swift); it's the only settings-like
         // surface the app has, so it moved here rather than duplicating the form in both
         // places (D171). Account (#57) joined it as a second tab rather than a third sidebar
         // section or its own window, same reasoning. Playback settings (#49) forms the third tab.

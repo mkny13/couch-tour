@@ -351,6 +351,12 @@ struct PlayerRailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
+                    
+                    HStack(spacing: 16) {
+                        volumeControl
+                        CastRoutePickerButton()
+                    }
+                    .padding(.top, 12)
                     .padding(.bottom, 26)
 
                 } else {
@@ -362,6 +368,32 @@ struct PlayerRailView: View {
         .frame(width: 392)
         .background(colors.elevated)
         .border(width: 1, edges: [.leading], color: colors.panelBorder)
+    }
+    
+    private var volumeControl: some View {
+        HStack(spacing: 6) {
+            Button {
+                player.toggleMute()
+            } label: {
+                Image(systemName: volumeSymbol)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(player.volume == 0 ? "Unmute" : "Mute")
+
+            Slider(value: $player.volume, in: 0...1)
+                .frame(width: 72)
+                .accessibilityLabel("Volume")
+        }
+        .foregroundStyle(colors.textMuted)
+    }
+
+    private var volumeSymbol: String {
+        switch player.volume {
+        case 0: return "speaker.slash.fill"
+        case ..<0.34: return "speaker.wave.1.fill"
+        case ..<0.67: return "speaker.wave.2.fill"
+        default: return "speaker.wave.3.fill"
+        }
     }
 
     @ViewBuilder
