@@ -4612,3 +4612,8 @@ own prompt.
 **Verification:** docs and issue split only. No code changed. Android `testDebugUnitTest`
 passes. `swift test` hits the same pre-existing Xcode license blocker as D233-D235, and this
 change touches no Swift.
+
+### D238 — Sync backend DB query efficiency (#241, part of #200)
+
+Added covering indices to `devices` (`devices_group_revoked`) and `progress` (`progress_deletedAt_seq`) to eliminate full table scans on the devices list and the tombstone purge job. The purge job's cost now scales with the number of old tombstones, not total history.
+Also eliminated the redundant second `seq` lookup in `handleSync` by deriving the post-push sequence number from the pre-read cursor and the applied-rows count.
