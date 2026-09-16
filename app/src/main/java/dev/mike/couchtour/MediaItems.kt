@@ -175,8 +175,8 @@ private fun coreMediaItem(
         info.key?.let { putString(Keys.QUEUE_KEY, it) }
         putString(Keys.QUEUE_TITLE, info.title)
         putString(Keys.QUEUE_SUBTITLE, info.subtitle)
-        putString(Keys.QUEUE_ART, info.art)
-        putString(Keys.WAVEFORM, waveformUrl)
+        putString(Keys.QUEUE_ART, info.art?.requireHttps())
+        putString(Keys.WAVEFORM, waveformUrl?.requireHttps())
         putString(Keys.TRACK_ID, id)
         backend?.let { putString(Keys.BACKEND, it) }
         putBoolean(Keys.LIKED, likedByUser)
@@ -203,7 +203,7 @@ private fun coreMediaItem(
         // Queue identity lives here instead, so the mini player still shows the
         // playlist you started from rather than the underlying show.
         .setSubtitle("${info.title} · ${info.subtitle}")
-        .setArtworkUri(art?.let { Uri.parse(it) })
+        .setArtworkUri(art?.let { Uri.parse(it.requireHttps()) })
         .setIsBrowsable(false)
         .setIsPlayable(true)
         .setExtras(extras)

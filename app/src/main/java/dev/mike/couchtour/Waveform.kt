@@ -78,7 +78,7 @@ object WaveformExtractor {
     suspend fun loadHeights(context: android.content.Context, url: String, sampleCount: Int = 400): WaveformHeights? {
         cache.get(url)?.let { return it }
         val request = ImageRequest.Builder(context)
-            .data(url)
+            .data(url.requireHttps())
             .allowHardware(false)
             .build()
         val drawable = context.imageLoader.execute(request).drawable as? BitmapDrawable

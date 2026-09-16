@@ -108,12 +108,12 @@ class MediaItemsTest {
     fun `a phish-in and a relisten item are built by the same converging path`() {
         // D73: the phone and the Auto browse tree must produce byte-identical queues for the
         // same inputs, whichever backend they came from.
-        val info = QueueInfo(key = "k", title = "t", subtitle = "s", art = "art.jpg", artist = "Grateful Dead")
+        val info = QueueInfo(key = "k", title = "t", subtitle = "s", art = "https://art.jpg", artist = "Grateful Dead")
         val track = PlayableTrack(id = "t1", title = "Song", durationMs = 1000, url = "https://a/1.mp3")
 
         val viaRecording = recordingMediaItem(track, info)
         assertEquals("Grateful Dead", viaRecording.mediaMetadata.artist)
-        assertEquals("art.jpg", viaRecording.mediaMetadata.artworkUri.toString())
+        assertEquals("https://art.jpg", viaRecording.mediaMetadata.artworkUri.toString())
         assertEquals("t · s", viaRecording.mediaMetadata.subtitle)
     }
 
