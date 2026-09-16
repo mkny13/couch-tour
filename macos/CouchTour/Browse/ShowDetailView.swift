@@ -287,6 +287,10 @@ struct ShowDetailView: View {
                 .buttonStyle(.plain)
             }
 
+            if let release = detail.summary.externalRelease {
+                ExternalLinkButton(externalRelease: release)
+            }
+
             // Like (#148) — the replacement for the removed Save/bookmark pill. A phish.in
             // server-side show like; hidden for Relisten shows, which have none.
             ShowLikeButton(
