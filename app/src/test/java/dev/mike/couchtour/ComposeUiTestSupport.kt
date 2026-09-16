@@ -5,8 +5,11 @@ import android.content.ComponentName
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.navigation.NavHostController
@@ -109,6 +112,16 @@ fun SemanticsNodeInteractionsProvider.onScreenOrder(candidates: List<String>): L
         }
         .sortedBy { it.second }
         .map { it.first }
+
+/**
+ * A FilterChip labelled [label]. Chip labels routinely collide with other text on the same
+ * screen — "SBD" is both a tag-filter chip and a badge on every soundboard row — so matching
+ * on selectability is what tells the control apart from the decoration.
+ */
+fun chip(label: String): SemanticsMatcher = hasText(label) and isSelectable()
+
+fun SemanticsNodeInteractionsProvider.onChip(label: String): SemanticsNodeInteraction =
+    onNode(chip(label))
 
 fun SemanticsNodeInteraction.exists(): Boolean =
     runCatching { fetchSemanticsNode() }.isSuccess
