@@ -4617,3 +4617,10 @@ change touches no Swift.
 
 Added covering indices to `devices` (`devices_group_revoked`) and `progress` (`progress_deletedAt_seq`) to eliminate full table scans on the devices list and the tombstone purge job. The purge job's cost now scales with the number of old tombstones, not total history.
 Also eliminated the redundant second `seq` lookup in `handleSync` by deriving the post-push sequence number from the pre-read cursor and the applied-rows count.
+
+### D239 — macOS DB query efficiency (#240, part of #200)
+
+Added additive `CREATE INDEX IF NOT EXISTS` migrations (`v10_progressIndexes` and `v10_localPlaylistIndexes`) in GRDB.
+Added covering index for artists, indices for live progress and continue-listening lists, and for the sync queue.
+Modified `ProgressStore.changedSince` to return rows ordered by `updatedAt` ascending natively, removing the in-memory `.sorted` step in `SyncSession.syncOnce`.
+Test coverage asserts that the `EXPLAIN QUERY PLAN` output for these hot paths utilizes the indexes, avoids `USE TEMP B-TREE FOR ORDER BY`, and prevents full table scans.

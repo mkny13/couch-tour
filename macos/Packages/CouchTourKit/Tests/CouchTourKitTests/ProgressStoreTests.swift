@@ -449,6 +449,65 @@ final class ProgressStoreTests: XCTestCase {
         }
     }
 
+    func testV10MigrationPreservesExistingData() throws {
+        let queue = try DatabaseQueue()
+
+        var partialMigrator = DatabaseMigrator()
+        partialMigrator.registerMigration("v6_initial") { db in
+            try db.create(table: "progress") { t in
+                t.column("queueKey", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("subtitle", .text).notNull()
+                t.column("artUrl", .text)
+                t.column("trackIndex", .integer).notNull()
+                t.column("positionMs", .integer).notNull()
+                t.column("trackTitle", .text).notNull()
+                t.column("updatedAt", .integer).notNull()
+                t.column("finished", .boolean).notNull().defaults(to: false)
+                t.column("dismissed", .boolean).notNull().defaults(to: false)
+                t.column("artist", .text).notNull().defaults(to: "")
+            }
+        }
+        partialMigrator.registerMigration("v7_deletedAt") { db in
+            try db.alter(table: "progress") { t in
+                t.add(column: "deletedAt", .integer)
+            }
+        }
+        try partialMigrator.migrate(queue)
+
+        // Insert pre-migration row
+        try queue.write { db in
+            let prog = self.progress(key: "show:1997-11-17", trackIndex: 3, positionMs: 12_000)
+            try prog.save(db)
+        }
+
+        // Now run full migrator including v10_progressIndexes
+        var fullMigrator = partialMigrator
+        fullMigrator.registerMigration("v9_artistTourPreferences") { db in
+            try db.create(table: "artist_tour_preferences") { t in
+                t.column("artistKey", .text).primaryKey()
+                t.column("tourName", .text)
+                t.column("year", .text)
+                t.column("updatedAt", .integer).notNull()
+            }
+        }
+        fullMigrator.registerMigration("v10_progressIndexes") { db in
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_live_updated_at ON progress(updatedAt DESC) WHERE deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_in_progress_updated_at ON progress(updatedAt DESC) WHERE finished = 0 AND dismissed = 0 AND deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_artist_updated_at ON progress(artist, updatedAt DESC) WHERE deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_changed_since_updated_at ON progress(updatedAt)")
+        }
+        try fullMigrator.migrate(queue)
+
+        // Verify pre-existing data is intact
+        try queue.read { db in
+            let prog = try PlaybackProgress.fetchOne(db, key: "show:1997-11-17")
+            XCTAssertNotNil(prog)
+            XCTAssertEqual(3, prog?.trackIndex)
+            XCTAssertEqual(12_000, prog?.positionMs)
+        }
+    }
+
     // -------------------------------------------------------- backup exclusion (#192)
 
     func testDefaultURLDirectoryIsExcludedFromBackup() throws {
@@ -461,5 +520,83 @@ final class ProgressStoreTests: XCTestCase {
         let values = try dir.resourceValues(forKeys: [.isExcludedFromBackupKey])
         XCTAssertEqual(true, values.isExcludedFromBackup,
                        "Database directory should be excluded from Time Machine backup")
+    }
+
+    // -------------------------------------------------------- query planner audit (#240)
+
+    private func assertQueryPlan(_ request: some FetchRequest, usesIndex index: String?, avoidsSort: Bool = true, avoidsScan: Bool = true) throws {
+        try store.dbQueue.read { db in
+            let statement = try request.makePreparedRequest(db, forSingleResult: false).statement
+            let planRows = try Row.fetchAll(db, sql: "EXPLAIN QUERY PLAN " + statement.sql, arguments: statement.arguments)
+            let plan = planRows.compactMap { $0["detail"] as String? }.joined(separator: "\n")
+            
+            if let index = index {
+                XCTAssertTrue(plan.contains("USING INDEX \(index)"), "Query plan should use index \(index):\n\(plan)")
+            }
+            if avoidsSort {
+                XCTAssertFalse(plan.contains("USE TEMP B-TREE FOR ORDER BY"), "Query plan should avoid temporary B-tree for sort:\n\(plan)")
+            }
+            if avoidsScan {
+                let lines = plan.components(separatedBy: "\n")
+                for line in lines {
+                    if line.contains("SCAN progress") && !line.contains("USING INDEX") && !line.contains("USING COVERING INDEX") {
+                        XCTFail("Query plan should avoid bare table scan on progress:\n\(plan)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func seedForQueryPlanner() throws {
+        // Need enough rows to prove the query planner uses indexes rather than scanning a small table.
+        for i in 0..<200 {
+            try store.put(progress(key: "show:\(i)", finished: i % 2 == 0, dismissed: i % 3 == 0, updatedAt: Int64(i), artist: i % 4 == 0 ? "Phish" : "Grateful Dead"))
+        }
+    }
+
+    func testQueryPlansForHotPaths() throws {
+        try seedForQueryPlanner()
+
+        // Continue Listening
+        let inProgressRequest = PlaybackProgress
+            .filter(Column("finished") == false && Column("dismissed") == false && Column("deletedAt") == nil)
+            .order(Column("updatedAt").desc)
+            .limit(25)
+        try assertQueryPlan(inProgressRequest, usesIndex: "idx_progress_in_progress_updated_at")
+
+        // History
+        let historyRequest = PlaybackProgress
+            .filter(Column("deletedAt") == nil)
+            .order(Column("updatedAt").desc)
+        try assertQueryPlan(historyRequest, usesIndex: "idx_progress_live_updated_at")
+
+        // Artist History
+        let artistHistoryRequest = PlaybackProgress
+            .filter(Column("artist") == "Phish" && Column("deletedAt") == nil)
+            .order(Column("updatedAt").desc)
+        try assertQueryPlan(artistHistoryRequest, usesIndex: "idx_progress_artist_updated_at")
+
+        // Changed Since (Sync)
+        let changedSinceRequest = PlaybackProgress
+            .filter(Column("updatedAt") > 100)
+            .order(Column("updatedAt").asc)
+        try assertQueryPlan(changedSinceRequest, usesIndex: "idx_progress_changed_since_updated_at")
+        
+        // Distinct Artists
+        // SQLite's DISTINCT + ORDER BY on a covered column can use an index.
+        try store.dbQueue.read { db in
+            let planRows = try Row.fetchAll(db, sql: "EXPLAIN QUERY PLAN SELECT DISTINCT artist FROM progress WHERE artist != '' AND deletedAt IS NULL ORDER BY artist")
+            let plan = planRows.compactMap { $0["detail"] as String? }.joined(separator: "\n")
+            // A covering index on (artist, ...) helps avoid scans or temp b-trees if possible.
+            // With idx_progress_artist_updated_at ON progress(artist, updatedAt DESC) WHERE deletedAt IS NULL
+            XCTAssertTrue(plan.contains("USING INDEX idx_progress_artist_updated_at") || plan.contains("USING COVERING INDEX idx_progress_artist_updated_at"), "Query plan should use artist index:\n\(plan)")
+            XCTAssertFalse(plan.contains("USE TEMP B-TREE FOR ORDER BY"), "Should avoid temporary B-tree for sort:\n\(plan)")
+            let lines = plan.components(separatedBy: "\n")
+            for line in lines {
+                if line.contains("SCAN progress") && !line.contains("USING INDEX") && !line.contains("USING COVERING INDEX") {
+                    XCTFail("Should avoid bare table scan on progress:\n\(plan)")
+                }
+            }
+        }
     }
 }
