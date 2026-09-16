@@ -23,6 +23,12 @@ Committing the result is what makes the outcome visible to Claude and to Kanban 
 
 Add new items when finishing a batch. Keep the `uat-NNN` ids stable and never reuse one.
 
+Marking an item `[!]` with a note also files a `type:bug p1` GitHub issue automatically
+(`scripts/uat-server.py`, D241): the first `[!]` opens the issue, a re-mark comments on
+the still-open issue instead of duplicating it, and the issue number is remembered on the
+note line as `(→ #N)`. Passing or clearing never closes the filed issue — that stays a
+human/Mahler decision through the normal pipeline.
+
 ---
 
 ## Batch 1 — macOS tag filter, sort, artwork, context menu (v0.63, #67/#21/#62/#115, D206)

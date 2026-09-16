@@ -4632,3 +4632,39 @@ Test coverage asserts that the `EXPLAIN QUERY PLAN` output for these hot paths u
 - **Credential Leaks**: Scanned `macos/` for `.env` files and hardcoded API tokens/passwords. None were found. Keychain is appropriately used for persisting JWT and Sync Device tokens (`SyncTokenStore.swift` and `PhishInTokenStore.swift`), and passwords are not stored in memory post-login.
 - **URL Pooling**: Scanned for unpooled `URLSession` usage. The app relies exclusively on `URLSession.shared`, pooling connections safely across network boundaries.
 - **Subshell Executions**: Scanned `macos/` for `Process()`, `NSTask()`, `system()`, and `popen()`. None exist.
+
+### D241 — Marking a UAT item [!] files its GitHub bug automatically (#258)
+
+`scripts/uat-server.py` no longer just edits `UAT.md` when an item is marked `[!]` with a
+note — it also files a `type:bug p1` issue on this repo via the local `gh` CLI, in the
+shape contract written down in mkny13/mahler#292 (title `UAT fail: <item title> (<id>)`,
+body with the item id, area, source link, and the note verbatim). Groundwork's phase-2
+implementation (mkny13/groundwork#125) files the same shape from its in-app panel, so
+Mahler's `sync` ingests both without changes.
+
+Why these choices:
+
+- **The local `gh` CLI, not a new token.** Unlike groundwork's hosted case, this script
+  only ever runs on Mike's machine, where `gh` is already authenticated — no credential
+  to create, store, or scope (mahler#292's decision: each app files through its own
+  existing write path and credentials).
+- **The issue number lives in `UAT.md` itself**, as a trailing `(→ #N)` marker on the
+  note line. UAT.md is the single source of truth the server is built on; a side-car
+  database would be a second thing to keep in sync. The marker survives a later pass as
+  a marker-only note line, so a re-fail finds its old issue even after the note was
+  cleared — closing that gap is the whole point of the dedup rule.
+- **Dedup per the contract:** a re-mark comments on the still-open linked issue; a
+  re-mark after the issue was closed opens a fresh issue (a regression is a new report,
+  not the same one). A re-mark with an unchanged note files nothing — the note textarea
+  saves on blur, and without that guard every edit would spam the issue with comments.
+- **A pass or clear never touches the filed issue.** Closing bugs stays a human/Mahler
+  decision through the normal pipeline, same as everywhere else.
+- **gh failures degrade to a warning**, surfaced in the board's toast. The `UAT.md`
+  write is the source of truth for the UAT record and must succeed regardless; the next
+  note edit retries the filing. (Found during live verification: `gh issue view --json
+  state` reports `"OPEN"` uppercase — the comparison is case-insensitive.)
+
+Tests: `scripts/test_uat_server.py` (stdlib unittest, no new dependencies — there was no
+existing Python test pattern under `scripts/` to follow), 16 tests covering the shape,
+dedup, regression, marker persistence, and gh-failure paths, plus one live end-to-end run
+against a throwaway item id (issues #285/#286, created and closed as evidence).

@@ -8,11 +8,20 @@ rewritten in place so the result lands in git where Claude and Kanban tasks can 
 
 Statuses map to the checkbox character in UAT.md: ' ' pending, 'x' pass, '!' needs work.
 A "needs work" item carries a note on the following line, indented under the list item.
+
+Marking an item [!] with a note also files a GitHub bug (type:bug p1) through the local gh
+CLI, in the shape spec'd by mkny13/mahler#292: the first [!] opens the issue, a re-mark
+comments on the still-open issue instead of duplicating it, and a re-mark after that issue
+was closed opens a new one (a regression, not the same report). The number is remembered on
+the note line as a trailing '(→ #N)' marker and survives a later pass as a marker-only line,
+so a fresh [!] always finds its old issue. Passing or clearing never touches the filed
+issue — closing it stays a human/Mahler decision through the normal pipeline.
 """
 
 import argparse
 import json
 import re
+import subprocess
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -26,6 +35,128 @@ SECTION_RE = re.compile(r"^## (.*)$")
 
 STATUS_BY_CHAR = {" ": "pending", "x": "pass", "!": "needs-work"}
 CHAR_BY_STATUS = {v: k for k, v in STATUS_BY_CHAR.items()}
+
+# The bug target is this repo, by slug rather than by cwd: the server can be started
+# from anywhere and gh only auto-detects the repo from the working directory.
+REPO_SLUG = "mkny13/couch-tour"
+SOURCE_LINK = f"https://github.com/{REPO_SLUG}/blob/main/UAT.md"
+
+# The trailing '(→ #N)' that pins a filed issue to an item's note line. The arrow makes
+# an accidental collision with note prose practically impossible.
+MARKER_RE = re.compile(r"\s*\(→ #(\d+)\)\s*")
+BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+PLATFORM_RE = re.compile(r"\((Android|macOS|both|sync)\)", re.IGNORECASE)
+
+BUG_FOOTER = (
+    "Filed automatically from the in-app UAT check. "
+    "Passing this item again does not close this issue."
+)
+
+
+class GhError(RuntimeError):
+    """A gh CLI call failed; the UAT.md write still went through, so this is a warning."""
+
+
+def split_marker(note):
+    """Split a note's '(→ #N)' filed-issue marker off, returning (clean note, issue no)."""
+    m = MARKER_RE.search(note)
+    if not m:
+        return note, None
+    return (note[: m.start()] + note[m.end():]).strip(), int(m.group(1))
+
+
+def item_title(text):
+    """Human title for the filed bug: the item's bolded name, or a trimmed prefix of it."""
+    if m := BOLD_RE.search(text):
+        return m.group(1)
+    # Unbolded items: most descriptions introduce their body with ' — '.
+    return text.split(" — ")[0][:80].rstrip()
+
+
+def area(text, section):
+    """The bug's area label: the item's platform when it names one, else its section."""
+    m = PLATFORM_RE.search(text)
+    if not m:
+        return section
+    g = m.group(1).lower()
+    return {"macos": "macOS", "android": "Android"}.get(g, g.capitalize())
+
+
+def bug_body(item_id, title, area, note):
+    """The filed issue body — the shape contract from mkny13/mahler#292, verbatim."""
+    return (
+        f"**UAT item:** `{item_id}` — {title}\n"
+        f"**Area:** {area}\n"
+        f"**Source:** {SOURCE_LINK}\n"
+        "\n"
+        f"{note}\n"
+        "\n"
+        "---\n"
+        f"{BUG_FOOTER}"
+    )
+
+
+def comment_body(note):
+    return (
+        "Re-failed in the UAT board. New note:\n"
+        "\n"
+        f"{note}\n"
+        "\n"
+        "---\n"
+        f"{BUG_FOOTER}"
+    )
+
+
+def run_gh(args):
+    """Run the local gh CLI; stdout on success, GhError carrying stderr on failure."""
+    try:
+        r = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=60)
+    except OSError as e:
+        raise GhError(f"gh not runnable: {e}") from e
+    except subprocess.TimeoutExpired as e:
+        raise GhError(f"gh timed out: {' '.join(args)}") from e
+    if r.returncode != 0:
+        raise GhError((r.stderr or r.stdout).strip() or f"gh exited {r.returncode}")
+    return r.stdout
+
+
+def create_issue(title, body):
+    """Create the issue and return its number (gh prints the new issue's URL)."""
+    out = run_gh([
+        "issue", "create", "--repo", REPO_SLUG,
+        "--title", title, "--body", body,
+        "--label", "type:bug", "--label", "p1",
+    ])
+    url = out.strip().splitlines()[-1] if out.strip() else ""
+    if m := re.search(r"/issues/(\d+)\s*$", url):
+        return int(m.group(1))
+    raise GhError(f"could not parse created issue url: {url!r}")
+
+
+def issue_state(number):
+    out = run_gh(["issue", "view", str(number), "--repo", REPO_SLUG, "--json", "state"])
+    try:
+        return json.loads(out)["state"]
+    except (KeyError, ValueError) as e:
+        raise GhError(f"could not read state of #{number}: {e}") from e
+
+
+def comment_on_issue(number, body):
+    run_gh(["issue", "comment", str(number), "--repo", REPO_SLUG, "--body", body])
+
+
+def file_bug_report(item_id, title, area, note, linked_issue):
+    """File or update the GitHub bug for one [!] mark, and return the issue number.
+
+    Dedup rule (mahler#292): an open linked issue gets the new note as a comment rather
+    than a second issue; a closed one means the bug came back after a fix, so a fresh
+    issue is opened instead of reopening the old report.
+    """
+    if linked_issue is not None:
+        if issue_state(linked_issue).lower() == "open":
+            comment_on_issue(linked_issue, body=comment_body(note))
+            return linked_issue
+    return create_issue(title=f"UAT fail: {title} ({item_id})", body=bug_body(item_id, title, area, note))
 
 
 def parse(text):
@@ -41,11 +172,13 @@ def parse(text):
             note = ""
             if i + 1 < len(lines) and (n := NOTE_RE.match(lines[i + 1])):
                 note = n.group(1)
+            note, issue = split_marker(note)
             item = {
                 "id": m.group(2),
                 "status": STATUS_BY_CHAR[m.group(1)],
                 "text": m.group(3),
                 "note": note,
+                "issue": issue,
             }
             if current is None:
                 current = {"title": "Ungrouped", "items": []}
@@ -55,8 +188,52 @@ def parse(text):
 
 
 def update(item_id, status, note):
-    """Rewrite one item's status (and note) in UAT.md, leaving everything else byte-identical."""
+    """Rewrite one item's status (and note) in UAT.md, leaving everything else byte-identical.
+
+    A [!] with a note also files a GitHub bug (see file_bug_report) and pins its number
+    onto the note line as a trailing '(→ #N)'. The marker survives a later pass as a
+    marker-only note line, so a fresh [!] still finds its old issue; a [!] re-mark with
+    an unchanged note files nothing (every textarea blur would otherwise spam the issue
+    with duplicate comments).
+
+    Returns a result dict for the API response. A gh failure degrades to a warning —
+    the UAT.md write is the source of truth and must succeed regardless.
+    """
     lines = UAT_PATH.read_text().splitlines()
+    text, existing_note, section, located = "", "", "", False
+    for idx, line in enumerate(lines):
+        if m := SECTION_RE.match(line):
+            section = m.group(1)
+        elif (m := ITEM_RE.match(line)) and m.group(2) == item_id:
+            text = m.group(3)
+            if idx + 1 < len(lines) and (n := NOTE_RE.match(lines[idx + 1])):
+                existing_note = n.group(1)
+            located = True
+            break
+    if not located:
+        raise KeyError(item_id)
+    _, existing_issue = split_marker(existing_note)
+
+    note = note.strip()
+    clean, incoming_issue = split_marker(note)
+    existing_clean = split_marker(existing_note)[0]
+    issue_no, warning = existing_issue, None
+
+    if status == "needs-work" and clean:
+        if incoming_issue is not None:
+            # The payload itself carries the marker: already on record.
+            issue_no = incoming_issue
+        elif clean == existing_clean and existing_issue is not None:
+            # Same note as already on disk: nothing new to report.
+            pass
+        else:
+            try:
+                issue_no = file_bug_report(
+                    item_id, item_title(text), area(text, section), clean, existing_issue
+                )
+            except (GhError, OSError) as e:
+                warning = f"saved to UAT.md, but filing the GitHub bug failed: {e}"
+
     out, i, found = [], 0, False
     while i < len(lines):
         line = lines[i]
@@ -68,14 +245,20 @@ def update(item_id, status, note):
             # Drop any existing note line; it is re-added below only if still relevant.
             if i < len(lines) and NOTE_RE.match(lines[i]):
                 i += 1
-            if status == "needs-work" and note.strip():
-                out.append(f"  > {note.strip()}")
+            if status == "needs-work" and clean:
+                marker = f" (→ #{issue_no})" if issue_no is not None else ""
+                out.append(f"  > {clean}{marker}")
+            elif issue_no is not None:
+                # The note is gone but the filed issue isn't — keep the linkage alive
+                # so re-failing finds it instead of opening a duplicate.
+                out.append(f"  > (→ #{issue_no})")
             continue
         out.append(line)
         i += 1
     if not found:
         raise KeyError(item_id)
     UAT_PATH.write_text("\n".join(out) + "\n")
+    return {"ok": True, "issue": issue_no, "warning": warning}
 
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
@@ -170,6 +353,9 @@ h2 { font-size: 1.05rem; font-weight: 600; margin: 0; color: var(--fg); }
   font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent-light);
   font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(145,132,217,0.12);
 }
+a.id { text-decoration: none; }
+a.id:hover { text-decoration: underline; }
+.id.issue { background: rgba(16,185,129,0.15); color: var(--pass); }
 .txt { margin: 0.3rem 0 0; line-height: 1.5; }
 .txt strong { color: var(--fg); font-weight: 600; }
 .txt code {
@@ -297,7 +483,7 @@ function render() {
           <button class="w" aria-pressed="${it.status==='needs-work'}" onclick="setStatus('${it.id}','needs-work')" title="Mark as Needs Work">!</button>
         </div>
         <div class="body">
-          <span class="id">${it.id}</span>
+          <span class="id">${it.id}</span>${it.issue ? ` <a class="id issue" href="https://github.com/mkny13/couch-tour/issues/${it.issue}" target="_blank" rel="noopener" title="GitHub bug filed from this item">→ #${it.issue}</a>` : ''}
           <div class="txt">${md(it.text)}</div>
           ${it.status === 'needs-work' ? `
             <textarea placeholder="What went wrong? This is the bug report the next agent reads."
@@ -323,14 +509,23 @@ function find(id) {
   return data.flatMap(s => s.items).find(i => i.id === id);
 }
 
+let savedTimer;
 async function save(it) {
-  await fetch('/api/item', {
+  const r = await fetch('/api/item', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({id: it.id, status: it.status, note: it.note || ''})
   });
-  $('saved').classList.add('on');
-  setTimeout(() => $('saved').classList.remove('on'), 900);
+  const j = await r.json();
+  if (j.issue) it.issue = j.issue;
+  render();
+  const t = $('saved');
+  t.textContent = j.warning ? '⚠ ' + j.warning
+    : '✓ Saved to UAT.md' + (j.issue ? ` — filed as #${j.issue}` : '');
+  t.style.background = j.warning ? 'var(--warn)' : '';
+  t.classList.add('on');
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => t.classList.remove('on'), j.warning ? 6000 : 1200);
 }
 
 async function setStatus(id, st) {
@@ -373,12 +568,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, "not found", "text/plain")
         try:
             payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            update(payload["id"], payload["status"], payload.get("note", ""))
+            result = update(payload["id"], payload["status"], payload.get("note", ""))
         except KeyError as e:
             return self._send(404, json.dumps({"error": f"unknown item {e}"}), "application/json")
         except Exception as e:  # malformed body, unwritable file
             return self._send(400, json.dumps({"error": str(e)}), "application/json")
-        self._send(200, json.dumps({"ok": True}), "application/json")
+        self._send(200, json.dumps(result), "application/json")
 
     def log_message(self, *args):
         pass  # the page is chatty; keep the terminal readable
