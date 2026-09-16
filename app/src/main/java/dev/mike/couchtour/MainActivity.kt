@@ -2456,11 +2456,18 @@ internal fun SearchResultsList(
         if (all.isNotEmpty()) listOf("All") + all else emptyList()
     }
 
-    val r = remember(rArtist, selectedTag) {
-        if (selectedTag.isNullOrBlank() || selectedTag.equals("All", ignoreCase = true)) {
+    // A tag picked for an earlier query (or another artist chip) that these hits don't carry
+    // falls back to All (uat-004) — filtering by it would only ever say "Nothing matched."
+    val activeTag = selectedTag?.takeIf { tag ->
+        !tag.equals("All", ignoreCase = true) && availableTags.any { it.equals(tag, ignoreCase = true) }
+    }
+    LaunchedEffect(activeTag) { if (activeTag == null) selectedTag = null }
+
+    val r = remember(rArtist, activeTag) {
+        if (activeTag == null) {
             rArtist
         } else {
-            val tag = selectedTag!!
+            val tag = activeTag
             rArtist.copy(
                 shows = rArtist.shows.filterByTag(tag),
                 tracks = rArtist.tracks.filter { it.tags.any { t -> t.name.equals(tag, ignoreCase = true) } },
@@ -2502,8 +2509,8 @@ internal fun SearchResultsList(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(availableTags, key = { it }) { tag ->
-                    val isSelected = (selectedTag == null && tag == "All") ||
-                        selectedTag.equals(tag, ignoreCase = true)
+                    val isSelected = (activeTag == null && tag == "All") ||
+                        activeTag.equals(tag, ignoreCase = true)
                     FilterChip(
                         selected = isSelected,
                         onClick = { selectedTag = if (tag == "All") null else tag },

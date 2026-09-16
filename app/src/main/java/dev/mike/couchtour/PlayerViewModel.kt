@@ -75,7 +75,13 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
         val future = MediaController.Builder(app, token).buildAsync()
-        future.addListener({ attach(future.get()) }, MoreExecutors.directExecutor())
+        // get() rethrows a failed connection; left unguarded, that escapes into whatever thread
+        // completed the future and takes the process down, for a player the UI can live without.
+        future.addListener({
+            runCatching { future.get() }
+                .onSuccess { attach(it) }
+                .onFailure { Log.w("PlayerViewModel", "MediaController failed to connect", it) }
+        }, MoreExecutors.directExecutor())
     }
 
     @VisibleForTesting

@@ -101,6 +101,18 @@ val NavHostController.currentRoute: String?
 fun NavHostController.arg(name: String): String? = currentBackStackEntry?.arguments?.getString(name)
 
 /**
+ * A real [PlayerViewModel] with no playback service behind it. Robolectric would otherwise
+ * "connect" its MediaController with a null component name and crash inside media3; declaring
+ * the service unbindable makes the connection fail cleanly instead, and a test that needs a
+ * player hands one to [PlayerViewModel.attach].
+ */
+fun playerViewModelForTest(): PlayerViewModel {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    shadowOf(app).declareComponentUnbindable(ComponentName(app, PlaybackService::class.java))
+    return PlayerViewModel(app)
+}
+
+/**
  * Titles of every node with one of [candidates] as its text, top to bottom — how a test reads
  * "what order is this list in" off the screen rather than off the data it fed in.
  */
