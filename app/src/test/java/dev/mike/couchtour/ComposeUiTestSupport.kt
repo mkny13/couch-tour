@@ -3,6 +3,7 @@ package dev.mike.couchtour
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.SemanticsMatcher
@@ -80,6 +81,17 @@ class ComposeUiRule {
         }
         return { nav }
     }
+
+    /**
+     * [createAndroidComposeRule]'s own waitUntil doesn't drain Robolectric's main looper, so a
+     * viewModelScope coroutine that hops to the IO dispatcher and back (a fetch, then a
+     * player call) never gets to resume while it polls. Idling the looper on every poll does.
+     */
+    fun waitFor(timeoutMs: Long = 5_000, condition: () -> Boolean) =
+        compose.waitUntil(timeoutMs) {
+            shadowOf(Looper.getMainLooper()).idle()
+            condition()
+        }
 
     companion object {
         private val NAV_TARGETS = listOf(
