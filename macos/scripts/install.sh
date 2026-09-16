@@ -28,9 +28,13 @@ fi
 echo "Regenerating Xcode project..."
 (cd "$macos_dir" && xcodegen generate)
 
-latest_prod_tag=$(curl -sL https://api.github.com/repos/mkny13/couch-tour/releases/latest 2>/dev/null | grep '"tag_name":' | head -1 | cut -d '"' -f 4 || true)
+if command -v jq &>/dev/null; then
+    latest_prod_tag=$(curl -sL https://api.github.com/repos/mkny13/couch-tour/releases/latest 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null || true)
+else
+    latest_prod_tag=$(curl -sL https://api.github.com/repos/mkny13/couch-tour/releases/latest 2>/dev/null | grep '"tag_name":' | head -1 | cut -d '"' -f 4 || true)
+fi
 if [ -z "$latest_prod_tag" ]; then
-    latest_prod_tag=$(gh release list --exclude-pre-releases -L 1 2>/dev/null | awk '{print $1}' || true)
+    latest_prod_tag=$(gh release list --exclude-pre-releases -L 1 --json tagName -q '.[0].tagName' 2>/dev/null || true)
 fi
 if [ -z "$latest_prod_tag" ]; then
     latest_prod_tag="v0.50"
