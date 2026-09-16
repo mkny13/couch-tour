@@ -1,3 +1,12 @@
+/*
+ * Credential Flow:
+ * - Tokens and pairing codes are opaque random strings generated via crypto.getRandomValues().
+ * - They are hashed immediately (SHA-256) and only the hash is stored in D1.
+ * - Raw tokens/codes are never written to the database, ensuring that a database leak yields no usable credentials.
+ * - Clients pass the raw token in the `Authorization: Bearer <token>` header.
+ * - This backend hashes the provided token to compare against the stored `tokenHash` (and `previousTokenHash` during rotation grace periods).
+ * - Pairing codes operate identically: short-lived, hashed at rest, and checked by hashing the client-provided code.
+ */
 import { sha256Hex } from "./crypto";
 import type { DeviceRow, Env } from "./types";
 
