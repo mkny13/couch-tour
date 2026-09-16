@@ -11,6 +11,7 @@ class CouchTourApp : Application() {
         super.onCreate()
         // Restore the session before any screen or the playback service issues a request.
         Session.init(this)
+        CuratedMatches.init(this)
         Favorites.init(this)
         LikedTracks.init(this)
         SavedShows.init(this)

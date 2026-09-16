@@ -910,7 +910,8 @@ extension Show {
             popularity: nil,
             likesCount: likesCount,
             id: id,
-            likedByUser: likedByUser
+            likedByUser: likedByUser,
+            externalRelease: CuratedMatches.shared.match(backend: .phishin, artistId: PHISH.id, date: date)
         )
     }
 
