@@ -304,4 +304,47 @@ final class RequestTests: XCTestCase {
         XCTAssertEqual(.song, hits.slices.first?.kind)
         XCTAssertEqual("Grateful Dead", hits.slices.first?.artist.name)
     }
+
+    // ----------------------------------------------------------------- YouTube
+
+    func testYouTubeSearchRequestsCorrectEndpointWithChannelIdAndSnippet() async throws {
+        server.enqueue(#"{"items":[]}"#)
+        YouTubeAPI.baseURL = URL(string: "https://mock.test/youtube/v3")!
+
+        _ = try await YouTubeAPI.search(channelId: "UC12345")
+
+        let request = server.takeRequest()!
+        XCTAssertEqual(["youtube", "v3", "search"], request.pathSegments)
+        XCTAssertEqual("UC12345", request.queryValue("channelId"))
+        XCTAssertEqual("snippet", request.queryValue("part"))
+        XCTAssertEqual("video", request.queryValue("type"))
+        XCTAssertNil(request.queryValue("key"))
+    }
+
+    func testYouTubeSearchAttachesKeyWhenPresent() async throws {
+        server.enqueue(#"{"items":[]}"#)
+        YouTubeAPI.baseURL = URL(string: "https://mock.test/youtube/v3")!
+        YouTubeAPI.apiKey = "some-api-key"
+
+        _ = try await YouTubeAPI.search(channelId: "UC12345")
+
+        let request = server.takeRequest()!
+        XCTAssertEqual("some-api-key", request.queryValue("key"))
+        
+        YouTubeAPI.apiKey = nil
+    }
+
+    func testYouTubeRaisesAPIExceptionOnError() async {
+        server.enqueue("nope", code: 403)
+        YouTubeAPI.baseURL = URL(string: "https://mock.test/youtube/v3")!
+
+        do {
+            _ = try await YouTubeAPI.search(channelId: "UC12345")
+            XCTFail("expected APIException")
+        } catch let error as APIException {
+            XCTAssertEqual(403, error.code)
+        } catch {
+            XCTFail("wrong error type: \(error)")
+        }
+    }
 }

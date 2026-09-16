@@ -960,3 +960,33 @@ public func pickRandomShow(
     return show
 }
 
+// ------------------------------------------------------------------- youtube
+
+public struct YouTubeVideo: Hashable, Sendable, Identifiable {
+    public let id: String
+    public let title: String
+    public let thumbnailURL: String?
+    public let durationMs: Int64?
+    public let publishedAt: String?
+    public let channelId: String
+    public let description: String?
+
+    public init(
+        id: String,
+        title: String,
+        thumbnailURL: String? = nil,
+        durationMs: Int64? = nil,
+        publishedAt: String? = nil,
+        channelId: String,
+        description: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.thumbnailURL = thumbnailURL
+        self.durationMs = durationMs
+        self.publishedAt = publishedAt
+        self.channelId = channelId
+        self.description = description
+    }
+}
+
