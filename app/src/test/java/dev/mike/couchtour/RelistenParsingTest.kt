@@ -151,6 +151,34 @@ class RelistenParsingTest {
     }
 
     @Test
+    fun `maps avgRatingWeighted and numReviews from RelistenSource to RecordingRef`() {
+        val source = RelistenSource(
+            uuid = "1",
+            avgRatingWeighted = 8.2600317,
+            numReviews = 116
+        )
+        val rec = source.toRecordingRef()
+        assertEquals(8.2600317, rec.rating, 0.0001)
+        assertEquals(116, rec.reviewCount)
+    }
+
+    @Test
+    fun `toShowDetail preserves rating-descending order across recording and alternates`() {
+        val show = json.decodeFromString<RelistenShowWithSources>(fixture("relisten_show.json"))
+        val detail = show.toShowDetail(deadArtist)
+
+        val combined = listOfNotNull(detail.recording) + detail.alternates
+
+        // Assert the combined list is sorted descending by rating
+        val ratings = combined.map { it.rating }
+        val sortedRatings = ratings.sortedDescending()
+        assertEquals(sortedRatings, ratings)
+
+        // Assert the default recording is the highest-rated tape
+        assertEquals(ratings.maxOrNull(), detail.recording?.rating)
+    }
+
+    @Test
     fun `converts track duration from seconds to milliseconds`() {
         // 325 seconds = 5:25. Everything else in the app is milliseconds; a track this far
         // off is the kind of bug that looks fine until someone opens the scrubber.
