@@ -4524,3 +4524,37 @@ Added a GitHub Actions workflow (`.github/workflows/sync-deploy.yml`) to deploy 
 - Unit tests (`testDebugUnitTest`) pass.
 - `swift test` fails purely due to an interactive Xcode license agreement blocker on the machine ("You have not agreed to the Xcode license agreements"), which predates this worktree. This branch touches no macOS files. (This caveat was established in D233's precedent.)
 
+### D235 — Scripts audit: no subshell injection found; hardened install.sh's JSON parsing (#221)
+
+Audit of `scripts/` and `macos/scripts/` for subshell execution vulnerabilities (part of #196,
+sibling to D232's storage audit).
+
+**Verified, no changes needed:**
+- `scripts/ci-wait.sh`, `scripts/cut-beta.sh`, `scripts/promote-beta.sh`,
+  `macos/scripts/install-beta.sh`, `macos/scripts/check-fixtures.sh`, and the `.command`
+  wrappers: all `set -euo pipefail`, all variables quoted, all user/CLI input passed as
+  discrete arguments to `gh`/`git`/`xcodebuild` (e.g. `-f release_notes="$notes"`) rather than
+  interpolated into a command string. No `eval`, no backticks, no `os.system`/`subprocess.run`
+  anywhere in `scripts/` (`uat-server.py` only calls `webbrowser.open()` on a URL built from an
+  `int`-typed `--port`).
+- `scripts/uat-server.py` has no subprocess surface at all — confirmed the issue's own
+  pre-audit note.
+
+**Changed — `macos/scripts/install.sh`:** the `curl … | grep '"tag_name":' | cut -d '"' -f 4`
+line parsed GitHub's release JSON positionally, which happens to work today but breaks
+silently the moment the API response's field order or whitespace shifts, rather than failing
+loudly. Now prefers `jq -r '.tag_name // empty'` when `jq` is installed (matching the issue's
+suggested fix), falling back to the old grep/cut on machines without `jq` so behavior is
+unchanged there. Also swapped the second fallback, `gh release list | awk '{print $1}'`
+(silently wrong if a release title contains a space, since TITLE is column 1) for
+`gh release list --json tagName -q '.[0].tagName'`, consistent with how `ci-wait.sh` and
+`cut-beta.sh` already use `gh`'s built-in `-q` instead of hand-rolled text parsing. Neither was
+an injection path — both only ever fed a `MARKETING_VERSION` build setting — but both were
+fragile parsing, which is what the issue asked to harden.
+
+**Verification:** `bash -n` on all eight scripts (`scripts/*.sh`,
+`macos/scripts/{install,install-beta,check-fixtures}.sh`, `macos/scripts/*.command`) passes.
+Android `testDebugUnitTest` passes. `swift test` hits the same pre-existing, environment-level
+Xcode license blocker as D233/D234 — this change touches only `macos/scripts/install.sh`, not
+`CouchTourKit` or the Swift app target.
+
