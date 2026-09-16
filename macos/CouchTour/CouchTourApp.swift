@@ -19,7 +19,7 @@ struct CouchTourApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ThreePaneThreePaneRootView()
+            ThreePaneRootView()
                 .environmentObject(appModel)
                 .environmentObject(player)
                 .environmentObject(appModel.favorites)
