@@ -308,10 +308,9 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   if (!cursor) throw new Error(`no seq counter for group ${device.groupId}`);
 
   // `since` is a seq value, not a timestamp — it can only be compared against another seq.
-  // retentionFloorSeq rises when a (not-yet-built) purge job removes old tombstones; a device
+  // retentionFloorSeq rises when the daily purge job removes old tombstones; a device
   // whose cursor sits below it can no longer trust that gap, since a delete it missed might
-  // already be gone from this table. Today the floor never moves, so this can't yet fire in
-  // production — it's here so the contract exists and is tested before the purge job does.
+  // already be gone from this table.
   //
   // since === 0 is a fresh client doing a full resync already — it has no prior gap to
   // distrust, so the floor never applies to it. Without this guard, a brand-new pairing would
