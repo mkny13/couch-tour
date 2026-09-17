@@ -21,39 +21,36 @@ issue body is its prompt.
 
 ## Standing rules for every batch below
 
-Each of these is a fresh worktree off `main`. Every batch ends the same way:
+Tasks are run by Mahler in dedicated worktrees under `.mahler-worktrees/` on assigned branches. Every batch follows the rules in `CLAUDE.md` ("Working under Mahler"):
 
 - Run the suites that apply. Android: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest`
   — and note that `local.properties` is gitignored, so a fresh worktree needs
   `echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties` before Gradle will run at all.
-  macOS: `cd macos/Packages/CouchTourKit && swift test`, plus
+  macOS: `swift test --package-path macos/Packages/CouchTourKit`, plus
   `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build`
   for anything touching the app target.
-- Baseline as of `1b442aa`: **Android 463 tests, macOS 370 tests**, both clean. README states the
-  Android count and is currently stale at 461 — Batch 0 fixes that; every other batch updates it
-  if its own work moves the number.
-- Log the work in `DECISIONS.md` under a new iteration with new `Dnn` identifiers. Where a
-  decision reverses an earlier one, add a superseding entry — never edit history.
-- Open a PR, let CI finish, self-review the actual diff, merge, then delete the branch.
-  **Do not remove the worktree** if you are running under the Kanban board — it owns yours. See
-  CLAUDE.md's "Working under the Cline Kanban board" for the full rules, including allocating
-  your `Dnnn` against `main` at merge time rather than branch time, and the two macOS
-  worktree build hazards (a symlinked `.xcodeproj`, and `xcodebuild` resolving `CouchTourKit`
-  from the main checkout) that can make a green macOS build meaningless.
-- Add anything only a human can confirm to [UAT.md](../UAT.md) — see CLAUDE.md's project
-  conventions. A green suite is not a verified feature.
-
-**A separate session is currently editing
-`macos/Packages/CouchTourKit/Sources/CouchTourKit/ProgressStore.swift` and
-`macos/Packages/CouchTourKit/Tests/CouchTourKitTests/ProgressStoreTests.swift`** (removing a dead
-`TrackedTourStore`). Stay out of both files. If your `swift test` count doesn't match the 370
-baseline, that's why — check whether those two files moved before assuming you broke something.
+- Baseline as of `1b442aa`: **Android 463 tests, macOS 370 tests**, both clean. Update README's test
+  count if your work moves the number.
+- Allocate decision IDs using `mahler next-id couch-tour D` to avoid collisions. Log the work in
+  `DECISIONS.md` under a new iteration. Where a decision reverses an earlier one, add a superseding
+  entry — never edit history.
+- **Your job ends at the push**: commit, push your branch, and end with `STATUS: DONE <summary>`.
+  Do not open a PR, watch CI, merge, or delete branches — Mahler's conductor handles the PR and
+  merge lifecycle. Never run `git worktree add/remove` or `git checkout -b`; stay on your assigned
+  branch in your worktree, and never commit to detached HEAD.
+- Check the two macOS worktree build hazards from `CLAUDE.md`: `CouchTour.xcodeproj` may be a symlink
+  into the main checkout (check with `ls -la macos/ | grep xcodeproj` and remove the symlink before
+  running `xcodegen generate`), and `xcodebuild` may resolve `CouchTourKit` from the main checkout
+  path rather than your worktree.
+- Add anything only a human can confirm to [UAT.md](../UAT.md) — see `CLAUDE.md`'s project
+  conventions. A green suite is not a verified feature (`swift test` covers `CouchTourKit` only,
+  not the macOS app target, and background screen automation is not permitted).
 
 ---
 
 ## Batch 0 — Audit closeout and doc corrections
 
-> Work in a fresh worktree off `main`. **This batch changes no application code at all** — nothing
+> **This batch changes no application code at all** — nothing
 > under `app/`, `macos/`, or `sync/`. It corrects the record, and it should land before the other
 > batches so they're planned against an accurate map.
 >
@@ -104,13 +101,13 @@ baseline, that's why — check whether those two files moved before assuming you
 > `macos/`, or `sync/`.
 >
 > **Verify:** no code changed, so there's nothing to test — but confirm `git diff --stat` touches
-> only `.md` files before opening the PR.
+> only `.md` files before committing and pushing.
 
 ---
 
 ## Batch 1 — Wire the shipped models into the macOS UI (#67, #21, #62) and add #115
 
-> Work in a fresh worktree off `main`. **This is the highest-value batch in Phase 2.** Three
+> **This is the highest-value batch in Phase 2.** Three
 > features already exist as tested pure logic in `CouchTourKit` and are simply not called by any
 > macOS view. You are writing view code against an API that is already written and already green.
 >
@@ -118,19 +115,18 @@ baseline, that's why — check whether those two files moved before assuming you
 >
 > **Another worktree may be running Batch 2A (Android) in parallel** — it works only in
 > `app/`, so there is no overlap. **Batch 2B is gated on this batch** because it also edits
-> `SearchView.swift`; don't start 2B's work here. A third session is editing
-> `CouchTourKit`'s `ProgressStore.swift` / `ProgressStoreTests.swift` — stay out of both.
+> `SearchView.swift`; don't start 2B's work here.
 >
 > Android is the spec for all three features: it implemented them for real and those decisions are
 > recorded. Don't re-derive them.
 >
-> **1. #21 — sort control on `ShowsView.swift`.** `ShowSortOption` (`Catalog.swift:161`) and
+> 1. **#21 — sort control on `ShowsView.swift`.** `ShowSortOption` (`Catalog.swift:161`) and
 > `sortShows(_:by:)` (`:185`) already exist with all seven cases and `displayName`s.
 > `ShowsView.swift` today is a plain `List` with no `@State` for sort or filter at all.
 >
 > Android's chip row (`MainActivity.kt:823-831`) offers Date / Top rated / Trending 48h / Hot 7d /
 > Popular 30d / Momentum. **A horizontal chip row is an Android idiom; on macOS prefer a toolbar
-> `Menu` or a `Picker`** — pick one, and say in the PR why. Whatever you choose, sort must be view
+> `Menu` or a `Picker`** — pick one, and record in DECISIONS.md why. Whatever you choose, sort must be view
 > state applied to already-loaded results: `ShowsView.load()` resets `loadState` wholesale, so
 > routing sort through it would refetch the network on every change.
 >
@@ -183,18 +179,16 @@ baseline, that's why — check whether those two files moved before assuming you
 >
 > **Verify:** `swift test` for anything you push down into the Kit — but note that most of this
 > batch is view code the package tests cannot reach, which is precisely how these three features
-> got marked shipped while being invisible. **A passing build proves very little here.** Install
-> with `macos/scripts/install.sh`, launch, and actually click: sort a year's shows, filter by a
-> tag, look at a Relisten show with no artwork, and right-click a Continue Listening card.
->
-> **Before you start, read the interactive-verification note at the bottom of this file** — the
-> keychain prompt will otherwise block exactly the manual pass this batch depends on.
+> got marked shipped while being invisible. Log all manual verification checks in `UAT.md` (sort
+> a year's shows, filter by a tag, look at a Relisten show with no artwork, right-click a Continue
+> Listening card) where Mike verifies them via `scripts/uat-server.py`. Do not attempt automated
+> macOS UI scripting (screen is locked).
 
 ---
 
 ## Batch 2A — List sort and filter, Android (#91, #116, #90)
 
-> Work in a fresh worktree off `main`. Three Feedback-filed issues that are one coherent piece of
+> Three Feedback-filed issues that are one coherent piece of
 > work: *let me reorder and narrow a long list.* Android first; Batch 2B does the macOS parity pass
 > afterwards and will reuse whatever you build.
 >
@@ -254,9 +248,8 @@ baseline, that's why — check whether those two files moved before assuming you
 > and Batch 1 both edit `SearchView.swift`, and 2B should reuse the pure helpers 2A lands rather
 > than writing a second implementation that drifts.
 >
-> Work in a fresh worktree off `main` (after those merges). Port Batch 2A's three fixes to macOS,
-> following the decisions it recorded rather than re-litigating them — read its PR and its
-> `DECISIONS.md` entry first.
+> Port Batch 2A's three fixes to macOS, following the decisions it recorded rather than
+> re-litigating them — read its `DECISIONS.md` entry first.
 >
 > Surfaces:
 >
@@ -274,14 +267,14 @@ baseline, that's why — check whether those two files moved before assuming you
 >
 > **Out of scope:** Android; anything Batch 1 already covered in `SearchView.swift`.
 >
-> **Verify:** `swift test` plus the app-target build, then launch and click — same reasoning as
-> Batch 1, and the same keychain caveat below.
+> **Verify:** `swift test` plus the app-target build, and log manual verification checks in
+> `UAT.md` (same reasoning as Batch 1; do not attempt automated macOS UI scripting).
 
 ---
 
 ## Batch 4 — Multi-level catalog cache (#61)
 
-> Work in a fresh worktree off `main`. **This batch is genuinely parallel with Batches 1 and 2A** —
+> **This batch is genuinely parallel with Batches 1 and 2A** —
 > it lives in the API/catalog layer, which none of them touch.
 >
 > Today there is exactly one cache on each platform: `@Volatile cachedArtists` on Android
@@ -350,16 +343,8 @@ landed, and let it produce its own batch breakdown.
 
 ---
 
-## Before any macOS batch: clear the keychain prompt by hand
+## macOS manual verification & UAT
 
-Batches 1 and 2B are almost entirely view code, and their verification is clicking. D204 already
-hit this and it will block the same pass again:
+Batches 1 and 2B are almost entirely view code, which automated test suites cannot fully exercise (`swift test` covers `CouchTourKit` only, not the app target, D208). Furthermore, background agents cannot perform macOS UI automation: the Mac mini screen is locked, and ad-hoc reinstalls trigger app-modal keychain password prompts.
 
-> Every ad-hoc reinstall invalidates the keychain ACL, so the app puts up a login-keychain password
-> prompt on launch and again on every activation; it's app-modal, and clearing it needs Mike's
-> password ("Always Allow"), which is not something to automate.
-
-It is a local-signing artifact, unrelated to any of this work, and it walled off GUI automation for
-an entire session. **Answer it once by hand before starting**, or those batches ship on a
-build-passes signal that — as the audit that produced this plan showed — proves very little about
-whether a macOS feature is reachable at all.
+Therefore, do not attempt UI automation from background agents. Instead, follow `CLAUDE.md`'s UAT process: **log all manual verification checks in `UAT.md`**, where Mike verifies them on actual devices/builds via `scripts/uat-server.py`.
