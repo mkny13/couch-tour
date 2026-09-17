@@ -189,70 +189,78 @@ public final class CastPlaybackStateMachine {
     public func handleIncomingPacket(_ packet: CastCodec.Packet) -> Event? {
         switch packet.namespace {
         case CastNamespace.heartbeat:
-            if packet.payloadUtf8.contains("PING") {
-                return .heartbeatPong
-            }
-
+            return handleHeartbeat(packet)
         case CastNamespace.receiver:
-            if let status = CastCodec.parseReceiverStatus(json: packet.payloadUtf8) {
-                if let vol = status.volumeLevel { volumeLevel = vol }
-                if let muted = status.isMuted { isMuted = muted }
-
-                if status.appId == defaultCastReceiverAppId {
-                    self.receiverSessionId = status.sessionId
-                    let previousTransportId = self.transportId
-                    self.transportId = status.transportId
-
-                    if status.transportId != nil && (previousTransportId == nil || previousTransportId != status.transportId) {
-                        connectionState = .connectedToReceiver
-                        return .needTransportConnection
-                    }
-                } else if status.appId == nil && receiverSessionId != nil {
-                    // Receiver app was closed
-                    reset()
-                    return .receiverDisconnected
-                }
-            }
-
+            return handleReceiverStatus(packet)
         case CastNamespace.media:
-            if let mediaStatus = CastCodec.parseMediaStatus(json: packet.payloadUtf8) {
-                if let session = mediaStatus.mediaSessionId {
-                    self.mediaSessionId = session
-                }
-                if let dur = mediaStatus.duration {
-                    self.durationMs = Int64(dur * 1000)
-                }
-                if let vol = mediaStatus.volumeLevel {
-                    self.volumeLevel = vol
-                }
-                if let muted = mediaStatus.isMuted {
-                    self.isMuted = muted
-                }
-                self.positionMs = Int64(mediaStatus.currentTime * 1000)
-                self.lastIdleReason = mediaStatus.idleReason
-
-                switch mediaStatus.playerState {
-                case .playing, .buffering:
-                    self.isPlaying = true
-                    self.connectionState = .ready
-                case .paused:
-                    self.isPlaying = false
-                    self.connectionState = .ready
-                case .idle:
-                    self.isPlaying = false
-                    if mediaStatus.idleReason == .finished {
-                        return .mediaFinished
-                    }
-                case .unknown:
-                    break
-                }
-                return .mediaStatusUpdated
-            }
-
+            return handleMediaStatus(packet)
         default:
-            break
+            return nil
+        }
+    }
+
+    private func handleHeartbeat(_ packet: CastCodec.Packet) -> Event? {
+        if packet.payloadUtf8.contains("PING") {
+            return .heartbeatPong
         }
         return nil
+    }
+
+    private func handleReceiverStatus(_ packet: CastCodec.Packet) -> Event? {
+        guard let status = CastCodec.parseReceiverStatus(json: packet.payloadUtf8) else { return nil }
+        if let vol = status.volumeLevel { volumeLevel = vol }
+        if let muted = status.isMuted { isMuted = muted }
+
+        if status.appId == defaultCastReceiverAppId {
+            self.receiverSessionId = status.sessionId
+            let previousTransportId = self.transportId
+            self.transportId = status.transportId
+
+            if status.transportId != nil && (previousTransportId == nil || previousTransportId != status.transportId) {
+                connectionState = .connectedToReceiver
+                return .needTransportConnection
+            }
+        } else if status.appId == nil && receiverSessionId != nil {
+            // Receiver app was closed
+            reset()
+            return .receiverDisconnected
+        }
+        return nil
+    }
+
+    private func handleMediaStatus(_ packet: CastCodec.Packet) -> Event? {
+        guard let mediaStatus = CastCodec.parseMediaStatus(json: packet.payloadUtf8) else { return nil }
+        if let session = mediaStatus.mediaSessionId {
+            self.mediaSessionId = session
+        }
+        if let dur = mediaStatus.duration {
+            self.durationMs = Int64(dur * 1000)
+        }
+        if let vol = mediaStatus.volumeLevel {
+            self.volumeLevel = vol
+        }
+        if let muted = mediaStatus.isMuted {
+            self.isMuted = muted
+        }
+        self.positionMs = Int64(mediaStatus.currentTime * 1000)
+        self.lastIdleReason = mediaStatus.idleReason
+
+        switch mediaStatus.playerState {
+        case .playing, .buffering:
+            self.isPlaying = true
+            self.connectionState = .ready
+        case .paused:
+            self.isPlaying = false
+            self.connectionState = .ready
+        case .idle:
+            self.isPlaying = false
+            if mediaStatus.idleReason == .finished {
+                return .mediaFinished
+            }
+        case .unknown:
+            break
+        }
+        return .mediaStatusUpdated
     }
 
     public func reset() {
