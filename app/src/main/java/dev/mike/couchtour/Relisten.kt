@@ -74,11 +74,7 @@ data class RelistenPopularityWindows(
     @SerialName("48h") val window48h: RelistenPopularityWindow? = null,
     @SerialName("7d") val window7d: RelistenPopularityWindow? = null,
     @SerialName("30d") val window30d: RelistenPopularityWindow? = null,
-) {
-    val w48h: RelistenPopularityWindow? get() = window48h
-    val w7d: RelistenPopularityWindow? get() = window7d
-    val w30d: RelistenPopularityWindow? get() = window30d
-}
+)
 
 @Serializable
 data class RelistenPopularity(

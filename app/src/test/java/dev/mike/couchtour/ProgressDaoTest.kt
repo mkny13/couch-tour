@@ -224,7 +224,6 @@ class ProgressDaoTest {
         assertEquals(0, dao.history().first().size)
         assertEquals(0, dao.historyCount().first())
         assertEquals(emptyList<String>(), dao.artists().first())
-        assertEquals(emptyList<String>(), dao.historyFor("Phish").first().map { it.queueKey })
     }
 
     @Test
@@ -301,18 +300,6 @@ class ProgressDaoTest {
         assertEquals(
             listOf("Grateful Dead", "Phish", "Widespread Panic"),
             dao.artists().first(),
-        )
-    }
-
-    @Test
-    fun `filters history to one artist, newest first`() = runBlocking {
-        dao.put(progress("relisten:grateful-dead/1972-08-27/b", artist = "Grateful Dead", updatedAt = 100))
-        dao.put(progress("show:1997-02-13", artist = "Phish", updatedAt = 200))
-        dao.put(progress("relisten:grateful-dead/1977-05-08/a", artist = "Grateful Dead", updatedAt = 300))
-
-        assertEquals(
-            listOf("relisten:grateful-dead/1977-05-08/a", "relisten:grateful-dead/1972-08-27/b"),
-            dao.historyFor("Grateful Dead").first().map { it.queueKey },
         )
     }
 

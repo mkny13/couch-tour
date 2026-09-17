@@ -235,9 +235,6 @@ object PhishInApi {
             postJson(path("auth", "login").build(), mapOf("email" to email, "password" to password))
         )
 
-    suspend fun currentUser(): User =
-        json.decodeFromString(get(path("auth", "user").build()))
-
     // ----------------------------------------------------------------- browse
 
     suspend fun years(): List<Period> =

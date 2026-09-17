@@ -52,9 +52,9 @@ class ApiRequestTest {
     @Test
     fun `sends the jwt as X-Auth-Token`() = runBlocking {
         PhishInApi.authToken = "the-jwt"
-        enqueue("""{"username":"mike","email":"m@example.com"}""")
+        enqueue("""{"shows":[]}""")
 
-        PhishInApi.currentUser()
+        PhishInApi.likedShows()
 
         assertEquals("the-jwt", take().getHeader("X-Auth-Token"))
     }
@@ -64,9 +64,9 @@ class ApiRequestTest {
         // Authorization: Bearer is phish.in's API-key mechanism, not user auth. Both
         // forms return an identical bare 401, so only an assertion catches the mix-up.
         PhishInApi.authToken = "the-jwt"
-        enqueue("""{"username":"mike","email":"m@example.com"}""")
+        enqueue("""{"shows":[]}""")
 
-        PhishInApi.currentUser()
+        PhishInApi.likedShows()
 
         assertNull(take().getHeader("Authorization"))
     }
@@ -129,7 +129,7 @@ class ApiRequestTest {
         PhishInApi.onUnauthorized = { loggedOut = true }
         enqueue("""{"message":"Unauthorized"}""", code = 401)
 
-        runCatching { PhishInApi.currentUser() }
+        runCatching { PhishInApi.likedShows() }
 
         assertTrue(loggedOut)
     }

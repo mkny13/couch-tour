@@ -305,35 +305,6 @@ fun WaveformScrubber(
 }
 
 /**
- * 2dp bottom progress bar overlay for In Progress rows and mini-player.
- */
-@Composable
-fun ProgressBarOverlay(
-    progress: Float,
-    modifier: Modifier = Modifier,
-    height: Dp = 2.dp,
-    useGradient: Boolean = true
-) {
-    val ledger = LocalLedgerColors.current
-    val fraction = progress.coerceIn(0f, 1f)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height)
-            .background(ledger.textPrimary.copy(alpha = 0.10f))
-    ) {
-        if (fraction > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction)
-                    .height(height)
-                    .background(if (useGradient) ledger.specGradient else Brush.linearGradient(listOf(ledger.accentBase, ledger.accentBase)))
-            )
-        }
-    }
-}
-
-/**
  * Jam Chart Note card with dismiss control matching the design handoff.
  */
 @Composable
@@ -389,42 +360,6 @@ fun JamChartNoteCard(
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
-    }
-}
-
-/**
- * 40x22 toggle switch matching Ledger design handoff.
- */
-@Composable
-fun LedgerToggle(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val ledger = LocalLedgerColors.current
-    val trackColor = if (checked) {
-        if (ledger.isDark) ledger.accentBase else Color(0xFF6F62C7)
-    } else {
-        if (ledger.isDark) ledger.controlOutline else ledger.panelBorder
-    }
-    val thumbColor = if (checked) Color(0xFFF3F5FE) else ledger.textMuted
-
-    Box(
-        modifier = modifier
-            .width(40.dp)
-            .height(22.dp)
-            .clip(RoundedCornerShape(11.dp))
-            .background(trackColor)
-            .clickable { onCheckedChange(!checked) }
-            .padding(2.dp),
-        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
-    ) {
-        Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(CircleShape)
-                .background(thumbColor)
-        )
     }
 }
 

@@ -28,15 +28,6 @@ fun relativeTime(epochMs: Long, nowMs: Long = System.currentTimeMillis()): Strin
     }
 }
 
-/**
- * Maps a horizontal touch on a scrubber of [widthPx] to a position in the track.
- * Clamped, so a drag past either edge lands on the start or the end rather than
- * seeking out of bounds.
- */
-fun positionAt(x: Float, widthPx: Int, durationMs: Long): Long {
-    if (widthPx <= 0 || durationMs <= 0) return 0
-    return (x / widthPx.toFloat() * durationMs).toLong().coerceIn(0L, durationMs)
-}
 
 /**
  * Calculates playback progress fraction clamped strictly between 0.0 and 1.0.

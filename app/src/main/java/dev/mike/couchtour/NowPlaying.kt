@@ -631,28 +631,6 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
     }
 }
 
-/** Artwork with a procedural artwork fallback. */
-@Composable
-fun ArtworkBox(
-    artUrl: String?,
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-    show: ShowSummary? = null,
-    artistName: String? = null,
-    showDate: String? = null,
-    venueName: String? = null,
-) {
-    ShowArtwork(
-        artUrl = artUrl,
-        show = show,
-        artistName = artistName,
-        date = showDate,
-        venue = venueName,
-        contentDescription = contentDescription,
-        modifier = modifier,
-    )
-}
-
 @Composable
 internal fun PostShowTourPromptBanner(
     prompt: ShowSummary,
@@ -704,21 +682,4 @@ internal fun PostShowTourPromptBanner(
     }
 }
 
-@Composable
-internal fun AudioQualityBadge(format: String, isFlac: Boolean, modifier: Modifier = Modifier) {
-    val ledger = LocalLedgerColors.current
-    Surface(
-        color = if (isFlac) (if (ledger.isDark) Color(0x33F2A93B) else Color(0x1AA06615)) else ledger.cardSurface,
-        contentColor = if (isFlac) ledger.ratingAmber else ledger.textMuted,
-        shape = RoundedCornerShape(4.dp),
-        modifier = modifier,
-    ) {
-        Text(
-            text = format,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-        )
-    }
-}
+
