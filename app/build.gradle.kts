@@ -119,6 +119,12 @@ android {
         unitTests {
             // Robolectric needs the merged manifest and resources.
             isIncludeAndroidResources = true
+            // The 44 test classes otherwise share one JVM, so the first Robolectric class
+            // absorbs the framework+SQLite bootstrap (~2.5s) and everything queues behind
+            // it. Four forks pay that bootstrap concurrently; test data is fork-safe
+            // because Robolectric's temp dirs, MockWebServer ports, and file-based DBs are
+            // all per-JVM (Part 3 of #199).
+            all { it.maxParallelForks = 4 }
         }
     }
 }
