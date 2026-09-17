@@ -486,7 +486,14 @@ public final class SyncSession: ObservableObject {
         return trimmed.isEmpty ? Array(pending.prefix { $0.updatedAt == lastAt }) : Array(trimmed)
     }
 
-    private var pushTask: Task<Void, Never>?
+    // Internal, not private, so tests can await the in-flight push directly instead of
+    // guessing at wall time — mirrors Android's internal `debounceScope` test seam.
+    var pushTask: Task<Void, Never>?
+
+    /// The debounce window's pause. Injectable so a test replaces the wall clock with a gate
+    /// it opens explicitly — the Swift-side twin of Android's `debounceScope` riding
+    /// `runTest`'s virtual clock. Production always leaves the default.
+    var sleepForDebounce: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
 
     /// Debounced push after a play/pause/track-change event, so a phone-to-Mac handoff
     /// mid-listen doesn't have to wait for the next launch/foreground/15-minute timer.
@@ -496,7 +503,7 @@ public final class SyncSession: ObservableObject {
     public func requestDebouncedPush(_ progressStore: ProgressStore, delay: Duration = .seconds(2)) {
         pushTask?.cancel()
         pushTask = Task {
-            try? await Task.sleep(for: delay)
+            try? await sleepForDebounce(delay)
             guard !Task.isCancelled else { return }
             try? await sync(progressStore)
         }

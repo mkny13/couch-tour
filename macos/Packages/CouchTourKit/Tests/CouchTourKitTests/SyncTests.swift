@@ -226,6 +226,40 @@ final class SyncAPIRequestTests: XCTestCase {
     }
 }
 
+/// A stand-in for the debounce window that hands control of "time has elapsed" to the test.
+/// `park()` suspends until `open()` — or until the parking task is cancelled, which is how
+/// superseded debounce windows unwind. Cancellation-safe: an `AsyncStream` finishes when its
+/// reading task is cancelled, so no parked continuation is ever leaked.
+final class DebounceGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuations: [AsyncStream<Void>.Continuation] = []
+    private var opened = false
+
+    func park() async {
+        let stream = AsyncStream<Void> { continuation in
+            lock.lock()
+            if opened {
+                lock.unlock()
+                continuation.finish()
+            } else {
+                continuations.append(continuation)
+                lock.unlock()
+            }
+        }
+        var iterator = stream.makeAsyncIterator()
+        await iterator.next()
+    }
+
+    func open() {
+        lock.lock()
+        opened = true
+        let pending = continuations
+        continuations = []
+        lock.unlock()
+        pending.forEach { $0.finish() }
+    }
+}
+
 /// End-to-end `SyncSession` behaviour against a mock server, an in-memory `ProgressStore`,
 /// and an in-memory keychain — the same combination the Kotlin `SyncSessionTest` uses.
 final class SyncSessionTests: XCTestCase {
@@ -456,13 +490,24 @@ final class SyncSessionTests: XCTestCase {
         ))
         server.enqueue(#"{"seq":1,"changes":[]}"#)
 
+        // The debounce window is a gate the test opens explicitly, not a wall-clock sleep:
+        // every scheduled window parks in the gate, and only the one still scheduled when the
+        // gate opens ever reaches the wire. Superseded windows are cancelled while parked, and
+        // an `AsyncStream` finishes when its reading task is cancelled, so they unpark and hit
+        // `requestDebouncedPush`'s `Task.isCancelled` guard without ever pushing. This is the
+        // Swift twin of Android's `SyncTest` debounce test riding `runTest`'s virtual clock —
+        // the old version slept 300ms and could still flake under scheduler pressure.
+        let gate = DebounceGate()
+        session.sleepForDebounce = { _ in await gate.park() }
+
         // Mirrors Player's rate/currentItem observers all firing for the same real event —
         // only the last-scheduled delay should actually land.
         session.requestDebouncedPush(store, delay: .milliseconds(50))
         session.requestDebouncedPush(store, delay: .milliseconds(50))
         session.requestDebouncedPush(store, delay: .milliseconds(50))
 
-        try await Task.sleep(for: .milliseconds(300))
+        gate.open()
+        await session.pushTask?.value
 
         XCTAssertEqual(1, server.requestCount - requestsBeforeDebounce)
         let pushed = server.takeRequest()!.bodyString!
