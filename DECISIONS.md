@@ -4704,3 +4704,11 @@ Changes:
 Verified: `testDebugUnitTest` (535 tests) and `swift test` (381 tests) green on the final
 state. Test counts unchanged, so the README's counts still hold. Nothing in the change is
 human-visible; no UAT items added (issue's "needs a human" list is empty).
+
+### D245 — Part 1 of #200: Prune prompt context bloat in recipes and rules (#208)
+
+Audited `CLAUDE.md` and files under `prompts/` to reduce prompt context bloat and improve agent token economy:
+- **`CLAUDE.md`**: Condensed from 254 lines (14.5 KB) to 85 lines (5.5 KB), a ~70% reduction. Pruned historical narratives, conversational phrasing, and obsolete references while retaining 100% of operational constraints: Android Studio JDK requirement, local test instructions, beta release workflow (`scripts/cut-beta.sh`), production promote restrictions (`scripts/promote-beta.sh`), macOS package test and app target build/install instructions, sync backend dev/migration commands and merge-gate deploy workflow, load-bearing database and class naming rules, Room migration constraints, project conventions (DECISIONS/ROADMAP/UAT), Mahler worktree lifecycle rules and status lines, local.properties setup, macOS build hazards, and publishing constraints.
+- **`prompts/`**: Audited `prompts/macos-ux-polish-batches.md`, `prompts/phase-2-batch-prompts.md`, `prompts/phase-2-batches.md`, and `prompts/phase-2-plan.md`. All referenced batches and plans (Phase 2 and macOS UX Polish) have merged. Replaced 977 lines (62 KB) of dead recipes with concise ~6-9 line archived summaries retaining issue mappings and cross-references.
+- **Impact**: Reduced rules and prompt recipes from 1,231 lines (76.5 KB / ~19k tokens) to 114 lines (7.1 KB / ~1.8k tokens), a 91% reduction in prompt context bloat.
+
