@@ -17,6 +17,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -2218,175 +2219,27 @@ private fun TourPickerDialog(
                 )
 
                 if (pickingYear || selectedYear.isBlank()) {
-                    Text("Select a year:", style = MaterialTheme.typography.labelMedium)
-                    if (periodsState.value == null) {
-                        Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .weight(1f, fill = false)
-                                .heightIn(max = 260.dp)
-                        ) {
-                            items(validYears) { yr ->
-                                val isSelected = selectedYear == yr
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            if (selectedYear != yr) {
-                                                selectedYear = yr
-                                                selectedTour = ""
-                                            }
-                                            pickingYear = false
-                                        }
-                                        .padding(vertical = 10.dp, horizontal = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        yr,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (isSelected) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
+                    TourYearPickerSection(
+                        validYears = validYears,
+                        selectedYear = selectedYear,
+                        periodsLoaded = periodsState.value != null,
+                        onSelectYear = { yr ->
+                            if (selectedYear != yr) {
+                                selectedYear = yr
+                                selectedTour = ""
                             }
-                        }
-                    }
+                            pickingYear = false
+                        },
+                    )
                 } else {
-                    // Header with selected year and "Change" action
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                "YEAR",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                selectedYear,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        TextButton(onClick = { pickingYear = true }) {
-                            Text("Change year")
-                        }
-                    }
-
-                    Text("Select a tour from $selectedYear:", style = MaterialTheme.typography.labelMedium)
-
-                    if (showsState.value == null) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(160.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .weight(1f, fill = false)
-                                .heightIn(max = 240.dp)
-                        ) {
-                            // Option 1: Entire Year (all shows in this year)
-                            item {
-                                val isEntireYear = selectedTour.isBlank()
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedTour = "" }
-                                        .padding(vertical = 10.dp, horizontal = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            "All shows in $selectedYear",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = if (isEntireYear) FontWeight.SemiBold else FontWeight.Normal,
-                                            color = if (isEntireYear) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            "Track all shows from this year",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    if (isEntireYear) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            }
-
-                            // Option 2...N: Distinct tours in this year
-                            if (availableTours.isNotEmpty()) {
-                                items(availableTours) { tour ->
-                                    val isSelected = selectedTour == tour
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { selectedTour = tour }
-                                            .padding(vertical = 10.dp, horizontal = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            tour,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        if (isSelected) {
-                                            Icon(
-                                                Icons.Default.Check,
-                                                contentDescription = "Selected",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
-                                item {
-                                    Text(
-                                        "No named tours listed for $selectedYear.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    TourSelectionSection(
+                        selectedYear = selectedYear,
+                        selectedTour = selectedTour,
+                        availableTours = availableTours,
+                        showsLoaded = showsState.value != null,
+                        onChangeYear = { pickingYear = true },
+                        onSelectTour = { selectedTour = it },
+                    )
                 }
             }
         },
@@ -2409,6 +2262,207 @@ private fun TourPickerDialog(
             }
         }
     )
+}
+/** Spinner box shown while the periods or shows load inside the tour picker dialog. */
+@Composable
+private fun TourPickerLoadingBox() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(160.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+    }
+}
+
+/** A single selectable dialog row with a trailing check mark when chosen. */
+@Composable
+private fun TourPickerRow(
+    label: String,
+    isSelected: Boolean,
+    boldWhenSelected: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (isSelected && boldWhenSelected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        if (isSelected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+/** Year list half of the tour picker dialog, shown while a year is being chosen. */
+@Composable
+private fun ColumnScope.TourYearPickerSection(
+    validYears: List<String>,
+    selectedYear: String,
+    periodsLoaded: Boolean,
+    onSelectYear: (String) -> Unit,
+) {
+    Text("Select a year:", style = MaterialTheme.typography.labelMedium)
+    if (!periodsLoaded) {
+        TourPickerLoadingBox()
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .heightIn(max = 260.dp)
+        ) {
+            items(validYears) { yr ->
+                TourPickerRow(
+                    label = yr,
+                    isSelected = selectedYear == yr,
+                ) {
+                    onSelectYear(yr)
+                }
+            }
+        }
+    }
+}
+
+
+
+/** Tour list half of the tour picker dialog, shown once a year is picked. */
+@Composable
+private fun ColumnScope.TourSelectionSection(
+    selectedYear: String,
+    selectedTour: String,
+    availableTours: List<String>,
+    showsLoaded: Boolean,
+    onChangeYear: () -> Unit,
+    onSelectTour: (String) -> Unit,
+) {
+    // Header with selected year and "Change" action
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Text(
+                "YEAR",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                selectedYear,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        TextButton(onClick = onChangeYear) {
+            Text("Change year")
+        }
+    }
+
+    Text("Select a tour from $selectedYear:", style = MaterialTheme.typography.labelMedium)
+
+    if (!showsLoaded) {
+        TourPickerLoadingBox()
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .heightIn(max = 240.dp)
+        ) {
+            // Option 1: Entire Year (all shows in this year)
+            item {
+                TourEntireYearOption(
+                    selectedYear = selectedYear,
+                    isSelected = selectedTour.isBlank(),
+                    onClick = { onSelectTour("") },
+                )
+            }
+
+            // Option 2...N: Distinct tours in this year
+            if (availableTours.isNotEmpty()) {
+                items(availableTours) { tour ->
+                    TourPickerRow(
+                        label = tour,
+                        isSelected = selectedTour == tour,
+                        boldWhenSelected = true,
+                    ) {
+                        onSelectTour(tour)
+                    }
+                }
+            } else {
+                item {
+                    Text(
+                        "No named tours listed for $selectedYear.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The "All shows in <year>" option — tracking every show rather than one named tour. */
+@Composable
+private fun TourEntireYearOption(
+    selectedYear: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "All shows in $selectedYear",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                "Track all shows from this year",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (isSelected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 
 @Composable
