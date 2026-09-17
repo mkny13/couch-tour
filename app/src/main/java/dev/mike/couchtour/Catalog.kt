@@ -51,7 +51,6 @@ fun deriveSyntheticTags(recording: RecordingRef): List<TagRef> =
     )
 
 fun Tag.toTagRef() = TagRef(name = name, description = description, color = color, priority = priority)
-fun TagRef.toTag() = Tag(name = name, description = description, color = color, priority = priority)
 
 @Serializable
 data class Popularity(
@@ -70,13 +69,6 @@ enum class ShowSortMode(val label: String) {
     HOT_7D("Hot (7d)"),
     POPULAR_30D("Popular (30d)"),
     MOMENTUM("Momentum");
-
-    companion object {
-        val DATE = DATE_DESC
-        val RATING = TOP_RATED
-        val TRENDING_7D = HOT_7D
-        val TRENDING_30D = POPULAR_30D
-    }
 }
 
 fun List<ShowSummary>.sortedByMode(mode: ShowSortMode): List<ShowSummary> = when (mode) {

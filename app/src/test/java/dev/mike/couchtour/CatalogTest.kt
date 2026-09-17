@@ -504,6 +504,10 @@ class CatalogTest {
 
     @Test
     fun `tag models round trip between Tag and TagRef`() {
+        // TagRef.toTag() has no production caller since the tag-filter UI reads TagRef
+        // directly (#218 dead-code pass); the inverse mapping stays pinned here.
+        fun TagRef.toTag() = Tag(name = name, description = description, color = color, priority = priority)
+
         val tag = Tag(name = "Soundboard", description = "Direct SBD feed", color = "#00FF00", priority = 10, notes = "Clean")
         val ref = tag.toTagRef()
         assertEquals("Soundboard", ref.name)

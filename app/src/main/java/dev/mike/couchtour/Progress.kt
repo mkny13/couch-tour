@@ -87,9 +87,6 @@ interface ProgressDao {
     @Query("SELECT queueKey FROM progress WHERE finished = 1 AND deletedAt IS NULL")
     fun finishedKeys(): Flow<List<String>>
 
-    @Query("SELECT * FROM progress WHERE artist = :artist AND deletedAt IS NULL ORDER BY updatedAt DESC")
-    fun historyFor(artist: String): Flow<List<Progress>>
-
     @Query("SELECT * FROM progress WHERE queueKey = :key AND deletedAt IS NULL")
     suspend fun get(key: String): Progress?
 
@@ -131,23 +128,14 @@ interface ArtistTourPreferenceDao {
     @Query("SELECT * FROM artist_tour_preferences WHERE artist_key = :artistKey")
     suspend fun getPreference(artistKey: String): ArtistTourPreferenceEntity?
 
-    @Query("SELECT * FROM artist_tour_preferences WHERE artist_key = :artistKey")
-    fun getPreferenceFlow(artistKey: String): Flow<ArtistTourPreferenceEntity?>
-
     @Query("SELECT * FROM artist_tour_preferences")
     fun getAllPreferences(): Flow<List<ArtistTourPreferenceEntity>>
-
-    @Query("SELECT * FROM artist_tour_preferences")
-    suspend fun getAllPreferencesSync(): List<ArtistTourPreferenceEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPreference(preference: ArtistTourPreferenceEntity)
 
     @Query("DELETE FROM artist_tour_preferences WHERE artist_key = :artistKey")
     suspend fun deletePreference(artistKey: String)
-
-    @Query("DELETE FROM artist_tour_preferences")
-    suspend fun clearAll()
 }
 
 @Entity(

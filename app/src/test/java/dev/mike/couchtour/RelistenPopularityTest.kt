@@ -46,21 +46,18 @@ class RelistenPopularityTest {
         assertEquals(612, w48!!.plays)
         assertEquals(95.3917, w48.hours, 0.0001)
         assertEquals(24.7386, w48.hotScore, 0.0001)
-        assertEquals(w48, windows.w48h)
 
         val w7d = windows.window7d
         assertNotNull(w7d)
         assertEquals(1640, w7d!!.plays)
         assertEquals(251.5275, w7d.hours, 0.0001)
         assertEquals(40.4969, w7d.hotScore, 0.0001)
-        assertEquals(w7d, windows.w7d)
 
         val w30d = windows.window30d
         assertNotNull(w30d)
         assertEquals(8457, w30d!!.plays)
         assertEquals(1311.8942, w30d.hours, 0.0001)
         assertEquals(91.9619, w30d.hotScore, 0.0001)
-        assertEquals(w30d, windows.w30d)
     }
 
     @Test

@@ -106,7 +106,7 @@ class SessionTest {
         Session.login("m@example.com", "hunter2")
         server.enqueue(MockResponse().setResponseCode(401).setBody("""{"message":"Unauthorized"}"""))
 
-        runCatching { PhishInApi.currentUser() }
+        runCatching { PhishInApi.likedShows() }
 
         // Otherwise the app looks signed in while every personal screen errors.
         assertFalse(Session.signedIn)
