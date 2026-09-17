@@ -350,6 +350,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_8_9,
                 PhishInDb.MIGRATION_9_10,
                 PhishInDb.MIGRATION_10_11,
+                PhishInDb.MIGRATION_11_12,
             )
             .allowMainThreadQueries()
             .build()
@@ -820,6 +821,78 @@ class MigrationTest {
             assertTrue(indices.contains("index_progress_artist"))
             assertTrue(indices.contains("index_local_playlist_tracks_playlistId_position"))
             assertFalse(indices.contains("index_local_playlist_tracks_playlistId"))
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v11 -> v12
+
+    private val v11IdentityHash = "516547d12265f1e57a3d70daf910f252"
+
+    /** v11 = v10's tables plus the index changes MIGRATION_10_11 applied. */
+    private fun createV11DatabaseWithRows() {
+        openRawDb().use { db ->
+            db.execSQL(v9CreateTable)
+            db.execSQL(v8LocalPlaylistsTable)
+            db.execSQL(v8LocalPlaylistTracksTable)
+            db.execSQL("DROP INDEX IF EXISTS `index_local_playlist_tracks_playlistId`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId_position` ON `local_playlist_tracks` (`playlistId`, `position`)")
+            db.execSQL(v9ArtistTourPreferenceTable)
+            db.execSQL(v10ExternalReleaseTable)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_deletedAt` ON `progress` (`deletedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_updatedAt` ON `progress` (`updatedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_finished` ON `progress` (`finished`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_artist` ON `progress` (`artist`)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v11IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlists (id, name, trackCount, createdAt, updatedAt)
+                   VALUES ('p1', 'Key Jams', 1, 1000, 1000)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlist_tracks
+                   (playlistId, position, backend, trackId, showDate, artistSlug, recordingId, title, durationMs, venueName, artUrl)
+                   VALUES ('p1', 0, 'phishin', '42', '1997-11-17', NULL, NULL, 'Tweezer', 300000, 'McNichols', NULL)"""
+            )
+            db.version = 11
+        }
+    }
+
+    @Test
+    fun `migrating from v11 keeps every row and accepts taper preferences`() = runBlocking {
+        createV11DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            // The migration itself only adds a table; existing data must be untouched.
+            assertEquals(1, db.progressDao().history().first().size)
+            assertEquals(1, db.localPlaylistDao().tracksOnce("p1").size)
+
+            val prefDao = db.taperPreferenceDao()
+            val pref = TaperPreferenceEntity(
+                taperName = "Charlie Miller",
+                preference = TaperPref.PREFERRED,
+                updatedAt = 123_456_789L,
+            )
+            prefDao.upsertPreference(pref)
+
+            assertEquals(pref, prefDao.getPreferenceFlow("Charlie Miller").first())
+            assertEquals(listOf(pref), prefDao.getAllPreferences().first())
+
+            // Overwriting moves preferred -> avoided, deleting returns the taper to neutral.
+            prefDao.upsertPreference(pref.copy(preference = TaperPref.AVOIDED, updatedAt = 987_654_321L))
+            assertEquals(TaperPref.AVOIDED, prefDao.getPreferenceFlow("Charlie Miller").first()!!.preference)
+            prefDao.deletePreference("Charlie Miller")
+            assertNull(prefDao.getPreferenceFlow("Charlie Miller").first())
         } finally {
             db.close()
         }

@@ -62,6 +62,9 @@ final class AppModel: ObservableObject {
     /// Which tab ⌘, opens on. Home's Settings & status tiles set this before opening the
     /// window, so a tile lands on the form it names.
     @Published var settingsTab: SettingsTab = .playback
+    /// Taper name -> "PREFERRED"/"AVOIDED" (tapers with no entry are neutral). Reloaded from
+    /// GRDB after every write; there is no cross-process writer to observe (#173).
+    @Published var taperPreferences: [String: String] = [:]
     private var themeCancellable: AnyCancellable?
 
     init() {
@@ -79,6 +82,34 @@ final class AppModel: ObservableObject {
         localPlaylistStore = progressStore.flatMap { try? LocalPlaylistStore(sharing: $0) }
         themeCancellable = themeSettings.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
+        }
+        reloadTaperPreferences()
+    }
+
+    func reloadTaperPreferences() {
+        guard let progressStore else { return }
+        if let list = try? progressStore.getTaperPreferences() {
+            taperPreferences = Dictionary(uniqueKeysWithValues: list.map { ($0.taperName, $0.preference) })
+        }
+    }
+
+    /// Cycles a taper's preference: neutral -> PREFERRED -> AVOIDED -> neutral (#173).
+    func cycleTaperPreference(_ taperName: String) {
+        guard let progressStore else { return }
+        do {
+            switch taperPreferences[taperName] {
+            case TaperPreference.preferred:
+                try progressStore.saveTaperPreference(taperName: taperName, preference: TaperPreference.avoided)
+            case TaperPreference.avoided:
+                try progressStore.deleteTaperPreference(taperName: taperName)
+            default:
+                try progressStore.saveTaperPreference(taperName: taperName, preference: TaperPreference.preferred)
+            }
+            reloadTaperPreferences()
+        } catch {
+            // A failed write leaves the previous state on disk and in the UI; nothing here
+            // is worth blocking playback over, so the error stays in the log only.
+            NSLog("Couldn't save taper preference: \(error)")
         }
     }
 

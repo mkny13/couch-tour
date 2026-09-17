@@ -378,6 +378,46 @@ final class ProgressStoreTests: XCTestCase {
         XCTAssertNil(try store.getTourPreference(artistKey: "relisten:grateful-dead"))
     }
 
+    // ------------------------------------------------ MARK: - Taper Preferences (#173)
+
+    func testSaveAndGetTaperPreference() throws {
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.preferred, now: 12_345)
+
+        let all = try store.getTaperPreferences()
+        XCTAssertEqual(1, all.count)
+        XCTAssertEqual("Charlie Miller", all[0].taperName)
+        XCTAssertEqual("PREFERRED", all[0].preference)
+        XCTAssertEqual(12_345, all[0].updatedAt)
+    }
+
+    func testUpdateTaperPreferenceOverwritesPrevious() throws {
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.preferred, now: 1_000)
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.avoided, now: 2_000)
+
+        let all = try store.getTaperPreferences()
+        XCTAssertEqual(1, all.count)
+        XCTAssertEqual("AVOIDED", all[0].preference)
+        XCTAssertEqual(2_000, all[0].updatedAt)
+    }
+
+    func testDeleteTaperPreferenceReturnsTaperToNeutral() throws {
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.preferred, now: 1_000)
+        try store.deleteTaperPreference(taperName: "Charlie Miller")
+
+        XCTAssertTrue(try store.getTaperPreferences().isEmpty)
+        // Deleting an absent taper is a no-op.
+        try store.deleteTaperPreference(taperName: "Never Saved")
+        XCTAssertTrue(try store.getTaperPreferences().isEmpty)
+    }
+
+    func testTaperPreferencesAreOrderedByUpdatedAtDesc() throws {
+        try store.saveTaperPreference(taperName: "A", preference: TaperPreference.preferred, now: 100)
+        try store.saveTaperPreference(taperName: "B", preference: TaperPreference.avoided, now: 300)
+        try store.saveTaperPreference(taperName: "C", preference: TaperPreference.preferred, now: 200)
+
+        XCTAssertEqual(["B", "C", "A"], try store.getTaperPreferences().map { $0.taperName })
+    }
+
     func testDeleteNonExistentTourPreferenceIsNoOp() throws {
         try store.saveTourPreference(ArtistTourPreference(artistKey: "artist:a", tourName: "Tour A", year: "1991"))
         XCTAssertNoThrow(try store.deleteTourPreference(artistKey: "artist:nonexistent"))
