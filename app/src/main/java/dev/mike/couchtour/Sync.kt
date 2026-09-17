@@ -477,8 +477,11 @@ object SyncSession {
 
     private var pushJob: Job? = null
     // Its own scope, not the caller's (PlaybackService's dies with the service): a debounce
-    // in flight must survive whatever component happened to trigger it.
-    private val debounceScope = CoroutineScope(Dispatchers.IO)
+    // in flight must survive whatever component happened to trigger it. Internal, not
+    // private, so tests can swap in a scope riding runTest's virtual clock (SyncTest's
+    // debounce test) instead of waiting out real delays; production always leaves the
+    // default in place.
+    internal var debounceScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
     /**
      * Debounced push after a play/pause/track-change event, so a phone-to-Mac handoff

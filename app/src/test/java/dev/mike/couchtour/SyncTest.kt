@@ -3,7 +3,13 @@ package dev.mike.couchtour
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -454,27 +460,47 @@ class SyncSessionTest {
     }
 
     @Test
-    fun `requestDebouncedPush coalesces a burst of calls into a single push`() = runBlocking {
-        claim()
-        db.progressDao().put(
-            Progress(
-                queueKey = "show:1997-11-17", title = "t", subtitle = "s", artUrl = null,
-                trackIndex = 0, positionMs = 100, trackTitle = "Track", updatedAt = 5_000,
-                artist = "Phish",
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `requestDebouncedPush coalesces a burst of calls into a single push`() = runTest {
+        // The debounce rides this test's virtual clock instead of real 50ms sleeps: under
+        // scheduler pressure, a real delay could fire the first push before all three calls
+        // landed, turning "coalesces" into "coalesces, sometimes". UnconfinedTestDispatcher
+        // matters beyond virtual time — the resumed coroutine finishes on whatever thread its
+        // HTTP work completes on, rather than staying registered with the scheduler, so
+        // runTest's leaked-coroutine check never sees a job still suspended on Dispatchers.IO.
+        val productionScope = SyncSession.debounceScope
+        SyncSession.debounceScope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        try {
+            claim()
+            db.progressDao().put(
+                Progress(
+                    queueKey = "show:1997-11-17", title = "t", subtitle = "s", artUrl = null,
+                    trackIndex = 0, positionMs = 100, trackTitle = "Track", updatedAt = 5_000,
+                    artist = "Phish",
+                )
             )
-        )
-        enqueue("""{"seq":1,"changes":[]}""")
+            enqueue("""{"seq":1,"changes":[]}""")
 
-        // Mirrors onIsPlayingChanged/onMediaItemTransition/onPlaybackStateChanged all firing
-        // for the same real event — only the last-scheduled delay should actually land.
-        SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
-        SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
-        SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
+            // Mirrors onIsPlayingChanged/onMediaItemTransition/onPlaybackStateChanged all firing
+            // for the same real event — each call reschedules the delay, so only the
+            // last-scheduled one is still on the clock.
+            SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
+            SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
+            SyncSession.requestDebouncedPush(db.progressDao(), delayMs = 50)
 
-        val pushed = server.takeRequest(2, TimeUnit.SECONDS)
-        assertNotNull(pushed)
-        assertTrue(pushed!!.body.readUtf8().contains(""""queueKey":"show:1997-11-17""""))
-        assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS))
+            // advanceTimeBy stops just short of the boundary, so runCurrent() is what actually
+            // fires the 50ms delay. The takeRequest timeouts that remain are failure
+            // diagnostics, not timing coordination: the push is already scheduled for certain.
+            advanceTimeBy(50)
+            runCurrent()
+
+            val pushed = server.takeRequest(2, TimeUnit.SECONDS)
+            assertNotNull(pushed)
+            assertTrue(pushed!!.body.readUtf8().contains(""""queueKey":"show:1997-11-17""""))
+            assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS))
+        } finally {
+            SyncSession.debounceScope = productionScope
+        }
     }
 
     // ------------------------------------------------------------------ push chunking
