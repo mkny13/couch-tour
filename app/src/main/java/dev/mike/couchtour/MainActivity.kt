@@ -37,6 +37,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.rounded.ThumbDown
+import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -103,6 +106,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -1713,7 +1717,18 @@ private fun recordingLabel(rec: RecordingRef): String {
 private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String, date: String, vm: PlayerViewModel, nav: NavHostController) {
     var open by remember { mutableStateOf(false) }
     var compareOpen by remember { mutableStateOf(false) }
-    val sources = listOfNotNull(detail.recording) + detail.alternates
+    val taperPreferences by vm.taperPreferencesFlow().collectAsState(initial = emptyMap())
+    // Stable sort: preferred tapers float to the top, avoided sink to the bottom, and
+    // within each band the upstream (rating/quality) order is preserved.
+    val sources = remember(detail, taperPreferences) {
+        fun prefScore(source: RecordingRef): Int = when (taperPreferences[source.taper ?: source.label]) {
+            TaperPref.PREFERRED -> -1
+            TaperPref.AVOIDED -> 1
+            else -> 0
+        }
+        (listOfNotNull(detail.recording) + detail.alternates)
+            .sortedWith(compareBy { prefScore(it) })
+    }
 
     Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
         RowItem(
@@ -1739,7 +1754,18 @@ private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String
                     }
                     items(sources, key = { it.id }) { source ->
                         val current = source.id == detail.recording?.id
-                        SourceRow(source, current) {
+                        val taperName = source.taper ?: source.label
+                        val pref = taperPreferences[taperName]
+                        SourceRow(
+                            source = source,
+                            current = current,
+                            preference = pref,
+                            onCyclePreference = {
+                                // Owner picked a visible icon (issue #173 comment): tapping
+                                // cycles neutral -> preferred -> avoided -> neutral.
+                                vm.cycleTaperPreference(taperName, pref)
+                            },
+                        ) {
                             open = false
                             if (!current) {
                                 // If this show is playing (or paused) right now, carry the
@@ -1772,22 +1798,58 @@ private fun SourcePicker(detail: ShowDetail, backendId: String, artistId: String
 }
 
 @Composable
-internal fun SourceRow(source: RecordingRef, current: Boolean, onClick: () -> Unit) {
+internal fun SourceRow(
+    source: RecordingRef,
+    current: Boolean,
+    preference: String? = null,
+    onCyclePreference: () -> Unit = {},
+    onClick: () -> Unit,
+) {
+    val isPreferred = preference == TaperPref.PREFERRED
+    val isAvoided = preference == TaperPref.AVOIDED
     Column(
         Modifier
             .fillMaxWidth()
+            .background(
+                if (isPreferred) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                else Color.Transparent
+            )
             .clickable(onClick = onClick)
+            // Avoided tapers stay visible (so they can be un-avoided) but read as demoted.
+            .alpha(if (isAvoided) 0.5f else 1f)
             .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 (if (current) "✓ " else "") + source.label,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = if (isPreferred) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isPreferred) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            IconButton(onClick = onCyclePreference, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = when (preference) {
+                        TaperPref.PREFERRED -> Icons.Rounded.ThumbUp
+                        TaperPref.AVOIDED -> Icons.Rounded.ThumbDown
+                        else -> Icons.Outlined.ThumbUp
+                    },
+                    contentDescription = when (preference) {
+                        TaperPref.PREFERRED -> "Marked preferred — tap to mark avoided"
+                        TaperPref.AVOIDED -> "Marked avoided — tap to clear"
+                        else -> "Tap to mark this taper preferred"
+                    },
+                    modifier = Modifier.size(20.dp),
+                    tint = when (preference) {
+                        TaperPref.PREFERRED -> MaterialTheme.colorScheme.primary
+                        TaperPref.AVOIDED -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
+                )
+            }
             if (source.hasFlac) {
                 SourceBadge("FLAC", MaterialTheme.colorScheme.secondary)
             } else {
