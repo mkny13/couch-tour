@@ -33,7 +33,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Wrangler 4.x (resolved from ^4.0.0, currently 4.123.0) requires Node >= 22 —
+          # pinning 20 made every deploy run die at `npm run deploy:staging` with
+          # "Wrangler requires at least Node.js v22.0.0" (issue #291).
+          node-version: "22"
 
       - run: npm ci
       - run: npm run typecheck
