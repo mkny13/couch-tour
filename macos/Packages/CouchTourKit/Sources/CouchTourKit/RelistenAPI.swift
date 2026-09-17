@@ -592,52 +592,14 @@ extension RelistenShowWithSources {
     /// sorts them by rating. A non-nil id that matches nothing (a stale queue key against a
     /// tape that's since been removed) falls back to the default rather than an empty show.
     public func toShowDetail(artist: ArtistRef, recordingId: String? = nil) -> ShowDetail {
-        let chosen: RelistenSource? = {
-            if let recordingId, let match = sources.first(where: { $0.uuid == recordingId }) { return match }
-            return sources.first
-        }()
-
+        let chosen = chosenSource(matching: recordingId)
         let chosenRecording = chosen?.toRecordingRef()
-
-        var showTags: [Tag] = []
-        let hasSbd = hasSoundboardSource || sources.contains { $0.isSoundboard }
-        let hasFlac = hasStreamableFlacSource || sources.contains { src in
-            src.sets.contains { set in set.tracks.contains { $0.flacUrl != nil && !$0.flacUrl!.isEmpty } }
-        }
-        let hasMatrix = sources.contains { $0.toRecordingRef().looksLikeMatrix }
-
-        if hasSbd {
-            showTags.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
-        }
-        if hasMatrix {
-            showTags.append(Tag(name: "Matrix", description: "Matrix recording (SBD + AUD)", priority: 8))
-        }
-        if hasFlac {
-            showTags.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
-        }
-
-        let tracks: [PlayableTrack] = (chosen?.sets ?? [])
-            .sorted { $0.index < $1.index }
-            .flatMap { set in
-                set.tracks
-                    .filter { !($0.mp3Url ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
-                    .map { track in
-                        var trackTags: [Tag] = []
-                        if chosenRecording?.isSoundboard == true {
-                            trackTags.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
-                        }
-                        if track.flacUrl != nil && !track.flacUrl!.isEmpty {
-                            trackTags.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
-                        }
-                        return track.toPlayableTrack(
-                            artist: artist,
-                            showDate: displayDate,
-                            venueName: venue?.name,
-                            setName: set.name,
-                            tags: trackTags
-                        )
-                    }
-            }
+        let showTags = deriveShowTags()
+        let tracks = playableTracks(
+            chosen: chosen,
+            chosenIsSoundboard: chosenRecording?.isSoundboard == true,
+            artist: artist
+        )
 
         let summary = ShowSummary(
             artist: artist,
@@ -660,6 +622,66 @@ extension RelistenShowWithSources {
             tags: showTags,
             popularity: popularity
         )
+    }
+
+    /// `recordingId` nil takes the default tape — the first source, since Relisten already
+    /// sorts them by rating. A non-nil id that matches nothing (a stale queue key against a
+    /// tape that's since been removed) falls back to the default rather than an empty show.
+    private func chosenSource(matching recordingId: String?) -> RelistenSource? {
+        if let recordingId, let match = sources.first(where: { $0.uuid == recordingId }) { return match }
+        return sources.first
+    }
+
+    /// Show-level tags derived across every source, strongest claim first (SBD > Matrix > FLAC).
+    private func deriveShowTags() -> [Tag] {
+        let hasSbd = hasSoundboardSource || sources.contains { $0.isSoundboard }
+        let hasFlac = hasStreamableFlacSource || sources.contains { src in
+            src.sets.contains { set in set.tracks.contains { $0.flacUrl != nil && !$0.flacUrl!.isEmpty } }
+        }
+        let hasMatrix = sources.contains { $0.toRecordingRef().looksLikeMatrix }
+
+        var tags: [Tag] = []
+        if hasSbd {
+            tags.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
+        }
+        if hasMatrix {
+            tags.append(Tag(name: "Matrix", description: "Matrix recording (SBD + AUD)", priority: 8))
+        }
+        if hasFlac {
+            tags.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
+        }
+        return tags
+    }
+
+    /// The playable tracks of the chosen tape, set order preserved, dropping entries with
+    /// no mp3_url (nothing to stream).
+    private func playableTracks(
+        chosen: RelistenSource?,
+        chosenIsSoundboard: Bool,
+        artist: ArtistRef
+    ) -> [PlayableTrack] {
+        (chosen?.sets ?? [])
+            .sorted { $0.index < $1.index }
+            .flatMap { set in
+                set.tracks
+                    .filter { !($0.mp3Url ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+                    .map { track in
+                        var trackTags: [Tag] = []
+                        if chosenIsSoundboard {
+                            trackTags.append(Tag(name: "SBD", description: "Soundboard recording", priority: 10))
+                        }
+                        if track.flacUrl != nil && !track.flacUrl!.isEmpty {
+                            trackTags.append(Tag(name: "FLAC", description: "Lossless FLAC audio", priority: 5))
+                        }
+                        return track.toPlayableTrack(
+                            artist: artist,
+                            showDate: displayDate,
+                            venueName: venue?.name,
+                            setName: set.name,
+                            tags: trackTags
+                        )
+                    }
+            }
     }
 }
 

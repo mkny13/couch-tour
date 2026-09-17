@@ -159,67 +159,135 @@ private fun coreMediaItem(
     val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
     val resolvedVenue = venueName ?: info.subtitle
 
-    // FLAC vs MP3 is a preference (#141), not a capability — a track carrying a flac_url
-    // can play either, so the choice is read here at queue-build time, like skipFiller.
-    // Under COMPRESSED, Keys.FLAC_URL is dropped from the extras too, not just the URI:
-    // Cast's hand-back (CastItemConverter.toMediaItem) and the Now Playing quality badge
-    // both read that key, so leaving it behind would quietly restore lossless audio the
-    // moment playback returned from the TV. A track with an flac_url but no mp3_url still
-    // plays FLAC — a preference must never make a tape unplayable.
-    val hasFlac = !flacUrl.isNullOrBlank() &&
-        (PlaybackSettings.audioQuality.value == AudioQuality.LOSSLESS || url.isBlank())
-    val playbackUri = (if (hasFlac) flacUrl!! else url).requireHttps()
-    val mimeType = if (hasFlac) MimeTypes.AUDIO_FLAC else MimeTypes.AUDIO_MPEG
-
-    val extras = Bundle().apply {
-        info.key?.let { putString(Keys.QUEUE_KEY, it) }
-        putString(Keys.QUEUE_TITLE, info.title)
-        putString(Keys.QUEUE_SUBTITLE, info.subtitle)
-        putString(Keys.QUEUE_ART, info.art?.requireHttps())
-        putString(Keys.WAVEFORM, waveformUrl?.requireHttps())
-        putString(Keys.TRACK_ID, id)
-        backend?.let { putString(Keys.BACKEND, it) }
-        putBoolean(Keys.LIKED, likedByUser)
-        putInt(Keys.LIKES_COUNT, likesCount)
-        if (hasFlac) flacUrl?.let { putString(Keys.FLAC_URL, it) }
-        if (url.isNotBlank()) putString(Keys.MP3_URL, url)
-        resolvedDate?.let { putString(Keys.SHOW_DATE, it) }
-        resolvedVenue?.let { putString(Keys.VENUE_NAME, it) }
-        putString(Keys.ARTIST_NAME, artist)
-        putString(Keys.ARTIST_ID, artistId)
-        if (showRating > 0.0) putDouble(Keys.SHOW_RATING, showRating)
-        tapeLineage?.let { putString(Keys.TAPE_LINEAGE, it) }
-        if (setName.isNotBlank()) putString(Keys.SET_NAME, setName)
-        if (trackPosition > 0) putInt(Keys.TRACK_POSITION, trackPosition)
-    }
-    val meta = MediaMetadata.Builder()
-        .setTitle(title)
-        .setArtist(artist)
-        // The album is the show the track was played at, not the queue it arrived in.
-        // External scrobblers (the Last.fm app reads our MediaSession directly) take
-        // this field verbatim, and "some playlist · by someone · 99 tracks" is not an
-        // album. Every track carries its own show, including inside a playlist.
-        .setAlbumTitle(albumFor(showDate, venueName, info))
-        // Queue identity lives here instead, so the mini player still shows the
-        // playlist you started from rather than the underlying show.
-        .setSubtitle("${info.title} · ${info.subtitle}")
-        .setArtworkUri(art?.let { Uri.parse(it.requireHttps()) })
-        .setIsBrowsable(false)
-        .setIsPlayable(true)
-        .setExtras(extras)
-        .build()
+    val audio = resolveAudioSource(url, flacUrl)
+    val extras = mediaItemExtras(
+        info = info,
+        id = id,
+        waveformUrl = waveformUrl,
+        backend = backend,
+        likedByUser = likedByUser,
+        likesCount = likesCount,
+        mp3Url = url,
+        flacUrl = flacUrl,
+        usesFlac = audio.usesFlac,
+        showDate = resolvedDate,
+        venueName = resolvedVenue,
+        artist = artist,
+        artistId = artistId,
+        showRating = showRating,
+        tapeLineage = tapeLineage,
+        setName = setName,
+        trackPosition = trackPosition,
+    )
+    val meta = mediaMetadata(title, artist, art, showDate, venueName, info, extras)
 
     return MediaItem.Builder()
         .setMediaId(id)
-        .setUri(playbackUri)
+        .setUri(audio.playbackUri)
         // ExoPlayer sniffs the container and never needs this. Cast does: a queue item
         // with no content type is rejected outright by the media item converter, so
         // casting would throw on the first track without it.
-        .setMimeType(mimeType)
+        .setMimeType(audio.mimeType)
         .setMediaMetadata(meta)
         .apply { clipping?.let { setClippingConfiguration(it) } }
         .build()
 }
+
+/**
+ * FLAC vs MP3 is a preference (#141), not a capability — a track carrying a flac_url can
+ * play either, so the choice is read here at queue-build time, like skipFiller.
+ *
+ * Under COMPRESSED the FLAC source is skipped entirely. A track with an flac_url but no
+ * mp3_url still plays FLAC — a preference must never make a tape unplayable.
+ */
+private fun resolveAudioSource(mp3Url: String, flacUrl: String?): AudioSource {
+    val usesFlac = !flacUrl.isNullOrBlank() &&
+        (PlaybackSettings.audioQuality.value == AudioQuality.LOSSLESS || mp3Url.isBlank())
+    val playbackUri = (if (usesFlac) flacUrl!! else mp3Url).requireHttps()
+    val mimeType = if (usesFlac) MimeTypes.AUDIO_FLAC else MimeTypes.AUDIO_MPEG
+    return AudioSource(playbackUri, mimeType, usesFlac)
+}
+
+/** The URI + MIME type actually handed to the player for one track. */
+private data class AudioSource(
+    val playbackUri: String,
+    val mimeType: String,
+    /** True when the lossless source won; also gates [Keys.FLAC_URL] in the extras. */
+    val usesFlac: Boolean,
+)
+
+/**
+ * The per-track extras bundle every downstream reader (queue saver, Cast hand-back, the
+ * Now Playing card, scrobblers) unpacks. Under COMPRESSED, Keys.FLAC_URL is dropped from
+ * here too, not just the URI: Cast's hand-back (CastItemConverter.toMediaItem) and the Now
+ * Playing quality badge both read that key, so leaving it behind would quietly restore
+ * lossless audio the moment playback returned from the TV.
+ */
+private fun mediaItemExtras(
+    info: QueueInfo,
+    id: String,
+    waveformUrl: String?,
+    backend: String?,
+    likedByUser: Boolean,
+    likesCount: Int,
+    mp3Url: String,
+    flacUrl: String?,
+    usesFlac: Boolean,
+    showDate: String?,
+    venueName: String?,
+    artist: String,
+    artistId: String,
+    showRating: Double,
+    tapeLineage: String?,
+    setName: String,
+    trackPosition: Int,
+): Bundle = Bundle().apply {
+    info.key?.let { putString(Keys.QUEUE_KEY, it) }
+    putString(Keys.QUEUE_TITLE, info.title)
+    putString(Keys.QUEUE_SUBTITLE, info.subtitle)
+    putString(Keys.QUEUE_ART, info.art?.requireHttps())
+    putString(Keys.WAVEFORM, waveformUrl?.requireHttps())
+    putString(Keys.TRACK_ID, id)
+    backend?.let { putString(Keys.BACKEND, it) }
+    putBoolean(Keys.LIKED, likedByUser)
+    putInt(Keys.LIKES_COUNT, likesCount)
+    if (usesFlac) flacUrl?.let { putString(Keys.FLAC_URL, it) }
+    if (mp3Url.isNotBlank()) putString(Keys.MP3_URL, mp3Url)
+    showDate?.let { putString(Keys.SHOW_DATE, it) }
+    venueName?.let { putString(Keys.VENUE_NAME, it) }
+    putString(Keys.ARTIST_NAME, artist)
+    putString(Keys.ARTIST_ID, artistId)
+    if (showRating > 0.0) putDouble(Keys.SHOW_RATING, showRating)
+    tapeLineage?.let { putString(Keys.TAPE_LINEAGE, it) }
+    if (setName.isNotBlank()) putString(Keys.SET_NAME, setName)
+    if (trackPosition > 0) putInt(Keys.TRACK_POSITION, trackPosition)
+}
+
+/** The [MediaMetadata] shown in system UI (notifications, Android Auto, scrobblers). */
+private fun mediaMetadata(
+    title: String,
+    artist: String,
+    art: String?,
+    showDate: String?,
+    venueName: String?,
+    info: QueueInfo,
+    extras: Bundle,
+): MediaMetadata = MediaMetadata.Builder()
+    .setTitle(title)
+    .setArtist(artist)
+    // The album is the show the track was played at, not the queue it arrived in.
+    // External scrobblers (the Last.fm app reads our MediaSession directly) take
+    // this field verbatim, and "some playlist · by someone · 99 tracks" is not an
+    // album. Every track carries its own show, including inside a playlist.
+    .setAlbumTitle(albumFor(showDate, venueName, info))
+    // Queue identity lives here instead, so the mini player still shows the
+    // playlist you started from rather than the underlying show.
+    .setSubtitle("${info.title} · ${info.subtitle}")
+    .setArtworkUri(art?.let { Uri.parse(it.requireHttps()) })
+    .setIsBrowsable(false)
+    .setIsPlayable(true)
+    .setExtras(extras)
+    .build()
 
 /**
  * The Relisten counterpart of [showTrackItems] — builds the playable items for a chosen
