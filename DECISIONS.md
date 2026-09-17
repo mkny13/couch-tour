@@ -4668,3 +4668,39 @@ Tests: `scripts/test_uat_server.py` (stdlib unittest, no new dependencies — th
 existing Python test pattern under `scripts/` to follow), 16 tests covering the shape,
 dedup, regression, marker persistence, and gh-failure paths, plus one live end-to-end run
 against a throwaway item id (issues #285/#286, created and closed as evidence).
+
+### D243 — Part 3 of #199: execution-time creep — one wall-clock sleep found and made deterministic; parallel forks measured and rejected (#213)
+
+Profiled both suites end to end. Android: 535 tests in ~13s wall (`--rerun`, warm daemon),
+summed per-class JVM time 9.6s; the two outliers (CastTest 2.9s, DiscoveryCatalogE2ETest
+2.7s) are not per-test creep — they are the one-time Robolectric framework + SQLite native
+bootstrap attributed to whichever class runs first, unavoidable per JVM run. A full sweep
+found **zero** sleeps or polling waits left in Android tests — Part 2.1 already moved the
+debounce test onto `runTest`'s virtual clock, and the only timed MockWebServer calls are
+failure-diagnostics, not timing coordination.
+
+Changes:
+
+- **macOS: the debounce test's 300ms wall-clock sleep is gone.**
+  `SyncSessionTests.testRequestDebouncedPushCoalesces…` used to sleep 300ms to out-wait a
+  50ms debounce — real time on every run, and still racy under scheduler pressure. Mirroring
+  Android's internal `debounceScope` seam, `SyncSession` now exposes an injectable
+  `sleepForDebounce` and an internal `pushTask`. The test parks every scheduled window in a
+  cancellation-safe `DebounceGate` (an `AsyncStream` finishes when its reading task is
+  cancelled, so superseded windows unwind into the existing `Task.isCancelled` guard), opens
+  the gate, and awaits `pushTask` directly: 300ms → 3ms, and "coalesces" is now asserted
+  after the push has actually landed rather than after a guessed delay. Suite execution
+  1.167s → 0.809s; the production default (`Task.sleep`) is untouched.
+- **Android: `maxParallelForks` measured and rejected.** 4 forks: 20.4s wall; 2 forks:
+  13.7s; single JVM: ~12.5-13s. Each fork pays its own Robolectric bootstrap (and its
+  framework-cache extraction contends for I/O on this machine's external SSD), so forks
+  *added* time. The single-JVM suite is already "well under a minute"; left as-is.
+- **Gradle configuration cache also rejected:** it can't engage — `gitVersionName()` shells
+  out to `gh release view` (a live network call) at configuration time, and making that
+  configuration-cache-compatible would change versionName sourcing for non-release CI
+  builds, which is outside this issue's "localized to test configuration" scope. Recorded
+  here because it is the next real lever if test-suite wall time ever creeps again.
+
+Verified: `testDebugUnitTest` (535 tests) and `swift test` (381 tests) green on the final
+state. Test counts unchanged, so the README's counts still hold. Nothing in the change is
+human-visible; no UAT items added (issue's "needs a human" list is empty).
