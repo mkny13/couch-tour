@@ -1,9 +1,9 @@
 # Phase 2 — Planning Prompt
 
 This is a **planning-only** prompt for [ROADMAP.md](../ROADMAP.md)'s Phase 2 ("Audio
-Fidelity, Discovery & Media Power Features") table. Do not write any application code or open
-a PR against `app/`, `macos/`, or `sync/` while running this. The deliverable is a plan Mike
-reviews and approves — implementation is a separate, later pass, the same two-step shape
+Fidelity, Discovery & Media Power Features") table. Do not write any application code against
+`app/`, `macos/`, or `sync/` while running this. The deliverable is a plan Mike reviews and
+approves — implementation is a separate, later pass, the same two-step shape
 Phase 2 Batch 4 used (C1 produced a design the direction got chosen from; C2 was the
 implementation prompt written only after that).
 
@@ -85,7 +85,8 @@ pass, and say which and why.
 ## Output
 
 Write the plan to `prompts/phase-2-batches.md` (new file, sibling to this one) and present it
-to Mike for review — don't start implementation work or open any code PRs in this pass. Once
-he picks a direction, the next session turns the approved plan into the actual batch prompts,
+to Mike for review — don't start implementation work in this pass. Commit, push, and report
+status with `STATUS: DONE <summary>` (under Mahler, PRs are handled automatically by the conductor).
+Once he picks a direction, the next session turns the approved plan into the actual batch prompts,
 the same way Batch C1's chosen direction became Batch C2's prompt in
 [macos-ux-polish-batches.md](macos-ux-polish-batches.md).

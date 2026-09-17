@@ -14,15 +14,13 @@ prompts below are kept as the record of what was asked for.
 | B | [#99](https://github.com/mkny13/couch-tour/issues/99) | **Merged** — #112 (D202) |
 | C | [#102](https://github.com/mkny13/couch-tour/issues/102) | C1 done, direction chosen. **C2 is ready to run.** |
 
-Every batch: run `cd macos/Packages/CouchTourKit && swift test` plus a
-`xcodegen generate && xcodebuild … build` of the app target, log the work in `DECISIONS.md`
-under a new iteration, update the README's test count if it moved, and open a PR.
+Every batch: follow the Mahler rules in `CLAUDE.md`. Mahler owns the worktree and branch; do not run `git worktree add/remove` or `git checkout -b`, and never commit to detached HEAD. Run the test suites (`JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest && swift test --package-path macos/Packages/CouchTourKit` plus `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` for app-target work). Allocate decision IDs with `mahler next-id couch-tour D`, log the work in `DECISIONS.md` under a new iteration, add manual checks to `UAT.md`, update the README's test count if it moved, commit, push, and end with `STATUS: DONE <summary>`. Do not open a PR, watch CI, or merge — Mahler's conductor handles the PR lifecycle.
 
 ---
 
 ## Batch A — Home screen interaction fixes
 
-> Work in a fresh worktree off `main`. This batch closes #97, #98, #100, and #101 — four
+> This batch closes #97, #98, #100, and #101 — four
 > small, independent Home-screen fixes on the macOS client (one of them also touches
 > Android). Read each issue with `gh issue view <n>` before starting; they contain the
 > specific file/function diagnosis and shouldn't be re-derived.
@@ -42,7 +40,7 @@ under a new iteration, update the README's test count if it moved, and open a PR
 >    re-resolving Next Stop — `reloadDiscovery()` reads that state, so ordering matters.
 >    Check `clearPreference()` takes the same path. Then verify whether Android's
 >    `loadOnce(Triple(today, favoritedArtists…, preferencesMap))` already invalidates
->    correctly; if it does, say so in the PR and change nothing there.
+>    correctly; if it does, record it in the commit message and change nothing there.
 >
 > 2. **#101 — Surprise Me from starred artists.** Change the call site on both clients from
 >    the merged catalog to the already-computed `favoritedArtists` list. You need to decide
@@ -75,7 +73,7 @@ under a new iteration, update the README's test count if it moved, and open a PR
 
 ## Batch B — Player bar navigation
 
-> Work in a fresh worktree off `main`. This batch closes #99: on macOS, clicking the track
+> This batch closes #99: on macOS, clicking the track
 > title or date in the player bar should open that show, and clicking the artist name should
 > open that artist — matching what Android's `NowPlaying.kt` already does. Read
 > `gh issue view 99` first; it contains the architectural analysis.
@@ -110,7 +108,7 @@ under a new iteration, update the README's test count if it moved, and open a PR
 > affordance. It also creates a case worth checking by hand: a view pushed from the player
 > bar onto a section stack the user never drilled into renders a Back button that dismisses
 > to that section's root, which may be a screen they were never on. Confirm that lands
-> somewhere sensible, and if it doesn't, say so in the PR rather than papering over it.
+> somewhere sensible, and if it doesn't, record it in the commit message rather than papering over it.
 >
 > Apply the same navigable identity to `NowPlayingInspector`'s header block, which renders
 > the same artist/date/track text inertly today.
@@ -191,13 +189,6 @@ deliberately UI-free.
 
 ### Verification
 
-A real launch, not just a build: VoiceOver over the transport and tour picker, Increase Contrast
-in both appearances, and the Accessibility text-size setting at a couple of steps. Confirm ⌘[ pops
-correctly from a destination reached via the player bar, and that ⌘F focuses the field from a
-cold launch.
+Build and test verification: `swift test` on `CouchTourKit` plus the app-target build. Note that `swift test` covers `CouchTourKit` only, not the app target (D208); any manual verification items (VoiceOver over transport, Increase Contrast, dynamic sizing, ⌘[ pop, ⌘F focus) belong in `UAT.md` where Mike verifies them on actual builds via `scripts/uat-server.py`. Do not attempt automated macOS UI scripting (the screen is locked).
 
-Log the pass in DECISIONS.md. It supersedes **D169** (Search as its own sidebar section — the
-stack-isolation reasoning survives, the section doesn't), **D171** (History as its own flat screen,
-and the Settings-scene placement, which this reinforces rather than reverses), **D197** (Home's
-duplicate Account/Sync sheets), and simplifies **D202** (Batch B's cross-section route). Update the
-README's test count if it moves.
+Log the pass in DECISIONS.md (allocating the decision ID with `mahler next-id couch-tour D`). It supersedes **D169** (Search as its own sidebar section — the stack-isolation reasoning survives, the section doesn't), **D171** (History as its own flat screen, and the Settings-scene placement, which this reinforces rather than reverses), **D197** (Home's duplicate Account/Sync sheets), and simplifies **D202** (Batch B's cross-section route). Update the README's test count if it moves, commit, push, and end with `STATUS: DONE <summary>`.

@@ -3,7 +3,7 @@
 Produced by [phase-2-plan.md](phase-2-plan.md)'s planning pass on 2026-08-31, and **approved by
 Mike the same day** — see "Decisions taken" at the bottom, which the batches above already
 reflect. The batches below have since been turned into working prompts:
-**[phase-2-batch-prompts.md](phase-2-batch-prompts.md)** is what you hand to a worktree. This file
+**[phase-2-batch-prompts.md](phase-2-batch-prompts.md)** contains the task prompts. This file
 stays the reasoning and the audit behind them.
 
 Baseline at the time of writing: `main` @ `5e6ad7b`, Android **463 tests / 0 failures**, macOS
@@ -290,8 +290,9 @@ reconcile later.
 2. **Batch 1 (macOS, including #115) ∥ Batch 2A (Android) ∥ Batch 4 (#61)** — three parallel
    worktrees, no file overlap.
 3. **Batch 2B** — macOS parity, after 1 and 2A land.
-4. **Cut a beta** — per CLAUDE.md, at the end of the batch. Batches 1–2B are almost all macOS
-   view work, which only real use will validate.
+4. **Verify via UAT on beta build** — Batches 1–2B are almost all macOS view work, which only real
+   use will validate; manual verification checks are logged to `UAT.md` for Mike to verify on beta
+   builds (cutting betas is done via GitHub Actions workflow; agents end at the push).
 5. **Batch 6 (#65)** — its own phase, and with #18 deferred it owns the playback pipeline
    uncontended.
 
@@ -331,10 +332,10 @@ so it doesn't read as an oversight.
   numbering densely. Intentional per D83; noting it so it isn't "fixed."
 - `local.properties` is gitignored and machine-specific, so a fresh worktree cannot run
   `./gradlew testDebugUnitTest` until it is recreated:
-  `echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties`. Worth a line in CLAUDE.md's
-  Android build section.
-- **Interactive macOS verification is still walled off.** D204 already flagged this: every ad-hoc
-  reinstall invalidates the keychain ACL, and the resulting app-modal prompt needs Mike's password
-  ("Always Allow"). Batches 1, 2B, and 3 are almost entirely view code whose verification is
-  clicking. Answer that prompt by hand once before starting them, or those batches ship on a
-  build-passes signal that proves very little.
+  `echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties`. Documented in `CLAUDE.md` under
+  "Working under Mahler".
+- **Interactive macOS verification is walled off.** Background agents cannot perform GUI automation
+  (the Mac mini screen is locked, and ad-hoc reinstalls trigger modal keychain password prompts).
+  Batches 1, 2B, and 3 are almost entirely view code whose verification is clicking; per `CLAUDE.md`,
+  manual verification items must be logged to `UAT.md` so Mike can verify them on actual builds
+  via `scripts/uat-server.py`.
