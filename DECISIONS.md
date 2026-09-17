@@ -4712,3 +4712,12 @@ Audited `CLAUDE.md` and files under `prompts/` to reduce prompt context bloat an
 - **`prompts/`**: Audited `prompts/macos-ux-polish-batches.md`, `prompts/phase-2-batch-prompts.md`, `prompts/phase-2-batches.md`, and `prompts/phase-2-plan.md`. All referenced batches and plans (Phase 2 and macOS UX Polish) have merged. Replaced 977 lines (62 KB) of dead recipes with concise ~6-9 line archived summaries retaining issue mappings and cross-references.
 - **Impact**: Reduced rules and prompt recipes from 1,231 lines (76.5 KB / ~19k tokens) to 114 lines (7.1 KB / ~1.8k tokens), a 91% reduction in prompt context bloat.
 
+### D246 — Test suite health & verification across Android and macOS (#189, Part of #176)
+
+Completed the final verification leg of the #176 refactoring and codebase health pass:
+- **Android unit test suite**: Verified all 535 tests across 38 test suites pass cleanly with 0 failures, 0 ignored, and ~9s execution time via `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest`. Clean runs and repeat executions confirm no test flakiness or regressions from refactoring work.
+- **macOS package test suite**: Verified all 381 tests across 30 test suites pass cleanly with 0 failures, 0 unexpected, and ~0.8s execution time via `swift test --package-path macos/Packages/CouchTourKit`. Repeat executions confirm test stability and deterministic timing.
+- **Combined verification command**: Verified `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest && swift test --package-path macos/Packages/CouchTourKit` executes cleanly and passes end-to-end.
+- **macOS app target**: Verified XcodeGen project generation (`xcodegen generate`) and app compilation (`xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build`) succeed without errors.
+- **Suite health**: No flaky tests, timing leaks, or regressions identified. Test counts remain 535 Android and 381 macOS, matching `README.md`.
+
