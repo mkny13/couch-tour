@@ -373,140 +373,140 @@ class DiscoveryCatalogE2ETest {
 
     @Test
     fun `T1_F3_migration8To9CreatesArtistTourPreferencesTable`() {
-        val db = openDb()
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `progress` (
-                `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
-                `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
-                `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `finished` INTEGER NOT NULL,
-                `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL DEFAULT '', `deletedAt` INTEGER
-            )
-        """.trimIndent())
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
-                `artistKey` TEXT NOT NULL PRIMARY KEY,
-                `preferenceType` TEXT NOT NULL,
-                `tourName` TEXT,
-                `periodId` TEXT,
-                `periodLabel` TEXT,
-                `updatedAt` INTEGER NOT NULL
-            )
-        """.trimIndent())
+        openDb().use { db ->
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `progress` (
+                    `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
+                    `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
+                    `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `finished` INTEGER NOT NULL,
+                    `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL DEFAULT '', `deletedAt` INTEGER
+                )
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
+                    `artistKey` TEXT NOT NULL PRIMARY KEY,
+                    `preferenceType` TEXT NOT NULL,
+                    `tourName` TEXT,
+                    `periodId` TEXT,
+                    `periodLabel` TEXT,
+                    `updatedAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
 
-        // Insert and verify preference row
-        db.execSQL("INSERT INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'TOUR', 'Spring 1977', 'uuid-1977', '1977', 1700000000)")
-        val cursor = db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:grateful-dead'", null)
-        assertTrue(cursor.moveToFirst())
-        assertEquals("Spring 1977", cursor.getString(cursor.getColumnIndexOrThrow("tourName")))
-        assertEquals("TOUR", cursor.getString(cursor.getColumnIndexOrThrow("preferenceType")))
-        cursor.close()
-        db.close()
+            // Insert and verify preference row
+            db.execSQL("INSERT INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'TOUR', 'Spring 1977', 'uuid-1977', '1977', 1700000000)")
+            db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:grateful-dead'", null).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Spring 1977", cursor.getString(cursor.getColumnIndexOrThrow("tourName")))
+                assertEquals("TOUR", cursor.getString(cursor.getColumnIndexOrThrow("preferenceType")))
+            }
+        }
     }
 
     @Test
     fun `T1_F3_artistTourPreferenceInsertAndQueryByKey`() {
-        val db = openDb()
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
-                `artistKey` TEXT NOT NULL PRIMARY KEY,
-                `preferenceType` TEXT NOT NULL,
-                `tourName` TEXT,
-                `periodId` TEXT,
-                `periodLabel` TEXT,
-                `updatedAt` INTEGER NOT NULL
-            )
-        """.trimIndent())
+        openDb().use { db ->
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
+                    `artistKey` TEXT NOT NULL PRIMARY KEY,
+                    `preferenceType` TEXT NOT NULL,
+                    `tourName` TEXT,
+                    `periodId` TEXT,
+                    `periodLabel` TEXT,
+                    `updatedAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
 
-        db.execSQL("INSERT OR REPLACE INTO `artist_tour_preferences` VALUES ('relisten:jgb', 'YEAR', NULL, '1978', '1978', 1700000100)")
-        val cursor = db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:jgb'", null)
-        assertTrue(cursor.moveToFirst())
-        assertEquals("YEAR", cursor.getString(cursor.getColumnIndexOrThrow("preferenceType")))
-        assertEquals("1978", cursor.getString(cursor.getColumnIndexOrThrow("periodLabel")))
-        cursor.close()
-        db.close()
+            db.execSQL("INSERT OR REPLACE INTO `artist_tour_preferences` VALUES ('relisten:jgb', 'YEAR', NULL, '1978', '1978', 1700000100)")
+            db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:jgb'", null).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("YEAR", cursor.getString(cursor.getColumnIndexOrThrow("preferenceType")))
+                assertEquals("1978", cursor.getString(cursor.getColumnIndexOrThrow("periodLabel")))
+            }
+        }
     }
 
     @Test
     fun `T1_F3_artistTourPreferenceUpdateExisting`() {
-        val db = openDb()
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
-                `artistKey` TEXT NOT NULL PRIMARY KEY,
-                `preferenceType` TEXT NOT NULL,
-                `tourName` TEXT,
-                `periodId` TEXT,
-                `periodLabel` TEXT,
-                `updatedAt` INTEGER NOT NULL
-            )
-        """.trimIndent())
+        openDb().use { db ->
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
+                    `artistKey` TEXT NOT NULL PRIMARY KEY,
+                    `preferenceType` TEXT NOT NULL,
+                    `tourName` TEXT,
+                    `periodId` TEXT,
+                    `periodLabel` TEXT,
+                    `updatedAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
 
-        db.execSQL("INSERT OR REPLACE INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'YEAR', NULL, '1972', '1972', 1000)")
-        db.execSQL("INSERT OR REPLACE INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'TOUR', 'Europe 72', '1972', '1972', 2000)")
+            db.execSQL("INSERT OR REPLACE INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'YEAR', NULL, '1972', '1972', 1000)")
+            db.execSQL("INSERT OR REPLACE INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'TOUR', 'Europe 72', '1972', '1972', 2000)")
 
-        val cursor = db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:grateful-dead'", null)
-        assertTrue(cursor.moveToFirst())
-        assertEquals("TOUR", cursor.getString(cursor.getColumnIndexOrThrow("preferenceType")))
-        assertEquals("Europe 72", cursor.getString(cursor.getColumnIndexOrThrow("tourName")))
-        assertEquals(2000L, cursor.getLong(cursor.getColumnIndexOrThrow("updatedAt")))
-        cursor.close()
-        db.close()
+            db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:grateful-dead'", null).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("TOUR", cursor.getString(cursor.getColumnIndexOrThrow("preferenceType")))
+                assertEquals("Europe 72", cursor.getString(cursor.getColumnIndexOrThrow("tourName")))
+                assertEquals(2000L, cursor.getLong(cursor.getColumnIndexOrThrow("updatedAt")))
+            }
+        }
     }
 
     @Test
     fun `T1_F3_artistTourPreferenceDelete`() {
-        val db = openDb()
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
-                `artistKey` TEXT NOT NULL PRIMARY KEY,
-                `preferenceType` TEXT NOT NULL,
-                `tourName` TEXT,
-                `periodId` TEXT,
-                `periodLabel` TEXT,
-                `updatedAt` INTEGER NOT NULL
-            )
-        """.trimIndent())
+        openDb().use { db ->
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
+                    `artistKey` TEXT NOT NULL PRIMARY KEY,
+                    `preferenceType` TEXT NOT NULL,
+                    `tourName` TEXT,
+                    `periodId` TEXT,
+                    `periodLabel` TEXT,
+                    `updatedAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
 
-        db.execSQL("INSERT INTO `artist_tour_preferences` VALUES ('relisten:goose', 'TOUR', 'Fall 2024', '2024', '2024', 1000)")
-        db.execSQL("DELETE FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:goose'")
+            db.execSQL("INSERT INTO `artist_tour_preferences` VALUES ('relisten:goose', 'TOUR', 'Fall 2024', '2024', '2024', 1000)")
+            db.execSQL("DELETE FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:goose'")
 
-        val cursor = db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:goose'", null)
-        assertFalse(cursor.moveToFirst())
-        cursor.close()
-        db.close()
+            db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:goose'", null).use { cursor ->
+                assertFalse(cursor.moveToFirst())
+            }
+        }
     }
 
     @Test
     fun `T1_F3_migration8To9PreservesProgressAndPlaylists`() {
-        val db = openDb()
-        db.execSQL("""
-            CREATE TABLE `progress` (
-                `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
-                `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
-                `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `finished` INTEGER NOT NULL,
-                `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL DEFAULT '', `deletedAt` INTEGER
-            )
-        """.trimIndent())
-        db.execSQL("INSERT INTO `progress` VALUES ('show:1977-05-08', 'Cornell 77', 'Barton Hall', NULL, 3, 50000, 'Scarlet Begonias', 1700000000, 0, 0, 'Grateful Dead', NULL)")
+        openDb().use { db ->
+            db.execSQL("""
+                CREATE TABLE `progress` (
+                    `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
+                    `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
+                    `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `finished` INTEGER NOT NULL,
+                    `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL DEFAULT '', `deletedAt` INTEGER
+                )
+            """.trimIndent())
+            db.execSQL("INSERT INTO `progress` VALUES ('show:1977-05-08', 'Cornell 77', 'Barton Hall', NULL, 3, 50000, 'Scarlet Begonias', 1700000000, 0, 0, 'Grateful Dead', NULL)")
 
-        // Apply migration statement
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
-                `artistKey` TEXT NOT NULL PRIMARY KEY,
-                `preferenceType` TEXT NOT NULL,
-                `tourName` TEXT,
-                `periodId` TEXT,
-                `periodLabel` TEXT,
-                `updatedAt` INTEGER NOT NULL
-            )
-        """.trimIndent())
+            // Apply migration statement
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
+                    `artistKey` TEXT NOT NULL PRIMARY KEY,
+                    `preferenceType` TEXT NOT NULL,
+                    `tourName` TEXT,
+                    `periodId` TEXT,
+                    `periodLabel` TEXT,
+                    `updatedAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
 
-        // Check progress row is still fully intact
-        val cursor = db.rawQuery("SELECT * FROM `progress` WHERE `queueKey` = 'show:1977-05-08'", null)
-        assertTrue(cursor.moveToFirst())
-        assertEquals("Cornell 77", cursor.getString(cursor.getColumnIndexOrThrow("title")))
-        assertEquals(50000L, cursor.getLong(cursor.getColumnIndexOrThrow("positionMs")))
-        cursor.close()
-        db.close()
+            // Check progress row is still fully intact
+            db.rawQuery("SELECT * FROM `progress` WHERE `queueKey` = 'show:1977-05-08'", null).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Cornell 77", cursor.getString(cursor.getColumnIndexOrThrow("title")))
+                assertEquals(50000L, cursor.getLong(cursor.getColumnIndexOrThrow("positionMs")))
+            }
+        }
     }
 
     // --- F5: Next Stop Defunct Artist Resolution Engine ---
@@ -1055,42 +1055,41 @@ class DiscoveryCatalogE2ETest {
         // 3. Verify listening history is preserved
         // 4. Write tour preference and verify roundtrip
 
-        val db = openDb()
-        db.execSQL("""
-            CREATE TABLE `progress` (
-                `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
-                `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
-                `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `finished` INTEGER NOT NULL,
-                `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL DEFAULT '', `deletedAt` INTEGER
-            )
-        """.trimIndent())
-        db.execSQL("INSERT INTO `progress` VALUES ('recording:grateful-dead:1977-05-08:tape1', '1977-05-08', 'Barton Hall', NULL, 2, 45000, 'Scarlet Begonias', 1000, 1, 0, 'Grateful Dead', NULL)")
+        openDb().use { db ->
+            db.execSQL("""
+                CREATE TABLE `progress` (
+                    `queueKey` TEXT NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL,
+                    `artUrl` TEXT, `trackIndex` INTEGER NOT NULL, `positionMs` INTEGER NOT NULL,
+                    `trackTitle` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `finished` INTEGER NOT NULL,
+                    `dismissed` INTEGER NOT NULL, `artist` TEXT NOT NULL DEFAULT '', `deletedAt` INTEGER
+                )
+            """.trimIndent())
+            db.execSQL("INSERT INTO `progress` VALUES ('recording:grateful-dead:1977-05-08:tape1', '1977-05-08', 'Barton Hall', NULL, 2, 45000, 'Scarlet Begonias', 1000, 1, 0, 'Grateful Dead', NULL)")
 
-        // Run migration
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
-                `artistKey` TEXT NOT NULL PRIMARY KEY,
-                `preferenceType` TEXT NOT NULL,
-                `tourName` TEXT,
-                `periodId` TEXT,
-                `periodLabel` TEXT,
-                `updatedAt` INTEGER NOT NULL
-            )
-        """.trimIndent())
+            // Run migration
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `artist_tour_preferences` (
+                    `artistKey` TEXT NOT NULL PRIMARY KEY,
+                    `preferenceType` TEXT NOT NULL,
+                    `tourName` TEXT,
+                    `periodId` TEXT,
+                    `periodLabel` TEXT,
+                    `updatedAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
 
-        // Verify history preserved
-        val progressCursor = db.rawQuery("SELECT * FROM `progress` WHERE `finished` = 1", null)
-        assertTrue(progressCursor.moveToFirst())
-        assertEquals("recording:grateful-dead:1977-05-08:tape1", progressCursor.getString(progressCursor.getColumnIndexOrThrow("queueKey")))
-        progressCursor.close()
+            // Verify history preserved
+            db.rawQuery("SELECT * FROM `progress` WHERE `finished` = 1", null).use { progressCursor ->
+                assertTrue(progressCursor.moveToFirst())
+                assertEquals("recording:grateful-dead:1977-05-08:tape1", progressCursor.getString(progressCursor.getColumnIndexOrThrow("queueKey")))
+            }
 
-        // Insert tour preference
-        db.execSQL("INSERT INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'TOUR', 'Spring 1977', '1977', '1977', 2000)")
-        val prefCursor = db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:grateful-dead'", null)
-        assertTrue(prefCursor.moveToFirst())
-        assertEquals("Spring 1977", prefCursor.getString(prefCursor.getColumnIndexOrThrow("tourName")))
-        prefCursor.close()
-
-        db.close()
+            // Insert tour preference
+            db.execSQL("INSERT INTO `artist_tour_preferences` VALUES ('relisten:grateful-dead', 'TOUR', 'Spring 1977', '1977', '1977', 2000)")
+            db.rawQuery("SELECT * FROM `artist_tour_preferences` WHERE `artistKey` = 'relisten:grateful-dead'", null).use { prefCursor ->
+                assertTrue(prefCursor.moveToFirst())
+                assertEquals("Spring 1977", prefCursor.getString(prefCursor.getColumnIndexOrThrow("tourName")))
+            }
+        }
     }
 }

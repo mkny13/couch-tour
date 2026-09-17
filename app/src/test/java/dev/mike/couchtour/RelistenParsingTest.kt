@@ -18,7 +18,7 @@ class RelistenParsingTest {
 
     private fun fixture(name: String): String =
         javaClass.classLoader!!.getResourceAsStream("fixtures/$name")!!
-            .bufferedReader().readText()
+            .bufferedReader().use { it.readText() }
 
     private val deadArtist = ArtistRef(Backend.RELISTEN, "grateful-dead", "Grateful Dead", hasSets = false, hasMultipleSources = true)
 

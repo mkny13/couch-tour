@@ -4721,3 +4721,22 @@ Completed the final verification leg of the #176 refactoring and codebase health
 - **macOS app target**: Verified XcodeGen project generation (`xcodegen generate`) and app compilation (`xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build`) succeed without errors.
 - **Suite health**: No flaky tests, timing leaks, or regressions identified. Test counts remain 535 Android and 381 macOS, matching `README.md`.
 
+### D247 — Codebase Health: Fix unclosed resource leaks (#217)
+
+Audited and eliminated unclosed resource leaks (DB connections, cursors, file streams, network responses, event observers, and sockets) across Android, macOS, sync backend, and test scripts:
+- **Android SQLite database & cursor leaks**:
+  - `MigrationTest.kt`: Fixed `createV9DatabaseWithRows()` and `createV10DatabaseWithRows()` which bypassed the test suite's tracked `openRawDb()` helper by calling `SQLiteDatabase.openOrCreateDatabase` directly without failure-safe tracking. Standardized `createV1DatabaseWithRows()` through `createV10DatabaseWithRows()` to use `openRawDb().use { db -> ... }` for immediate, scoped cleanup.
+  - `DiscoveryCatalogE2ETest.kt`: Wrapped all 7 raw queries in `.use { cursor -> ... }` and wrapped database instances in `openDb().use { db -> ... }` across F3 and scenario tests to ensure cursors and database handles are closed immediately even if assertions throw.
+- **Android fixture stream leaks**:
+  - Closed unclosed resource streams when reading test fixtures via `getResourceAsStream(...).bufferedReader().use { it.readText() }` across `ApiParsingTest.kt`, `CatalogTest.kt`, `RelistenParsingTest.kt`, and `RelistenPopularityTest.kt`.
+- **macOS AVFoundation periodic time observer leak**:
+  - `Player.swift`: Added `queuePlayer.removeTimeObserver(timeObserverToken)` in `deinit` to properly balance `addPeriodicTimeObserver`, releasing the observation block retained by `AVQueuePlayer`.
+- **Script test socket & HTTP response leaks**:
+  - `scripts/test_uat_server.py`: Added `server.server_close` cleanup on `HTTPServer` instances and explicitly closed `HTTPError` responses (`cm.exception.close()`), eliminating Python `ResourceWarning: unclosed <socket.socket>` and `Implicitly cleaning up <HTTPError>` warnings during test runs.
+- **Audited and confirmed clean**:
+  - Android OkHttp requests all consume response bodies within `.use { resp -> ... }`.
+  - Android `PlaybackService` cleans up both cast/local players, media session, audio focus, and cancels coroutine scope in `onDestroy()`.
+  - Android `PlayerViewModel` releases media controller in `onCleared()`.
+  - macOS GRDB `DatabaseQueue` instances manage underlying SQLite connections safely with automatic pool/deinit cleanup.
+  - Sync backend D1 bindings and worker fetch handlers operate statelessly without dangling sockets or cursors.
+
