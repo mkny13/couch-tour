@@ -12,7 +12,7 @@ class RelistenPopularityTest {
 
     private fun fixture(name: String): String =
         javaClass.classLoader!!.getResourceAsStream("fixtures/$name")!!
-            .bufferedReader().readText()
+            .bufferedReader().use { it.readText() }
 
     private val deadArtist = ArtistRef(
         backend = Backend.RELISTEN,

@@ -196,6 +196,7 @@ class HttpTests(UatServerTestCase):
              mock.patch.object(uat_server, "comment_on_issue", mock.Mock()):
             server = HTTPServer(("127.0.0.1", 0), uat_server.Handler)
             threading.Thread(target=server.serve_forever, daemon=True).start()
+            self.addCleanup(server.server_close)
             self.addCleanup(server.shutdown)
             import urllib.request
             req = urllib.request.Request(
@@ -211,6 +212,7 @@ class HttpTests(UatServerTestCase):
     def test_api_unknown_item_is_404(self):
         server = HTTPServer(("127.0.0.1", 0), uat_server.Handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         import urllib.request
         import urllib.error
@@ -222,6 +224,7 @@ class HttpTests(UatServerTestCase):
         with self.assertRaises(urllib.error.HTTPError) as cm:
             urllib.request.urlopen(req)
         self.assertEqual(cm.exception.code, 404)
+        cm.exception.close()
 
 
 if __name__ == "__main__":

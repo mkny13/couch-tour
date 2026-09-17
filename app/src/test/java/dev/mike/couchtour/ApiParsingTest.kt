@@ -19,7 +19,7 @@ class ApiParsingTest {
 
     private fun fixture(name: String): String =
         javaClass.classLoader!!.getResourceAsStream("fixtures/$name")!!
-            .bufferedReader().readText()
+            .bufferedReader().use { it.readText() }
 
     // ------------------------------------------------------------------ shows
 

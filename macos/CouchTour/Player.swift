@@ -100,6 +100,9 @@ final class Player: NSObject, ObservableObject {
     }
 
     deinit {
+        if let timeObserverToken {
+            queuePlayer.removeTimeObserver(timeObserverToken)
+        }
         if let spaceKeyMonitor {
             NSEvent.removeMonitor(spaceKeyMonitor)
         }

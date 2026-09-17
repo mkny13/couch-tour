@@ -301,7 +301,7 @@ class CatalogTest {
     @Test
     fun `phish-in search results carry their tracks and playlists straight through`() {
         val fixture = javaClass.classLoader!!.getResourceAsStream("fixtures/search.json")!!
-            .bufferedReader().readText()
+            .bufferedReader().use { it.readText() }
         val results = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
             .decodeFromString<SearchResults>(fixture)
         val hits = results.toSearchHits()
