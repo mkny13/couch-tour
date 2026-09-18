@@ -508,6 +508,143 @@ final class ProgressStoreTests: XCTestCase {
         }
     }
 
+    /// v11 adds the source_loudness cache (#266). A real pre-v11 database with a progress
+    /// row must come through untouched, and the new table must be usable — column names
+    /// match Android's `source_loudness` (Room MIGRATION_11_12) exactly.
+    func testV11MigrationPreservesExistingData() throws {
+        let queue = try DatabaseQueue()
+
+        var partialMigrator = DatabaseMigrator()
+        partialMigrator.registerMigration("v6_initial") { db in
+            try db.create(table: "progress") { t in
+                t.column("queueKey", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("subtitle", .text).notNull()
+                t.column("artUrl", .text)
+                t.column("trackIndex", .integer).notNull()
+                t.column("positionMs", .integer).notNull()
+                t.column("trackTitle", .text).notNull()
+                t.column("updatedAt", .integer).notNull()
+                t.column("finished", .boolean).notNull().defaults(to: false)
+                t.column("dismissed", .boolean).notNull().defaults(to: false)
+                t.column("artist", .text).notNull().defaults(to: "")
+            }
+        }
+        partialMigrator.registerMigration("v7_deletedAt") { db in
+            try db.alter(table: "progress") { t in
+                t.add(column: "deletedAt", .integer)
+            }
+        }
+        try partialMigrator.migrate(queue)
+
+        // Insert pre-migration row
+        try queue.write { db in
+            let prog = self.progress(key: "show:1997-11-17", trackIndex: 3, positionMs: 12_000)
+            try prog.save(db)
+        }
+
+        // Now run the full migrator, including v11_sourceLoudness
+        var fullMigrator = partialMigrator
+        fullMigrator.registerMigration("v9_artistTourPreferences") { db in
+            try db.create(table: "artist_tour_preferences") { t in
+                t.column("artistKey", .text).primaryKey()
+                t.column("tourName", .text)
+                t.column("year", .text)
+                t.column("updatedAt", .integer).notNull()
+            }
+        }
+        fullMigrator.registerMigration("v10_progressIndexes") { db in
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_live_updated_at ON progress(updatedAt DESC) WHERE deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_in_progress_updated_at ON progress(updatedAt DESC) WHERE finished = 0 AND dismissed = 0 AND deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_artist_updated_at ON progress(artist, updatedAt DESC) WHERE deletedAt IS NULL")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_changed_since_updated_at ON progress(updatedAt)")
+        }
+        fullMigrator.registerMigration("v11_sourceLoudness") { db in
+            try db.create(table: "source_loudness") { t in
+                t.column("leveling_key", .text).primaryKey()
+                t.column("lufs", .double).notNull()
+                t.column("peak_db", .double).notNull()
+                t.column("sampled_tracks", .integer).notNull()
+                t.column("algorithm_version", .integer).notNull()
+                t.column("measured_at", .integer).notNull()
+            }
+        }
+        try fullMigrator.migrate(queue)
+
+        // Verify pre-existing data is intact
+        try queue.read { db in
+            let prog = try PlaybackProgress.fetchOne(db, key: "show:1997-11-17")
+            XCTAssertNotNil(prog)
+            XCTAssertEqual(3, prog?.trackIndex)
+            XCTAssertEqual(12_000, prog?.positionMs)
+        }
+
+        // Verify the source_loudness table works on the migrated database
+        try queue.write { db in
+            let loudness = SourceLoudness(key: "show:1997-11-17", lufs: -14.0, peakDb: -0.5, sampledTracks: 3, measuredAt: 1_234)
+            try loudness.save(db)
+        }
+        try queue.read { db in
+            let loudness = try SourceLoudness.fetchOne(db, key: "show:1997-11-17")
+            XCTAssertNotNil(loudness)
+            XCTAssertEqual(-14.0, loudness?.lufs ?? 0, accuracy: 0.0001)
+        }
+    }
+
+    // -------------------------------------------------------- source loudness cache (#266)
+
+    private func sourceLoudness(
+        key: String = "show:1997-11-17",
+        lufs: Double = -14.0,
+        peakDb: Double = -0.5,
+        sampledTracks: Int = 3,
+        algorithmVersion: Int = SourceLoudness.currentAlgorithmVersion,
+        measuredAt: Int64 = 1_234
+    ) -> SourceLoudness {
+        SourceLoudness(
+            key: key, lufs: lufs, peakDb: peakDb, sampledTracks: sampledTracks,
+            algorithmVersion: algorithmVersion, measuredAt: measuredAt
+        )
+    }
+
+    func testSavesAndReadsBackSourceLoudness() throws {
+        try store.saveSourceLoudness(sourceLoudness(lufs: -13.7))
+        let row = try store.getSourceLoudness(key: "show:1997-11-17")
+        XCTAssertNotNil(row)
+        XCTAssertEqual(-13.7, row?.lufs ?? 0, accuracy: 0.0001)
+        XCTAssertEqual(-0.5, row?.peakDb ?? 0, accuracy: 0.0001)
+        XCTAssertEqual(3, row?.sampledTracks)
+        XCTAssertEqual(SourceLoudness.currentAlgorithmVersion, row?.algorithmVersion)
+        XCTAssertEqual(1_234, row?.measuredAt)
+        XCTAssertNil(try store.getSourceLoudness(key: "relisten:phish/1997-11-17/x"))
+    }
+
+    func testSourceLoudnessUpsertReplacesRatherThanDuplicating() throws {
+        try store.saveSourceLoudness(sourceLoudness(lufs: -14.0))
+        try store.saveSourceLoudness(sourceLoudness(lufs: -16.2))
+        XCTAssertEqual(-16.2, try store.getSourceLoudness(key: "show:1997-11-17")?.lufs ?? 0, accuracy: 0.0001)
+    }
+
+    func testSourceLoudnessIsAMissForOtherAlgorithmVersions() throws {
+        try store.saveSourceLoudness(sourceLoudness(algorithmVersion: SourceLoudness.currentAlgorithmVersion + 1))
+        // A row measured by a different meter version counts as a miss, not an answer.
+        XCTAssertNil(try store.currentSourceLoudness(key: "show:1997-11-17"))
+        // The raw read still sees it, so the caller can decide to re-measure in place.
+        XCTAssertNotNil(try store.getSourceLoudness(key: "show:1997-11-17"))
+    }
+
+    func testCurrentSourceLoudnessIsAMissWhenAbsent() throws {
+        XCTAssertNil(try store.currentSourceLoudness(key: "show:never-measured"))
+    }
+
+    func testClearAllSourceLoudnessEmptiesTheTable() throws {
+        try store.saveSourceLoudness(sourceLoudness(key: "show:1997-11-17"))
+        try store.saveSourceLoudness(sourceLoudness(key: "relisten:phish/1997-11-17/x"))
+        try store.clearAllSourceLoudness()
+        XCTAssertNil(try store.getSourceLoudness(key: "show:1997-11-17"))
+        XCTAssertNil(try store.getSourceLoudness(key: "relisten:phish/1997-11-17/x"))
+    }
+
     // -------------------------------------------------------- backup exclusion (#192)
 
     func testDefaultURLDirectoryIsExcludedFromBackup() throws {

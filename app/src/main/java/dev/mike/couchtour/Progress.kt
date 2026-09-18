@@ -159,8 +159,8 @@ interface ExternalReleaseDao {
 }
 
 @Database(
-    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class, ExternalReleaseEntity::class],
-    version = 11,
+    entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class, ExternalReleaseEntity::class, SourceLoudnessEntity::class],
+    version = 12,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
@@ -168,6 +168,7 @@ abstract class PhishInDb : RoomDatabase() {
     abstract fun localPlaylistDao(): LocalPlaylistDao
     abstract fun artistTourPreferenceDao(): ArtistTourPreferenceDao
     abstract fun externalReleaseDao(): ExternalReleaseDao
+    abstract fun sourceLoudnessDao(): SourceLoudnessDao
 
     companion object {
         /**
@@ -295,6 +296,17 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /** Adds the volume leveling source_loudness cache (#266). Local derived data only;
+         *  never synced, so the sync payload is untouched. Written as a real migration so
+         *  the progress history this database exists to hold survives untouched. */
+        internal val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `source_loudness` (`leveling_key` TEXT NOT NULL, `lufs` REAL NOT NULL, `peak_db` REAL NOT NULL, `sampled_tracks` INTEGER NOT NULL, `algorithm_version` INTEGER NOT NULL, `measured_at` INTEGER NOT NULL, PRIMARY KEY(`leveling_key`))"
+                )
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -308,6 +320,7 @@ abstract class PhishInDb : RoomDatabase() {
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                 MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+                MIGRATION_11_12,
             )
                 .build().also { instance = it }
         }
