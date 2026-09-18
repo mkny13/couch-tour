@@ -14,12 +14,15 @@ final class RequestTests: XCTestCase {
         server.start()
         PhishInAPI.baseURL = URL(string: "https://mock.test/api/v2")!
         RelistenAPI.baseURL = URL(string: "https://mock.test/api")!
+        YouTubeAPI.baseURL = URL(string: "https://mock.test/youtube/v3")!
     }
 
     override func tearDown() {
         server.shutdown()
         PhishInAPI.baseURL = URL(string: "https://phish.in/api/v2")!
         RelistenAPI.baseURL = URL(string: "https://api.relisten.net/api")!
+        YouTubeAPI.baseURL = URL(string: "https://www.googleapis.com/youtube/v3")!
+        YouTubeAPI.apiKey = nil
         super.tearDown()
     }
 
@@ -303,5 +306,60 @@ final class RequestTests: XCTestCase {
         XCTAssertEqual(1, hits.slices.count)
         XCTAssertEqual(.song, hits.slices.first?.kind)
         XCTAssertEqual("Grateful Dead", hits.slices.first?.artist.name)
+    }
+
+    // ----------------------------------------------------------------- YouTube
+
+    func testYouTubeSearchRequestsTheSearchEndpointWithTheChannelAndSnippetParts() async throws {
+        server.enqueue(#"{"items":[]}"#)
+
+        _ = try await YouTubeAPI.search(channelId: "UC12345")
+
+        let request = try XCTUnwrap(server.takeRequest())
+        XCTAssertEqual(["youtube", "v3", "search"], request.pathSegments)
+        XCTAssertEqual("snippet", request.queryValue("part"))
+        XCTAssertEqual("UC12345", request.queryValue("channelId"))
+        XCTAssertEqual("video", request.queryValue("type"))
+        XCTAssertEqual("50", request.queryValue("maxResults"))
+        XCTAssertEqual("date", request.queryValue("order"))
+    }
+
+    func testYouTubeSearchOmitsTheKeyParamUntilAnApiKeyIsSet() async throws {
+        server.enqueue(#"{"items":[]}"#)
+
+        _ = try await YouTubeAPI.search(channelId: "UC12345")
+
+        XCTAssertNil(server.takeRequest()!.queryValue("key"))
+    }
+
+    func testYouTubeSearchSendsTheKeyParamWhenAnApiKeyIsSet() async throws {
+        server.enqueue(#"{"items":[]}"#)
+        YouTubeAPI.apiKey = "test-key"
+
+        _ = try await YouTubeAPI.search(channelId: "UC12345")
+
+        XCTAssertEqual("test-key", server.takeRequest()!.queryValue("key"))
+    }
+
+    func testYouTubeSearchDecodesTheMockedResponseIntoNeutralVideos() async throws {
+        server.enqueue(try fixtureString("youtube_search.json"))
+
+        let videos = try await YouTubeAPI.search(channelId: "UCuAXFkgsw1L7xaCfnd5JJOw")
+
+        XCTAssertEqual(["dQw4w9WgXcQ", "aBcDeFgHiJk"], videos.map(\.id))
+        XCTAssertEqual("Rick Astley - Never Gonna Give You Up (Official Music Video)", videos.first?.title)
+    }
+
+    func testYouTubeRaisesAPIExceptionOnError() async {
+        server.enqueue("nope", code: 403)
+
+        do {
+            _ = try await YouTubeAPI.search(channelId: "UC12345")
+            XCTFail("expected APIException")
+        } catch let error as APIException {
+            XCTAssertEqual(403, error.code)
+        } catch {
+            XCTFail("wrong error type: \(error)")
+        }
     }
 }

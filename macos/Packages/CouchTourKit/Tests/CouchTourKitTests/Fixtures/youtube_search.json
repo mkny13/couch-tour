@@ -1,0 +1,59 @@
+{
+  "kind": "youtube#searchListResponse",
+  "etag": "some-etag",
+  "nextPageToken": "CAUQAA",
+  "regionCode": "US",
+  "pageInfo": {
+    "totalResults": 100,
+    "resultsPerPage": 5
+  },
+  "items": [
+    {
+      "kind": "youtube#searchResult",
+      "etag": "etag1",
+      "id": {
+        "kind": "youtube#video",
+        "videoId": "dQw4w9WgXcQ"
+      },
+      "snippet": {
+        "publishedAt": "2009-10-25T06:57:33Z",
+        "channelId": "UCuAXFkgsw1L7xaCfnd5JJOw",
+        "title": "Rick Astley - Never Gonna Give You Up (Official Music Video)",
+        "description": "The official video for Never Gonna Give You Up by Rick Astley",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Rick Astley",
+        "liveBroadcastContent": "none"
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "etag": "etag2",
+      "id": {
+        "kind": "youtube#video",
+        "videoId": "aBcDeFgHiJk"
+      },
+      "snippet": {
+        "channelId": "UCuAXFkgsw1L7xaCfnd5JJOw",
+        "title": "A Video Missing Some Fields",
+        "channelTitle": "Rick Astley",
+        "liveBroadcastContent": "none"
+      }
+    }
+  ]
+}
