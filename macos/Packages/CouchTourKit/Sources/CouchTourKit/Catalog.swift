@@ -991,3 +991,36 @@ public func pickRandomShow(
     return show
 }
 
+// ------------------------------------------------------------------- youtube
+
+/// A YouTube video browsable from an artist's channel (#16, #229). Neutral of the
+/// search.list DTO the same way `ShowSummary` is neutral of the phish.in/Relisten DTOs.
+/// `durationMs` stays optional until the `videos.list` `contentDetails` call lands (#231).
+public struct YouTubeVideo: Hashable, Sendable, Identifiable {
+    public let id: String
+    public let title: String
+    public let thumbnailURL: String?
+    public let durationMs: Int64?
+    public let publishedAt: Date?
+    public let channelId: String
+    public let description: String?
+
+    public init(
+        id: String,
+        title: String,
+        thumbnailURL: String? = nil,
+        durationMs: Int64? = nil,
+        publishedAt: Date? = nil,
+        channelId: String,
+        description: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.thumbnailURL = thumbnailURL
+        self.durationMs = durationMs
+        self.publishedAt = publishedAt
+        self.channelId = channelId
+        self.description = description
+    }
+}
+
