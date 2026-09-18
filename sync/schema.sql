@@ -81,9 +81,8 @@ CREATE INDEX progress_deletedAt_seq ON progress(deletedAt, groupId, seq);
 -- trusted, because tombstoned rows below it may have been purged already — a stale-cursor
 -- client would then miss a delete instead of seeing it, and silently resurrect the row on its
 -- next push. `since` is a seq value, not a timestamp, so this floor has to live on the same
--- scale rather than being compared against wall-clock time. No purge job exists yet in this
--- MVP, so the floor stays 0 (nothing purged, every cursor still trustworthy) until one is
--- built to raise it — see the 180-day tombstone-purge note in DECISIONS.md.
+-- scale rather than being compared against wall-clock time. The floor is raised by the
+-- daily 180-day tombstone-purge job (see purgeOldTombstones in src/index.ts).
 CREATE TABLE seqs (
     groupId TEXT PRIMARY KEY REFERENCES groups(id),
     next INTEGER NOT NULL,
