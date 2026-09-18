@@ -168,6 +168,19 @@ public final class ProgressStore {
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_artist_updated_at ON progress(artist, updatedAt DESC) WHERE deletedAt IS NULL")
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_progress_changed_since_updated_at ON progress(updatedAt)")
         }
+        // The volume leveling source_loudness cache (#266). Local derived data only; never
+        // synced, so the sync payload is untouched. Column names match Android's
+        // `source_loudness` table (Room MIGRATION_11_12) exactly.
+        migrator.registerMigration("v11_sourceLoudness") { db in
+            try db.create(table: "source_loudness") { t in
+                t.column("leveling_key", .text).primaryKey()
+                t.column("lufs", .double).notNull()
+                t.column("peak_db", .double).notNull()
+                t.column("sampled_tracks", .integer).notNull()
+                t.column("algorithm_version", .integer).notNull()
+                t.column("measured_at", .integer).notNull()
+            }
+        }
         return migrator
     }
 
@@ -310,6 +323,41 @@ public final class ProgressStore {
     public func deleteTourPreference(artistKey: String) throws {
         try dbQueue.write { db in
             _ = try ArtistTourPreference.deleteOne(db, key: artistKey)
+        }
+    }
+
+    // MARK: - Source Loudness Cache (#266)
+
+    /// Raw read, any algorithm version — see `currentSourceLoudness(key:)` for the read
+    /// the leveling pipeline should use.
+    public func getSourceLoudness(key: String) throws -> SourceLoudness? {
+        try dbQueue.read { db in
+            try SourceLoudness.fetchOne(db, key: key)
+        }
+    }
+
+    /// The cached measurement for `key`, but only if the current meter version produced it.
+    /// A stale `algorithmVersion` counts as a miss, not an answer: the caller re-measures
+    /// rather than leveling off old math — same rule as Android's
+    /// `SourceLoudnessDao.getCurrent`.
+    public func currentSourceLoudness(key: String) throws -> SourceLoudness? {
+        try dbQueue.read { db in
+            try SourceLoudness
+                .filter(Column("algorithm_version") == SourceLoudness.currentAlgorithmVersion)
+                .filter(Column("leveling_key") == key)
+                .fetchOne(db)
+        }
+    }
+
+    public func saveSourceLoudness(_ loudness: SourceLoudness) throws {
+        try dbQueue.write { db in
+            try loudness.save(db)
+        }
+    }
+
+    public func clearAllSourceLoudness() throws {
+        try dbQueue.write { db in
+            _ = try SourceLoudness.deleteAll(db)
         }
     }
 }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -350,6 +351,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_8_9,
                 PhishInDb.MIGRATION_9_10,
                 PhishInDb.MIGRATION_10_11,
+                PhishInDb.MIGRATION_11_12,
             )
             .allowMainThreadQueries()
             .build()
@@ -820,6 +822,103 @@ class MigrationTest {
             assertTrue(indices.contains("index_progress_artist"))
             assertTrue(indices.contains("index_local_playlist_tracks_playlistId_position"))
             assertFalse(indices.contains("index_local_playlist_tracks_playlistId"))
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v11 -> v12
+
+    // From app/schemas/dev.mike.couchtour.PhishInDb/11.json.
+    private val v11IdentityHash = "516547d12265f1e57a3d70daf910f252"
+
+    private fun createV11DatabaseWithRows() {
+        openRawDb().use { db ->
+            db.execSQL(v9CreateTable)
+            db.execSQL(v8LocalPlaylistsTable)
+            db.execSQL(v8LocalPlaylistTracksTable)
+            db.execSQL(v9ArtistTourPreferenceTable)
+            db.execSQL(v10ExternalReleaseTable)
+            // The v10 -> v11 indices are part of the v11 shape already.
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_deletedAt` ON `progress` (`deletedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_updatedAt` ON `progress` (`updatedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_finished` ON `progress` (`finished`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_artist` ON `progress` (`artist`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId_position` ON `local_playlist_tracks` (`playlistId`, `position`)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v11IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlists (id, name, trackCount, createdAt, updatedAt)
+                   VALUES ('p1', 'Key Jams', 1, 1000, 1000)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlist_tracks
+                   (playlistId, position, backend, trackId, showDate, artistSlug, recordingId, title, durationMs, venueName, artUrl)
+                   VALUES ('p1', 0, 'phishin', '42', '1997-11-17', NULL, NULL, 'Tweezer', 300000, 'McNichols', NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO external_releases (artist_key, date, platform, url)
+                   VALUES ('phish', '1997-11-17', 'bandcamp', 'https://bandcamp.com/x')"""
+            )
+            db.version = 11
+        }
+    }
+
+    /**
+     * The source_loudness cache (#266) is additive, but "additive" is only trustworthy if a
+     * real v11 database with rows in every table comes through it: the listening history,
+     * playlists, tour preferences, and external releases must all survive, and the new
+     * table must be usable through its DAO — including the rule that a row measured by a
+     * different algorithmVersion counts as a cache miss, not as an answer.
+     */
+    @Test
+    fun `migrating from v11 adds source_loudness and keeps every row`() = runBlocking {
+        createV11DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            // Existing data survives untouched.
+            assertEquals(1, db.progressDao().history().first().size)
+            assertEquals(1, db.localPlaylistDao().tracksOnce("p1").size)
+            assertNotNull(db.externalReleaseDao().get("phish", "1997-11-17"))
+            assertNotNull(db.artistTourPreferenceDao().getAllPreferences().first().size)
+
+            val dao = db.sourceLoudnessDao()
+
+            // The new table starts empty and is usable.
+            assertNull(dao.get("show:1992-12-02"))
+            dao.upsert(
+                SourceLoudnessEntity(
+                    key = "show:1992-12-02", lufs = -14.0, peakDb = -0.5,
+                    sampledTracks = 3, algorithmVersion = 1, measuredAt = 1234L,
+                )
+            )
+            assertEquals(-14.0, dao.get("show:1992-12-02")!!.lufs, 0.0)
+
+            // A row measured by a different algorithmVersion is a miss.
+            assertNull(dao.getCurrent("show:1992-12-02", algorithmVersion = 2))
+            assertNotNull(dao.getCurrent("show:1992-12-02", algorithmVersion = 1))
+
+            // Upsert replaces by key rather than duplicating.
+            dao.upsert(
+                SourceLoudnessEntity(
+                    key = "show:1992-12-02", lufs = -15.5, peakDb = -0.4,
+                    sampledTracks = 3, algorithmVersion = 2, measuredAt = 2000L,
+                )
+            )
+            assertEquals(-15.5, dao.getCurrent("show:1992-12-02", algorithmVersion = 2)!!.lufs, 0.0)
+            assertNotNull(dao.get("show:1992-12-02"))
+
+            dao.clearAll()
+            assertNull(dao.get("show:1992-12-02"))
         } finally {
             db.close()
         }
