@@ -29,6 +29,29 @@ final class Player: NSObject, ObservableObject {
     /// loaded. Set by `playYoutube`; the WKWebView playback surface #231 builds consumes it.
     @Published private(set) var youtubeVideo: YouTubeVideo?
 
+    // MARK: - Comparison Mode State
+    @Published private(set) var alternates: [RecordingRef] = []
+    @Published private(set) var isComparingSources = false
+    @Published private(set) var comparisonSources: [RecordingRef] = []
+    private var comparisonPlayers: [String: AVPlayer] = [:]
+    @Published private(set) var activeComparisonSourceId: String? = nil
+
+    struct QueueState {
+        let tracks: [PlayableTrack]
+        let currentIndex: Int?
+        let positionMs: Int64
+        let isPlaying: Bool
+        let queueKey: String?
+        let recording: RecordingRef?
+    }
+    private var originalQueueState: QueueState?
+
+    var hasRealAlternates: Bool {
+        guard let show else { return false }
+        return show.artist.hasMultipleSources && !alternates.isEmpty
+    }
+
+
     // MARK: - Cast & Remote Routing State
     @Published private(set) var isCasting = false
     @Published private(set) var castDeviceName: String?
@@ -199,6 +222,148 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Compare Sources
+
+    func enterCompareSourcesMode(sources: [RecordingRef], currentTrack: PlayableTrack, positionMs: Int64) {
+        guard let show = show else { return }
+
+        // Store current queue state
+        originalQueueState = QueueState(
+            tracks: tracks,
+            currentIndex: currentIndex,
+            positionMs: positionMs,
+            isPlaying: isPlaying,
+            queueKey: queueKey,
+            recording: recording
+        )
+
+        let wasPlaying = isPlaying
+        if wasPlaying {
+            if isCasting {
+                castClient.pause()
+            } else {
+                queuePlayer.pause()
+            }
+        }
+
+        comparisonSources = sources
+        isComparingSources = true
+        let currentVolume = volume
+
+        Task {
+            var players: [String: AVPlayer] = [:]
+            await withTaskGroup(of: (String, AVPlayer?).self) { group in
+                for source in sources {
+                    group.addTask {
+                        let sourceAPI = sourceFor(show.artist.backend)
+                        guard let detail = try? await sourceAPI.show(artist: show.artist, date: show.date, recordingId: source.id) else {
+                            return (source.id, nil)
+                        }
+
+                        let match = detail.tracks.first { track in
+                            track.title == currentTrack.title || track.position == currentTrack.position
+                        }
+                        guard let match = match else { return (source.id, nil) }
+
+                        let playURL = (match.flacUrl?.isEmpty == false) ? match.flacUrl! : match.url
+                        let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
+                        let item = AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
+                        let player = AVPlayer(playerItem: item)
+                        player.volume = currentVolume
+                        return (source.id, player)
+                    }
+                }
+
+                for await (id, player) in group {
+                    if let player = player {
+                        players[id] = player
+                    }
+                }
+            }
+
+            await MainActor.run {
+                self.comparisonPlayers = players
+                let time = CMTime(value: positionMs, timescale: 1000)
+                for (_, player) in players {
+                    player.seek(to: time)
+                }
+                
+                if let first = sources.first?.id, let firstPlayer = players[first] {
+                    self.activeComparisonSourceId = first
+                    firstPlayer.play()
+                }
+            }
+        }
+    }
+
+    func switchComparisonSource(to recordingId: String) {
+        guard isComparingSources, activeComparisonSourceId != recordingId else { return }
+        
+        let oldPlayer = activeComparisonSourceId.flatMap { comparisonPlayers[$0] }
+        let newPlayer = comparisonPlayers[recordingId]
+        
+        oldPlayer?.pause()
+        
+        let currentTime = oldPlayer?.currentTime() ?? CMTime(value: positionMs, timescale: 1000)
+        
+        newPlayer?.seek(to: currentTime)
+        newPlayer?.play()
+        
+        activeComparisonSourceId = recordingId
+    }
+
+    func exitCompareSourcesMode(confirmSelection: Bool) {
+        guard let state = originalQueueState else { return }
+        
+        let chosenRecordingId = activeComparisonSourceId
+        let wasPlaying = state.isPlaying
+        let positionMsToRestore: Int64
+        
+        if let activeId = activeComparisonSourceId, let activePlayer = comparisonPlayers[activeId] {
+            positionMsToRestore = Int64(activePlayer.currentTime().seconds * 1000)
+        } else {
+            positionMsToRestore = state.positionMs
+        }
+        
+        for player in comparisonPlayers.values {
+            player.pause()
+        }
+        comparisonPlayers.removeAll()
+        comparisonSources.removeAll()
+        isComparingSources = false
+        activeComparisonSourceId = nil
+        originalQueueState = nil
+        
+        if confirmSelection, let chosenId = chosenRecordingId, chosenId != state.recording?.id {
+            guard let show = show else { return }
+            Task {
+                let sourceAPI = sourceFor(show.artist.backend)
+                guard let detail = try? await sourceAPI.show(artist: show.artist, date: show.date, recordingId: chosenId) else {
+                    self.seek(toMs: positionMsToRestore)
+                    if wasPlaying {
+                        if self.isCasting { self.castClient.play() } else { self.queuePlayer.play() }
+                    }
+                    return
+                }
+                
+                let matchIndex = detail.tracks.firstIndex { 
+                    $0.title == self.currentTrack?.title || $0.position == self.currentTrack?.position
+                } ?? state.currentIndex ?? 0
+                
+                self.play(detail: detail, startIndex: matchIndex, resumePositionMs: positionMsToRestore)
+            }
+        } else {
+            self.seek(toMs: positionMsToRestore)
+            if wasPlaying {
+                if isCasting {
+                    castClient.play()
+                } else {
+                    queuePlayer.play()
+                }
+            }
+        }
+    }
+
     // MARK: - Queue Playback
 
     /// Starts a queue-key-bearing show or recording. `resumePositionMs`, when non-zero, is
@@ -207,6 +372,7 @@ final class Player: NSObject, ObservableObject {
         show = detail.summary
         recording = detail.recording
         queueKey = detail.queueKey
+        alternates = detail.alternates
         artURL = detail.summary.artURL ?? detail.tracks.first?.artURL
         loadArtwork(for: artURL)
 
