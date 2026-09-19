@@ -10,6 +10,11 @@ public enum QueueKind: Equatable {
     /// server playlist slug) specifically so a local id never round-trips through
     /// `PhishInApi.playlist(id)`, matching Android's `Queue.kt` (D161 in DECISIONS.md).
     case localPlaylist
+    /// A YouTube video embedded through the IFrame Player API (#231, D252). The id is the
+    /// YouTube video id (11 characters), not a show date — an Android client that does not yet
+    /// recognize this prefix skips the row rather than mis-playing it, safe for the eventual
+    /// shared `progress` table.
+    case youtube
 }
 
 /// Playback progress is stored under a namespaced key so every kind of queue can share one
@@ -32,6 +37,7 @@ public struct QueueRef: Equatable {
         case .playlist: return playlistQueueKey(id)
         case .recording: return recordingPrefix + id
         case .localPlaylist: return localPlaylistQueueKey(id)
+        case .youtube: return youtubeQueueKey(id)
         }
     }
 }
@@ -65,12 +71,18 @@ public func recordingQueueKey(_ artistSlug: String, _ date: String, _ sourceId: 
     recordingPrefix + RecordingId(artistSlug: artistSlug, date: date, sourceId: sourceId).id
 }
 
+public func youtubeQueueKey(_ videoId: String) -> String { youtubePrefix + videoId }
+
 /// Splits a stored key back into its parts. Returns nil for anything unrecognised rather than
 /// guessing — an unknown key should be skipped, not played as the wrong thing.
 public func parseQueueKey(_ raw: String) -> QueueRef? {
     if raw.hasPrefix(localPlaylistPrefix) {
         let rest = String(raw.dropFirst(localPlaylistPrefix.count))
         return rest.isEmpty ? nil : QueueRef(kind: .localPlaylist, id: rest)
+    }
+    if raw.hasPrefix(youtubePrefix) {
+        let rest = String(raw.dropFirst(youtubePrefix.count))
+        return rest.isEmpty ? nil : QueueRef(kind: .youtube, id: rest)
     }
     if raw.hasPrefix(playlistPrefix) {
         let rest = String(raw.dropFirst(playlistPrefix.count))
@@ -103,3 +115,4 @@ private let showPrefix = "show:"
 private let playlistPrefix = "playlist:"
 private let recordingPrefix = "relisten:"
 private let localPlaylistPrefix = "local-playlist:"
+private let youtubePrefix = "youtube:"

@@ -110,4 +110,27 @@ final class QueueKeyTests: XCTestCase {
         XCTAssertEqual(QueueKind.localPlaylist, parseQueueKey("local-playlist:x")!.kind)
         XCTAssertNil(parseQueueKey("local-playlist:"))
     }
+
+    // ------------------------------------------------------------- youtube (#231)
+
+    func testBuildsAYouTubeKey() {
+        XCTAssertEqual("youtube:dQw4w9WgXcQ", youtubeQueueKey("dQw4w9WgXcQ"))
+    }
+
+    func testRoundTripsAYouTubeKey() {
+        let ref = parseQueueKey(youtubeQueueKey("dQw4w9WgXcQ"))
+        XCTAssertEqual(QueueRef(kind: .youtube, id: "dQw4w9WgXcQ"), ref)
+        XCTAssertEqual("youtube:dQw4w9WgXcQ", ref!.key)
+    }
+
+    func testRejectsAnEmptyYouTubeKey() {
+        XCTAssertNil(parseQueueKey("youtube:"))
+    }
+
+    func testYouTubeKeyDoesNotCollideWithOtherPrefixes() {
+        // An existing "show:" row must remain a show, not suddenly parse as youtube.
+        XCTAssertEqual(QueueKind.show, parseQueueKey("show:1997-02-13")!.kind)
+        XCTAssertEqual(QueueKind.youtube, parseQueueKey("youtube:dQw4w9WgXcQ")!.kind)
+        XCTAssertEqual(QueueKind.playlist, parseQueueKey("playlist:youtube:x")!.kind)
+    }
 }
