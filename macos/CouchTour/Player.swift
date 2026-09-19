@@ -25,6 +25,9 @@ final class Player: NSObject, ObservableObject {
     @Published private(set) var positionMs: Int64 = 0
     @Published private(set) var artURL: String?
     @Published private(set) var postShowPrompt: ShowSummary?
+    /// The YouTube video the user tapped in the artist page, nil when nothing YouTube is
+    /// loaded. Set by `playYoutube`; the WKWebView playback surface #231 builds consumes it.
+    @Published private(set) var youtubeVideo: YouTubeVideo?
 
     // MARK: - Cast & Remote Routing State
     @Published private(set) var isCasting = false
@@ -230,6 +233,38 @@ final class Player: NSObject, ObservableObject {
         } else {
             startQueue(tracks: detail.tracks, startIndex: startIndex, resumePositionMs: resumePositionMs)
         }
+    }
+
+    /// Routes a YouTube video tap from the artist page into the player (#230). Playback
+    /// itself is #231 (a WKWebView IFrame surface); this stub only defines the route
+    /// contract: any in-flight show/track queue is torn down, the video's thumbnail becomes
+    /// the artwork, and the video is published for #231's surface to consume. Callers open
+    /// the Now Playing inspector (`appModel.showNowPlaying = true`), the same seam every
+    /// other play tap uses.
+    func playYoutube(video: YouTubeVideo) {
+        stopAudio()
+        // State cleared before the queue teardown so the KVO handler sees a nil show and
+        // skips the post-show prompt — leaving show playback, not finishing it.
+        show = nil
+        recording = nil
+        queueKey = nil
+        postShowPrompt = nil
+        youtubeVideo = video
+        artURL = video.thumbnailURL
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
+    }
+
+    /// Tears the local queue down without the show-finished side effects of a drained
+    /// queue — used when leaving show playback for a different media kind.
+    private func stopAudio() {
+        queuePlayer.pause()
+        queuePlayer.removeAllItems()
+        items.removeAll()
+        tracks = []
+        currentIndex = nil
+        isPlaying = false
+        positionMs = 0
     }
 
     private func loadArtwork(for urlString: String?) {
