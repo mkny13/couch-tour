@@ -16,6 +16,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // NewPipeExtractor (#232) is distributed on JitPack, not Maven Central. Scoped
+        // to com.github so nothing else can silently resolve from it.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.TeamNewPipe") }
+        }
     }
 }
 
