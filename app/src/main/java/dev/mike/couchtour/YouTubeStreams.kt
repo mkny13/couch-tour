@@ -98,7 +98,9 @@ class YouTubeDownloader(private val http: OkHttpClient = OkHttpClient()) : Downl
 
         http.newCall(builder.build()).execute().use { resp ->
             val body = resp.body?.string()
-            return Response(resp.code, resp.message, resp.headers.toMultimap(), body)
+            // NewPipe v0.26's Response carries a trailing latestUrl (the URL after any
+            // redirects) so extractors can resolve relative links.
+            return Response(resp.code, resp.message, resp.headers.toMultimap(), body, resp.request.url.toString())
         }
     }
 }
