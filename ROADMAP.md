@@ -191,7 +191,7 @@ preserved. The work is split into:
 | **#24** | **Advanced Source Selection & Taper Intelligence** | Side-by-side snippet comparisons across tapers, taper reputation scoring, and user-preferred / avoided taper filters. | Android, macOS |
 | **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation — Leanback launcher entry point, TV app manifest, `Catalog`/`PlaybackService` wired in) shipped, D233; Parts 2 (browse UI) and 3 (Now Playing / transport) still open. | Android TV |
 | **#15** | **Spotify/Tidal Live Release Links** | Where a show matches an officially released live album on Spotify or Tidal, surface a simple external link to it (in-app playback isn't feasible). | Cross-platform |
-| **#16** | **YouTube Concert Video / Audio** | Stream concert video from YouTube with a dedicated toggle for audio-only background playback. | Cross-platform |
+| **#16** | **YouTube Concert Video / Audio** | Stream concert video from YouTube via the official IFrame embedded player (visible-only, D252 — background audio-only is dropped per YouTube's embedded-player ToS). macOS playback shipped (#231); Android parity (#232) pending. | Cross-platform |
 
 ---
 
