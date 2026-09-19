@@ -117,6 +117,8 @@ struct ThreePaneRootView: View {
                 ShowDetailView(show: show)
             case .localPlaylist(let playlist):
                 LocalPlaylistView(playlistId: playlist.id)
+            case .youtube(let video):
+                YouTubeVideoView(video: video)
             }
         }
         .navigationBarBackButtonHidden(true)

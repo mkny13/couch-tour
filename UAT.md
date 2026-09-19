@@ -151,3 +151,7 @@ Long-standing items that predate this sprint.
 ## Source ratings and taper details (#237)
 
 - [ ] `uat-054` **Source picker layout** (Android) — Visual layout of the Source picker on Android — confirm the `★ rating · N reviews`, taper name, and lineage text in each `SourceRow` are not cluttered and render readably, and that the highest-rated source appears at the top of the list (Relisten pre-sorts, no client-side re-sort). Navigate to a multi-source Relisten show (e.g. Grateful Dead 1977-05-08), open the Source picker, and verify.
+
+## Artist page YouTube section (#230, macOS)
+
+- [ ] `uat-055` **Artist page YouTube section** (macOS) — Requires a YouTube Data API key (owner-supplied, D44/D251): `defaults write dev.mike.couchtour.mac youtubeAPIKey <key>` before launching. On the Phish artist page (Artists → Phish), a **YouTube** section renders below the years list, listing the channel's recent videos with thumbnail, title, and publish date. Clicking a video (or its play affordance) opens the Now Playing inspector with the video's thumbnail as artwork (playback itself is #231 — the inspector shows the stub state, no audio yet). Artists with no curated channel (e.g. any Relisten artist) show no YouTube section. With the key unset, the section is hidden entirely. Error path: disconnect network (or exhaust quota) → the section shows "Couldn't load YouTube videos: …" with a working Retry button.

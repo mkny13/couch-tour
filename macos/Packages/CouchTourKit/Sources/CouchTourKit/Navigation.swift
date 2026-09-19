@@ -24,6 +24,11 @@ public enum Route: Hashable {
     case period(artist: ArtistRef, period: PeriodRef)
     case show(ShowSummary)
     case localPlaylist(LocalPlaylist)
+    /// A video from an artist's YouTube channel (#230). Nothing pushes it yet — the
+    /// click-back wiring in the player rail / Now Playing surfaces lands with playback
+    /// (#231) — but the route and its crumb are defined here so that wiring only has to
+    /// push a value that already routes.
+    case youtube(YouTubeVideo)
 
     /// This route's own segment of the breadcrumb — and, via the trail's last element, the
     /// screen name a feedback issue is filed against (`FeedbackButton`). A show's date or an
@@ -38,6 +43,7 @@ public enum Route: Hashable {
         case .period(_, let period): return period.label
         case .show(let show): return show.date
         case .localPlaylist(let playlist): return playlist.name
+        case .youtube(let video): return video.title
         }
     }
 }

@@ -4740,3 +4740,10 @@ Audited and eliminated unclosed resource leaks (DB connections, cursors, file st
   - macOS GRDB `DatabaseQueue` instances manage underlying SQLite connections safely with automatic pool/deinit cleanup.
   - Sync backend D1 bindings and worker fetch handlers operate statelessly without dangling sockets or cursors.
 
+### D251 — Artist→YouTube-channel resolution is a hand-curated map in the app target (#230)
+
+Part 1 (#229) left the artist→channel mapping as an explicit seam ("resolved in Part 2"); this closes it:
+- **Curated map, not derived:** `YouTubeChannels` (macOS app target) maps `backend:artistId` to a channel ID, seeded with Phish's official channel (`UCDEPOd0RCvw8iSTqFpSBZLA`, resolved from youtube.com/@phish's channel metadata). There is no catalog API for channel ownership, YouTube IDs are opaque, and only the owner knows which channel is authoritative for a given tape source — so nothing is guessed. Artists absent from the map get no YouTube section at all.
+- **App target, not CouchTourKit:** the map is app-level configuration the same way the API key is, not a catalog model; keeping it out of the package keeps `swift test` coverage meaningful (there is nothing to test beyond a dictionary lookup) and the package neutral of per-install credentials.
+- **API key (D44 precedent):** `YouTubeAPI.apiKey` is owner-supplied, read at app startup from `UserDefaults` key `youtubeAPIKey` (`defaults write dev.mike.couchtour.mac youtubeAPIKey <key>`). The YouTube section hides entirely when the key is unset — a section that could only ever show an error would be noise, and the error/retry states are reserved for real fetch failures (network, quota).
+
