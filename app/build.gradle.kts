@@ -158,6 +158,10 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
+    // NewPipeExtractor pulls okhttp transitively; keeping it out of the resolution means
+    // the app's audited 4.12.0 (see the version catalog header) stays the single copy on
+    // the classpath — our own Downloader injects it into NewPipe, so nothing is lost.
+    implementation(libs.newpipe.extractor) { exclude(group = "com.squareup.okhttp3") }
     implementation(libs.coil.compose)
     implementation(libs.androidx.palette.ktx)
     implementation(libs.androidx.security.crypto)

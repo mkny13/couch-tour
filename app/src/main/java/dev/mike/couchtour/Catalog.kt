@@ -331,6 +331,55 @@ data class ShowDetail(
         }
 }
 
+// -------------------------------------------------------------------- YouTube (#232)
+
+/**
+ * One video from an artist's YouTube channel — the Android twin of the macOS model from
+ * #229, kept field-for-field so the two platforms stay comparable.
+ *
+ * Browse metadata comes from YouTube Data API v3's `search.list`, which carries no duration
+ * and no playable URLs. Duration and the direct audio/video stream URLs (#234's toggle
+ * needs both) arrive later, from a separate stream-resolution step — see
+ * [withStreams] — so they start null here and are filled in on the way to playback.
+ */
+data class YouTubeVideo(
+    val id: String,
+    val title: String,
+    val channelId: String,
+    val thumbnailUrl: String? = null,
+    val description: String? = null,
+    val publishedAtMs: Long? = null,
+    val durationMs: Long? = null,
+    val audioStreamUrl: String? = null,
+    val videoStreamUrl: String? = null,
+)
+
+/**
+ * The listening-history key for a video (#234). The `youtube:<videoId>` prefix matches the
+ * platform-wide convention for queue keys (`show:`, `playlist:`, `relisten:`) and is the
+ * same on macOS, so a video's resume position survives on both — and stays separate from
+ * the date-keyed show rows, which the `progress` table stores unmigrated.
+ */
+fun youtubeProgressKey(videoId: String) = "youtube:$videoId"
+
+/**
+ * [YouTubeVideo.withStreams]'s payload: the resolved direct URLs and the video's true
+ * duration (which `search.list` never carries). Audio is playable standalone — the
+ * background audio-only mode #234 keeps — while video streams are muxed (video+audio),
+ * so the toggle between the two never needs to merge separate tracks.
+ */
+data class ResolvedStreams(
+    val audioStreamUrl: String,
+    val videoStreamUrl: String,
+    val durationMs: Long,
+)
+
+fun YouTubeVideo.withStreams(resolved: ResolvedStreams): YouTubeVideo = copy(
+    audioStreamUrl = resolved.audioStreamUrl,
+    videoStreamUrl = resolved.videoStreamUrl,
+    durationMs = resolved.durationMs,
+)
+
 interface MusicSource {
     val backend: Backend
 
