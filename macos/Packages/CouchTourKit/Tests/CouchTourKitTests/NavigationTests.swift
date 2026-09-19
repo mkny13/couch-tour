@@ -15,6 +15,7 @@ final class NavigationTests: XCTestCase {
         let show = ShowSummary(artist: dead, date: "1977-05-08")
         let period = PeriodRef(id: "1977", label: "1977")
         let playlist = LocalPlaylist(id: "p1", name: "Road trip", createdAt: 0, updatedAt: 0)
+        let video = YouTubeVideo(id: "v1", title: "Phish: 12/31/95 Madison Square Garden", channelId: "c")
 
         XCTAssertEqual(Route.artists.crumbTitle, "Artists")
         XCTAssertEqual(Route.listening.crumbTitle, "Listening")
@@ -22,6 +23,7 @@ final class NavigationTests: XCTestCase {
         XCTAssertEqual(Route.period(artist: dead, period: period).crumbTitle, "1977")
         XCTAssertEqual(Route.show(show).crumbTitle, "1977-05-08")
         XCTAssertEqual(Route.localPlaylist(playlist).crumbTitle, "Road trip")
+        XCTAssertEqual(Route.youtube(video).crumbTitle, "Phish: 12/31/95 Madison Square Garden")
     }
 
     // ---------------------------------------------------------------- breadcrumb trail
@@ -58,9 +60,16 @@ final class NavigationTests: XCTestCase {
     /// two return the hierarchy to different depths.
     func testRoutesForDifferentContentAreDistinct() {
         let show = ShowSummary(artist: dead, date: "1977-05-08")
+        let video = YouTubeVideo(id: "v1", title: "Same title, different video", channelId: "c")
         XCTAssertNotEqual(Route.artist(dead), .artist(wsp))
         XCTAssertNotEqual(Route.show(show), .show(ShowSummary(artist: dead, date: "1977-05-09")))
         XCTAssertNotEqual(Route.show(show), .artist(dead))
         XCTAssertNotEqual(Route.artists, .listening)
+        // A YouTube video's id is its identity — two uploads can share a title.
+        XCTAssertNotEqual(
+            Route.youtube(video),
+            .youtube(YouTubeVideo(id: "v2", title: video.title, channelId: "c"))
+        )
+        XCTAssertNotEqual(Route.youtube(video), .artist(dead))
     }
 }
