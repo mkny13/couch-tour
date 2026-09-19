@@ -33,6 +33,11 @@ func resolveShowDetail(for progress: PlaybackProgress, localPlaylistStore: Local
             throw ResumeError.unresumable
         }
         return try await localPlaylistShowDetail(playlist, store: localPlaylistStore)
+
+    case .youtube:
+        // YouTube videos don't resolve through the show-detail path — they carry their own
+        // metadata in the progress row and resume via Player.resumeYoutube() instead.
+        throw ResumeError.unresumable
     }
 }
 

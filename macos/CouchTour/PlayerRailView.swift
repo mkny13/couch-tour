@@ -359,6 +359,53 @@ struct PlayerRailView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 26)
 
+                } else if let video = player.youtubeVideo {
+                    // YouTube video embed — visible-only, D252.
+                    YouTubePlayerView(
+                        videoId: video.id,
+                        resumePositionSeconds: Int(player.positionMs / 1000)
+                    )
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal, 24)
+                    .padding(.top, 22)
+
+                    // Video title
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("YOUTUBE")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.4)
+                            .foregroundStyle(colors.textMuted)
+                        Text(video.title)
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(colors.textPrimary)
+                            .lineLimit(3)
+                        if let publishedAt = video.publishedAt {
+                            Text(publishedAt.formatted(date: .abbreviated, time: .omitted))
+                                .font(.system(size: 13))
+                                .foregroundStyle(colors.textSubtle)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+
+                    Spacer(minLength: 16)
+
+                    // Position indicator
+                    HStack {
+                        Text(fmt(player.positionMs))
+                            .font(.system(size: 12))
+                            .foregroundStyle(colors.textMuted)
+                        Spacer()
+                        if player.isPlaying {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(colors.accentIcon)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 26)
+
                 } else {
                     // Empty state fallback when no show is loaded
                     fallbackRailContent

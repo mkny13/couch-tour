@@ -26,8 +26,11 @@ final class Player: NSObject, ObservableObject {
     @Published private(set) var artURL: String?
     @Published private(set) var postShowPrompt: ShowSummary?
     /// The YouTube video the user tapped in the artist page, nil when nothing YouTube is
-    /// loaded. Set by `playYoutube`; the WKWebView playback surface #231 builds consumes it.
+    /// loaded. Set by `playYoutube`; the WKWebView playback surface consumes it.
     @Published private(set) var youtubeVideo: YouTubeVideo?
+    /// Whether the player is currently in audio mode (AVQueuePlayer/Cast) or YouTube
+    /// visible-only mode (WKWebView IFrame embed). Drives UI surface selection (#231).
+    @Published private(set) var playbackMode: PlaybackMode = .audio
 
     // MARK: - Cast & Remote Routing State
     @Published private(set) var isCasting = false
@@ -204,6 +207,8 @@ final class Player: NSObject, ObservableObject {
     /// Starts a queue-key-bearing show or recording. `resumePositionMs`, when non-zero, is
     /// applied once the starting track is actually ready — see `pendingResumeMs`.
     func play(detail: ShowDetail, startIndex: Int = 0, resumePositionMs: Int64 = 0) {
+        youtubeVideo = nil
+        playbackMode = .audio
         show = detail.summary
         recording = detail.recording
         queueKey = detail.queueKey
@@ -235,24 +240,77 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
-    /// Routes a YouTube video tap from the artist page into the player (#230). Playback
-    /// itself is #231 (a WKWebView IFrame surface); this stub only defines the route
-    /// contract: any in-flight show/track queue is torn down, the video's thumbnail becomes
-    /// the artwork, and the video is published for #231's surface to consume. Callers open
-    /// the Now Playing inspector (`appModel.showNowPlaying = true`), the same seam every
-    /// other play tap uses.
+    /// Routes a YouTube video tap from the artist page into the player (#230→#231).
+    /// Tears down any in-flight show/track queue, enters `.youtubeVideo` mode, and
+    /// publishes the video for the WKWebView IFrame surface to consume. Progress is
+    /// saved under a `youtube:<videoId>` queue key so the video appears in Continue
+    /// Listening (though resume is visible-only — the IFrame embed must be on screen).
     func playYoutube(video: YouTubeVideo) {
         stopAudio()
         // State cleared before the queue teardown so the KVO handler sees a nil show and
         // skips the post-show prompt — leaving show playback, not finishing it.
         show = nil
         recording = nil
-        queueKey = nil
         postShowPrompt = nil
         youtubeVideo = video
+        playbackMode = .youtubeVideo
+        queueKey = youtubeQueueKey(video.id)
         artURL = video.thumbnailURL
+        positionMs = 0
+        isPlaying = false
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         MPNowPlayingInfoCenter.default().playbackState = .stopped
+    }
+
+    /// Called by the WKWebView bridge when the IFrame player reports state changes
+    /// (playing, paused, ended) and position updates.
+    func youtubeStateChanged(playing: Bool, positionMs: Int64, durationMs: Int64) {
+        guard playbackMode == .youtubeVideo, youtubeVideo != nil else { return }
+        self.isPlaying = playing
+        self.positionMs = positionMs
+        saveYoutubeProgress(force: true)
+    }
+
+    /// Called by the WKWebView bridge on its periodic position tick (~500ms).
+    func youtubePositionTick(positionMs: Int64) {
+        guard playbackMode == .youtubeVideo, youtubeVideo != nil else { return }
+        self.positionMs = positionMs
+        if isPlaying {
+            saveYoutubeProgress(force: false)
+        }
+    }
+
+    /// Saves a progress row for the current YouTube video under its `youtube:<id>` key.
+    /// Uses the video's own metadata for the display fields (title, thumbnail) since there
+    /// is no show/track to pull from.
+    private func saveYoutubeProgress(force: Bool) {
+        guard let video = youtubeVideo, let queueKey else { return }
+        let didSave = recorder.saveTick(
+            queueKey: queueKey,
+            show: ShowSummary(
+                artist: ArtistRef(backend: .phishin, id: "youtube", name: "YouTube"),
+                date: video.title
+            ),
+            track: PlayableTrack(
+                id: video.id, title: video.title, position: 1,
+                durationMs: video.durationMs ?? 0, url: ""
+            ),
+            trackIndex: 0,
+            positionMs: positionMs,
+            artURL: artURL,
+            force: force
+        )
+        if didSave && force, let syncSession, let progressStore {
+            syncSession.requestDebouncedPush(progressStore)
+        }
+    }
+
+    /// Resumes a YouTube video from a Continue Listening row. The video must already
+    /// be known (stored in the progress row's metadata) — there's no network fetch,
+    /// unlike show/recording resume.
+    func resumeYoutube(video: YouTubeVideo, positionMs: Int64) {
+        playYoutube(video: video)
+        self.positionMs = positionMs
     }
 
     /// Tears the local queue down without the show-finished side effects of a drained
