@@ -63,7 +63,7 @@ class YouTubeParsingTest {
         assertNull(video.thumbnailUrl)
         assertNull(video.publishedAtMs)
         assertNull(video.description)
-        assertEquals("UCuAXFkgsw1L7xaCfnd5JJOw", video.channelId, "channelId falls back to the snippet's own")
+        assertEquals("channelId falls back to the snippet's own", "UCuAXFkgsw1L7xaCfnd5JJOw", video.channelId)
     }
 
     @Test
