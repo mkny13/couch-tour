@@ -211,6 +211,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     val detail = runCatching { RelistenApi.show(summary.artist.id, summary.date).toShowDetail(summary.artist) }.getOrNull()
                     if (detail != null) playRecording(detail)
                 }
+                // Next Stop comes from the tape backends; YouTube artists have no shows.
+                Backend.YOUTUBE -> Unit
             }
         }
     }

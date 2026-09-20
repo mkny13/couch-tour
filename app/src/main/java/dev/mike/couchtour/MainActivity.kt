@@ -487,6 +487,9 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                                 when (show.artist.backend) {
                                                     Backend.PHISHIN -> nav.navigate("show/${show.date}")
                                                     Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                                                    // Home's in-progress rows are tape shows;
+                                                    // YouTube artists have none.
+                                                    Backend.YOUTUBE -> Unit
                                                 }
                                             }
                                     ) {
@@ -745,6 +748,9 @@ private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
                             when (show.artist.backend) {
                                 Backend.PHISHIN -> nav.navigate("show/${show.date}")
                                 Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                                // Surprise me draws from the tape backends; YouTube
+                                // artists have no shows, so this can't come up.
+                                Backend.YOUTUBE -> Unit
                             }
                         }
                     busy = false
@@ -913,6 +919,8 @@ private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController) {
                     when (show.artist.backend) {
                         Backend.PHISHIN -> nav.navigate("show/${show.date}")
                         Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                        // On-this-date rows are tape shows; YouTube artists have none.
+                        Backend.YOUTUBE -> Unit
                     }
                 }
                 .padding(horizontal = 20.dp, vertical = 7.dp),
@@ -2576,8 +2584,12 @@ internal fun SearchResultsList(
 
         if (r.isEmpty) {
             val message = if (results.failed.isNotEmpty()) {
-                "Couldn't search " + results.failed.joinToString(" or ") {
-                    if (it == Backend.PHISHIN) "Phish" else "Relisten"
+                "Couldn't search " + results.failed.joinToString(" or ") { backend ->
+                    when (backend) {
+                        Backend.PHISHIN -> "Phish"
+                        Backend.RELISTEN -> "Relisten"
+                        Backend.YOUTUBE -> "YouTube"
+                    }
                 } + "."
             } else {
                 "Nothing matched."
@@ -2615,6 +2627,8 @@ internal fun SearchResultsList(
                             when (show.artist.backend) {
                                 Backend.PHISHIN -> nav.navigate("show/${show.date}")
                                 Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
+                                // Search hits are tape shows; YouTube has no term search.
+                                Backend.YOUTUBE -> Unit
                             }
                         }
                     )

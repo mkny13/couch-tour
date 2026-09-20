@@ -181,7 +181,11 @@ fun List<LocalPlaylistTrackEntity>.filterByTitleIndexed(query: String): List<Ind
 
 enum class Backend(val id: String) {
     PHISHIN("phishin"),
-    RELISTEN("relisten");
+    RELISTEN("relisten"),
+    // YouTube (#233): not a tape source — an artist's channel of videos browsed on the
+    // artist page. No artist rows of its own ([YouTubeCatalogSource.artists] is empty), so
+    // it never appears in the Home/Artists lists or the Auto browse tree.
+    YOUTUBE("youtube");
 
     companion object {
         /** Null for anything unrecognised — these ids travel in nav routes and media IDs. */
@@ -328,6 +332,9 @@ data class ShowDetail(
             Backend.RELISTEN -> recording?.let {
                 recordingQueueKey(summary.artist.id, summary.date, it.id)
             }
+            // A YouTube video queues under [youtubeProgressKey] (#234); a YouTube
+            // artist never resolves to a [ShowDetail], so nothing here can resume.
+            Backend.YOUTUBE -> null
         }
 }
 
@@ -393,12 +400,22 @@ interface MusicSource {
     /** [term] is at least 3 characters — both APIs return nothing below that. A backend
      *  with nothing to offer returns empty hits rather than throwing. */
     suspend fun search(term: String): SearchHits
+
+    /**
+     * An artist channel's YouTube videos for the artist page's YouTube section (#233).
+     * Backends that aren't YouTube keep the default — an empty list, which the artist
+     * page treats the same as "no channel mapped": the section hides rather than
+     * rendering an empty one. YouTube search (#233 out of scope) doesn't go through
+     * [search], which stays about tape.
+     */
+    suspend fun youtubeContent(artist: ArtistRef): List<YouTubeVideo> = emptyList()
 }
 
 /** Shared by MainActivity's screens and PlaybackService's Auto browse tree — one seam, two callers. */
 internal fun sourceFor(backend: Backend): MusicSource = when (backend) {
     Backend.PHISHIN -> PhishInSource
     Backend.RELISTEN -> RelistenCatalogSource
+    Backend.YOUTUBE -> YouTubeCatalogSource
 }
 
 /**
@@ -715,6 +732,9 @@ internal fun Track.toPlayableTrack(showArt: String?) = PlayableTrack(
 fun showShareUrl(artist: ArtistRef, date: String): String = when (artist.backend) {
     Backend.PHISHIN -> "https://phish.in/$date"
     Backend.RELISTEN -> "https://relisten.net/${artist.id}/${date.replace('-', '/')}"
+    // YouTube has no per-show page; the channel is the closest real destination a
+    // YouTube-backend share can point at (the artist id *is* the channel id).
+    Backend.YOUTUBE -> "https://www.youtube.com/channel/${artist.id}"
 }
 
 /**
@@ -730,4 +750,5 @@ fun showShareUrl(artist: ArtistRef, date: String): String = when (artist.backend
 fun trackShareUrl(artist: ArtistRef, date: String, trackSlug: String?): String? = when (artist.backend) {
     Backend.PHISHIN -> trackSlug?.let { "https://phish.in/$date/$it" }
     Backend.RELISTEN -> null
+    Backend.YOUTUBE -> null
 }

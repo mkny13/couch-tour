@@ -55,6 +55,9 @@ internal fun recentPeriods(periods: List<PeriodRef>, count: Int = TOUR_PERIODS):
 internal fun showId(show: ShowSummary): String = when (show.artist.backend) {
     Backend.PHISHIN -> showQueueKey(show.date)
     Backend.RELISTEN -> recordingShowKey(show.artist.id, show.date)
+    // A YouTube artist has no shows (and can't be favorited — it never appears in any
+    // artist list), so this key can never match a played entry; it exists for exhaustiveness.
+    Backend.YOUTUBE -> "youtube-show:${show.artist.id}"
 }
 
 /**
