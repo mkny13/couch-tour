@@ -181,6 +181,9 @@ public actor LoudnessMeasurer {
     /// Concurrent calls for the same key coalesce: the first caller creates the in-flight
     /// task, later callers await the same task, and one fetch pass serves everyone.
     public func measure(key: String, tracks: [PlayableTrack]) async -> SourceLoudness? {
+        // A caller that was already cancelled (queue torn down, scene dismissed) measures
+        // nothing — measurement only runs for a live listener.
+        if Task.isCancelled { return nil }
         if let cached = cachedResult(key: key) { return cached }
         if let running = inFlight[key] { return await running.value }
         // Between the check above and this store there is no await, so only one caller
@@ -276,7 +279,9 @@ public actor LoudnessMeasurer {
         var contentLength: Int?
         var probe = URLRequest(url: url)
         probe.httpMethod = "HEAD"
-        if let (response, _) = try? await session.data(for: probe),
+        // URLSession.data returns (Data, URLResponse); a HEAD has no body, so only the
+        // response half matters here.
+        if let (_, response) = try? await session.data(for: probe),
            let http = response as? HTTPURLResponse,
            http.expectedContentLength > 0 {
             contentLength = Int(http.expectedContentLength)
