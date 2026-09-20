@@ -12,6 +12,7 @@ class CouchTourApp : Application() {
         // Restore the session before any screen or the playback service issues a request.
         Session.init(this)
         CuratedMatches.init(this)
+        HeuristicMatches.init(this)
         Favorites.init(this)
         LikedTracks.init(this)
         SavedShows.init(this)

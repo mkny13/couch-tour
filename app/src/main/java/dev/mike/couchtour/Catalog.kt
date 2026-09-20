@@ -230,7 +230,10 @@ enum class ExternalReleasePlatform {
 @Serializable
 data class ExternalRelease(
     val platform: ExternalReleasePlatform,
-    val url: String
+    val url: String,
+    /** True when this match was produced by the heuristic date+venue algorithm rather than
+     *  hand-curated. The UI shows a confidence indicator so users know the match is automated. */
+    val isHeuristic: Boolean = false,
 )
 
 data class ShowSummary(
@@ -685,7 +688,9 @@ internal fun Show.toShowSummary() = ShowSummary(
                 url = externalReleaseUrl!!
             )
         }.getOrNull()
-    } else null,
+    } else {
+        HeuristicMatches.match(Backend.PHISHIN, PHISH.id, date)
+    },
 )
 
 internal fun Show.toShowDetail(): ShowDetail {

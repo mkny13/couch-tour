@@ -536,6 +536,7 @@ extension RelistenShowSummary {
             tags: tags,
             popularity: popularity,
             externalRelease: CuratedMatches.shared.match(backend: artist.backend, artistId: artist.id, date: displayDate)
+                ?? HeuristicMatches.shared.match(backend: artist.backend, artistId: artist.id, date: displayDate)
         )
     }
 }
@@ -613,6 +614,7 @@ extension RelistenShowWithSources {
             tags: showTags,
             popularity: popularity,
             externalRelease: CuratedMatches.shared.match(backend: artist.backend, artistId: artist.id, date: displayDate)
+                ?? HeuristicMatches.shared.match(backend: artist.backend, artistId: artist.id, date: displayDate)
         )
 
         return ShowDetail(
