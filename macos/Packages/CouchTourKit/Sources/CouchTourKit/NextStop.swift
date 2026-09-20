@@ -35,7 +35,7 @@ public func playedShowIds(from keys: [String]) -> Set<String> {
             if let rec = parseRecordingId(ref.id) {
                 result.insert(recordingShowKey(rec.artistSlug, rec.date))
             }
-        case .playlist, .localPlaylist:
+        case .playlist, .localPlaylist, .youtube:
             break
         }
     }
