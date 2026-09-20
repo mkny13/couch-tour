@@ -274,6 +274,7 @@ internal fun RelistenSourceTrack.toPlayableTrack(
     venueName: String?,
     setName: String,
     sourceTags: List<TagRef> = emptyList(),
+    recordingId: RecordingId? = null,
 ) = PlayableTrack(
     id = uuid,
     title = title,
@@ -294,6 +295,7 @@ internal fun RelistenSourceTrack.toPlayableTrack(
     } else {
         sourceTags
     },
+    recordingId = recordingId,
 )
 
 /**
@@ -305,12 +307,14 @@ internal fun RelistenShowWithSources.toShowDetail(artist: ArtistRef, recordingId
     val chosen = recordingId?.let { id -> sources.firstOrNull { it.uuid == id } } ?: sources.firstOrNull()
     val chosenRecording = chosen?.toRecordingRef()
     val chosenTags = chosenRecording?.tags.orEmpty()
+    // Source identity for the loudness-leveling cache key (#265).
+    val chosenRecordingId = chosen?.let { RecordingId(artist.id, displayDate, it.uuid) }
     val tracks = chosen?.sets
         ?.sortedBy { it.index }
         ?.flatMap { set ->
             set.tracks
                 .filter { !it.mp3Url.isNullOrBlank() }
-                .map { it.toPlayableTrack(artist, displayDate, venue?.name, set.name, sourceTags = chosenTags) }
+                .map { it.toPlayableTrack(artist, displayDate, venue?.name, set.name, sourceTags = chosenTags, recordingId = chosenRecordingId) }
         }
         .orEmpty()
     val hasAnySbd = hasSoundboardSource || sources.any { it.isSoundboard }

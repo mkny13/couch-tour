@@ -305,6 +305,9 @@ data class PlayableTrack(
     val artUrl: String? = null,
     val flacUrl: String? = null,
     val tags: List<TagRef> = emptyList(),
+    /** Non-null for Relisten tracks — carries the source identity needed for queue keys
+     *  and the loudness-leveling cache key (#265). */
+    val recordingId: RecordingId? = null,
 )
 
 data class ShowDetail(
