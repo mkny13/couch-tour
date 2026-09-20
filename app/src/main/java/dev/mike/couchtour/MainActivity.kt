@@ -223,6 +223,15 @@ fun App(
                     nav = nav,
                 )
             }
+            // A YouTube video row's destination. Part 3 (#234) replaces the stub with the
+            // player screen; the route shape is already final so the section's navigation
+            // doesn't have to change again.
+            composable("youtube/{videoId}") { entry ->
+                YouTubeVideoScreen(
+                    videoId = entry.arguments?.getString("videoId").orEmpty(),
+                    nav = nav,
+                )
+            }
             composable(
                 "artist/{backend}/{id}/{period}?label={label}",
                 arguments = listOf(navArgument("label") { type = NavType.StringType; nullable = true }),
@@ -1237,7 +1246,7 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
         Header(loaded.value?.getOrNull()?.first?.name ?: artistId, nav, trailing = {
             loaded.value?.getOrNull()?.first?.let { FavoriteButton(it) }
         })
-        Loaded(loaded.value) { (_, periods) ->
+        Loaded(loaded.value) { (artist, periods) ->
             LazyColumn {
                 // Newest first, matching the phish.in years screen.
                 items(periods.sortedByDescending { it.label }, key = { it.id }) { period ->
@@ -1258,7 +1267,103 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
                         }
                     )
                 }
+                // YouTube section (#233): the artist channel's videos, appended below the
+                // period list — the macOS target's layout (D251). Nothing at all when
+                // there's no curated channel or no API key.
+                youtubeSection(artist, nav)
             }
+        }
+    }
+}
+
+/** Appends one artist's YouTube section into an [androidx.compose.foundation.lazy.LazyListScope]
+ *  (#233). Hidden entirely — not even a header — when the artist has no curated channel
+ *  or the install has no API key (D44/D251 precedent), since a permanently broken section
+ *  is noise; a real fetch failure gets an inline error, distinct from "no videos". */
+private fun androidx.compose.foundation.lazy.LazyListScope.youtubeSection(
+    artist: ArtistRef,
+    nav: NavHostController,
+) {
+    if (youtubeSectionChannel(artist) == null) return
+    item(key = "youtube") {
+        YouTubeSectionContent(artist, nav)
+    }
+}
+
+/** The section's body, inside its [LazyListScope.item]: a spinner while the channel's
+ *  videos load, an inline error on failure (distinct from a genuinely empty channel),
+ *  and the video rows once loaded. */
+@Composable
+private fun YouTubeSectionContent(artist: ArtistRef, nav: NavHostController) {
+    val section = loadOnce("youtube-${artist.key}") { YouTubeCatalogSource.youtubeContent(artist) }
+    SectionHeader("YouTube", divided = true)
+    Loaded(section.value) { videos ->
+        videos.forEach { video ->
+            YouTubeVideoRow(video) { nav.navigate("youtube/${video.id}") }
+        }
+        if (videos.isEmpty()) {
+            Text(
+                "No videos.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+/** One video: 16:9 thumbnail on the left (macOS target's row shape, D251), title and a
+ *  relative upload date beside it. Tapping navigates to the video route; #234 plays it. */
+@Composable
+private fun YouTubeVideoRow(video: YouTubeVideo, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = video.thumbnailUrl,
+            contentDescription = video.title,
+            modifier = Modifier
+                .width(112.dp)
+                .height(63.dp) // 16:9, YouTube's own aspect
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                video.title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            video.publishedAtMs?.takeIf { it > 0 }?.let { ms ->
+                Text(
+                    relativeTime(ms),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** Placeholder for #234's video screen. The route exists so the section's rows navigate
+ *  somewhere real in the meantime, and so Part 3 only swaps the body. */
+@Composable
+private fun YouTubeVideoScreen(videoId: String, nav: NavHostController) {
+    Column(Modifier.fillMaxSize()) {
+        Header("YouTube", nav)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                "Playback coming soon ($videoId)",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
         }
     }
 }
