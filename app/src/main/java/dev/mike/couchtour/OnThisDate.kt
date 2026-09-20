@@ -181,6 +181,9 @@ private suspend fun showsFor(
         // Labels are plain years, so descending order is most-recent-first. Relisten's
         // archives are deep enough that the budget always binds long before the list ends.
         Backend.RELISTEN -> all.sortedByDescending { it.label }.take(yearsEach)
+        // YouTube artists have no anniversary tape; they can't be favorited anyway
+        // (they never appear in any artist list), so this branch is purely exhaustive-when.
+        Backend.YOUTUBE -> emptyList()
     }
     periods
         .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
