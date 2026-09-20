@@ -198,40 +198,26 @@ class LoudnessTest {
 
     @Test
     fun levelingKey_phishin_track() {
-        val track = Catalog.PlayableTrack(
-            id = 1,
+        val track = PlayableTrack(
+            id = "1",
             title = "Tweezer",
-            mp3 = "https://example.com/tweezer.mp3",
-            position = 1,
-            duration = 300_000,
+            url = "https://example.com/tweezer.mp3",
             showDate = "2023-07-14",
-            showId = 100,
-            venueId = null,
-            venueName = null,
-            venueLocation = null,
-            recordingId = null,
         )
         assertEquals("show:2023-07-14", track.levelingKey)
     }
 
     @Test
     fun levelingKey_relisten_track() {
-        val track = Catalog.PlayableTrack(
-            id = 2,
+        val track = PlayableTrack(
+            id = "2",
             title = "Tweezer",
-            mp3 = "https://example.com/tweezer.mp3",
-            position = 1,
-            duration = 300_000,
+            url = "https://example.com/tweezer.mp3",
             showDate = "2023-07-14",
-            showId = 0,
-            venueId = null,
-            venueName = null,
-            venueLocation = null,
-            recordingId = Catalog.RecordingId(
+            recordingId = RecordingId(
                 artistSlug = "phish",
-                showDate = "2023-07-14",
-                sourceId = 12345,
-                artistName = "Phish",
+                date = "2023-07-14",
+                sourceId = "12345",
             ),
         )
         assertEquals("relisten:phish/2023-07-14/12345", track.levelingKey)

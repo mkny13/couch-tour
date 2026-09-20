@@ -141,23 +141,21 @@ final class LoudnessTests: XCTestCase {
 
     func testLevelingKeyPhishinTrack() {
         let track = PlayableTrack(
-            id: 1, title: "Tweezer",
-            mp3: URL(string: "https://example.com/tweezer.mp3")!,
-            position: 1, duration: 300, showDate: "2023-07-14",
-            showId: 100
+            id: "1", title: "Tweezer",
+            url: "https://example.com/tweezer.mp3",
+            showDate: "2023-07-14"
         )
         XCTAssertEqual(track.levelingKey, "show:2023-07-14")
     }
 
     func testLevelingKeyRelistenTrack() {
         let track = PlayableTrack(
-            id: 2, title: "Tweezer",
-            mp3: URL(string: "https://example.com/tweezer.mp3")!,
-            position: 1, duration: 300, showDate: "2023-07-14",
-            showId: 0,
+            id: "2", title: "Tweezer",
+            url: "https://example.com/tweezer.mp3",
+            showDate: "2023-07-14",
             recordingId: RecordingId(
-                artistSlug: "phish", showDate: "2023-07-14",
-                sourceId: 12345, artistName: "Phish"
+                artistSlug: "phish", date: "2023-07-14",
+                sourceId: "12345"
             )
         )
         XCTAssertEqual(track.levelingKey, "relisten:phish/2023-07-14/12345")
