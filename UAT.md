@@ -163,3 +163,8 @@ Long-standing items that predate this sprint.
 ## YouTube API client & stream resolution (#232, Android)
 
 - [ ] `uat-056` **NewPipe stream resolution on device** (Android) — Unit tests cover only a fake resolver; the real `NewPipeStreamResolver` talks to YouTube and can only be verified live. Resolve a real Phish channel video (needs the app wired to a channel + key from Part 2, or a temporary debug harness): `YouTubeStreams.kt`'s resolver returns both a direct audio stream URL and a muxed (video+audio) stream URL, and the true duration in ms. If resolution fails (NewPipeExtractor regularly needs an update after YouTube changes its internals), the failure surfaces as `StreamResolutionException` — record the NewPipeExtractor version that worked.
+
+## Preferred and avoided tapers (#173)
+
+- [ ] `uat-058` **Taper preference cycle in the Source picker** (Android) — Open a multi-source show's Source picker: each row shows a faint thumbs-up icon. Tap it once — row turns preferred (thumbs-up tinted primary, row highlighted, sorts to top, label bold/primary-colored). Tap again — avoided (thumbs-down red, row dimmed, sinks to bottom). Tap a third time — back to neutral (faint icon, default sort). Kill and relaunch the app; preferences persist.
+- [ ] `uat-059` **Taper preference cycle in the Source picker** (macOS) — Same cycle on the macOS Show Detail source picker: neutral (grey thumbs-up) → preferred (filled thumbs-up, accent wash, top of list) → avoided (filled thumbs-down red, dimmed, bottom) → neutral. Preferences persist across relaunch, and sorting is stable (within each band the rating order is preserved). Verify a row whose taper is unset ("Unlabeled source") can also be marked — it keys on the row label in that case.

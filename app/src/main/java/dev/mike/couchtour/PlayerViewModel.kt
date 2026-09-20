@@ -10,9 +10,11 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -69,6 +71,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val localPlaylistDao = PhishInDb.get(app).localPlaylistDao()
     val artistTourPreferenceDao = PhishInDb.get(app).artistTourPreferenceDao()
     val externalReleaseDao = PhishInDb.get(app).externalReleaseDao()
+    val taperPreferenceDao = PhishInDb.get(app).taperPreferenceDao()
 
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
@@ -436,6 +439,27 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             artistTourPreferenceDao.deletePreference(artistKey)
         }
     }
+
+    /** Cycles a taper's preference: neutral -> PREFERRED -> AVOIDED -> neutral (#173). */
+    fun cycleTaperPreference(taperName: String, current: String?) {
+        viewModelScope.launch {
+            when (current) {
+                null -> taperPreferenceDao.upsertPreference(
+                    TaperPreferenceEntity(taperName = taperName, preference = TaperPref.PREFERRED)
+                )
+                TaperPref.PREFERRED -> taperPreferenceDao.upsertPreference(
+                    TaperPreferenceEntity(taperName = taperName, preference = TaperPref.AVOIDED)
+                )
+                else -> taperPreferenceDao.deletePreference(taperName)
+            }
+        }
+    }
+
+    /** Taper name -> "PREFERRED"/"AVOIDED"; tapers with no row are neutral. */
+    fun taperPreferencesFlow(): Flow<Map<String, String>> =
+        taperPreferenceDao.getAllPreferences().map { list ->
+            list.associate { it.taperName to it.preference }
+        }
 
     // --------------------------------------------------------------- controls
 

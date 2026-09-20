@@ -352,6 +352,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_9_10,
                 PhishInDb.MIGRATION_10_11,
                 PhishInDb.MIGRATION_11_12,
+                PhishInDb.MIGRATION_12_13,
             )
             .allowMainThreadQueries()
             .build()
@@ -919,6 +920,102 @@ class MigrationTest {
 
             dao.clearAll()
             assertNull(dao.get("show:1992-12-02"))
+        } finally {
+            db.close()
+        }
+    }
+
+    // ------------------------------------------------------------ v12 -> v13
+
+    private val v12SourceLoudnessTable = """
+        CREATE TABLE IF NOT EXISTS `source_loudness` (`leveling_key` TEXT NOT NULL, `lufs` REAL NOT NULL, `peak_db` REAL NOT NULL, `sampled_tracks` INTEGER NOT NULL, `algorithm_version` INTEGER NOT NULL, `measured_at` INTEGER NOT NULL, PRIMARY KEY(`leveling_key`))
+    """.trimIndent()
+    private val v12IdentityHash = "7409655957135aee6d747a3ab3f28dc0" // Fake — Room overrides it via room_master_table.
+
+    /** v12 = v11's tables plus the source_loudness cache MIGRATION_11_12 added. */
+    private fun createV12DatabaseWithRows() {
+        openRawDb().use { db ->
+            db.execSQL(v9CreateTable)
+            db.execSQL(v8LocalPlaylistsTable)
+            db.execSQL(v8LocalPlaylistTracksTable)
+            db.execSQL(v9ArtistTourPreferenceTable)
+            db.execSQL(v10ExternalReleaseTable)
+            // The v10 -> v11 indices are part of the v11 shape already.
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_deletedAt` ON `progress` (`deletedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_updatedAt` ON `progress` (`updatedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_finished` ON `progress` (`finished`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_artist` ON `progress` (`artist`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_playlist_tracks_playlistId_position` ON `local_playlist_tracks` (`playlistId`, `position`)")
+            db.execSQL(v12SourceLoudnessTable)
+            db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)")
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
+                arrayOf(v12IdentityHash),
+            )
+            db.execSQL(
+                """INSERT INTO progress
+                   (queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist, deletedAt)
+                   VALUES ('show:1992-12-02','1992-12-02','Newport',NULL,22,169397,'Rocky Top',200,1,0,'Phish',NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlists (id, name, trackCount, createdAt, updatedAt)
+                   VALUES ('p1', 'Key Jams', 1, 1000, 1000)"""
+            )
+            db.execSQL(
+                """INSERT INTO local_playlist_tracks
+                   (playlistId, position, backend, trackId, showDate, artistSlug, recordingId, title, durationMs, venueName, artUrl)
+                   VALUES ('p1', 0, 'phishin', '42', '1997-11-17', NULL, NULL, 'Tweezer', 300000, 'McNichols', NULL)"""
+            )
+            db.execSQL(
+                """INSERT INTO external_releases (artist_key, date, platform, url)
+                   VALUES ('phish', '1997-11-17', 'billybreaths', 'https://example.com/release/1')"""
+            )
+            db.execSQL(
+                """INSERT INTO source_loudness (leveling_key, lufs, peak_db, sampled_tracks, algorithm_version, measured_at)
+                   VALUES ('show:1992-12-02', -14.0, -0.5, 3, 1, 1234)"""
+            )
+            db.version = 12
+        }
+    }
+
+    /**
+     * The taper preferences table (#173) is additive, but a real v12 database with rows in
+     * every table must come through it untouched: the listening history, playlists, tour
+     * preferences, external releases, and the source_loudness cache all survive, and the
+     * new table must be usable through its DAO.
+     */
+    @Test
+    fun `migrating from v12 adds taper_preferences and keeps every row`() = runBlocking {
+        createV12DatabaseWithRows()
+
+        val db = openWithCurrentSchema()
+        try {
+            // Existing data survives untouched.
+            assertEquals(1, db.progressDao().history().first().size)
+            assertEquals(1, db.localPlaylistDao().tracksOnce("p1").size)
+            assertNotNull(db.externalReleaseDao().get("phish", "1997-11-17"))
+            assertNotNull(db.artistTourPreferenceDao().getAllPreferences().first())
+            assertNotNull(db.sourceLoudnessDao().get("show:1992-12-02"))
+
+            val dao = db.taperPreferenceDao()
+
+            // The new table starts empty and is usable.
+            assertNull(dao.getPreferenceFlow("Charlie Miller").first())
+            val pref = TaperPreferenceEntity(
+                taperName = "Charlie Miller",
+                preference = TaperPref.PREFERRED,
+                updatedAt = 123_456_789L,
+            )
+            dao.upsertPreference(pref)
+
+            assertEquals(pref, dao.getPreferenceFlow("Charlie Miller").first())
+            assertEquals(listOf(pref), dao.getAllPreferences().first())
+
+            // Overwriting moves preferred -> avoided, deleting returns the taper to neutral.
+            dao.upsertPreference(pref.copy(preference = TaperPref.AVOIDED, updatedAt = 987_654_321L))
+            assertEquals(TaperPref.AVOIDED, dao.getPreferenceFlow("Charlie Miller").first()!!.preference)
+            dao.deletePreference("Charlie Miller")
+            assertNull(dao.getPreferenceFlow("Charlie Miller").first())
         } finally {
             db.close()
         }
