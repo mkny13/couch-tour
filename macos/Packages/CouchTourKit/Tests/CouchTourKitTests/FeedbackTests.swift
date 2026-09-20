@@ -34,6 +34,15 @@ final class FeedbackTests: XCTestCase {
         XCTAssertEqual("https://github.com/mkny13/couch-tour/issues/new", url?.absoluteString.components(separatedBy: "?").first)
     }
 
+    func testURLCarriesTheBugReportTemplate() throws {
+        // The repo disables blank issues (#295): without a template parameter GitHub rejects
+        // the pre-filled URL with "Unable to create issue".
+        let url = try XCTUnwrap(feedbackIssueURL(context: context))
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let template = components.queryItems?.first { $0.name == "template" }?.value
+        XCTAssertEqual("bug_report.md", template)
+    }
+
     func testOddCharactersInFieldsAreProperlyEncodedRatherThanCorruptingTheURL() throws {
         let odd = FeedbackContext(
             appVersion: "0.57-beta",

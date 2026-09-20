@@ -32,8 +32,12 @@ fun launchFeedback(context: Context, routeName: String?) {
         - Android OS: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})
     """.trimIndent()
 
+    // blank issues are disabled on the repo, so GitHub rejects a template-less pre-filled URL
+    // with "Unable to create issue" (#295): the template name must name a real file under
+    // .github/ISSUE_TEMPLATE/.
     val url = "https://github.com/mkny13/couch-tour/issues/new" +
-            "?title=${Uri.encode(title)}" +
+            "?template=bug_report.md" +
+            "&title=${Uri.encode(title)}" +
             "&body=${Uri.encode(body)}"
 
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {

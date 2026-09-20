@@ -40,6 +40,10 @@ public func feedbackIssueURL(context: FeedbackContext) -> URL? {
 
     var components = URLComponents(string: "https://github.com/mkny13/couch-tour/issues/new")
     components?.queryItems = [
+        // blank issues are disabled on the repo, so GitHub rejects a template-less pre-filled
+        // URL with "Unable to create issue" (#295); the name must match a real file under
+        // .github/ISSUE_TEMPLATE/.
+        URLQueryItem(name: "template", value: "bug_report.md"),
         URLQueryItem(name: "title", value: title),
         URLQueryItem(name: "body", value: body),
     ]

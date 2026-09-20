@@ -35,7 +35,7 @@ struct FeedbackButton: View {
         // it can't — it's a fixed literal — so falling back to that same literal is unreachable
         // in practice, not a real error path worth surfacing to the user.
         return feedbackIssueURL(context: context)
-            ?? URL(string: "https://github.com/mkny13/couch-tour/issues/new")!
+            ?? URL(string: "https://github.com/mkny13/couch-tour/issues/new?template=bug_report.md")!
     }
 
     private var buildChannel: String {
