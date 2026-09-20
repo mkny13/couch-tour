@@ -521,6 +521,9 @@ public struct PlayableTrack: Equatable, Sendable {
     public let tags: [Tag]
     public let position: Int
     public let popularity: RelistenPopularity?
+    /// Non-nil for Relisten tracks — carries the source identity needed for queue keys
+    /// and the loudness-leveling cache key (#265).
+    public let recordingId: RecordingId?
 
     public init(
         id: String,
@@ -537,7 +540,8 @@ public struct PlayableTrack: Equatable, Sendable {
         likesCount: Int = 0,
         likedByUser: Bool = false,
         tags: [Tag] = [],
-        popularity: RelistenPopularity? = nil
+        popularity: RelistenPopularity? = nil,
+        recordingId: RecordingId? = nil
     ) {
         self.id = id
         self.title = title
@@ -554,6 +558,7 @@ public struct PlayableTrack: Equatable, Sendable {
         self.likedByUser = likedByUser
         self.tags = tags
         self.popularity = popularity
+        self.recordingId = recordingId
     }
 }
 

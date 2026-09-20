@@ -568,7 +568,7 @@ extension RelistenSource {
 }
 
 extension RelistenSourceTrack {
-    public func toPlayableTrack(artist: ArtistRef, showDate: String, venueName: String?, setName: String, tags: [Tag] = []) -> PlayableTrack {
+    public func toPlayableTrack(artist: ArtistRef, showDate: String, venueName: String?, setName: String, tags: [Tag] = [], recordingId: RecordingId? = nil) -> PlayableTrack {
         PlayableTrack(
             id: uuid,
             title: title,
@@ -582,7 +582,8 @@ extension RelistenSourceTrack {
             showDate: showDate,
             venueName: venueName,
             flacUrl: flacUrl,
-            tags: tags
+            tags: tags,
+            recordingId: recordingId
         )
     }
 }
@@ -660,7 +661,9 @@ extension RelistenShowWithSources {
         chosenIsSoundboard: Bool,
         artist: ArtistRef
     ) -> [PlayableTrack] {
-        (chosen?.sets ?? [])
+        // Source identity for the loudness-leveling cache key (#265).
+        let recId = chosen.map { RecordingId(artistSlug: artist.id, date: displayDate, sourceId: $0.uuid) }
+        return (chosen?.sets ?? [])
             .sorted { $0.index < $1.index }
             .flatMap { set in
                 set.tracks
@@ -678,7 +681,8 @@ extension RelistenShowWithSources {
                             showDate: displayDate,
                             venueName: venue?.name,
                             setName: set.name,
-                            tags: trackTags
+                            tags: trackTags,
+                            recordingId: recId
                         )
                     }
             }

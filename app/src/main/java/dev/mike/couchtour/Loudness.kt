@@ -303,9 +303,13 @@ fun levelingGainDb(lufs: Double?, peakDbfs: Double): Double {
  * Leveling key: identifies the recording for loudness-cache lookup.
  *
  * - phish.in tracks:   `"show:<showDate>"`
- * - Relisten tracks:   `"relisten:<artistSlug>/<showDate>/<sourceId>"`
+ * - Relisten tracks:   `"relisten:<artistSlug>/<date>/<sourceId>"`
  *
  * Byte-identical to the existing queue-key grammar in [Queue.kt].
+ * Returns null when there isn't enough identity to form a key (e.g. a track
+ * with no show date and no recording id).
  */
-val Catalog.PlayableTrack.levelingKey: String
-    get() = recordingId?.let { recordingQueueKey(it) } ?: showQueueKey(showDate)
+val PlayableTrack.levelingKey: String?
+    get() = recordingId?.let {
+        recordingQueueKey(it.artistSlug, it.date, it.sourceId)
+    } ?: showDate?.let { showQueueKey(it) }

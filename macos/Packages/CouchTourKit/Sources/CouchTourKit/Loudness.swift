@@ -261,13 +261,15 @@ extension PlayableTrack {
     /// Leveling key: identifies the recording for loudness-cache lookup.
     ///
     /// - phish.in tracks:  `"show:<showDate>"`
-    /// - Relisten tracks:  `"relisten:<artistSlug>/<showDate>/<sourceId>"`
+    /// - Relisten tracks:  `"relisten:<artistSlug>/<date>/<sourceId>"`
     ///
     /// Byte-identical to the existing queue-key grammar in ``QueueKey``.
-    public var levelingKey: String {
+    /// Returns `nil` when there isn't enough identity to form a key (e.g. a
+    /// track with no show date and no recording id).
+    public var levelingKey: String? {
         if let rec = recordingId {
-            return recordingQueueKey(rec)
+            return recordingQueueKey(rec.artistSlug, rec.date, rec.sourceId)
         }
-        return showQueueKey(showDate)
+        return showDate.map { showQueueKey($0) }
     }
 }
