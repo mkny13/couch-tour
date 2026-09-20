@@ -177,6 +177,7 @@ class OnThisDateTest {
             when (it) {
                 Backend.PHISHIN -> phishSource
                 Backend.RELISTEN -> error("not used")
+                Backend.YOUTUBE -> error("not used")
             }
         }
         assertEquals(listOf(show("1996-11-17")), result)
