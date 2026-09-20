@@ -10,6 +10,11 @@ public enum QueueKind: Equatable {
     /// server playlist slug) specifically so a local id never round-trips through
     /// `PhishInApi.playlist(id)`, matching Android's `Queue.kt` (D161 in DECISIONS.md).
     case localPlaylist
+    /// A YouTube video played through the official IFrame embed (D256, #231). The id is
+    /// the YouTube video id, not a show date — an Android client that does not yet
+    /// recognize the prefix skips the row (returns nil) rather than mis-playing it, which
+    /// is what makes this safe for the eventual shared `progress` table.
+    case youtube
 }
 
 /// Playback progress is stored under a namespaced key so every kind of queue can share one
@@ -32,6 +37,7 @@ public struct QueueRef: Equatable {
         case .playlist: return playlistQueueKey(id)
         case .recording: return recordingPrefix + id
         case .localPlaylist: return localPlaylistQueueKey(id)
+        case .youtube: return youtubeQueueKey(id)
         }
     }
 }
@@ -65,6 +71,8 @@ public func recordingQueueKey(_ artistSlug: String, _ date: String, _ sourceId: 
     recordingPrefix + RecordingId(artistSlug: artistSlug, date: date, sourceId: sourceId).id
 }
 
+public func youtubeQueueKey(_ videoId: String) -> String { youtubePrefix + videoId }
+
 /// Splits a stored key back into its parts. Returns nil for anything unrecognised rather than
 /// guessing — an unknown key should be skipped, not played as the wrong thing.
 public func parseQueueKey(_ raw: String) -> QueueRef? {
@@ -79,6 +87,13 @@ public func parseQueueKey(_ raw: String) -> QueueRef? {
     if raw.hasPrefix(showPrefix) {
         let rest = String(raw.dropFirst(showPrefix.count))
         return rest.isEmpty ? nil : QueueRef(kind: .show, id: rest)
+    }
+    // Checked before its own prefix list matters for future-proofing only: "youtube:" shares
+    // no prefix with "playlist:"/"show:", but ordering youtube first keeps a hypothetical
+    // future id containing a colon from ever re-parsing as another namespace.
+    if raw.hasPrefix(youtubePrefix) {
+        let rest = String(raw.dropFirst(youtubePrefix.count))
+        return rest.isEmpty ? nil : QueueRef(kind: .youtube, id: rest)
     }
     // Validated on the way in, unlike the other two: a recording id that isn't all three
     // parts is unusable, and failing here beats failing at fetch time.
@@ -103,3 +118,4 @@ private let showPrefix = "show:"
 private let playlistPrefix = "playlist:"
 private let recordingPrefix = "relisten:"
 private let localPlaylistPrefix = "local-playlist:"
+private let youtubePrefix = "youtube:"
