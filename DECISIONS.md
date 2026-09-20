@@ -4755,7 +4755,7 @@ The Android half mirrors macOS #229 for browse and adds the stream-resolution st
 - **Resolution behind one small interface:** `YouTubeStreamResolver` exists precisely so unit tests can use a fake — real resolution talks to YouTube and breaks whenever YouTube changes internals. `NewPipeStreamResolver` picks the highest-bitrate audio and highest-resolution muxed video stream; failures surface as `StreamResolutionException` (on-device check: UAT `uat-056`).
 - **Model:** `YouTubeVideo` mirrors the macOS model field-for-field; `audioStreamUrl`/`videoStreamUrl`/`durationMs` start null from `search.list` and are filled by `withStreams(ResolvedStreams)` on the way to playback. Progress keys use the `youtube:<videoId>` prefix per the planning note — the same prefix on both platforms, distinct from the date-keyed show rows the `progress` table already stores.
 
-### D254 — Android artist page YouTube section rides the shared catalog seam as a third Backend (#233)
+### D257 — Android artist page YouTube section rides the shared catalog seam as a third Backend (#233)
 
 Part 2 of #177 (Android half). Two shapes were possible: a parallel, YouTube-specific code path in the artist page, or folding YouTube into the existing `Backend`/`MusicSource` plumbing that the phish.in/Relisten halves already share. Chose the latter:
 
