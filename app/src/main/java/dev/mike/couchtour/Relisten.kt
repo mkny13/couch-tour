@@ -240,7 +240,8 @@ internal fun RelistenShowSummary.toShowSummary(artist: ArtistRef) = ShowSummary(
     rating = avgRating,
     popularity = popularity?.toPopularity(),
     tags = deriveSyntheticTags(isSoundboard = hasSoundboardSource, hasFlac = hasStreamableFlacSource),
-    externalRelease = CuratedMatches.match(artist.backend, artist.id, displayDate),
+    externalRelease = CuratedMatches.match(artist.backend, artist.id, displayDate)
+        ?: HeuristicMatches.match(artist.backend, artist.id, displayDate),
 )
 
 internal fun RelistenSource.toRecordingRef(): RecordingRef {
@@ -331,12 +332,14 @@ internal fun RelistenShowWithSources.toShowDetail(artist: ArtistRef, recordingId
             recordingCount = sources.size.coerceAtLeast(1),
             popularity = popularity?.toPopularity(),
             tags = summaryTags,
-            externalRelease = CuratedMatches.match(artist.backend, artist.id, displayDate),
+            externalRelease = CuratedMatches.match(artist.backend, artist.id, displayDate)
+                ?: HeuristicMatches.match(artist.backend, artist.id, displayDate),
         ),
         recording = chosenRecording,
         alternates = sources.filter { it.uuid != chosen?.uuid }.map { it.toRecordingRef() },
         tracks = tracks,
-        externalRelease = CuratedMatches.match(artist.backend, artist.id, displayDate),
+        externalRelease = CuratedMatches.match(artist.backend, artist.id, displayDate)
+            ?: HeuristicMatches.match(artist.backend, artist.id, displayDate),
     )
 }
 

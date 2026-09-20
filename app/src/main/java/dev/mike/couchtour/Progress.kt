@@ -176,6 +176,7 @@ data class ExternalReleaseEntity(
     val date: String,
     val platform: String,
     val url: String,
+    @ColumnInfo(name = "is_heuristic", defaultValue = "0") val isHeuristic: Boolean = false,
 )
 
 @Dao
@@ -189,7 +190,7 @@ interface ExternalReleaseDao {
 
 @Database(
     entities = [Progress::class, LocalPlaylistEntity::class, LocalPlaylistTrackEntity::class, ArtistTourPreferenceEntity::class, ExternalReleaseEntity::class, SourceLoudnessEntity::class, TaperPreferenceEntity::class],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class PhishInDb : RoomDatabase() {
@@ -346,6 +347,16 @@ abstract class PhishInDb : RoomDatabase() {
             }
         }
 
+        /** Adds `is_heuristic` flag to external_releases so the UI can distinguish
+         *  automated date+venue matches from hand-curated ones (#181, D258). */
+        internal val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `external_releases` ADD COLUMN `is_heuristic` INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
         @Volatile private var instance: PhishInDb? = null
 
         fun get(context: Context): PhishInDb = instance ?: synchronized(this) {
@@ -359,7 +370,7 @@ abstract class PhishInDb : RoomDatabase() {
             ).addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                 MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                MIGRATION_11_12, MIGRATION_12_13,
+                MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
             )
                 .build().also { instance = it }
         }

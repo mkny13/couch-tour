@@ -4344,10 +4344,12 @@ private fun ExternalReleasePill(release: ExternalRelease) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val ledger = LocalLedgerColors.current
     
-    val label = when (release.platform) {
+    val platformName = when (release.platform) {
         ExternalReleasePlatform.SPOTIFY -> "Spotify"
         ExternalReleasePlatform.TIDAL -> "Tidal"
     }
+    // Heuristic matches show a suffix so users know this is an automated match, not curated.
+    val label = if (release.isHeuristic) "$platformName · Auto-matched" else platformName
 
     Row(
         modifier = Modifier
@@ -4367,7 +4369,7 @@ private fun ExternalReleasePill(release: ExternalRelease) {
         horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Icon(
-            Icons.AutoMirrored.Filled.OpenInNew,
+            if (release.isHeuristic) Icons.Filled.AutoAwesome else Icons.AutoMirrored.Filled.OpenInNew,
             contentDescription = null,
             tint = ledger.textSecondary,
             modifier = Modifier.size(15.dp)

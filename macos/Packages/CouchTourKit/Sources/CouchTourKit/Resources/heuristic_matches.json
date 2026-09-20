@@ -1,0 +1,112 @@
+{
+  "phishin:phish:1994-06-22": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/2QPFTmBhHyhs6MFKMNrwSN",
+    "isHeuristic": true
+  },
+  "phishin:phish:1994-10-31": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3ORGRHSbEKflFHFVOy4hGr",
+    "isHeuristic": true
+  },
+  "phishin:phish:1994-12-31": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/7FkjqFpjnWYMzLhy3DMMXR",
+    "isHeuristic": true
+  },
+  "phishin:phish:1995-10-31": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/2LdJsOyc3sdjsFqf3r8tNj",
+    "isHeuristic": true
+  },
+  "phishin:phish:1995-12-31": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3yA8dxliMBIBsiTjnMYXWu",
+    "isHeuristic": true
+  },
+  "phishin:phish:1996-10-31": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3NLRbV0TvsfGQ9IhSVr26v",
+    "isHeuristic": true
+  },
+  "phishin:phish:1997-11-22": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/7K5GFqrasVwbIYuqCCgZNi",
+    "isHeuristic": true
+  },
+  "phishin:phish:1997-12-31": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3zxCdQCsL0FvRKkZc4vVPp",
+    "isHeuristic": true
+  },
+  "phishin:phish:1998-04-02": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/70JgjYzGkMp7QnrJCiChYx",
+    "isHeuristic": true
+  },
+  "phishin:phish:1998-04-03": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/1JBK6rQNSzYOz15xQcpKhL",
+    "isHeuristic": true
+  },
+  "phishin:phish:1998-04-04": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/4WjfmJX8DtWQ3VMipLZCMk",
+    "isHeuristic": true
+  },
+  "phishin:phish:1998-04-05": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/2Xx3xBpYCKNekqVPKGPLDW",
+    "isHeuristic": true
+  },
+  "phishin:phish:1998-11-02": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3D1MNcvEiThKH9p5T3J6IM",
+    "isHeuristic": true
+  },
+  "phishin:phish:1999-09-14": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3BNFE1Uo6AJNLPr7npFk5D",
+    "isHeuristic": true
+  },
+  "phishin:phish:1999-12-31": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/4f2oCPfVVbgSjAR9QjQ7K2",
+    "isHeuristic": true
+  },
+  "phishin:phish:2000-09-30": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/5MH9Gs8h0ODSQFN5LLiGdj",
+    "isHeuristic": true
+  },
+  "relisten:grateful-dead:1977-05-08": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3T9UKU0jMIyrRz1JMmNMjQ",
+    "isHeuristic": true
+  },
+  "relisten:grateful-dead:1972-08-27": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/43YIoHKSrEw4OU2usPwVMn",
+    "isHeuristic": true
+  },
+  "relisten:grateful-dead:1971-08-06": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/6Wz9TRAb6NAoPuxuWCfBOs",
+    "isHeuristic": true
+  },
+  "relisten:grateful-dead:1969-02-27": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/3RGrlhAHXMWb26kFsWpNCM",
+    "isHeuristic": true
+  },
+  "relisten:grateful-dead:1970-02-13": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/6tkjU4Bv3Ly0m7G3RJqEdA",
+    "isHeuristic": true
+  },
+  "relisten:grateful-dead:1973-05-26": {
+    "platform": "spotify",
+    "url": "https://open.spotify.com/album/0SxB3Z7ILzq1lBPqJSJmV7",
+    "isHeuristic": true
+  }
+}
