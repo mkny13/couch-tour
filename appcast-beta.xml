@@ -6,6 +6,15 @@
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
+            <title>0.84-beta</title>
+            <pubDate>Sun, 20 Sep 2026 00:33:49 +0000</pubDate>
+            <sparkle:version>39</sparkle:version>
+            <sparkle:shortVersionString>0.84-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.84/CouchTourBeta-v0.84.zip" length="7865437" type="application/octet-stream" sparkle:edSignature="L9R6U7MN9w6Hrh9zLCR4BLVyPjVVzrh/5edzrYxRHvb4GcJlDls0tJbVOMRCvSQJ7gPvcIFyXQcxW2JX/YlXCQ=="/>
+        </item>
+        <item>
             <title>0.82-beta</title>
             <pubDate>Sat, 12 Sep 2026 20:01:42 +0000</pubDate>
             <sparkle:version>37</sparkle:version>
