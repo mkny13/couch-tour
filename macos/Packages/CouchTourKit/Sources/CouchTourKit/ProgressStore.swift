@@ -78,6 +78,29 @@ public struct ArtistTourPreference: Codable, Equatable, Hashable, FetchableRecor
     }
 }
 
+/// Taper preferences (#173). Persisted in GRDB on macOS and Room on Android
+/// (MIGRATION_12_13). `preference` is "PREFERRED" or "AVOIDED"; neutral tapers have no row.
+public struct TaperPreference: Codable, Equatable, Hashable, FetchableRecord, PersistableRecord, TableRecord, Sendable {
+    public static let databaseTableName = "taper_preferences"
+
+    public static let preferred = "PREFERRED"
+    public static let avoided = "AVOIDED"
+
+    public var taperName: String
+    public var preference: String
+    public var updatedAt: Int64
+
+    public init(
+        taperName: String,
+        preference: String,
+        updatedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+    ) {
+        self.taperName = taperName
+        self.preference = preference
+        self.updatedAt = updatedAt
+    }
+}
+
 /// GRDB wrapper around the `progress` table. Query shapes mirror Android's `ProgressDao`
 /// one-for-one so the two clients' notions of "history" and "continue listening" never diverge.
 public final class ProgressStore {
@@ -179,6 +202,15 @@ public final class ProgressStore {
                 t.column("sampled_tracks", .integer).notNull()
                 t.column("algorithm_version", .integer).notNull()
                 t.column("measured_at", .integer).notNull()
+            }
+        }
+        // Taper preferences (#173), mirroring Android's MIGRATION_12_13. Column names match
+        // Android's `taper_preferences` table exactly.
+        migrator.registerMigration("v12_taperPreferences") { db in
+            try db.create(table: "taper_preferences") { t in
+                t.column("taperName", .text).primaryKey()
+                t.column("preference", .text).notNull()
+                t.column("updatedAt", .integer).notNull()
             }
         }
         return migrator
@@ -358,6 +390,31 @@ public final class ProgressStore {
     public func clearAllSourceLoudness() throws {
         try dbQueue.write { db in
             _ = try SourceLoudness.deleteAll(db)
+        }
+    }
+
+    // MARK: - Taper Preferences (#173)
+
+    public func saveTaperPreference(
+        taperName: String,
+        preference: String,
+        now: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+    ) throws {
+        let pref = TaperPreference(taperName: taperName, preference: preference, updatedAt: now)
+        try dbQueue.write { db in
+            try pref.save(db)
+        }
+    }
+
+    public func getTaperPreferences() throws -> [TaperPreference] {
+        try dbQueue.read { db in
+            try TaperPreference.order(Column("updatedAt").desc).fetchAll(db)
+        }
+    }
+
+    public func deleteTaperPreference(taperName: String) throws {
+        try dbQueue.write { db in
+            _ = try TaperPreference.deleteOne(db, key: taperName)
         }
     }
 }

@@ -645,6 +645,48 @@ final class ProgressStoreTests: XCTestCase {
         XCTAssertNil(try store.getSourceLoudness(key: "relisten:phish/1997-11-17/x"))
     }
 
+    // -------------------------------------------------------- taper preferences (#173)
+
+    /// Taper preferences mirror Android's `taper_preferences` (Room MIGRATION_12_13):
+    /// a row with preference "PREFERRED"/"AVOIDED", no row = neutral.
+    func testSavesAndReadsBackTaperPreference() throws {
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.preferred)
+        let rows = try store.getTaperPreferences()
+        XCTAssertEqual(1, rows.count)
+        XCTAssertEqual("Charlie Miller", rows[0].taperName)
+        XCTAssertEqual(TaperPreference.preferred, rows[0].preference)
+    }
+
+    func testTaperPreferenceUpsertReplacesRatherThanDuplicating() throws {
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.preferred)
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.avoided)
+        let rows = try store.getTaperPreferences()
+        XCTAssertEqual(1, rows.count)
+        XCTAssertEqual(TaperPreference.avoided, rows[0].preference)
+    }
+
+    func testDeleteTaperPreferenceReturnsTheTaperToNeutral() throws {
+        try store.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.preferred)
+        try store.deleteTaperPreference(taperName: "Charlie Miller")
+        XCTAssertTrue(try store.getTaperPreferences().isEmpty)
+        // Deleting a taper that was never marked is a no-op, not an error.
+        try store.deleteTaperPreference(taperName: "Mike Luba")
+    }
+
+    func testTaperPreferencesSurviveStoreReopen() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fileStore = try ProgressStore(url: dir.appendingPathComponent("phishin.db"))
+        try fileStore.saveTaperPreference(taperName: "Charlie Miller", preference: TaperPreference.avoided)
+
+        let reopened = try ProgressStore(url: dir.appendingPathComponent("phishin.db"))
+        let rows = try reopened.getTaperPreferences()
+        XCTAssertEqual(1, rows.count)
+        XCTAssertEqual(TaperPreference.avoided, rows[0].preference)
+    }
+
     // -------------------------------------------------------- backup exclusion (#192)
 
     func testDefaultURLDirectoryIsExcludedFromBackup() throws {

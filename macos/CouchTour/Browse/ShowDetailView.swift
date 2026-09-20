@@ -232,7 +232,12 @@ struct ShowDetailView: View {
         }
         .buttonStyle(.plain)
         .popover(isPresented: $showSourcePicker) {
-            SourcePicker(sources: sources, currentID: detail.recording?.id, onSelect: selectSource)
+            SourcePicker(
+                sources: sources,
+                currentID: detail.recording?.id,
+                taperPreferences: appModel.taperPreferences,
+                onSelect: selectSource
+            )
         }
     }
 
@@ -424,8 +429,22 @@ struct ShowDetailView: View {
     }
 
     private func allSources(_ detail: ShowDetail) -> [RecordingRef] {
-        ([detail.recording].compactMap { $0 } + detail.alternates)
-            .sorted { $0.rating > $1.rating }
+        // Stable sort: preferred tapers float to the top, avoided sink to the bottom, and
+        // within each band the rating order is preserved (#173).
+        func prefScore(_ source: RecordingRef) -> Int {
+            switch appModel.taperPreferences[source.taper ?? source.label] {
+            case TaperPreference.preferred: return -1
+            case TaperPreference.avoided: return 1
+            default: return 0
+            }
+        }
+        return ([detail.recording].compactMap { $0 } + detail.alternates)
+            .sorted { a, b in
+                let scoreA = prefScore(a)
+                let scoreB = prefScore(b)
+                if scoreA != scoreB { return scoreA < scoreB }
+                return a.rating > b.rating
+            }
     }
 
     private func selectSource(_ recordingID: String) {
@@ -462,14 +481,21 @@ struct ShowDetailView: View {
 private struct SourcePicker: View {
     let sources: [RecordingRef]
     let currentID: String?
+    let taperPreferences: [String: String]
     let onSelect: (String) -> Void
 
     var body: some View {
         List(sources, id: \.id) { source in
+            let taperName = source.taper ?? source.label
             Button {
                 onSelect(source.id)
             } label: {
-                SourceRow(source: source, isCurrent: source.id == currentID)
+                SourceRow(
+                    source: source,
+                    isCurrent: source.id == currentID,
+                    preference: taperPreferences[taperName],
+                    onCyclePreference: { appModel.cycleTaperPreference(taperName) }
+                )
             }
             .buttonStyle(.plain)
         }
@@ -477,11 +503,18 @@ private struct SourcePicker: View {
         .frame(width: 340)
         .frame(minHeight: 80, maxHeight: 420)
     }
+
+    @EnvironmentObject private var appModel: AppModel
 }
 
 private struct SourceRow: View {
     let source: RecordingRef
     let isCurrent: Bool
+    var preference: String? = nil
+    var onCyclePreference: () -> Void = {}
+
+    private var isPreferred: Bool { preference == TaperPreference.preferred }
+    private var isAvoided: Bool { preference == TaperPreference.avoided }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -495,8 +528,28 @@ private struct SourceRow: View {
                 HStack(spacing: 6) {
                     Text(source.label)
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(isPreferred ? .bold : .semibold)
+                        .foregroundStyle(isPreferred ? Color.accentColor : .primary)
                         .lineLimit(1)
+                    if let preference {
+                        Button(action: onCyclePreference) {
+                            Image(systemName: isPreferred ? "hand.thumbsup.fill" : "hand.thumbsdown.fill")
+                                .font(.caption)
+                                .foregroundStyle(isPreferred ? Color.accentColor : Color.red)
+                        }
+                        .buttonStyle(.plain)
+                        .help(isPreferred ? "Preferred — tap to mark avoided" : "Avoided — tap to clear")
+                    } else {
+                        // Owner picked a visible icon (issue #173 comment): tapping cycles
+                        // neutral -> preferred -> avoided -> neutral.
+                        Button(action: onCyclePreference) {
+                            Image(systemName: "hand.thumbsup")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Tap to mark this taper preferred")
+                    }
                     if source.hasFlac {
                         sourceBadge("FLAC", color: .green)
                     } else {
@@ -531,6 +584,14 @@ private struct SourceRow: View {
             }
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(
+            // Preferred rows get a subtle accent wash; avoided rows stay readable but
+            // read as demoted (Android mirrors this with alpha).
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isPreferred ? Color.accentColor.opacity(0.10) : Color.clear)
+        )
+        .opacity(isAvoided ? 0.6 : 1.0)
         .contentShape(Rectangle())
     }
 
