@@ -1270,7 +1270,7 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
                 // YouTube section (#233): the artist channel's videos, appended below the
                 // period list — the macOS target's layout (D251). Nothing at all when
                 // there's no curated channel or no API key.
-                youtubeSection(artist, nav)
+                youtubeSection(artist) { nav.navigate("youtube/$it") }
             }
         }
     }
@@ -1279,14 +1279,16 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
 /** Appends one artist's YouTube section into an [androidx.compose.foundation.lazy.LazyListScope]
  *  (#233). Hidden entirely — not even a header — when the artist has no curated channel
  *  or the install has no API key (D44/D251 precedent), since a permanently broken section
- *  is noise; a real fetch failure gets an inline error, distinct from "no videos". */
-private fun androidx.compose.foundation.lazy.LazyListScope.youtubeSection(
+ *  is noise; a real fetch failure gets an inline error, distinct from "no videos".
+ *  [onVideoClick] receives the video id — the caller owns the navigation so tests don't
+ *  need a [NavHostController]. */
+internal fun androidx.compose.foundation.lazy.LazyListScope.youtubeSection(
     artist: ArtistRef,
-    nav: NavHostController,
+    onVideoClick: (String) -> Unit,
 ) {
     if (youtubeSectionChannel(artist) == null) return
     item(key = "youtube") {
-        YouTubeSectionContent(artist, nav)
+        YouTubeSectionContent(artist, onVideoClick)
     }
 }
 
@@ -1294,12 +1296,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.youtubeSection(
  *  videos load, an inline error on failure (distinct from a genuinely empty channel),
  *  and the video rows once loaded. */
 @Composable
-private fun YouTubeSectionContent(artist: ArtistRef, nav: NavHostController) {
+internal fun YouTubeSectionContent(artist: ArtistRef, onVideoClick: (String) -> Unit) {
     val section = loadOnce("youtube-${artist.key}") { YouTubeCatalogSource.youtubeContent(artist) }
     SectionHeader("YouTube", divided = true)
     Loaded(section.value) { videos ->
         videos.forEach { video ->
-            YouTubeVideoRow(video) { nav.navigate("youtube/${video.id}") }
+            YouTubeVideoRow(video) { onVideoClick(video.id) }
         }
         if (videos.isEmpty()) {
             Text(
