@@ -353,6 +353,7 @@ class MigrationTest {
                 PhishInDb.MIGRATION_10_11,
                 PhishInDb.MIGRATION_11_12,
                 PhishInDb.MIGRATION_12_13,
+                PhishInDb.MIGRATION_13_14,
             )
             .allowMainThreadQueries()
             .build()

@@ -4369,7 +4369,7 @@ private fun ExternalReleasePill(release: ExternalRelease) {
         horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Icon(
-            if (release.isHeuristic) Icons.Filled.AutoAwesome else Icons.AutoMirrored.Filled.OpenInNew,
+            if (release.isHeuristic) Icons.Default.Star else Icons.AutoMirrored.Filled.OpenInNew,
             contentDescription = null,
             tint = ledger.textSecondary,
             modifier = Modifier.size(15.dp)
