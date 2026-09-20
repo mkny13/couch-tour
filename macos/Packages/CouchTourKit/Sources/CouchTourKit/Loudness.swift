@@ -127,9 +127,10 @@ public final class LoudnessMeter {
              Biquad(b0: s2[0], b1: s2[1], b2: s2[2], a1: s2[3], a2: s2[4])]
         }
 
-        blockSize = Int(0.4 * Double(sampleRate))
+        let bs = Int(0.4 * Double(sampleRate))
+        blockSize = bs
         stepSize  = Int(0.1 * Double(sampleRate))
-        channelBlockBuf = (0..<channels).map { _ in [Double](repeating: 0, count: blockSize) }
+        channelBlockBuf = (0..<channels).map { _ in [Double](repeating: 0, count: bs) }
     }
 
     /// Feed interleaved float PCM samples.
