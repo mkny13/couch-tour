@@ -195,6 +195,7 @@ class DiscoveryCatalogE2ETest {
             val key = when (candidate.artist.backend) {
                 Backend.PHISHIN -> showQueueKey(candidate.date)
                 Backend.RELISTEN -> recordingShowKey(candidate.artist.id, candidate.date)
+                Backend.YOUTUBE -> "youtube-show:${candidate.artist.id}"
             }
             key in playedKeys
         }

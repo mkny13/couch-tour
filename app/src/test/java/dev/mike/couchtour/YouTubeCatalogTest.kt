@@ -85,8 +85,9 @@ class YouTubeCatalogTest {
         assertTrue(YouTubeCatalogSource.artists().isEmpty())
         assertTrue(YouTubeCatalogSource.periods(PHISH).isEmpty())
         assertTrue(YouTubeCatalogSource.shows(PHISH, PeriodRef("2024", "2024")).isEmpty())
-        assertTrue(YouTubeCatalogSource.search("tubular").isEmpty())
-        assertTrue(YouTubeCatalogSource.search("tubular").failed.isEmpty())
+        val hits = YouTubeCatalogSource.search("tubular")
+        assertTrue(hits.isEmpty)
+        assertTrue(hits.failed.isEmpty())
     }
 
     @Test
