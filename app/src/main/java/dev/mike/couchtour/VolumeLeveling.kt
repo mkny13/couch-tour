@@ -7,11 +7,7 @@ import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -82,7 +78,7 @@ class LevelingAudioProcessor : BaseAudioProcessor() {
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         val enc = inputAudioFormat.encoding
-        if (enc != C.ENCODING_PCM_16_BIT && enc != C.ENCODING_PCM_FLOAT) {
+        if (enc != C.ENCODING_PCM_16BIT && enc != C.ENCODING_PCM_FLOAT) {
             throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
         }
         channels = inputAudioFormat.channelCount
@@ -107,7 +103,9 @@ class LevelingAudioProcessor : BaseAudioProcessor() {
                     val g = nextGain()
                     repeat(channels) {
                         val s = input.short
-                        out.putShort((s * g).roundToInt().toShort())
+                        // Clamp, don't wrap: a boosted sample past full scale must pin at
+                        // ±32767, not overflow into the opposite sign.
+                        out.putShort((s * g).roundToInt().coerceIn(-32768, 32767).toShort())
                     }
                 }
                 out.put(input)
@@ -235,7 +233,7 @@ class LoudnessMeasurer(
                     // on the way out even when the decode throws.
                     val temp = File(tempDir, "leveling-${System.nanoTime()}.bin")
                     try {
-                        bytes.writeTo(temp)
+                        temp.writeBytes(bytes)
                         decoder.decode(temp)
                     } finally {
                         temp.delete()
@@ -400,73 +398,5 @@ class MediaCodecSegmentDecoder : SegmentDecoder {
     }
 }
 
-// ---------------------------------------------------------------------------
-// VolumeLeveler — the coordinator (#267)
-// ---------------------------------------------------------------------------
-
-/**
- * Decides when to measure and what gain to run, and owns the one in-flight measurement.
- *
- * - One measurement at a time; a queue switch cancels the old job and starts a new one,
- *   so flipping through shows in a hurry never queues a measurement backlog.
- * - Setting off ⇒ gain 0 dB immediately, no measurement started, cache untouched (rows
- *   outlive the toggle; they're keyed by source, not by setting).
- * - Failure to measure (network down, no usable segment) ⇒ 0 dB for that queue, nothing
- *   cached, so the next queue load retries. Playback never waits on a measurement: gain
- *   lands mid-track via the 50 ms ramp, which is the whole reason the processor ramps.
- *
- * macOS counterpart: `LoudnessMeasurer` (CouchTourKit, #268) + the MTAudioProcessingTap
- * in `Player.swift` (D259) — same cache shape, same gain rule, platform-native plumbing.
- */
-class VolumeLeveler(
-    private val scope: CoroutineScope,
-    private val db: PhishInDb,
-    private val measurer: LoudnessMeasurer,
-) {
-    private var job: Job? = null
-
-    /**
-     * Call on every queue change and every setting flip. Measures [key] when it has no
-     * current cached row, then reports the gain to apply through [onGain].
-     *
-     * The cache check and the write both go through [SourceLoudnessDao], version-gated:
-     * a row written by [LEVELING_ALGORITHM_VERSION] is a hit, anything else a miss that
-     * triggers a fresh measurement.
-     */
-    fun onQueueChanged(key: String?, tracks: List<LevelingSample>, onGain: (Double) -> Unit) {
-        job?.cancel()
-        job = if (key == null) null else scope.launch {
-            val dao = db.sourceLoudnessDao()
-            val cached = dao.getCurrent(key, LEVELING_ALGORITHM_VERSION)
-            if (cached != null) {
-                onGain(levelingGainDb(cached.lufs, cached.peakDb))
-                return@launch
-            }
-            // 0 dB while measuring — the queue plays un-leveled until the answer lands.
-            onGain(0.0)
-            ensureActive()
-            val measurement = measurer.measure(tracks)
-            if (measurement != null) {
-                dao.upsert(
-                    SourceLoudnessEntity(
-                        key = key,
-                        lufs = measurement.lufs,
-                        peakDb = measurement.peakDb,
-                        sampledTracks = measurement.sampledTracks,
-                        measuredAt = System.currentTimeMillis(),
-                        algorithmVersion = LEVELING_ALGORITHM_VERSION,
-                    )
-                )
-                onGain(levelingGainDb(measurement.lufs, measurement.peakDb))
-            }
-            // measurement == null: stay at 0 dB, write nothing, retry on the next load.
-        }
-    }
-
-    /** Called when the Settings toggle turns leveling off: gain back to 0 dB, job cancelled. */
-    fun onDisabled(onGain: (Double) -> Unit) {
-        job?.cancel()
-        job = null
-        onGain(0.0)
-    }
-}
+// The VolumeLeveler coordinator lives in VolumeLeveler.kt — one class per file keeps the
+// measurer (pure) apart from the coordinator (db + scope), and keeps both readable.
