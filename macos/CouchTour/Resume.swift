@@ -28,6 +28,11 @@ func resolveShowDetail(for progress: PlaybackProgress, localPlaylistStore: Local
     case .playlist:
         throw ResumeError.unresumable
 
+    // YouTube resume isn't implemented yet — a `youtube:` row (D253) can't be
+    // re-fetched into a ShowDetail, so it can't be resumed from history.
+    case .youtube:
+        throw ResumeError.unresumable
+
     case .localPlaylist:
         guard let localPlaylistStore, let playlist = try? localPlaylistStore.playlist(id: ref.id) else {
             throw ResumeError.unresumable
