@@ -4763,5 +4763,15 @@ Completes the macOS half of #268 (the measurer + `SourceLoudness` cache shipped 
 - **Cast excluded:** `connectCast` cancels the in-flight measurement and taps are not scheduled while casting — the receiver decodes the audio, so a local tap gain is meaningless there; `disconnectCast` re-runs `startQueue`, which re-schedules leveling.
 - **Settings toggle:** "Level volume across sources" (`PlaybackSettings.levelVolume`, @Published) is observed with Combine; toggling off resets all taps to unity immediately (no stall) and re-enabling reuses taps + cache. Cast sessions ignore the toggle change (verified live: UAT `uat-060`/`uat-061`).
 
+### D262 — Android artist page YouTube section rides the shared catalog seam as a third Backend (#233)
+
+Part 2 of #177 (Android half). Two shapes were possible: a parallel, YouTube-specific code path in the artist page, or folding YouTube into the existing `Backend`/`MusicSource` plumbing that the phish.in/Relisten halves already share. Chose the latter:
+
+- **`Backend.YOUTUBE` as a real enum member:** every `when (backend)` becomes compiler-checked. YouTube is not a tape catalog — `YouTubeCatalogSource` answers empty for artists/periods/shows/search — but the empty answers are honest ones (an artist id in a nav argument resolving through `sourceFor` must not crash), and exhaustive `when`s turn "did we remember YouTube here?" into a compile error. Artists can't be favorited and never appear in any artist list (its `artists()` is empty), so the tape-only branches (Surprise Me, On This Date, Next Stop) carry `Unit` branches that are unreachable by construction.
+- **The channel map stays curated, like macOS D251:** `YouTubeChannels` in `YouTubeCatalog.kt` maps `ArtistRef.key` → channel id (`phishin:phish` → Phish's official channel). There is no catalog API for this; only the owner knows which channel is authoritative per tape artist. `youtubeSectionChannel()` returns null — hiding the section entirely — when the artist is unmapped *or* the install has no API key (D44/D251: owner-supplied key; a section that can only ever fail is noise). Distinct inline error state for real fetch failures (network/quota), unlike an empty channel's "No videos." note.
+- **`MusicSource.youtubeContent(artist)`** with an empty default: non-YouTube sources contribute nothing (no capability flag — same reasoning as OnThisDate's showsFor), YouTube's source fronts `YouTubeApi.search`. UI: the artist page's `LazyColumn` appends a YouTube section below the period list (macOS layout, D251); rows are 16:9 thumbnail + title + relative date, tapping navigates to a final-shaped `youtube/{videoId}` route whose screen is a stub until #234 (Part 3) fills in playback.
+- **Tests:** `YouTubeCatalogTest` (MockWebServer, channel-resolution/hide rules, source wiring) and `ArtistScreenTest` — the app's first Robolectric Compose UI tests, which pull in `ui-test-junit4`/`ui-test-manifest` (BOM-versioned). Section states verified: rendered rows, tap→video id, hidden (no channel / no key), inline error on HTTP failure, "No videos." on an empty channel. 20 new tests; Android suite at 590, macOS unchanged at 438.
+
+
 
 

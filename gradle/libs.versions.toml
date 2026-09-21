@@ -97,6 +97,10 @@ okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver",
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
+# Compose UI tests run under Robolectric on the JVM (no emulator in CI); versions come
+# from the compose BOM like every other androidx.compose artifact.
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
