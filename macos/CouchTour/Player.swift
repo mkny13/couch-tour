@@ -3,6 +3,7 @@ import AVFoundation
 import Combine
 import CouchTourKit
 import MediaPlayer
+import MediaToolbox
 
 /// Wraps `AVQueuePlayer` and remote Google Cast client over one show's filtered track list.
 /// Like `PlaybackService.kt` on Android, it coordinates platform media players, progress recording,
@@ -12,6 +13,43 @@ import MediaPlayer
 /// `PlaybackService` makes — the player itself is what knows when a track actually changed or
 /// the queue actually drained (D20), not whichever screen happened to trigger playback.
 private let volumeDefaultsKey = "playerVolume"
+
+// MARK: - Volume leveling tap (#268)
+//
+// The playback half of the leveling pipeline: a constant-gain `MTAudioProcessingTap`
+// attached to each queue item's audio track. The measurer (in CouchTourKit) hands back a
+// `SourceLoudness`; `Player` turns it into a gain with the shared `levelingGainDb` rule and
+// pokes it into the tap storage — no re-seek, no queue rebuild, mid-track if necessary.
+
+/// The tap's mutable state, shared between the main actor (writes) and the realtime audio
+/// thread (reads). A non-atomic Float is deliberate: the callback reads one word, so a
+/// torn read is impossible on every supported architecture and a one-callback-stale value
+/// around a gain change is inaudible.
+final class GainTapStorage {
+    var gain: Float
+    init(gain: Float) { self.gain = gain }
+}
+
+// C function pointers — they can't capture, so `clientInfo` (the storage) carries the state.
+
+private let gainTapFinalize: MTAudioProcessingTapFinalizeCallback = { tap in
+    // Balances the passRetained handed to `clientInfo` at create time.
+    Unmanaged<GainTapStorage>.fromOpaque(MTAudioProcessingTapGetStorage(tap)).takeRetainedValue()
+}
+
+private let gainTapProcess: MTAudioProcessingTapProcessCallback = { tap, _, _, ioBufferList, _, _ in
+    let storage = Unmanaged<GainTapStorage>
+        .fromOpaque(MTAudioProcessingTapGetStorage(tap))
+        .takeUnretainedValue()
+    let gain = storage.gain
+    guard gain != 1.0 else { return }
+    for buffer in UnsafeMutableAudioBufferListPointer(ioBufferList) {
+        guard let data = buffer.mData else { continue }
+        let floats = data.assumingMemoryBound(to: Float.self)
+        let count = Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
+        for i in 0..<count { floats[i] *= gain }
+    }
+}
 
 @MainActor
 final class Player: NSObject, ObservableObject {
@@ -109,6 +147,19 @@ final class Player: NSObject, ObservableObject {
     private var currentItemObservation: NSKeyValueObservation?
     private var rateObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
+
+    // MARK: - Volume leveling (#268)
+
+    /// Background measurement pipeline (30s decode-ahead slices → BS.1770 → `progress` cache).
+    /// Only created when a `ProgressStore` exists: without the cache there is nowhere to
+    /// record a measurement, and re-measuring every queue from scratch would be pure waste.
+    private var loudnessMeasurer: LoudnessMeasurer?
+    private var levelingTask: Task<Void, Never>?
+    private var levelVolumeObservation: AnyCancellable?
+    /// Linear gain held for taps that attach after a measurement lands.
+    private var pendingLevelingGainLinear: Float = 1.0
+    /// Per-queue-item tap gain storage, keyed by item identity.
+    private var gainStorageByItem: [ObjectIdentifier: GainTapStorage] = [:]
     /// Bare-Space play/pause. Not a SwiftUI `keyboardShortcut` — see `SpacePlaybackHotkey`.
     private var spaceKeyMonitor: Any?
 
@@ -117,7 +168,13 @@ final class Player: NSObject, ObservableObject {
         self.progressStore = progressStore
         self.syncSession = syncSession
         self.playbackSettings = playbackSettings
+        if let progressStore {
+            loudnessMeasurer = LoudnessMeasurer(cache: progressStore)
+        }
         super.init()
+        levelVolumeObservation = playbackSettings?.$levelVolume.sink { [weak self] enabled in
+            self?.levelVolumeDidChange(enabled)
+        }
         queuePlayer.volume = volume
         configureRemoteCommands()
         configureSpaceKeyMonitor()
@@ -162,6 +219,10 @@ final class Player: NSObject, ObservableObject {
         isCasting = true
         castDeviceName = device.name
         queuePlayer.pause()
+        // Gain decisions are meaningless while the receiver decodes — don't let a
+        // in-flight measurement land into the taps mid-cast (#268).
+        levelingTask?.cancel()
+        levelingTask = nil
 
         castClient.connect(to: device)
         if let track = currentTrack {
@@ -426,6 +487,10 @@ final class Player: NSObject, ObservableObject {
     private func stopAudio() {
         queuePlayer.pause()
         queuePlayer.removeAllItems()
+        gainStorageByItem.removeAll()
+        levelingTask?.cancel()
+        levelingTask = nil
+        pendingLevelingGainLinear = 1.0
         items.removeAll()
         tracks = []
         currentIndex = nil
@@ -517,6 +582,10 @@ final class Player: NSObject, ObservableObject {
         self.tracks = filtered.tracks
         postShowPrompt = nil
         queuePlayer.removeAllItems()
+        // New queue → new items → new taps. Drop the old per-item gain state first.
+        gainStorageByItem.removeAll()
+        levelingTask?.cancel()
+        levelingTask = nil
         items = filtered.tracks.map { track in
             let playURL = (track.flacUrl?.isEmpty == false) ? track.flacUrl! : track.url
             let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
@@ -529,6 +598,8 @@ final class Player: NSObject, ObservableObject {
         positionMs = 0
         pendingResumeMs = resumePositionMs > 0 ? resumePositionMs : nil
         observeCurrentItemReadyForResume()
+        scheduleGainTaps()
+        scheduleLeveling()
         queuePlayer.play()
         updateNowPlayingInfo()
         claimNowPlaying(playing: true)
@@ -741,5 +812,119 @@ final class Player: NSObject, ObservableObject {
         let fromTrack = [track.showDate, track.venueName].compactMap { $0 }.joined(separator: " · ")
         if !fromTrack.isEmpty { return fromTrack }
         return "\(show.date) · \(show.where_)"
+    }
+
+    // MARK: - Volume leveling (#268)
+
+    /// Queue items from the playhead onward — the ones actually inserted into
+    /// `queuePlayer` (playback can start mid-show; see `items`).
+    private var liveItems: [AVPlayerItem] {
+        guard let currentIndex, items.indices.contains(currentIndex) else { return [] }
+        return Array(items[currentIndex...])
+    }
+
+    /// Reacts to the Settings toggle. Turning it on attaches taps and kicks off a
+    /// measurement (cache hit returns near-instantly); turning it off drops every tap
+    /// back to unity gain but leaves them attached — re-enabling on the same queue
+    /// then needs no new tap setup, just the cached measurement.
+    private func levelVolumeDidChange(_ enabled: Bool) {
+        guard !isCasting else { return }
+        levelingTask?.cancel()
+        levelingTask = nil
+        pendingLevelingGainLinear = 1.0
+        for storage in gainStorageByItem.values { storage.gain = 1.0 }
+        if enabled {
+            scheduleGainTaps()
+            scheduleLeveling()
+        }
+    }
+
+    private func scheduleGainTaps() {
+        guard playbackSettings?.levelVolume == true, !isCasting else { return }
+        for item in liveItems {
+            attachGainTap(to: item)
+        }
+    }
+
+    /// Runs the decode-ahead measurement in the background and applies the resulting
+    /// gain in place. One task per source key: a newer `startQueue` cancels the stale
+    /// task, and a completed measurement whose source has since changed is discarded
+    /// (its cached `SourceLoudness` still benefits the next play of that source).
+    private func scheduleLeveling() {
+        guard let settings = playbackSettings, settings.levelVolume else { return }
+        guard !isCasting else { return }
+        guard let measurer = loudnessMeasurer,
+              let key = tracks.first?.levelingKey else { return }
+        let queueTracks = tracks
+        levelingTask?.cancel()
+        levelingTask = Task { [weak self] in
+            let row = await measurer.measure(key: key, tracks: queueTracks)
+            guard let row, !Task.isCancelled else { return }
+            guard let self, self.tracks.first?.levelingKey == key else { return }
+            // `measure` returning nil (segments unfetchable / decode failure) means no
+            // trustworthy loudness — stay at 0 dB rather than guess.
+            self.applyLevelingGainDb(levelingGainDb(lufs: row.lufs, peakDbfs: row.peakDb))
+        }
+    }
+
+    private func applyLevelingGainDb(_ db: Double) {
+        let linear = Float(pow(10.0, db / 20.0))
+        pendingLevelingGainLinear = linear
+        for storage in gainStorageByItem.values { storage.gain = linear }
+    }
+
+    /// Registers `item` for a tap and resolves its audio track asynchronously. The
+    /// storage is registered up front so a Settings toggle or a completed measurement
+    /// mid-load is not lost; a queue teardown between registration and track load is
+    /// detected by identity and abandons the tap.
+    private func attachGainTap(to item: AVPlayerItem) {
+        let itemID = ObjectIdentifier(item)
+        guard gainStorageByItem[itemID] == nil else { return }
+        let storage = GainTapStorage(gain: pendingLevelingGainLinear)
+        gainStorageByItem[itemID] = storage
+        Task { [weak self] in
+            guard let self else { return }
+            guard self.gainStorageByItem[itemID] === storage else { return }
+            let audioTracks: [AVAssetTrack]
+            do {
+                audioTracks = try await item.asset.loadTracks(withMediaType: .audio)
+            } catch {
+                return
+            }
+            guard let audioTrack = audioTracks.first,
+                  self.gainStorageByItem[itemID] === storage else { return }
+            self.installGainTap(storage: storage, audioTrack: audioTrack, on: item)
+        }
+    }
+
+    private func installGainTap(storage: GainTapStorage, audioTrack: AVAssetTrack, on item: AVPlayerItem) {
+        let storageUnmanaged = Unmanaged.passRetained(storage)
+        var callbacks = MTAudioProcessingTapCallbacks(
+            version: kMTAudioProcessingTapCallbacksVersion_0,
+            clientInfo: storageUnmanaged.toOpaque(),
+            init: nil,
+            finalize: gainTapFinalize,
+            prepare: nil,
+            unprepare: nil,
+            process: gainTapProcess
+        )
+        var tapOut: MTAudioProcessingTap?
+        let status = MTAudioProcessingTapCreate(
+            kCFAllocatorDefault,
+            &callbacks,
+            kMTAudioProcessingTapCreationFlag_PostEffects,
+            &tapOut
+        )
+        guard status == noErr, let tap = tapOut else {
+            storageUnmanaged.release()
+            return
+        }
+        let parameters = AVMutableAudioMixInputParameters(track: audioTrack)
+        parameters.audioTapProcessor = tap
+        // MTAudioProcessingTapCreate handed us +1; the audio mix holds its own retain.
+        Unmanaged.passUnretained(tap).release()
+        let mix = AVMutableAudioMix()
+        mix.inputParameters = [parameters]
+        item.audioMix = mix
     }
 }

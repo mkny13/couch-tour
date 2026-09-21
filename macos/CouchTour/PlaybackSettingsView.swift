@@ -22,6 +22,10 @@ struct PlaybackSettingsView: View {
                 Text("Automatically bypasses non-music tracks (intros, outros, tuning, stage banter, crowd noise, and stage announcements) during playback.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Toggle("Level volume across sources", isOn: $settings.levelVolume)
+                Text("Measures each recording's loudness in the background (30-second decoded slices, EBU R128 / BS.1770) and plays it back with a constant gain, so a quiet audience tape and a hot soundboard mix play at the same loudness. Google Cast sessions are excluded — the receiver decodes the audio.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("Software Updates") {
                 Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
