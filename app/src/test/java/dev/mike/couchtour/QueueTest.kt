@@ -131,4 +131,45 @@ class QueueTest {
         // A bare "playlist:" id routes to PhishInApi.playlist; a local one has no such slug.
         assertEquals(QueueKind.LOCAL_PLAYLIST, parseQueueKey("local-playlist:abc-123")!!.kind)
     }
+
+    // ---------------------------------------------------------------- YouTube (#234)
+
+    @Test
+    fun `builds a youtube key from a video id`() {
+        assertEquals("youtube:dQw4w9WgXcQ", youtubeProgressKey("dQw4w9WgXcQ"))
+    }
+
+    @Test
+    fun `round-trips a youtube key`() {
+        val ref = parseQueueKey(youtubeProgressKey("dQw4w9WgXcQ"))
+        assertEquals(QueueRef(QueueKind.YOUTUBE, "dQw4w9WgXcQ"), ref)
+        assertEquals("youtube:dQw4w9WgXcQ", ref!!.key)
+    }
+
+    @Test
+    fun `rejects an empty youtube key`() {
+        assertNull(parseQueueKey("youtube:"))
+    }
+
+    @Test
+    fun `youtube keys do not collide with the other prefixes`() {
+        // The prefix decides the kind; a video id is opaque and may embed another prefix's
+        // literal, so each existing key must keep parsing as it always has.
+        assertEquals(QueueKind.SHOW, parseQueueKey("show:1997-02-13")!!.kind)
+        assertEquals(QueueKind.PLAYLIST, parseQueueKey("playlist:youtube:x")!!.kind)
+        assertEquals(QueueKind.RECORDING, parseQueueKey("relisten:youtube/1977-05-08/src")!!.kind)
+        assertEquals(QueueKind.LOCAL_PLAYLIST, parseQueueKey("local-playlist:youtube:x")!!.kind)
+        assertEquals(QueueKind.YOUTUBE, parseQueueKey("youtube:1997-02-13")!!.kind)
+        assertEquals(
+            QueueRef(QueueKind.YOUTUBE, "show:1997-02-13"),
+            parseQueueKey("youtube:show:1997-02-13"),
+        )
+    }
+
+    @Test
+    fun `the next-stop youtube-show identity is not a queue key`() {
+        // NextStop's "have I played this show?" key starts "youtube-", never "youtube:",
+        // so a progress row can never be mistaken for a video — or vice versa.
+        assertNull(parseQueueKey("youtube-show:UC123"))
+    }
 }
