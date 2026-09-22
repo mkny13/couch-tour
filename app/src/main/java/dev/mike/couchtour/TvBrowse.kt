@@ -10,6 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -23,13 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.tv.foundation.lazy.grid.TvGridCells
-import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
-import androidx.tv.foundation.lazy.grid.items
-import androidx.tv.foundation.lazy.list.TvLazyColumn
-import androidx.tv.foundation.lazy.list.TvLazyRow
-import androidx.tv.foundation.lazy.list.item
-import androidx.tv.foundation.lazy.list.items
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -38,9 +37,13 @@ import androidx.tv.material3.Text
 
 /**
  * The Google TV browse hierarchy (#225, Part 2.1 of #9): the artist level and the
- * artist→years level, rendered with Compose for TV (`androidx.tv.foundation.lazy.*` +
- * `androidx.tv.material3`) rather than Leanback Views. Show/track drill-down stays out
- * (Part 2.2); playback stays out (Part 3).
+ * artist→years level, rendered with Compose for TV (`androidx.tv.material3` widgets, laid
+ * out with plain `androidx.compose.foundation.lazy.*` containers — the pinned
+ * `androidx.tv:tv-foundation:1.0.0` stable release shipped its `TvLazyColumn`/`TvLazyRow`/
+ * `TvLazyVerticalGrid` wrappers only in earlier alphas and dropped them before 1.0.0, so
+ * standard `LazyColumn`/`LazyRow`/`LazyVerticalGrid` plus tv-material3's own
+ * focus-aware components are what Compose for TV actually ships today) rather than Leanback
+ * Views. Show/track drill-down stays out (Part 2.2); playback stays out (Part 3).
  *
  * The grouping and the years both ride the exact seams the phone app and Android Auto
  * already use — [groupArtistsForBrowse] for the phish/favorited/everyone-else split and
@@ -149,7 +152,7 @@ private fun TvArtistSectionList(
     sections: List<TvArtistSectionData>,
     onArtistClick: (ArtistRef) -> Unit,
 ) {
-    TvLazyColumn(
+    LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -164,7 +167,7 @@ private fun TvArtistSectionList(
                 )
             }
             item(key = "row-${section.section.name}") {
-                TvLazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     items(section.artists, key = { it.key }) { artist ->
                         TvCard(
                             title = artist.name,
@@ -212,8 +215,8 @@ private fun TvYearBrowseScreen(artist: ArtistRef, onBack: () -> Unit) {
                     val yearItems = remember(periods) {
                         periods!!.getOrNull()?.let { tvYearItems(it) }.orEmpty()
                     }
-                    TvLazyVerticalGrid(
-                        columns = TvGridCells.Fixed(6),
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(6),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),

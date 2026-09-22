@@ -97,8 +97,9 @@ class TvBrowseTest {
                 PeriodRef(id = "1998", label = "1998", showCount = 42),
             ),
         )
-        assertEquals("1 show", items[0].subtitle)
-        assertEquals("42 shows", items[1].subtitle)
+        // Newest-first sort puts 1998 ahead of 1997.
+        assertEquals("42 shows", items[0].subtitle)
+        assertEquals("1 show", items[1].subtitle)
     }
 
     @Test
