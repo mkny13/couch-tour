@@ -308,4 +308,113 @@ class MediaItemsTest {
         assertEquals("Set 1", rExtras?.getString(Keys.SET_NAME))
         assertEquals(3, rExtras?.getInt(Keys.TRACK_POSITION))
     }
+
+    // ------------------------------------------------------- YouTube (#234)
+
+    /** A resolved, playable YouTube video as #232's resolver produces it. */
+    private fun ytVideo(
+        id: String = "dQw4w9WgXcQ",
+        title: String = "Tweezer · Hampton 1989",
+    ) = YouTubeVideo(
+        id = id,
+        title = title,
+        channelId = "UCDEPOd0RCvw8iSTqFpSBZLA",
+        thumbnailUrl = "https://i.ytimg.com/vi/$id/hqdefault.jpg",
+        audioStreamUrl = "https://audio.example/$id.m4a",
+        videoStreamUrl = "https://video.example/$id.mp4",
+        durationMs = 3_875_000,
+    )
+
+    @Test
+    fun `a youtube media item plays the audio-only stream by default`() {
+        val item = youtubeMediaItem(ytVideo(), YouTubePlaybackMode.AUDIO)
+
+        assertEquals("https://audio.example/dQw4w9WgXcQ.m4a", item.localConfiguration?.uri.toString())
+    }
+
+    @Test
+    fun `a youtube media item in video mode plays the muxed stream`() {
+        val item = youtubeMediaItem(ytVideo(), YouTubePlaybackMode.VIDEO)
+
+        assertEquals("https://video.example/dQw4w9WgXcQ.mp4", item.localConfiguration?.uri.toString())
+    }
+
+    @Test
+    fun `a youtube media item carries both stream urls and its mode in extras`() {
+        val extras = youtubeMediaItem(ytVideo(), YouTubePlaybackMode.AUDIO).mediaMetadata.extras
+
+        assertEquals("https://audio.example/dQw4w9WgXcQ.m4a", extras?.getString(Keys.YOUTUBE_AUDIO_URL))
+        assertEquals("https://video.example/dQw4w9WgXcQ.mp4", extras?.getString(Keys.YOUTUBE_VIDEO_URL))
+        assertEquals("audio", extras?.getString(Keys.YOUTUBE_MODE))
+    }
+
+    @Test
+    fun `a youtube item tags the youtube backend and keys its queue for resume`() {
+        val item = youtubeMediaItem(ytVideo(), YouTubePlaybackMode.AUDIO)
+        val extras = item.mediaMetadata.extras
+
+        assertEquals(Backend.YOUTUBE.id, extras?.getString(Keys.BACKEND))
+        assertEquals("youtube:dQw4w9WgXcQ", extras?.getString(Keys.QUEUE_KEY))
+        // The video id is the media id, so the Cast converter and the resume path agree.
+        assertEquals("dQw4w9WgXcQ", item.mediaId)
+    }
+
+    @Test
+    fun `a youtube item scrobbles the channel as artist and the video as title`() {
+        // D50: the Last.fm app reads the MediaSession directly, so the channel the video
+        // came from is the artist — and the album stays the queue context, not a fake one.
+        val item = youtubeMediaItem(ytVideo(title = "Bathtub Gin · 1994-06-26"), YouTubePlaybackMode.AUDIO, artistName = "Trey Anastasio")
+
+        assertEquals("Bathtub Gin · 1994-06-26", item.mediaMetadata.title)
+        assertEquals("Trey Anastasio", item.mediaMetadata.artist)
+        // The album is the queue context (artist · source), same rule as every backend.
+        assertEquals("Trey Anastasio · YouTube", item.mediaMetadata.albumTitle)
+    }
+
+    @Test
+    fun `a youtube item publishes the thumbnail as artwork`() {
+        val item = youtubeMediaItem(ytVideo(), YouTubePlaybackMode.AUDIO)
+
+        assertEquals("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", item.mediaMetadata.artworkUri.toString())
+    }
+
+    @Test
+    fun `switching modes swaps the stream url and keeps identity`() {
+        // The toggle's whole contract: only the URI and mime change, so replaceMediaItem
+        // keeps the position, the queue, and the lockscreen metadata untouched.
+        val audio = youtubeMediaItem(ytVideo(), YouTubePlaybackMode.AUDIO)
+        val video = youtubeItemForMode(audio, YouTubePlaybackMode.VIDEO)!!
+
+        assertEquals("https://video.example/dQw4w9WgXcQ.mp4", video.localConfiguration?.uri.toString())
+        assertEquals("video", video.mediaMetadata.extras?.getString(Keys.YOUTUBE_MODE))
+        assertEquals(audio.mediaId, video.mediaId)
+        assertEquals(
+            audio.mediaMetadata.extras?.getString(Keys.QUEUE_KEY),
+            video.mediaMetadata.extras?.getString(Keys.QUEUE_KEY),
+        )
+        assertEquals(audio.mediaMetadata.title, video.mediaMetadata.title)
+        assertEquals(audio.mediaMetadata.artist, video.mediaMetadata.artist)
+
+        // And back — the exact round-trip the audio/video toggle performs.
+        val backToAudio = youtubeItemForMode(video, YouTubePlaybackMode.AUDIO)!!
+        assertEquals("https://audio.example/dQw4w9WgXcQ.m4a", backToAudio.localConfiguration?.uri.toString())
+        assertEquals("audio", backToAudio.mediaMetadata.extras?.getString(Keys.YOUTUBE_MODE))
+    }
+
+    @Test
+    fun `a non-youtube item is not a toggle target`() {
+        val info = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "McNichols Arena", art = null)
+        val track = Track(id = 1, title = "Tweezer", mp3Url = "https://phish.in/a.mp3", audioStatus = "complete")
+
+        assertNull(youtubeItemForMode(mediaItem(track, info), YouTubePlaybackMode.VIDEO))
+    }
+
+    @Test
+    fun `a youtube item built with no stream url at all fails loudly`() {
+        // A blank URI would surface as a confusing player error mid-playback; the item
+        // builder refuses instead.
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            youtubeMediaItem(ytVideo().copy(audioStreamUrl = null, videoStreamUrl = null), YouTubePlaybackMode.AUDIO)
+        }
+    }
 }

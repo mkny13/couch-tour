@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -69,6 +70,8 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -118,6 +121,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.PlayerView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -223,12 +229,25 @@ fun App(
                     nav = nav,
                 )
             }
-            // A YouTube video row's destination. Part 3 (#234) replaces the stub with the
-            // player screen; the route shape is already final so the section's navigation
-            // doesn't have to change again.
-            composable("youtube/{videoId}") { entry ->
+            // A YouTube video row's destination (#234): the playback screen. The video's
+            // title/thumb/artist travel as query args so the screen can build the queue
+            // without another fetch; the id stays the single path argument.
+            composable(
+                "youtube/{videoId}?title={title}&thumb={thumb}&artist={artist}&artistId={artistId}",
+                arguments = listOf(
+                    navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("thumb") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("artist") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("artistId") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { entry ->
                 YouTubeVideoScreen(
                     videoId = entry.arguments?.getString("videoId").orEmpty(),
+                    title = entry.arguments?.getString("title").orEmpty(),
+                    thumbUrl = entry.arguments?.getString("thumb").orEmpty(),
+                    artistName = entry.arguments?.getString("artist").orEmpty(),
+                    artistId = entry.arguments?.getString("artistId").orEmpty(),
+                    vm = vm,
                     nav = nav,
                 )
             }
@@ -1270,7 +1289,9 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
                 // YouTube section (#233): the artist channel's videos, appended below the
                 // period list — the macOS target's layout (D251). Nothing at all when
                 // there's no curated channel or no API key.
-                youtubeSection(artist) { nav.navigate("youtube/$it") }
+                youtubeSection(artist) { video ->
+                    nav.navigate(youtubeRoute(video.id, video.title, video.thumbnailUrl, artist.name, artist.id))
+                }
             }
         }
     }
@@ -1280,11 +1301,12 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
  *  (#233). Hidden entirely — not even a header — when the artist has no curated channel
  *  or the install has no API key (D44/D251 precedent), since a permanently broken section
  *  is noise; a real fetch failure gets an inline error, distinct from "no videos".
- *  [onVideoClick] receives the video id — the caller owns the navigation so tests don't
- *  need a [NavHostController]. */
+ *  [onVideoClick] receives the whole [YouTubeVideo] — the caller owns the navigation and
+ *  #234's screen needs the title/thumb alongside the id, so tests don't need a
+ *  [NavHostController]. */
 internal fun androidx.compose.foundation.lazy.LazyListScope.youtubeSection(
     artist: ArtistRef,
-    onVideoClick: (String) -> Unit,
+    onVideoClick: (YouTubeVideo) -> Unit,
 ) {
     if (youtubeSectionChannel(artist) == null) return
     item(key = "youtube") {
@@ -1296,12 +1318,12 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.youtubeSection(
  *  videos load, an inline error on failure (distinct from a genuinely empty channel),
  *  and the video rows once loaded. */
 @Composable
-internal fun YouTubeSectionContent(artist: ArtistRef, onVideoClick: (String) -> Unit) {
+internal fun YouTubeSectionContent(artist: ArtistRef, onVideoClick: (YouTubeVideo) -> Unit) {
     val section = loadOnce("youtube-${artist.key}") { YouTubeCatalogSource.youtubeContent(artist) }
     SectionHeader("YouTube", divided = true)
     Loaded(section.value) { videos ->
         videos.forEach { video ->
-            YouTubeVideoRow(video) { onVideoClick(video.id) }
+            YouTubeVideoRow(video) { onVideoClick(video) }
         }
         if (videos.isEmpty()) {
             Text(
@@ -1354,21 +1376,152 @@ private fun YouTubeVideoRow(video: YouTubeVideo, onClick: () -> Unit) {
     }
 }
 
-/** Placeholder for #234's video screen. The route exists so the section's rows navigate
- *  somewhere real in the meantime, and so Part 3 only swaps the body. */
+/**
+ * #234's video screen: starts (or picks up) playback of one YouTube video through the
+ * shared session — lockscreen controls, scrobbling and progress all work like any other
+ * queue — defaulting to audio-only background playback. The video surface renders the
+ * muxed stream only while this screen is front-and-center; leaving the screen (or the
+ * audio/video toggle) never restarts playback.
+ */
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
-private fun YouTubeVideoScreen(videoId: String, nav: NavHostController) {
-    Column(Modifier.fillMaxSize()) {
-        Header("YouTube", nav)
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Playback coming soon ($videoId)",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
+private fun YouTubeVideoScreen(
+    videoId: String,
+    title: String,
+    thumbUrl: String,
+    artistName: String,
+    artistId: String,
+    vm: PlayerViewModel,
+    nav: NavHostController,
+) {
+    val state by vm.state.collectAsState()
+    val playbackError by vm.playbackError.collectAsState()
+    val alreadyPlaying = state.backend == Backend.YOUTUBE.id && state.hasQueue && state.trackId == videoId
+    // Returning to the screen for a video that's already playing must not restart it —
+    // unlike a fresh row tap, which intentionally starts the video over.
+    LaunchedEffect(videoId, alreadyPlaying) {
+        if (!alreadyPlaying) {
+            vm.playYouTube(
+                YouTubeVideo(
+                    id = videoId,
+                    title = title,
+                    channelId = "",
+                    thumbnailUrl = thumbUrl.ifBlank { null },
+                ),
+                artistName = artistName.ifBlank { "Phish" },
+                artistId = artistId,
             )
         }
     }
+
+    Column(Modifier.fillMaxSize()) {
+        Header(title.ifBlank { "YouTube" }, nav)
+
+        // 16:9 surface: the real video when one is showing, the thumbnail otherwise.
+        if (state.youTubeMode == YouTubePlaybackMode.VIDEO && vm.player != null) {
+            AndroidView(
+                factory = { context ->
+                    PlayerView(context).apply {
+                        useController = false
+                        setShutterBackgroundColor(android.graphics.Color.BLACK)
+                    }
+                },
+                update = { view -> view.player = vm.player },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f),
+            )
+        } else {
+            AsyncImage(
+                model = thumbUrl.ifBlank { null },
+                contentDescription = title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            )
+        }
+
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(
+                title.ifBlank { videoId },
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (artistName.isNotBlank()) {
+                Text(
+                    artistName,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            playbackError?.let { message ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 12.dp),
+                ) {
+                    Text(
+                        message,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { vm.playYouTube(YouTubeVideo(id = videoId, title = title, channelId = "", thumbnailUrl = thumbUrl.ifBlank { null }), artistName, artistId) }) {
+                        Text("Retry")
+                    }
+                }
+            }
+
+            // Transport: play/pause plus the audio/video toggle (#234's headline). The
+            // toggle swaps the stream in place — position survives.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                IconButton(
+                    onClick = { vm.togglePlayPause() },
+                    enabled = alreadyPlaying,
+                ) {
+                    if (state.isBuffering) {
+                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (state.isPlaying) "Pause" else "Play",
+                        )
+                    }
+                }
+                // Hidden until playback exists — there is nothing to toggle before that.
+                if (alreadyPlaying) {
+                    TextButton(onClick = { vm.toggleYouTubeMode() }) {
+                        Icon(
+                            if (state.youTubeMode == YouTubePlaybackMode.VIDEO) Icons.Default.Headphones else Icons.Default.Videocam,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (state.youTubeMode == YouTubePlaybackMode.VIDEO) "Audio only" else "Watch video")
+                    }
+                }
+            }
+        }
+    }
 }
+
+/** Builds the player route for one video, with its context percent-encoded (#234). */
+internal fun youtubeRoute(
+    videoId: String,
+    title: String?,
+    thumbUrl: String?,
+    artistName: String?,
+    artistId: String?,
+): String = "youtube/${android.net.Uri.encode(videoId)}" +
+    "?title=${android.net.Uri.encode(title.orEmpty())}" +
+    "&thumb=${android.net.Uri.encode(thumbUrl.orEmpty())}" +
+    "&artist=${android.net.Uri.encode(artistName.orEmpty())}" +
+    "&artistId=${android.net.Uri.encode(artistId.orEmpty())}"
 
 /** Shows within one period of one Relisten artist. */
 @Composable
@@ -3782,8 +3935,16 @@ private fun ResumeBanner(progress: Progress, onResume: () -> Unit) {
     }
 }
 
-/** Navigates to whatever a queue key points at. */
-internal fun openQueueKey(key: String, nav: NavHostController) {
+/** Navigates to whatever a queue key points at. The optional context only matters for
+ *  YouTube queues (#234), which are keyed by video id alone — the title/thumb/artist that
+ *  the player route wants come from whichever progress row the caller has on hand. */
+internal fun openQueueKey(
+    key: String,
+    nav: NavHostController,
+    trackTitle: String? = null,
+    artUrl: String? = null,
+    artistName: String? = null,
+) {
     val ref = parseQueueKey(key) ?: return
     when (ref.kind) {
         QueueKind.PLAYLIST -> nav.navigate("playlist/${ref.id}")
@@ -3793,6 +3954,9 @@ internal fun openQueueKey(key: String, nav: NavHostController) {
             nav.navigate("recording/${Backend.RELISTEN.id}/${rec.artistSlug}/${rec.date}?src=${rec.sourceId}")
         }
         QueueKind.LOCAL_PLAYLIST -> nav.navigate("local-playlist/${ref.id}")
+        QueueKind.YOUTUBE -> nav.navigate(
+            youtubeRoute(ref.id, trackTitle, artUrl, artistName, artistId = "")
+        )
     }
 }
 

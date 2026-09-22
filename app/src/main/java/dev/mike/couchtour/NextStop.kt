@@ -72,6 +72,8 @@ internal fun playedShowIds(keys: Collection<String>): Set<String> = keys.mapNotN
             QueueKind.SHOW -> showQueueKey(ref.id)
             QueueKind.RECORDING -> parseRecordingId(ref.id)?.let { recordingShowKey(it.artistSlug, it.date) }
             QueueKind.PLAYLIST, QueueKind.LOCAL_PLAYLIST -> null
+            // A YouTube item is a single video, not a show; never matches a played show.
+            QueueKind.YOUTUBE -> null
         }
     }
 }

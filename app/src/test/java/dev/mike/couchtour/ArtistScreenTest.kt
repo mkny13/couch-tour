@@ -49,7 +49,7 @@ class ArtistScreenTest {
         YouTubeApi.apiKey = null
     }
 
-    private fun setContent(artist: ArtistRef, onVideoClick: (String) -> Unit = {}) {
+    private fun setContent(artist: ArtistRef, onVideoClick: (YouTubeVideo) -> Unit = {}) {
         compose.setContent {
             MaterialTheme {
                 LazyColumn {
@@ -85,7 +85,7 @@ class ArtistScreenTest {
         YouTubeApi.apiKey = "test-key"
         enqueueVideos("It's Ice")
         var clicked: String? = null
-        setContent(PHISH) { clicked = it }
+        setContent(PHISH) { clicked = it.id }
 
         compose.waitUntil { compose.onAllNodesWithText("It's Ice").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("It's Ice").performClick()
