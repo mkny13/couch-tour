@@ -9,12 +9,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -25,10 +27,12 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.abs
+import kotlin.math.PI
 import kotlin.math.pow
+import kotlin.math.sin
 
 /**
  * The Android volume-leveling half (#267): the playback gain processor, the decode-ahead
@@ -70,7 +74,7 @@ class VolumeLevelingTest {
         return out
     }
 
-    private fun processorConfigured(sampleRate: Int, channels: Int, floatPcm: Boolean = false): LevelingAudioProcessor {
+    private fun configuredProcessor(sampleRate: Int, channels: Int, floatPcm: Boolean = false): LevelingAudioProcessor {
         val p = LevelingAudioProcessor()
         p.configure(
             AudioProcessor.AudioFormat(
@@ -90,10 +94,14 @@ class VolumeLevelingTest {
         } else {
             floatsToPcm16(samples)
         }
-        p.queueInput(ByteBuffer.wrap(bytes))
+        val out = ByteBuffer.allocate(bytes.size * 2).order(ByteOrder.nativeOrder())
+        out.put(p.queueInput(ByteBuffer.wrap(bytes)))
         p.queueEndOfStream()
-        val out = p.output
-        out.order(ByteOrder.nativeOrder())
+        while (true) {
+            val chunk = p.output
+            if (chunk.hasRemaining()) out.put(chunk) else break
+        }
+        out.flip()
         val result = ArrayList<Float>(samples.size)
         if (floatPcm) {
             val fb = out.asFloatBuffer()
@@ -111,13 +119,14 @@ class VolumeLevelingTest {
 
     @Test
     fun `processor boosts a quiet signal by +6 dB`() {
-        val p = processorConfigured(48_000, 2)
+        val p = configuredProcessor(48_000, 2)
         p.setGainDb(6.0)
         val input = interleavedStereoSine(48_000, 1.0, -30.0)
         val out = push(p, input)
-        // After a 50 ms ramp the gain is settled at 10^(6/20) ≈ 1.9953; compare the
-        // settled tail (skip the ramp) against the input scaled by the same factor.
-        val skip = 60 * 2 // 60 frames, stereo
+        // After the 50 ms ramp (2400 frames at 48 kHz) the gain is settled at
+        // 10^(6/20) ≈ 1.9953; compare the settled tail against the input scaled
+        // by the same factor.
+        val skip = 3000 * 2 // 3000 frames, stereo
         for (i in skip until out.size) {
             assertEquals(input[i] * 1.9953f, out[i], 1e-3f)
         }
@@ -125,7 +134,7 @@ class VolumeLevelingTest {
 
     @Test
     fun `processor clamps int16 output instead of wrapping`() {
-        val p = processorConfigured(48_000, 2)
+        val p = configuredProcessor(48_000, 2)
         p.setGainDb(12.0)
         // Full-scale sine × 4× gain = way past ±1.0 — every sample must pin, not wrap.
         val out = push(p, interleavedStereoSine(48_000, 0.5, -0.5))
@@ -134,7 +143,7 @@ class VolumeLevelingTest {
 
     @Test
     fun `processor passes float pcm through with unity gain`() {
-        val p = processorConfigured(48_000, 2, floatPcm = true)
+        val p = configuredProcessor(48_000, 2, floatPcm = true)
         p.setGainDb(0.0) // unity
         val input = interleavedStereoSine(48_000, 0.5, -20.0)
         val out = push(p, input, floatPcm = true)
@@ -152,13 +161,13 @@ class VolumeLevelingTest {
 
     @Test
     fun `resetGain returns to unity with a ramp`() {
-        val p = processorConfigured(48_000, 2)
+        val p = configuredProcessor(48_000, 2)
         p.setGainDb(-12.0)
-        push(p, FloatArray(4800 * 2))
+        push(p, FloatArray(4800 * 2)) // 4800 frames of silence — ramp fully settled
         p.resetGain()
         val input = interleavedStereoSine(48_000, 1.0, -20.0)
         val out = push(p, input)
-        assertEquals(input[2400], out[2400], 1e-3f) // settled back to 0 dB
+        assertEquals(input[3000 * 2], out[3000 * 2], 1e-3f) // settled back to 0 dB
     }
 
     // -----------------------------------------------------------------------
@@ -167,10 +176,14 @@ class VolumeLevelingTest {
 
     @Test
     fun `sample indices spread across the track list`() {
-        assertEquals(listOf(0, 1, 2), levelingSampleIndices(total = 3))
-        assertEquals(listOf(4), levelingSampleIndices(total = 8))
+        assertEquals(listOf(0), levelingSampleIndices(total = 1))
+        assertEquals(listOf(0, 1), levelingSampleIndices(total = 2))
+        // Canonical macOS vectors: up to 3 samples, spread, never the tail alone.
+        assertEquals(listOf(1, 3, 5), levelingSampleIndices(total = 7))
+        assertEquals(listOf(5, 10, 15), levelingSampleIndices(total = 20))
         assertEquals(listOf(3, 6, 9), levelingSampleIndices(total = 12))
-        assertEquals((0 until 30).toList(), levelingSampleIndices(total = 30))
+        // More tracks than max caps at max.
+        assertEquals(3, levelingSampleIndices(total = 100).size)
     }
 
     @Test
