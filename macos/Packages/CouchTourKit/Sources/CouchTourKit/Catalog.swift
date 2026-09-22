@@ -352,10 +352,27 @@ public enum ExternalReleasePlatform: String, Codable, Sendable, Hashable {
 public struct ExternalRelease: Codable, Hashable, Sendable {
     public let platform: ExternalReleasePlatform
     public let url: String
+    /// True when this match was produced by the heuristic date+venue algorithm rather than
+    /// hand-curated. The UI shows a confidence indicator so users know the match is automated.
+    public let isHeuristic: Bool
     
-    public init(platform: ExternalReleasePlatform, url: String) {
+    enum CodingKeys: String, CodingKey {
+        case platform
+        case url
+        case isHeuristic
+    }
+    
+    public init(platform: ExternalReleasePlatform, url: String, isHeuristic: Bool = false) {
         self.platform = platform
         self.url = url
+        self.isHeuristic = isHeuristic
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        platform = try c.decode(ExternalReleasePlatform.self, forKey: .platform)
+        url = try c.decode(String.self, forKey: .url)
+        isHeuristic = try c.decodeIfPresent(Bool.self, forKey: .isHeuristic) ?? false
     }
 
     /// Returns the app-specific URL scheme (e.g., spotify:// or tidal://) derived from the web URL.
@@ -917,6 +934,7 @@ extension Show {
             id: id,
             likedByUser: likedByUser,
             externalRelease: CuratedMatches.shared.match(backend: .phishin, artistId: PHISH.id, date: date)
+                ?? HeuristicMatches.shared.match(backend: .phishin, artistId: PHISH.id, date: date)
         )
     }
 

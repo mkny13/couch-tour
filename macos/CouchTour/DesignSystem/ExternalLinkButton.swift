@@ -4,6 +4,7 @@ import SwiftUI
 
 /// External release link pill (#228).
 /// Opens the platform's native app via URL Scheme (spotify://, tidal://) with a web player fallback.
+/// Heuristic matches display an "Auto-matched" suffix and a spark icon (D258).
 public struct ExternalLinkButton: View {
     public let externalRelease: ExternalRelease
 
@@ -18,7 +19,7 @@ public struct ExternalLinkButton: View {
             HStack(spacing: 8) {
                 Image(systemName: iconName)
                     .font(.system(size: 14))
-                Text(platformLabel)
+                Text(label)
                     .font(.system(size: 14, weight: .medium))
             }
             .frame(height: 38)
@@ -33,6 +34,9 @@ public struct ExternalLinkButton: View {
     }
 
     private var iconName: String {
+        if externalRelease.isHeuristic {
+            return "sparkles"
+        }
         switch externalRelease.platform {
         case .spotify: return "music.note"
         case .tidal: return "waveform"
@@ -44,6 +48,11 @@ public struct ExternalLinkButton: View {
         case .spotify: return "Spotify"
         case .tidal: return "Tidal"
         }
+    }
+
+    /// Heuristic matches show a suffix so users know this is an automated match, not curated.
+    private var label: String {
+        externalRelease.isHeuristic ? "\(platformLabel) · Auto-matched" : platformLabel
     }
 
     private func openLink() {
