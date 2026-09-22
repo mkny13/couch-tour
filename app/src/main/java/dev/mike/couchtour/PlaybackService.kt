@@ -53,11 +53,17 @@ object Keys {
     const val SET_NAME = "set_name"
     const val TRACK_POSITION = "track_position"
 
+    /** YouTube playback (#234): the resolved stream URLs and the current playback mode. */
+    const val YOUTUBE_AUDIO_URL = "youtube_audio_url"
+    const val YOUTUBE_VIDEO_URL = "youtube_video_url"
+    const val YOUTUBE_MODE = "youtube_mode"
+
     /** Cast has to be told what to carry across the wire; nothing else enumerates these. */
     val ALL = listOf(
         QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID,
         LIKED, LIKES_COUNT, FLAC_URL, MP3_URL, SHOW_DATE, VENUE_NAME, ARTIST_NAME, ARTIST_ID,
-        SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION
+        SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION,
+        YOUTUBE_AUDIO_URL, YOUTUBE_VIDEO_URL, YOUTUBE_MODE
     )
 }
 
@@ -585,6 +591,25 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
             QueueKind.LOCAL_PLAYLIST -> localPlaylistQueueItems(PhishInDb.get(applicationContext).localPlaylistDao(), ref.id)
+            QueueKind.YOUTUBE -> {
+                // Resolving a video means NewPipe talking to YouTube; a failure yields an
+                // empty folder rather than a dead browse row (#234). Resumes in audio mode
+                // — the car (or any head unit) is a background-audio surface.
+                runCatching { NewPipeStreamResolver.resolve(ref.id) }.getOrNull()?.let { resolved ->
+                    listOf(
+                        youtubeMediaItem(
+                            YouTubeVideo(
+                                id = ref.id,
+                                title = progress?.trackTitle.orEmpty(),
+                                channelId = "",
+                                thumbnailUrl = progress?.artUrl,
+                            ).withStreams(resolved),
+                            YouTubePlaybackMode.AUDIO,
+                            artistName = progress?.artist?.takeIf { it.isNotBlank() } ?: "Phish",
+                        )
+                    )
+                } ?: emptyList()
+            }
         }
         if (progress == null || progress.finished || all.isEmpty()) return all
         return all.drop(progress.trackIndex.coerceIn(0, all.lastIndex))

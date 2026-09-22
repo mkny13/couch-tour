@@ -377,3 +377,122 @@ internal fun String.requireHttps(): String {
     if (this.startsWith("https://", ignoreCase = true)) return this
     return "https://invalid"
 }
+
+// ------------------------------------------------------------------ YouTube (#234)
+
+/**
+ * How a YouTube video is currently playing: audio-only (background playback, screen can
+ * go away) or with the muxed video+audio stream. The audio/video toggle (#234, the
+ * Android counterpart of macOS's dropped #16 toggle — macOS plays YouTube through the
+ * policy-restricted IFrame embed (D256), but Android resolves direct streams per D253,
+ * so both modes are genuinely available here) swaps between the two with
+ * [Player.replaceMediaItem], which keeps the queue and the playback position.
+ */
+internal enum class YouTubePlaybackMode(val id: String) {
+    AUDIO("audio"),
+    VIDEO("video");
+
+    companion object {
+        fun fromId(id: String?): YouTubePlaybackMode? = entries.firstOrNull { it.id == id }
+    }
+}
+
+private fun YouTubePlaybackMode.streamUrl(video: YouTubeVideo): String =
+    (if (this == YouTubePlaybackMode.AUDIO) video.audioStreamUrl else video.videoStreamUrl).orEmpty()
+
+private fun YouTubePlaybackMode.mimeType(): String =
+    // ExoPlayer sniffs the real container and never reads this; it exists for the Cast
+    // media-item converter (see [coreMediaItem]). YouTube's default direct formats are
+    // MP4-family (m4a audio, mp4 muxed video), which is the honest default here.
+    if (this == YouTubePlaybackMode.AUDIO) MimeTypes.AUDIO_MP4 else MimeTypes.VIDEO_MP4
+
+/**
+ * The playable [MediaItem] for one resolved YouTube video (#234) — a single-item queue,
+ * unlike every other builder here. Queue key is [youtubeProgressKey], so the video's
+ * position lands in the same `progress` table as shows and tapes and resumes like them;
+ * both stream URLs travel in the extras so the mode toggle can rebuild the item without
+ * re-resolving.
+ */
+internal fun youtubeMediaItem(
+    video: YouTubeVideo,
+    mode: YouTubePlaybackMode,
+    artistName: String = "Phish",
+    artistId: String = "phish",
+): MediaItem {
+    val audioUrl = video.audioStreamUrl.orEmpty().requireHttps()
+    val videoUrl = video.videoStreamUrl.orEmpty().requireHttps()
+    val url = mode.streamUrl(video).orEmpty().requireHttps()
+    check(url.isNotBlank()) { "YouTube item for ${video.id} built in $mode mode with no stream URL" }
+
+    val info = QueueInfo(
+        key = youtubeProgressKey(video.id),
+        title = artistName,
+        subtitle = "YouTube",
+        art = video.thumbnailUrl,
+        artist = artistName,
+        artistId = artistId,
+    )
+    val extras = mediaItemExtras(
+        info = info,
+        id = video.id,
+        waveformUrl = null,
+        backend = Backend.YOUTUBE.id,
+        likedByUser = false,
+        likesCount = 0,
+        // Neither MP3_URL nor FLAC_URL apply to YouTube streams; the mode badge reads
+        // YOUTUBE_MODE instead (PlayerViewModel.refresh), not the FLAC key.
+        mp3Url = "",
+        flacUrl = null,
+        usesFlac = false,
+        showDate = null,
+        venueName = null,
+        artist = artistName,
+        artistId = artistId,
+        showRating = 0.0,
+        tapeLineage = null,
+        setName = "",
+        trackPosition = 0,
+    ).apply {
+        putString(Keys.YOUTUBE_AUDIO_URL, audioUrl)
+        putString(Keys.YOUTUBE_VIDEO_URL, videoUrl)
+        putString(Keys.YOUTUBE_MODE, mode.id)
+    }
+    val meta = mediaMetadata(
+        title = video.title,
+        artist = artistName,
+        art = video.thumbnailUrl,
+        showDate = null,
+        venueName = null,
+        info = info,
+        extras = extras,
+    )
+
+    return MediaItem.Builder()
+        .setMediaId(video.id)
+        .setUri(url)
+        .setMimeType(mode.mimeType())
+        .setMediaMetadata(meta)
+        .build()
+}
+
+/**
+ * Rebuilds an in-flight YouTube [MediaItem] for another [YouTubePlaybackMode] — the
+ * toggle's payload. Identity (mediaId, queue key, metadata, artwork) is preserved so
+ * [Player.replaceMediaItem] can swap it in without dropping the queue or restarting
+ * playback; only the URI and mime type change. Returns null for anything that isn't a
+ * YouTube item (no stream URLs in the extras), so a stray call is a no-op, not a crash.
+ */
+internal fun youtubeItemForMode(item: MediaItem, mode: YouTubePlaybackMode): MediaItem? {
+    val extras = item.mediaMetadata.extras ?: return null
+    val audioUrl = extras.getString(Keys.YOUTUBE_AUDIO_URL) ?: return null
+    val videoUrl = extras.getString(Keys.YOUTUBE_VIDEO_URL) ?: return null
+    val url = (if (mode == YouTubePlaybackMode.AUDIO) audioUrl else videoUrl)
+        ?.takeIf { it.isNotBlank() } ?: return null
+    val nextExtras = Bundle(extras).apply { putString(Keys.YOUTUBE_MODE, mode.id) }
+    val meta = item.mediaMetadata.buildUpon().setExtras(nextExtras).build()
+    return item.buildUpon()
+        .setUri(url.requireHttps())
+        .setMimeType(mode.mimeType())
+        .setMediaMetadata(meta)
+        .build()
+}
