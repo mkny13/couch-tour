@@ -12,7 +12,11 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
@@ -52,6 +56,8 @@ object Keys {
     const val TAPE_LINEAGE = "tape_lineage"
     const val SET_NAME = "set_name"
     const val TRACK_POSITION = "track_position"
+    const val LEVELING_KEY = "leveling_key"
+    const val TRACK_DURATION_MS = "track_duration_ms"
 
     /** YouTube playback (#234): the resolved stream URLs and the current playback mode. */
     const val YOUTUBE_AUDIO_URL = "youtube_audio_url"
@@ -63,6 +69,7 @@ object Keys {
         QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID,
         LIKED, LIKES_COUNT, FLAC_URL, MP3_URL, SHOW_DATE, VENUE_NAME, ARTIST_NAME, ARTIST_ID,
         SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION,
+        LEVELING_KEY, TRACK_DURATION_MS,
         YOUTUBE_AUDIO_URL, YOUTUBE_VIDEO_URL, YOUTUBE_MODE
     )
 }
@@ -103,6 +110,14 @@ class PlaybackService : MediaLibraryService() {
     private var castPlayer: RemoteCastPlayer? = null
     private var handoff: Handoff? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Volume leveling (#267). The processor sits in the local player's render pipeline —
+    // one instance for the service's lifetime, so its gain state survives track changes
+    // and reconfigures without dropping audio. Cast bypasses it entirely: the receiver
+    // renders, so a cast queue plays un-leveled (same as the macOS tap being skipped on
+    // external audio devices).
+    private val levelingProcessor = LevelingAudioProcessor()
+    private lateinit var volumeLeveler: VolumeLeveler
 
     // -------------------------------------------------------------- audio focus / ducking
     // Cast doesn't touch phone audio, so focus is only ever requested for localPlayer.
@@ -164,7 +179,20 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         Favorites.init(this)
 
-        val player = ExoPlayer.Builder(this)
+        // The leveling processor has to be in the sink's processor chain, which means
+        // building the sink ourselves through a custom renderers factory. Everything else
+        // about the factory stays default — this only reroutes buildAudioSink.
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParameters: Boolean,
+            ): AudioSink = DefaultAudioSink.Builder(context)
+                .setAudioProcessors(arrayOf<AudioProcessor>(levelingProcessor))
+                .build()
+        }
+
+        val player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -199,6 +227,27 @@ class PlaybackService : MediaLibraryService() {
                     else ExoPlayer.PreloadConfiguration.DEFAULT
                 )
                 player.setPauseAtEndOfMediaItems(false)
+            }
+        }
+
+        // Volume leveling (#267). Reacts to queue transitions (see playerListener) and to
+        // the toggle: off means 0 dB immediately and no measurement running; on means
+        // re-evaluate whatever queue is loaded right now.
+        volumeLeveler = VolumeLeveler(
+            scope = scope,
+            db = PhishInDb.get(applicationContext),
+            measurer = LoudnessMeasurer(
+                decoder = MediaCodecSegmentDecoder(),
+                tempDir = cacheDir,
+            ),
+        )
+        scope.launch {
+            PlaybackSettings.levelVolume.collect { enabled ->
+                if (enabled) {
+                    updateLeveling(session?.player?.currentMediaItem)
+                } else {
+                    volumeLeveler.onDisabled { levelingProcessor.resetGain() }
+                }
             }
         }
 
@@ -253,11 +302,41 @@ class PlaybackService : MediaLibraryService() {
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
             saveNow()
             SyncSession.requestDebouncedPush(progressDao())
+            updateLeveling(item)
         }
 
         override fun onPlaybackStateChanged(state: Int) {
             saveNow()
             SyncSession.requestDebouncedPush(progressDao())
+        }
+    }
+
+    /**
+     * Feed the current queue to the leveler (#267): one measurement per source, keyed by
+     * the queue's leveling identity. Called on every transition and on the toggle.
+     *
+     * The samples are read from the whole timeline, not just the playing item — the
+     * measurement samples up to three tracks spread across the source, so it needs the
+     * full track list. An item without a [Keys.LEVELING_KEY] (a shuffled queue, a Relisten
+     * row of a local playlist) leaves the gain where it was until the next keyed queue:
+     * [VolumeLeveler.onQueueChanged] with a null key just stops any in-flight measurement.
+     */
+    private fun updateLeveling(item: MediaItem?) {
+        if (!PlaybackSettings.levelVolume.value) return
+        val player = session?.player ?: return
+        val key = item?.mediaMetadata?.extras?.getString(Keys.LEVELING_KEY)
+        val samples = (0 until player.mediaItemCount).mapNotNull { i ->
+            val it = player.getMediaItemAt(i)
+            val extras = it.mediaMetadata.extras
+            val url = it.localConfiguration?.uri?.toString() ?: return@mapNotNull null
+            LevelingSample(
+                url = url,
+                durationMs = extras?.getLong(Keys.TRACK_DURATION_MS) ?: 0L,
+            )
+        }
+        volumeLeveler.onQueueChanged(key, samples) { gainDb ->
+            // Main thread (scope is Main): the documented caller side of setGainDb.
+            levelingProcessor.setGainDb(gainDb)
         }
     }
 
