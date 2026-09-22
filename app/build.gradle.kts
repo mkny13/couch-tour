@@ -146,6 +146,7 @@ dependencies {
     implementation(libs.media3.session)
     implementation(libs.media3.common)
     implementation(libs.media3.cast)
+    implementation(libs.media3.ui)
 
     // Cast discovery and the session lifecycle. mediarouter arrives transitively with the
     // Cast framework, but the device picker is ours and uses it directly, so it's declared.

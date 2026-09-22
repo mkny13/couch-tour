@@ -388,7 +388,7 @@ internal fun String.requireHttps(): String {
  * so both modes are genuinely available here) swaps between the two with
  * [Player.replaceMediaItem], which keeps the queue and the playback position.
  */
-internal enum class YouTubePlaybackMode(val id: String) {
+public enum class YouTubePlaybackMode(val id: String) {
     AUDIO("audio"),
     VIDEO("video");
 
