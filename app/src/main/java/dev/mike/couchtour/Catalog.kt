@@ -368,9 +368,11 @@ data class YouTubeVideo(
  * The listening-history key for a video (#234). The `youtube:<videoId>` prefix matches the
  * platform-wide convention for queue keys (`show:`, `playlist:`, `relisten:`) and is the
  * same on macOS, so a video's resume position survives on both — and stays separate from
- * the date-keyed show rows, which the `progress` table stores unmigrated.
+ * the date-keyed show rows, which the `progress` table stores unmigrated. The prefix
+ * literal lives in Queue.kt ([QueueKind.YOUTUBE]'s namespace) so [parseQueueKey] and this
+ * builder can never drift apart.
  */
-fun youtubeProgressKey(videoId: String) = "youtube:$videoId"
+fun youtubeProgressKey(videoId: String) = YOUTUBE_KEY_PREFIX + videoId
 
 /**
  * [YouTubeVideo.withStreams]'s payload: the resolved direct URLs and the video's true

@@ -1,6 +1,6 @@
 package dev.mike.couchtour
 
-enum class QueueKind { SHOW, PLAYLIST, RECORDING, LOCAL_PLAYLIST }
+enum class QueueKind { SHOW, PLAYLIST, RECORDING, LOCAL_PLAYLIST, YOUTUBE }
 
 /**
  * Playback progress is stored under a namespaced key so every kind of queue can share one
@@ -18,6 +18,7 @@ data class QueueRef(val kind: QueueKind, val id: String) {
         QueueKind.PLAYLIST -> playlistQueueKey(id)
         QueueKind.RECORDING -> RECORDING_PREFIX + id
         QueueKind.LOCAL_PLAYLIST -> localPlaylistQueueKey(id)
+        QueueKind.YOUTUBE -> YOUTUBE_PREFIX + id
     }
 }
 
@@ -62,6 +63,13 @@ fun parseQueueKey(raw: String): QueueRef? = when {
         raw.removePrefix(SHOW_PREFIX).takeIf { it.isNotEmpty() }
             ?.let { QueueRef(QueueKind.SHOW, it) }
 
+    // Checked before the recording branch implicitly by not matching its prefix; the
+    // "youtube-show:" Next Stop key (NextStop.kt) cannot collide because it starts
+    // "youtube-", never "youtube:".
+    raw.startsWith(YOUTUBE_PREFIX) ->
+        raw.removePrefix(YOUTUBE_PREFIX).takeIf { it.isNotEmpty() }
+            ?.let { QueueRef(QueueKind.YOUTUBE, it) }
+
     // Validated on the way in, unlike the others: a recording id that isn't all three
     // parts is unusable, and failing here beats failing at fetch time.
     raw.startsWith(RECORDING_PREFIX) ->
@@ -85,3 +93,6 @@ private const val SHOW_PREFIX = "show:"
 private const val PLAYLIST_PREFIX = "playlist:"
 private const val RECORDING_PREFIX = "relisten:"
 private const val LOCAL_PLAYLIST_PREFIX = "local-playlist:"
+private const val YOUTUBE_PREFIX = "youtube:"
+
+internal const val YOUTUBE_KEY_PREFIX = YOUTUBE_PREFIX

@@ -50,6 +50,8 @@ data class PlayerState(
     val tapeLineage: String? = null,
     val setName: String = "",
     val trackPosition: Int = 0,
+    /** Non-null only while a YouTube video (#234) is the current item. */
+    val youTubeMode: YouTubePlaybackMode? = null,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -64,8 +66,24 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _compareState = MutableStateFlow<CompareSourcesState?>(null)
     val compareState: StateFlow<CompareSourcesState?> = _compareState.asStateFlow()
 
+    private val _playbackError = MutableStateFlow<String?>(null)
+    val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
+
     private var activeShowSummary: ShowSummary? = null
     private var lastResolvedEndedShowDate: String? = null
+
+    /**
+     * The stream-resolution seam (#234, D253): the real resolver talks to YouTube through
+     * NewPipe and is verified on device (UAT); unit tests swap in a fake.
+     */
+    internal var youtubeStreamResolver: YouTubeStreamResolver = NewPipeStreamResolver
+
+    /**
+     * The live session player, for #234's video surface — a same-process [PlayerView]
+     * attaches to the [MediaController] directly and renders the muxed stream. Null until
+     * the controller connects.
+     */
+    val player: Player? get() = controller
 
     val progressDao = PhishInDb.get(app).progressDao()
     val localPlaylistDao = PhishInDb.get(app).localPlaylistDao()
@@ -99,6 +117,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val audioFormat = if (isFlac) "FLAC" else "MP3"
         val queueKey = extras?.getString(Keys.QUEUE_KEY)
         val backend = extras?.getString(Keys.BACKEND)
+        val youTubeMode = extras?.getString(Keys.YOUTUBE_MODE)?.let { YouTubePlaybackMode.fromId(it) }
 
         var showDate = extras?.getString(Keys.SHOW_DATE).orEmpty()
         var venueName = extras?.getString(Keys.VENUE_NAME).orEmpty()
@@ -169,6 +188,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             tapeLineage = extras?.getString(Keys.TAPE_LINEAGE),
             setName = extras?.getString(Keys.SET_NAME).orEmpty(),
             trackPosition = extras?.getInt(Keys.TRACK_POSITION, 0) ?: 0,
+            youTubeMode = youTubeMode,
         )
 
         // When playback reaches the end of the show (after encore), prompt for next tour stop (#85)
@@ -309,7 +329,64 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         c.play()
     }
 
-    // ------------------------------------------------------- local playlists (#12, D161)
+    // -------------------------------------------------------- YouTube (#234)
+
+    /**
+     * Play one YouTube video (#234) as a single-item, resumable queue. Starts audio-only
+     * — the video stream is a toggle away ([toggleYouTubeMode]) without re-resolving.
+     *
+     * [video] arrives from the artist-page row (id, title, thumb); a resume (from history
+     * or Auto) reconstructs it from the progress row, since there is no YouTube detail
+     * fetch to rebuild the rest — the stream URLs come from [youtubeStreamResolver] here.
+     */
+    fun playYouTube(video: YouTubeVideo, artistName: String = "Phish", artistId: String = "phish") {
+        activeShowSummary = null
+        _postShowPrompt.value = null
+        lastResolvedEndedShowDate = null
+        viewModelScope.launch {
+            _playbackError.value = null
+            runCatching { youtubeStreamResolver.resolve(video.id) }
+                .onSuccess { resolved ->
+                    start(
+                        listOf(youtubeMediaItem(video.withStreams(resolved), YouTubePlaybackMode.AUDIO, artistName, artistId)),
+                        0, 0,
+                    )
+                }
+                .onFailure { e ->
+                    Log.w("PlayerViewModel", "playYouTube(${video.id}) failed: ${e.javaClass.simpleName}: ${e.message}")
+                    _playbackError.value = "Couldn't load this video. Check your connection and try again."
+                }
+        }
+    }
+
+    /**
+     * Swap the current YouTube item between audio-only and the muxed video stream. The
+     * replacement item carries the same mediaId, queue key and metadata with only the URI
+     * changed, so [Player.replaceMediaItem] keeps the queue and the playback position —
+     * the toggle never restarts the video.
+     */
+    fun toggleYouTubeMode() {
+        val c = controller ?: return
+        val item = c.currentMediaItem ?: return
+        val current = item.mediaMetadata.extras?.getString(Keys.YOUTUBE_MODE)
+            ?.let { YouTubePlaybackMode.fromId(it) } ?: return
+        val next = if (current == YouTubePlaybackMode.AUDIO) YouTubePlaybackMode.VIDEO else YouTubePlaybackMode.AUDIO
+        val replacement = youtubeItemForMode(item, next) ?: return
+        runCatching {
+            c.replaceMediaItem(c.currentMediaItemIndex, replacement)
+        }.onFailure { e ->
+            // A cast-side player that can't replace in place falls back to a same-position
+            // restart — momentary, and strictly better than losing the mode.
+            Log.w("PlayerViewModel", "replaceMediaItem fell back: ${e.javaClass.simpleName}")
+            val pos = c.currentPosition
+            val wasPlaying = c.playWhenReady
+            c.setMediaItem(replacement, pos)
+            c.prepare()
+            if (wasPlaying) c.play()
+        }
+    }
+
+    // -------------------------------------------------- local playlists (#12, D161)
 
     suspend fun createLocalPlaylist(name: String): String {
         val id = UUID.randomUUID().toString()
@@ -394,6 +471,15 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         playRecording(RelistenCatalogSource.show(artist, rec.date, rec.sourceId), index, position)
                     }
                     QueueKind.LOCAL_PLAYLIST -> start(localPlaylistItems(ref.id), index, position)
+                    QueueKind.YOUTUBE -> playYouTube(
+                        YouTubeVideo(
+                            id = ref.id,
+                            title = progress.trackTitle,
+                            channelId = "",
+                            thumbnailUrl = progress.artUrl,
+                        ),
+                        artistName = progress.artist.ifBlank { "Phish" },
+                    )
                 }
             }.onSuccess {
                 Log.d("PlayerViewModel", "resume(${ref.kind}) ready after ${(System.nanoTime() - startNanos) / 1_000_000}ms")
