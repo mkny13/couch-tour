@@ -5,10 +5,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The pure mapping behind the TV browse levels (#225): section grouping, year sorting, and
- * subtitle text. The composables themselves need a TV device or emulator to check (UAT);
- * these tests pin the model so the D-pad UI is at least fed the right rows in the right
- * order.
+ * The pure mapping behind the TV browse levels (#225, #226): section grouping, year/show
+ * sorting, subtitle text, and track-to-set grouping. The composables themselves need a TV
+ * device or emulator to check (UAT); these tests pin the model so the D-pad UI is at least
+ * fed the right rows in the right order.
  */
 class TvBrowseTest {
 
@@ -110,5 +110,77 @@ class TvBrowseTest {
         )
         val items = tvYearItems(periods)
         assertEquals(listOf("2017", "1983-1987"), items.map { it.period.id })
+    }
+
+    // ------------------------------------------------------ tvShowItems
+
+    private fun show(
+        date: String,
+        venue: String? = "Venue",
+        location: String? = "City, ST",
+    ) = ShowSummary(artist = artist(), date = date, venue = venue, location = location)
+
+    @Test
+    fun `show items sort newest-first, matching the phone's default show sort`() {
+        val shows = listOf(show("1997-11-17"), show("1999-07-23"), show("1994-06-18"))
+        val items = tvShowItems(shows)
+        assertEquals(listOf("1999-07-23", "1997-11-17", "1994-06-18"), items.map { it.show.date })
+    }
+
+    @Test
+    fun `show item subtitle is venue and location, matching ShowSummary#where`() {
+        val items = tvShowItems(listOf(show("1997-11-17", venue = "Hampton Coliseum", location = "Hampton, VA")))
+        assertEquals("Hampton Coliseum · Hampton, VA", items.single().subtitle)
+    }
+
+    @Test
+    fun `show item subtitle is blank when venue and location are both missing`() {
+        val items = tvShowItems(listOf(show("1997-11-17", venue = null, location = null)))
+        assertEquals("", items.single().subtitle)
+    }
+
+    // ------------------------------------------------------ tvTrackSections
+
+    private fun track(id: String, setName: String, title: String = "Track $id") =
+        PlayableTrack(id = id, title = title, setName = setName, url = "https://example.com/$id.mp3")
+
+    @Test
+    fun `tracks group into contiguous set sections, in order`() {
+        val tracks = listOf(
+            track("1", "Set 1"),
+            track("2", "Set 1"),
+            track("3", "Set 2"),
+            track("4", "Encore"),
+        )
+        val sections = tvTrackSections(tracks)
+        assertEquals(listOf("Set 1", "Set 2", "Encore"), sections.map { it.setName })
+        assertEquals(listOf("1", "2"), sections[0].rows.map { it.track.id })
+        assertEquals(listOf("3"), sections[1].rows.map { it.track.id })
+        assertEquals(listOf("4"), sections[2].rows.map { it.track.id })
+    }
+
+    @Test
+    fun `tracks with no set name collapse into one unnamed section`() {
+        val tracks = listOf(track("1", ""), track("2", ""), track("3", ""))
+        val sections = tvTrackSections(tracks)
+        assertEquals(1, sections.size)
+        assertEquals("", sections.single().setName)
+        assertEquals(listOf("1", "2", "3"), sections.single().rows.map { it.track.id })
+    }
+
+    @Test
+    fun `track rows carry a 1-based position, so the UI never needs to recompute it`() {
+        val tracks = listOf(track("1", "Set 1"), track("2", "Set 1"), track("3", "Set 2"))
+        val sections = tvTrackSections(tracks)
+        assertEquals(listOf(1, 2), sections[0].rows.map { it.position })
+        assertEquals(listOf(3), sections[1].rows.map { it.position })
+    }
+
+    @Test
+    fun `a repeated set name after a different set starts a new section, not a merge`() {
+        val tracks = listOf(track("1", "Set 1"), track("2", "Set 2"), track("3", "Set 1"))
+        val sections = tvTrackSections(tracks)
+        assertEquals(listOf("Set 1", "Set 2", "Set 1"), sections.map { it.setName })
+        assertTrue(sections.all { it.rows.size == 1 })
     }
 }
