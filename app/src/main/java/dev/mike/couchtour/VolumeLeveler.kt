@@ -30,21 +30,22 @@ class VolumeLeveler(
      * or null for an unleveled queue (shuffled, a Relisten row of a local playlist). A null
      * key only stops measurement — the gain stays where it is until the next keyed queue.
      */
-    fun onQueueChanged(key: String?, samples: List<LevelingSample>, onGain: (Double) -> Unit) {
+    fun onQueueChanged(key: String?, samples: List<LevelingSample>, onGain: (Double) -> Unit): Job? {
         if (key == null) {
             measurement?.cancel()
             measurement = null
             activeKey = null
-            return
+            onGain(0.0)
+            return null
         }
-        if (key == activeKey) return // repeated transitions inside the same queue
+        if (key == activeKey) return null // repeated transitions inside the same queue
         measurement?.cancel()
         activeKey = key
         if (samples.isEmpty()) {
             onGain(0.0)
-            return
+            return null
         }
-        measurement = scope.launch {
+        val job = scope.launch {
             // New source: play at unity until its loudness is known.
             onGain(0.0)
             val dao = db.sourceLoudnessDao()
@@ -68,6 +69,8 @@ class VolumeLeveler(
             }
             onGain(levelingGainDb(result.lufs, result.peakDb))
         }
+        measurement = job
+        return job
     }
 
     /** The setting turned off: stop measuring, drop the source memory, back to unity. */

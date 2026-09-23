@@ -62,9 +62,10 @@ class LevelingAudioProcessor : BaseAudioProcessor() {
     private var channels = 0
     private var encoding = C.ENCODING_INVALID
 
-    /** Set the playback gain in dB, ramped from wherever the audio currently is. */
+    /** Set the playback gain in dB, ramped from wherever the audio currently is. Clamped to ±12 dB. */
     fun setGainDb(db: Double) {
-        val target = 10.0.pow(db / 20.0).toFloat()
+        val clamped = db.coerceIn(-12.0, 12.0)
+        val target = 10.0.pow(clamped / 20.0).toFloat()
         rampFrom = currentGain
         rampTo = target
         rampFramesDone = 0
@@ -185,7 +186,7 @@ data class LoudnessMeasurement(
  * block gated out, i.e. silence) returns null — and then nothing is written anywhere, so
  * the next queue load retries.
  */
-class LoudnessMeasurer(
+open class LoudnessMeasurer(
     private val client: OkHttpClient = defaultClient(),
     private val decoder: SegmentDecoder,
     private val tempDir: File,
@@ -215,7 +216,7 @@ class LoudnessMeasurer(
      * Measure one source. Returns null when nothing usable was measured — the caller
      * writes nothing to the cache in that case, so the next queue load retries.
      */
-    suspend fun measure(tracks: List<LevelingSample>): LoudnessMeasurement? {
+    open suspend fun measure(tracks: List<LevelingSample>): LoudnessMeasurement? {
         val indices = levelingSampleIndices(tracks.size)
         if (indices.isEmpty()) return null
 

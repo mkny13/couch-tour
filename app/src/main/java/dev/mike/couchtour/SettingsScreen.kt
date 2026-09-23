@@ -134,7 +134,7 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             onCheckedChange = { PlaybackSettings.setGapless(it) }
         )
         SettingsToggleRow(
-            label = "Level volume",
+            label = "Level volume across sources",
             checked = levelVolume,
             onCheckedChange = { PlaybackSettings.setLevelVolume(it) },
             help = "Evens out loudness across shows and tapes. " +
