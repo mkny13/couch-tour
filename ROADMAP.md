@@ -204,7 +204,7 @@ preserved. The work is split into:
 | Issue | Feature | Description | Platforms |
 |---|---|---|---|
 | **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. Strategy: on-device measurement cached per source (D237), split into #265-#269. | Android, macOS |
-| **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation — Leanback launcher entry point, TV app manifest, `Catalog`/`PlaybackService` wired in) shipped, D233; Parts 2 (browse UI) and 3 (Now Playing / transport) still open. | Android TV |
+| **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation, D233) and Part 2 (browse UI — artist/year D266, show/track D269) shipped; Part 3 (Now Playing / transport / playback) still open. | Android TV |
 
 ---
 
