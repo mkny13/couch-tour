@@ -465,8 +465,9 @@ private fun TvTrackListScreen(
     val detail by tvLoadOnce("show-${artist.key}-${show.date}") {
         sourceFor(artist.backend).show(artist, show.date)
     }
-    val savedProgress by tvLoadOnce("progress-${show.date}") {
-        vm.progressFor(showQueueKey(show.date))
+    val queueKey = detail?.getOrNull()?.queueKey
+    val savedProgress by tvLoadOnce(queueKey ?: "no-progress-${show.date}") {
+        queueKey?.let { vm.progressFor(it) }
     }
     val state by vm.state.collectAsState()
     val progress = savedProgress?.getOrNull()?.takeIf { !it.finished }
