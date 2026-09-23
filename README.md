@@ -46,6 +46,12 @@ hosted on archive.org.
   and each tape keeps its own resume point. Likes, playlists, and login stay phish.in-only
 - Search spans every artist, not just Phish: shows, songs, and venues across phish.in and
   Relisten fan out together, with a filter chip row when a query hits more than one band
+- Artist pages with a matched YouTube channel get a video section; tapping a video plays it
+  through the same session as everything else, defaulting to audio-only background playback
+  with a toggle to switch to video
+- Where a show matches an officially released live album on Spotify or Tidal, a link on the
+  show page opens it in that app — playback stays in Couch Tour, this is just a pointer to
+  the official release
 
 ## Not in yet
 

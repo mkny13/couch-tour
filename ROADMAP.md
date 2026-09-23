@@ -88,6 +88,22 @@ Historical implementation details and architectural choices are logged separatel
 - **Non-functional carousel arrows removed**: Static chevron circle buttons in `topLedgerBar` and `onThisDateShelf` header removed; macOS horizontal scrolling relies on native trackpad/mouse gestures.
 - **Completes #144**: Builds on D227 (empty-state honest replacements) to resolve all remaining mockup elements on the Home screen.
 
+### 12. YouTube Concert Video / Audio (Shipped — #16, #177, #178, D251, D253, D262)
+
+- **Artist page YouTube section**: hand-curated artist→channel map, since neither phish.in nor Relisten link YouTube channels (D251).
+- **Android**: YouTube Data API v3 for channel/video browse, NewPipeExtractor for stream resolution, both behind one interface (D253); the artist page's YouTube section rides the shared catalog seam as a third `Backend` alongside phish.in and Relisten (D262). Defaults to audio-only background playback with a video/audio toggle; lockscreen controls, scrobbling, and progress all work like any other queue.
+- **macOS**: matching artist page YouTube section and video playback (#178).
+
+### 13. Spotify/Tidal Live Release Links (Shipped — #15, #179–#181)
+
+- **Show Detail external link**: where a show matches an officially released live album on Spotify or Tidal, a link opens it in that app (deep link with a web-URL fallback) or website — in-app playback isn't offered. Part 1 built the data model and show-page link UI (Android and macOS); Part 2 added a bundled, hand-curated JSON mapping of known releases; Part 3 added heuristic date+venue matching to catch releases outside the curated list.
+
+### 14. Advanced Source Selection & Taper Intelligence (Shipped — #24, #171–#173)
+
+- **Source ratings surfaced**: the Source picker shows Relisten's `avg_rating` and review count per tape. A true cross-catalog taper reputation score was scoped out — Relisten exposes no such endpoint, and computing one would mean fetching the whole catalog (#171).
+- **Compare Sources**: a mode that toggles between same-timestamp snippets of the current track across tapers/sources without losing the main queue state, on Android and macOS (#172).
+- **Preferred / avoided tapers**: local (not synced) taper flags that sort preferred tapers to the top and avoided ones to the bottom of the Source picker (#173).
+
 ---
 
 ## Prioritized Product Roadmap
@@ -103,21 +119,21 @@ flowchart LR
         S5["Discovery: Tags, Momentum, Cache, Artwork (#67, #21, #61, #62; D206, D207)"]
         S6["Settings Audio Quality & Gapless, Android (#141, D228)"]
         S7["Show Detail: Save→Like Replacement, macOS (#148, D229)"]
+        S8["YouTube Audio/Video Support (#16, #177, #178, D251, D253, D262)"]
+        S9["Spotify/Tidal Live Release Links (#15, #179-#181)"]
+        S10["Taper Intelligence & Source Comparison (#24, #171-#173)"]
     end
 
     subgraph NearTerm ["Phase 2 Remaining"]
         direction TB
-        M1["macOS Audio Quality Control (#141)"]
-        M2["#67 Tag Browse UI: Show List & macOS"]
+        M1["macOS Audio Quality Control — unbuilt, untracked (#141 closed)"]
+        M2["Tag Browse UI: Show List — unbuilt, untracked (#67 closed)"]
     end
 
     subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]
         direction TB
         L1["#18 Volume Leveling Across Sources (#265-#269)"]
-        L2["#24 Taper Intelligence & Source Comparison"]
         L3["#9 Google TV App"]
-        L4["#15 Spotify Live Releases"]
-        L5["#16 YouTube Audio/Video Support"]
     end
 
     Shipped --> NearTerm --> LongTerm
@@ -155,9 +171,9 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 
 | Issue | Feature | Description | Platforms | Status |
 |---|---|---|---|---|
-| **#141** | **Audio Quality Preference** | Turn the Settings "Audio quality" row into a real, persisted preference driving FLAC/MP3 selection. The capability already ships (D187, D189 — FLAC preferred, MP3 rewritten at Cast time); only the user-facing control is missing. | Android, macOS | Android shipped (D228: quality preference, gapless preload wiring, Crossfade row and DOWNLOADS & STORAGE section removed); macOS control still open |
+| **#141** | **Audio Quality Preference** | Turn the Settings "Audio quality" row into a real, persisted preference driving FLAC/MP3 selection. The capability already ships (D187, D189 — FLAC preferred, MP3 rewritten at Cast time); only the user-facing control is missing. | Android, macOS | Android shipped (D228: quality preference, gapless preload wiring, Crossfade row and DOWNLOADS & STORAGE section removed); #141 is closed (it was the Android issue) — the macOS control is unbuilt and **no open issue tracks it** |
 | **#65** | ~~Offline Downloads~~ | **Not planned** — closed 2026-09-05. Downloads are deliberately out of scope. The Settings "DOWNLOADS & STORAGE" section (dead "Downloaded shows" row and "Wi-Fi only downloads" toggle) is removed as part of #141. | — | Not planned |
-| **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS | Search filter shipped (D206, verified `uat-004`); show list interaction queued for UI revamp |
+| **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS | Search filter shipped (D206, verified `uat-004`); #67 is closed — the show-list interaction is unbuilt and **no open issue tracks it** |
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS | Shipped (D206, verified in UAT `uat-001`, `uat-002`) |
 | **#91** | **Sortable Search Results** | Sort Universal Search results by date or phish.in community like count instead of default API order. | Android, macOS | Shipped (D205, D210, verified in UAT `uat-011`) |
 | **#61** | **Multi-Level Catalog Cache** | Implement structured caching for years, shows, and venue metadata beyond the single in-memory artist list. | Android, macOS | Shipped (D207, verified in UAT `uat-014`, `uat-015`) |
@@ -188,10 +204,7 @@ preserved. The work is split into:
 | Issue | Feature | Description | Platforms |
 |---|---|---|---|
 | **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. Strategy: on-device measurement cached per source (D237), split into #265-#269. | Android, macOS |
-| **#24** | **Advanced Source Selection & Taper Intelligence** | Side-by-side snippet comparisons across tapers, taper reputation scoring, and user-preferred / avoided taper filters. | Android, macOS |
 | **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation — Leanback launcher entry point, TV app manifest, `Catalog`/`PlaybackService` wired in) shipped, D233; Parts 2 (browse UI) and 3 (Now Playing / transport) still open. | Android TV |
-| **#15** | **Spotify/Tidal Live Release Links** | Where a show matches an officially released live album on Spotify or Tidal, surface a simple external link to it (in-app playback isn't feasible). | Cross-platform |
-| **#16** | **YouTube Concert Video / Audio** | Stream concert video from YouTube with a dedicated toggle for audio-only background playback. | Cross-platform |
 
 ---
 
