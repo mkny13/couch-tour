@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,9 +28,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -157,44 +160,68 @@ private fun <T> tvLoadOnce(key: Any = Unit, block: suspend () -> T): State<Resul
  * period is, which is only ever set once an artist is) so at most one is active at a time.
  */
 @Composable
-fun TvBrowseScreen() {
+fun TvBrowseScreen(vm: PlayerViewModel = viewModel()) {
     var selectedArtist by remember { mutableStateOf<ArtistRef?>(null) }
     var selectedPeriod by remember { mutableStateOf<PeriodRef?>(null) }
     var selectedShow by remember { mutableStateOf<ShowSummary?>(null) }
+    var showNowPlaying by remember { mutableStateOf(false) }
 
     val artist = selectedArtist
     val period = selectedPeriod
     val show = selectedShow
 
-    BackHandler(enabled = show != null) { selectedShow = null }
-    BackHandler(enabled = show == null && period != null) { selectedPeriod = null }
-    BackHandler(enabled = show == null && period == null && artist != null) { selectedArtist = null }
+    BackHandler(enabled = showNowPlaying) { showNowPlaying = false }
+    BackHandler(enabled = !showNowPlaying && show != null) { selectedShow = null }
+    BackHandler(enabled = !showNowPlaying && show == null && period != null) { selectedPeriod = null }
+    BackHandler(enabled = !showNowPlaying && show == null && period == null && artist != null) { selectedArtist = null }
 
-    when {
-        artist == null -> TvArtistBrowseScreen(onArtistClick = { selectedArtist = it })
-        period == null -> TvYearBrowseScreen(
-            artist = artist,
-            onBack = { selectedArtist = null },
-            onYearClick = { selectedPeriod = it },
-        )
-        show == null -> TvShowBrowseScreen(
-            artist = artist,
-            period = period,
-            onBack = { selectedPeriod = null },
-            onShowClick = { selectedShow = it },
-        )
-        else -> TvTrackListScreen(
-            artist = artist,
-            show = show,
-            onBack = { selectedShow = null },
-        )
+    if (showNowPlaying) {
+        TvNowPlayingScreen(vm = vm, onBack = { showNowPlaying = false })
+    } else {
+        when {
+            artist == null -> TvArtistBrowseScreen(
+                vm = vm,
+                onArtistClick = { selectedArtist = it },
+                onOpenNowPlaying = { showNowPlaying = true },
+            )
+            period == null -> TvYearBrowseScreen(
+                artist = artist,
+                vm = vm,
+                onBack = { selectedArtist = null },
+                onYearClick = { selectedPeriod = it },
+                onOpenNowPlaying = { showNowPlaying = true },
+            )
+            show == null -> TvShowBrowseScreen(
+                artist = artist,
+                period = period,
+                vm = vm,
+                onBack = { selectedPeriod = null },
+                onShowClick = { selectedShow = it },
+                onOpenNowPlaying = { showNowPlaying = true },
+            )
+            else -> TvTrackListScreen(
+                artist = artist,
+                show = show,
+                vm = vm,
+                onBack = { selectedShow = null },
+                onOpenNowPlaying = { showNowPlaying = true },
+            )
+        }
     }
 }
 
 @Composable
-private fun TvArtistBrowseScreen(onArtistClick: (ArtistRef) -> Unit) {
+private fun TvArtistBrowseScreen(
+    vm: PlayerViewModel,
+    onArtistClick: (ArtistRef) -> Unit,
+    onOpenNowPlaying: () -> Unit,
+) {
     val perBackend by tvLoadOnce("artists") { loadArtistsByBackend() }
     val favoriteKeys by Favorites.keys.collectAsState()
+    val state by vm.state.collectAsState()
+    val context = LocalContext.current
+    val inProgressRows by PhishInDb.get(context).progressDao().inProgress().collectAsState(initial = emptyList())
+    val continueListeningItems = remember(inProgressRows) { tvContinueListeningItems(inProgressRows) }
 
     val sections = remember(perBackend, favoriteKeys) {
         perBackend?.getOrNull()?.let { backend ->
@@ -210,7 +237,17 @@ private fun TvArtistBrowseScreen(onArtistClick: (ArtistRef) -> Unit) {
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> TvArtistSectionList(sections.orEmpty(), onArtistClick)
+            else -> TvArtistSectionList(
+                sections = sections.orEmpty(),
+                continueListening = continueListeningItems,
+                hasQueue = state.hasQueue,
+                onArtistClick = onArtistClick,
+                onResumeClick = { progress ->
+                    vm.resume(progress)
+                    onOpenNowPlaying()
+                },
+                onOpenNowPlaying = onOpenNowPlaying,
+            )
         }
     }
 }
@@ -218,13 +255,50 @@ private fun TvArtistBrowseScreen(onArtistClick: (ArtistRef) -> Unit) {
 @Composable
 private fun TvArtistSectionList(
     sections: List<TvArtistSectionData>,
+    continueListening: List<TvContinueListeningItem>,
+    hasQueue: Boolean,
     onArtistClick: (ArtistRef) -> Unit,
+    onResumeClick: (Progress) -> Unit,
+    onOpenNowPlaying: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (hasQueue) {
+            item(key = "header-now-playing") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Button(onClick = onOpenNowPlaying) {
+                        Text("▶ Now Playing")
+                    }
+                }
+            }
+        }
+        if (continueListening.isNotEmpty()) {
+            item(key = "heading-continue-listening") {
+                Text(
+                    text = "Continue listening",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            item(key = "row-continue-listening") {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    items(continueListening, key = { "progress-${it.progress.queueKey}" }) { item ->
+                        TvCard(
+                            title = item.title,
+                            subtitle = item.subtitle,
+                            onClick = { onResumeClick(item.progress) },
+                        )
+                    }
+                }
+            }
+        }
         sections.forEach { section ->
             item(key = "heading-${section.section.name}") {
                 Text(
@@ -250,10 +324,17 @@ private fun TvArtistSectionList(
 }
 
 @Composable
-private fun TvYearBrowseScreen(artist: ArtistRef, onBack: () -> Unit, onYearClick: (PeriodRef) -> Unit) {
+private fun TvYearBrowseScreen(
+    artist: ArtistRef,
+    vm: PlayerViewModel,
+    onBack: () -> Unit,
+    onYearClick: (PeriodRef) -> Unit,
+    onOpenNowPlaying: () -> Unit,
+) {
     val periods by tvLoadOnce("periods-${artist.key}") {
         sourceFor(artist.backend).periods(artist)
     }
+    val state by vm.state.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -270,6 +351,10 @@ private fun TvYearBrowseScreen(artist: ArtistRef, onBack: () -> Unit, onYearClic
             // this exists because a visible, focusable way back reads better at the head of
             // a grid full of cards than a gesture the user has to already know about.
             Button(onClick = onBack) { Text("← All artists") }
+            if (state.hasQueue) {
+                Spacer(modifier = Modifier.weight(1f))
+                Button(onClick = onOpenNowPlaying) { Text("▶ Now Playing") }
+            }
         }
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when {
@@ -309,12 +394,15 @@ private fun TvYearBrowseScreen(artist: ArtistRef, onBack: () -> Unit, onYearClic
 private fun TvShowBrowseScreen(
     artist: ArtistRef,
     period: PeriodRef,
+    vm: PlayerViewModel,
     onBack: () -> Unit,
     onShowClick: (ShowSummary) -> Unit,
+    onOpenNowPlaying: () -> Unit,
 ) {
     val shows by tvLoadOnce("shows-${artist.key}-${period.id}") {
         sourceFor(artist.backend).shows(artist, period)
     }
+    val state by vm.state.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -328,6 +416,10 @@ private fun TvShowBrowseScreen(
                 fontWeight = FontWeight.Bold,
             )
             Button(onClick = onBack) { Text("← Years") }
+            if (state.hasQueue) {
+                Spacer(modifier = Modifier.weight(1f))
+                Button(onClick = onOpenNowPlaying) { Text("▶ Now Playing") }
+            }
         }
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when {
@@ -363,10 +455,21 @@ private fun TvShowBrowseScreen(
 }
 
 @Composable
-private fun TvTrackListScreen(artist: ArtistRef, show: ShowSummary, onBack: () -> Unit) {
+private fun TvTrackListScreen(
+    artist: ArtistRef,
+    show: ShowSummary,
+    vm: PlayerViewModel,
+    onBack: () -> Unit,
+    onOpenNowPlaying: () -> Unit,
+) {
     val detail by tvLoadOnce("show-${artist.key}-${show.date}") {
         sourceFor(artist.backend).show(artist, show.date)
     }
+    val savedProgress by tvLoadOnce("progress-${show.date}") {
+        vm.progressFor(showQueueKey(show.date))
+    }
+    val state by vm.state.collectAsState()
+    val progress = savedProgress?.getOrNull()?.takeIf { !it.finished }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -389,6 +492,20 @@ private fun TvTrackListScreen(artist: ArtistRef, show: ShowSummary, onBack: () -
                 }
             }
             Button(onClick = onBack) { Text("← Shows") }
+            if (progress != null && detail?.getOrNull() != null) {
+                Button(onClick = {
+                    detail?.getOrNull()?.let { d ->
+                        vm.playShowDetail(d, startIndex = progress.trackIndex, startPositionMs = progress.positionMs)
+                        onOpenNowPlaying()
+                    }
+                }) {
+                    Text("▶ Resume (${progress.trackTitle})")
+                }
+            }
+            if (state.hasQueue) {
+                Spacer(modifier = Modifier.weight(1f))
+                Button(onClick = onOpenNowPlaying) { Text("▶ Now Playing") }
+            }
         }
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when {
@@ -419,7 +536,13 @@ private fun TvTrackListScreen(artist: ArtistRef, show: ShowSummary, onBack: () -
                                 }
                             }
                             items(section.rows, key = { "track-${it.track.id}" }) { row ->
-                                TvTrackCard(row = row, onClick = { /* Part 3: playback */ })
+                                TvTrackCard(row = row, onClick = {
+                                    detail?.getOrNull()?.let { d ->
+                                        val trackIndex = d.tracks.indexOfFirst { t -> t.id == row.track.id }.coerceAtLeast(0)
+                                        vm.playShowDetail(d, startIndex = trackIndex)
+                                        onOpenNowPlaying()
+                                    }
+                                })
                             }
                         }
                     }

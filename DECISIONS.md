@@ -4790,6 +4790,21 @@ Part 2.2 of #9 (depends on #225/D266). Extends `TvBrowseScreen` to the full `art
 - **Playback stub:** track row `onClick` is `/* Part 3: playback */`, the same bare-comment convention the year grid used pre-Part-2.2 — no placeholder screen, no fake `PlayerViewModel` call.
 - **Tests:** `tvShowItems` (sort order, subtitle) and `tvTrackSections` (grouping, position numbering, unnamed-section collapse) — pure logic only, continuing D266/TvBrowseTest's convention that the composables themselves are a UAT item, not a Robolectric/Compose-UI-test target. 7 new tests; Android suite at 618, macOS unchanged at 438.
 
+### D270 — Google TV playback: Now Playing screen, transport controls, queue navigation, volume routing, and progress/resume (#184)
+
+Part 3 of #9 (completes TV playback layer, building on #182 TV foundation and #183 TV browse UI):
+
+- **Now Playing screen (`TvNowPlaying.kt`):** A split landscape layout tailored for 10-foot TV viewing. The left pane renders high-resolution cover art (falling back to `ShowArtwork`/procedural art), large track title, artist and show/venue metadata, audio format badge (FLAC/MP3), a progress bar with current and total elapsed time, and a row of TV-focusable transport buttons (Previous, Rewind 15s, Play/Pause, Fast Forward 15s, Next). A ticker updates scrubber progress every 500ms while playing.
+- **Queue navigation and track selection:** The right pane renders the active player queue as a scrollable `LazyColumn` of focusable TV Cards (`androidx.tv.material3.Card`). The actively playing track is highlighted with a distinct indicator (`▶`, bold title, primary color accent). D-pad up/down navigates between tracks; pressing Select/OK calls `vm.seekToTrack(index)` to immediately jump playback to that track.
+- **Hardware remote transport & volume controls:**
+  - `TvMainActivity.onCreate` sets `volumeControlStream = AudioManager.STREAM_MUSIC`, ensuring hardware volume keys on physical Android TV / Google TV remotes control music stream volume directly.
+  - `TvMainActivity.onKeyDown` intercepts remote media key events (`KEYCODE_MEDIA_PLAY_PAUSE`, `KEYCODE_MEDIA_PLAY`, `KEYCODE_MEDIA_PAUSE`, `KEYCODE_MEDIA_NEXT`, `KEYCODE_MEDIA_PREVIOUS`, `KEYCODE_MEDIA_FAST_FORWARD`, `KEYCODE_MEDIA_REWIND`, `KEYCODE_MEDIA_STOP`, `KEYCODE_HEADSETHOOK`), forwarding them to `PlayerViewModel`/`PlaybackService` so playback responds immediately to dedicated remote buttons.
+- **Progress saving & resume on TV:**
+  - Since TV playback uses the existing `PlaybackService` and `QueueInfo` with `queueKey`, progress rows are automatically written to Room's `progress` table every 5s and on pause/stop.
+  - The TV artist browse screen displays a "Continue listening" shelf at the top if in-progress rows exist; selecting an in-progress show resumes playback at the saved track and position.
+  - The TV track list screen checks for saved progress on the show being browsed; if present, a prominent "▶ Resume ({trackTitle})" button appears in the header. Selecting any track starts playback at that track and opens the Now Playing screen.
+- **Tests:** 13 new unit tests in `TvNowPlayingTest.kt` (progress fraction, subtitle formatting, continue listening filtering) and `MediaItemsTest.kt` (extras `DURATION_MS` persistence); Android suite at 631, macOS unchanged at 438.
+
 
 
 

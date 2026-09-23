@@ -52,6 +52,18 @@ data class PlayerState(
     val trackPosition: Int = 0,
     /** Non-null only while a YouTube video (#234) is the current item. */
     val youTubeMode: YouTubePlaybackMode? = null,
+    /** Tracks currently queued in the player session. */
+    val queue: List<QueueTrackItem> = emptyList(),
+)
+
+data class QueueTrackItem(
+    val index: Int,
+    val mediaId: String,
+    val title: String,
+    val artist: String = "",
+    val durationMs: Long = 0,
+    val setName: String = "",
+    val trackPosition: Int = 0,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -156,6 +168,23 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
         val isBuffering = c.playbackState == Player.STATE_BUFFERING || (c.playWhenReady && !c.isPlaying && c.playbackState != Player.STATE_ENDED && c.mediaItemCount > 0)
 
+        val queueItems = if (c.mediaItemCount > 0) {
+            (0 until c.mediaItemCount).map { i ->
+                val mItem = c.getMediaItemAt(i)
+                val mMeta = mItem.mediaMetadata
+                val mExtras = mMeta.extras
+                QueueTrackItem(
+                    index = i,
+                    mediaId = mItem.mediaId,
+                    title = mMeta.title?.toString() ?: "Track ${i + 1}",
+                    artist = mMeta.artist?.toString().orEmpty(),
+                    durationMs = mExtras?.getLong(Keys.DURATION_MS, 0L) ?: 0L,
+                    setName = mExtras?.getString(Keys.SET_NAME).orEmpty(),
+                    trackPosition = mExtras?.getInt(Keys.TRACK_POSITION, i + 1) ?: (i + 1),
+                )
+            }
+        } else emptyList()
+
         _state.value = PlayerState(
             connected = true,
             hasQueue = c.mediaItemCount > 0,
@@ -189,6 +218,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             setName = extras?.getString(Keys.SET_NAME).orEmpty(),
             trackPosition = extras?.getInt(Keys.TRACK_POSITION, 0) ?: 0,
             youTubeMode = youTubeMode,
+            queue = queueItems,
         )
 
         // When playback reaches the end of the show (after encore), prompt for next tour stop (#85)
@@ -560,6 +590,33 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun previous() = controller?.seekToPreviousMediaItem()
     fun seekTo(ms: Long) {
         controller?.seekTo(ms)
+    }
+
+    fun seekToTrack(index: Int, positionMs: Long = 0) {
+        val c = controller ?: return
+        if (index in 0 until c.mediaItemCount) {
+            c.seekTo(index, positionMs)
+            c.play()
+        }
+    }
+
+    fun playShowDetail(detail: ShowDetail, startIndex: Int = 0, startPositionMs: Long = 0) {
+        when (detail.summary.artist.backend) {
+            Backend.PHISHIN -> {
+                viewModelScope.launch {
+                    val show = runCatching { PhishInApi.show(detail.summary.date) }.getOrNull()
+                    if (show != null) {
+                        playShow(show, startIndex, startPositionMs)
+                    } else {
+                        playRecording(detail, startIndex, startPositionMs)
+                    }
+                }
+            }
+            Backend.RELISTEN -> {
+                playRecording(detail, startIndex, startPositionMs)
+            }
+            Backend.YOUTUBE -> Unit
+        }
     }
 
     // -------------------------------------------------------- comparison (#235)

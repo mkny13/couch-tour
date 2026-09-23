@@ -99,6 +99,7 @@ internal fun mediaItem(
         tapeLineage = tapeLineage,
         setName = track.setName,
         trackPosition = track.position,
+        durationMs = track.duration,
     )
 }
 
@@ -125,6 +126,7 @@ internal fun recordingMediaItem(
     tapeLineage = tapeLineage,
     setName = track.setName,
     trackPosition = track.position,
+    durationMs = track.durationMs,
 )
 
 /**
@@ -155,6 +157,7 @@ private fun coreMediaItem(
     tapeLineage: String? = null,
     setName: String = "",
     trackPosition: Int = 0,
+    durationMs: Long = 0,
 ): MediaItem {
     val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
     val resolvedVenue = venueName ?: info.subtitle
@@ -178,6 +181,7 @@ private fun coreMediaItem(
         tapeLineage = tapeLineage,
         setName = setName,
         trackPosition = trackPosition,
+        durationMs = durationMs,
     )
     val meta = mediaMetadata(title, artist, art, showDate, venueName, info, extras)
 
@@ -241,6 +245,7 @@ private fun mediaItemExtras(
     tapeLineage: String?,
     setName: String,
     trackPosition: Int,
+    durationMs: Long = 0,
 ): Bundle = Bundle().apply {
     info.key?.let { putString(Keys.QUEUE_KEY, it) }
     putString(Keys.QUEUE_TITLE, info.title)
@@ -261,6 +266,7 @@ private fun mediaItemExtras(
     tapeLineage?.let { putString(Keys.TAPE_LINEAGE, it) }
     if (setName.isNotBlank()) putString(Keys.SET_NAME, setName)
     if (trackPosition > 0) putInt(Keys.TRACK_POSITION, trackPosition)
+    if (durationMs > 0) putLong(Keys.DURATION_MS, durationMs)
 }
 
 /** The [MediaMetadata] shown in system UI (notifications, Android Auto, scrobblers). */
@@ -452,6 +458,7 @@ internal fun youtubeMediaItem(
         tapeLineage = null,
         setName = "",
         trackPosition = 0,
+        durationMs = video.durationMs ?: 0L,
     ).apply {
         putString(Keys.YOUTUBE_AUDIO_URL, audioUrl)
         putString(Keys.YOUTUBE_VIDEO_URL, videoUrl)

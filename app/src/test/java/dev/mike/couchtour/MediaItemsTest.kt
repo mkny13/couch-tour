@@ -417,4 +417,20 @@ class MediaItemsTest {
             youtubeMediaItem(ytVideo().copy(audioStreamUrl = null, videoStreamUrl = null), YouTubePlaybackMode.AUDIO)
         }
     }
+
+    // ----------------------------------------------------------- durationMs
+
+    @Test
+    fun `mediaItem stores track duration in extras DURATION_MS`() {
+        val info = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "Denver", art = null)
+        val track = Track(id = 1, title = "Ghost", mp3Url = "https://phish.in/ghost.mp3", duration = 654_000L, audioStatus = "complete")
+        val item = mediaItem(track, info)
+        assertEquals(654_000L, item.mediaMetadata.extras?.getLong(Keys.DURATION_MS))
+    }
+
+    @Test
+    fun `recordingMediaItem stores track duration in extras DURATION_MS`() {
+        val items = recordingTrackItems(detail())
+        assertEquals(325_000L, items.first().mediaMetadata.extras?.getLong(Keys.DURATION_MS))
+    }
 }
