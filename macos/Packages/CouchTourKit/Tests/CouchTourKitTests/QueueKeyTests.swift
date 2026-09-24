@@ -76,6 +76,26 @@ final class QueueKeyTests: XCTestCase {
         XCTAssertNil(parseRecordingId("phish/1997-11-17"))
     }
 
+    func testRecordingShowKeyBuildsTwoPartKeyAndParseQueueKeyRejectsIt() {
+        // recordingShowKey produces a two-part key ("relisten:artistSlug/date") for show-level matching.
+        let showKey = recordingShowKey("grateful-dead", "1977-05-08")
+        XCTAssertEqual("relisten:grateful-dead/1977-05-08", showKey)
+
+        // parseQueueKey must reject two-part show keys: a recording queue cannot be resumed
+        // without a specific source/tape id.
+        XCTAssertNil(parseQueueKey(showKey), "parseQueueKey must reject two-part recording show keys")
+    }
+
+    func testRejectsMalformedRecordingIds() {
+        // Leading or trailing slashes, empty components, or wrong part counts must fail parseRecordingId.
+        XCTAssertNil(parseRecordingId("/artist/1977-05-08/src"))
+        XCTAssertNil(parseRecordingId("artist/1977-05-08/src/"))
+        XCTAssertNil(parseRecordingId("artist//src"))
+        XCTAssertNil(parseRecordingId("artist/1977-05-08/src/extra"))
+        XCTAssertNil(parseRecordingId("/"))
+        XCTAssertNil(parseRecordingId("//"))
+    }
+
     func testAColonInsideARecordingPartIsNotADelimiter() {
         // Recording parts are split on "/" precisely so the first-colon-only rule that show
         // and playlist keys live under never applies here.

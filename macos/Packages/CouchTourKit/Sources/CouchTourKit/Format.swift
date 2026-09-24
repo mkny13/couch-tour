@@ -75,7 +75,9 @@ public func formatShowDate(_ raw: String) -> String {
     let parts = trimmed.components(separatedBy: CharacterSet(charactersIn: "-/"))
     if parts.count == 3,
        let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]),
-       y > 1900 && y < 2100 {
+       y > 1900 && y < 2100,
+       (1...12).contains(m),
+       (1...31).contains(d) {
         return String(format: "%04d-%02d-%02d", y, m, d)
     }
 

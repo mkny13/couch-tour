@@ -1,19 +1,28 @@
 import Foundation
 
+/// Interface for writing playback progress and mark-finished state, permitting
+/// tests to supply mock or failing store implementations.
+public protocol ProgressWriting: AnyObject {
+    func put(_ progress: PlaybackProgress) throws
+    func markFinished(key: String) throws
+}
+
+extension ProgressStore: ProgressWriting {}
+
 /// Ports the save rules from Android's `PlaybackService.saveNow()`: write every 5s while
 /// playing, plus immediately on play/pause and track change (D7). `finished` is only ever
 /// set by the queue actually draining (D20) — never accepted as a parameter here, so nothing
 /// can call `save` and guess a queue is finished from the outside.
 @MainActor
 public final class ProgressRecorder {
-    private let store: ProgressStore?
+    private let store: ProgressWriting?
     private var lastSaveTime: Date = .distantPast
 
     private var lastSavedQueueKey: String?
     private var lastSavedTrackIndex: Int?
     private var lastSavedPositionMs: Int64?
 
-    public init(store: ProgressStore?) {
+    public init(store: ProgressWriting?) {
         self.store = store
     }
 
@@ -21,7 +30,7 @@ public final class ProgressRecorder {
     /// should land immediately rather than wait for the next tick.
     ///
     /// Returns `true` if a record was actually written to the store, `false` if skipped
-    /// (e.g. throttled or position unchanged).
+    /// (e.g. throttled, position unchanged, or write failed).
     @discardableResult
     public func saveTick(
         queueKey: String?, show: ShowSummary?, track: PlayableTrack?, trackIndex: Int?,
@@ -40,11 +49,6 @@ public final class ProgressRecorder {
             return false
         }
 
-        lastSaveTime = Date()
-        lastSavedQueueKey = queueKey
-        lastSavedTrackIndex = trackIndex
-        lastSavedPositionMs = positionMs
-
         // dismissed is written false unconditionally, same as Android: saving during
         // playback is what brings a previously-dismissed queue back (D38's test case).
         let row = PlaybackProgress(
@@ -60,8 +64,17 @@ public final class ProgressRecorder {
             dismissed: false,
             artist: show.artist.name
         )
-        try? store.put(row)
-        return true
+        do {
+            try store.put(row)
+            lastSaveTime = Date()
+            lastSavedQueueKey = queueKey
+            lastSavedTrackIndex = trackIndex
+            lastSavedPositionMs = positionMs
+            return true
+        } catch {
+            NSLog("[ProgressRecorder] Failed to put progress row: \(error)")
+            return false
+        }
     }
 
     /// Sets the flag on the existing row without touching trackIndex/positionMs — playing it
@@ -71,6 +84,10 @@ public final class ProgressRecorder {
         lastSavedQueueKey = nil
         lastSavedTrackIndex = nil
         lastSavedPositionMs = nil
-        try? store.markFinished(key: queueKey)
+        do {
+            try store.markFinished(key: queueKey)
+        } catch {
+            NSLog("[ProgressRecorder] Failed to mark finished: \(error)")
+        }
     }
 }

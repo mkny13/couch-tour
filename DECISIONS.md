@@ -4806,5 +4806,17 @@ Part 3 of #9 (completes TV playback layer, building on #182 TV foundation and #1
 - **Tests:** 13 new unit tests in `TvNowPlayingTest.kt` (progress fraction, subtitle formatting, continue listening filtering) and `MediaItemsTest.kt` (extras `DURATION_MS` persistence); Android suite at 631, macOS unchanged at 438.
 
 
+### D271 — Correctness bug fixes in CouchTourKit: loudness buffer slide, show date bounds, and progress-save error handling (#330)
+
+Addressed three correctness defects and audit findings across `CouchTourKit`:
+
+- **F1: `LoudnessMeter.slideBlock()` overlap-safe copy (`Loudness.swift`):** Replaced `update(from:count:)` (documented undefined behaviour for overlapping memory slices `[0, keep)` and `[stepSize, blockSize)`) with `memmove`. Added `testFullScaleSineExercisesMultipleBlockSlidesAndPinsLUFS` in `LoudnessTests.swift` exercising 16 consecutive slide operations and asserting the integrated loudness matches ITU-R BS.1770-4 (-3.0 ± 0.1 LUFS, 0.0 dBFS peak). Added `uat-066` for human listening verification.
+- **F2: `formatShowDate` month/day bounds (`Format.swift`):** Bounded month to `1...12` and day to `1...31` in the fast numeric branch, falling through to `DateFormatter` and raw string fallback on failure. Added `testFormatShowDateRejectsOutOfRangeMonthAndDay` in `FormatTests.swift` verifying out-of-range inputs are rejected from formatting into YYYY-MM-DD.
+- **F3: `ProgressRecorder` error handling and write retry (`ProgressRecorder.swift`):** Introduced `ProgressWriting` protocol implemented by `ProgressStore`. In `saveTick`, moved state updates (`lastSaveTime`, `lastSavedQueueKey`, `lastSavedTrackIndex`, `lastSavedPositionMs`) to execute only after a successful `store.put(row)`, caught and logged failures via `NSLog`, and returned `false`. Added `testSaveTickReturnsFalseWhenStoreThrowsAndRetriesNextTickAtSamePosition` in `ProgressRecorderTests.swift` proving that a failed write returns `false`, preserves `lastSaved*` state, and permits subsequent retry at the same position.
+- **Queue key consistency (`QueueKey.swift`, `Catalog.swift`):** Centralized `recordingShowKey` in `QueueKey.swift` using `recordingPrefix`, marked `RecordingId` as `Sendable` to eliminate Swift 6 concurrency warnings, and documented why `parseQueueKey` intentionally rejects two-part recording show keys. Added regression tests in `QueueKeyTests.swift`.
+- **Tests:** 5 new macOS package tests (443 total, 0 failures); Android suite unchanged at 631.
+
+
+
 
 

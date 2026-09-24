@@ -627,10 +627,6 @@ public struct ShowDetail: Equatable, Sendable {
     }
 }
 
-public func recordingShowKey(_ artistSlug: String, _ date: String) -> String {
-    "relisten:\(artistSlug)/\(date)"
-}
-
 // ------------------------------------------------------------------- search
 
 /// What a song or venue hit resolves to: a named slice of one artist's catalog.

@@ -79,7 +79,23 @@ final class FormatTests: XCTestCase {
     func testFormatShowDate() {
         XCTAssertEqual("1997-11-17", formatShowDate("1997-11-17"))
         XCTAssertEqual("1997-11-17", formatShowDate("1997/11/17"))
+        XCTAssertEqual("1997-05-08", formatShowDate("1997-5-8"))
+        XCTAssertEqual("1997-05-08", formatShowDate("1997/5/8"))
         XCTAssertEqual("1977-05-08", formatShowDate("May 8, 1977"))
+    }
+
+    func testFormatShowDateRejectsOutOfRangeMonthAndDay() {
+        // Numeric branch bounds month to 1...12 and day to 1...31, letting anything outside
+        // fall through to DateFormatter and then returning raw string.
+        // Out-of-range dates with slashes or unpadded digits are not formatted into YYYY-MM-DD.
+        XCTAssertEqual("2020/99/99", formatShowDate("2020/99/99"))
+        XCTAssertEqual("2020/13/01", formatShowDate("2020/13/01"))
+        XCTAssertEqual("2020/01/32", formatShowDate("2020/01/32"))
+        XCTAssertEqual("2020/00/15", formatShowDate("2020/00/15"))
+        XCTAssertEqual("2020/05/00", formatShowDate("2020/05/00"))
+        XCTAssertEqual("2020-13-1", formatShowDate("2020-13-1"))
+        XCTAssertEqual("2020-1-32", formatShowDate("2020-1-32"))
+        XCTAssertEqual("2020-99-99", formatShowDate("2020-99-99"))
     }
 
     func testFormatSetRoman() {

@@ -179,4 +179,70 @@ final class ProgressRecorderTests: XCTestCase {
         )
         XCTAssertTrue(replayedSaved)
     }
+
+    func testSaveTickReturnsFalseWhenStoreThrowsAndRetriesNextTickAtSamePosition() throws {
+        let failingStore = FailingProgressStore()
+        let testRecorder = ProgressRecorder(store: failingStore)
+
+        // First attempt with store failing: saveTick must return false.
+        let firstResult = testRecorder.saveTick(
+            queueKey: "show:2026-07-29",
+            show: sampleShow,
+            track: sampleTrack(),
+            trackIndex: 9,
+            positionMs: 10_000,
+            artURL: nil,
+            force: true
+        )
+
+        XCTAssertFalse(firstResult, "saveTick must return false when store.put throws")
+        XCTAssertEqual(failingStore.putCallCount, 1)
+        XCTAssertNil(failingStore.lastSavedRow)
+
+        // Store recovers. An immediately following tick at the exact same position
+        // must NOT be skipped as duplicate; it must attempt the write again and succeed.
+        failingStore.shouldThrow = false
+        let retryResult = testRecorder.saveTick(
+            queueKey: "show:2026-07-29",
+            show: sampleShow,
+            track: sampleTrack(),
+            trackIndex: 9,
+            positionMs: 10_000,
+            artURL: nil,
+            force: true
+        )
+
+        XCTAssertTrue(retryResult, "saveTick must retry and succeed after previous failure")
+        XCTAssertEqual(failingStore.putCallCount, 2, "Must have called put again")
+        XCTAssertEqual(failingStore.lastSavedRow?.positionMs, 10_000)
+
+        // Now that it succeeded, a third call at the same position MUST be deduplicated.
+        let thirdResult = testRecorder.saveTick(
+            queueKey: "show:2026-07-29",
+            show: sampleShow,
+            track: sampleTrack(),
+            trackIndex: 9,
+            positionMs: 10_000,
+            artURL: nil,
+            force: true
+        )
+        XCTAssertFalse(thirdResult, "Subsequent tick at same position must be deduplicated once saved successfully")
+        XCTAssertEqual(failingStore.putCallCount, 2, "Must not attempt write when deduplicated")
+    }
+}
+
+private final class FailingProgressStore: ProgressWriting {
+    var shouldThrow = true
+    var putCallCount = 0
+    var lastSavedRow: PlaybackProgress?
+
+    func put(_ progress: PlaybackProgress) throws {
+        putCallCount += 1
+        if shouldThrow {
+            throw NSError(domain: "dev.mike.couchtour.test", code: -1, userInfo: [NSLocalizedDescriptionKey: "Simulated store failure"])
+        }
+        lastSavedRow = progress
+    }
+
+    func markFinished(key: String) throws {}
 }

@@ -47,7 +47,7 @@ public struct QueueRef: Equatable {
 /// The source matters as much as the date: Relisten carries around nine tapes of an average
 /// Grateful Dead show, and two tapes of one date split the music into different tracks. A key
 /// without its source would resume a stored index against the wrong track list.
-public struct RecordingId: Equatable {
+public struct RecordingId: Equatable, Sendable {
     public let artistSlug: String
     public let date: String
     public let sourceId: String
@@ -69,6 +69,12 @@ public func localPlaylistQueueKey(_ id: String) -> String { localPlaylistPrefix 
 
 public func recordingQueueKey(_ artistSlug: String, _ date: String, _ sourceId: String) -> String {
     recordingPrefix + RecordingId(artistSlug: artistSlug, date: date, sourceId: sourceId).id
+}
+
+/// A recording key with its tape id dropped — the show it's a tape of. Every tape of the
+/// same night shares this, which is what "have I played this show?" actually asks (#22).
+public func recordingShowKey(_ artistSlug: String, _ date: String) -> String {
+    recordingPrefix + "\(artistSlug)/\(date)"
 }
 
 public func youtubeQueueKey(_ videoId: String) -> String { youtubePrefix + videoId }
@@ -96,7 +102,10 @@ public func parseQueueKey(_ raw: String) -> QueueRef? {
         return rest.isEmpty ? nil : QueueRef(kind: .youtube, id: rest)
     }
     // Validated on the way in, unlike the other two: a recording id that isn't all three
-    // parts is unusable, and failing here beats failing at fetch time.
+    // parts is unusable, and failing here beats failing at fetch time. Note that
+    // `recordingShowKey` produces a two-part key ("relisten:artist/date"); rejecting it here
+    // in `parseQueueKey` is intentional because a two-part key cannot identify a specific tape
+    // to play/resume.
     if raw.hasPrefix(recordingPrefix) {
         let rest = String(raw.dropFirst(recordingPrefix.count))
         guard let recordingId = parseRecordingId(rest) else { return nil }
