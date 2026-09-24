@@ -10,6 +10,20 @@ import org.junit.Test
  */
 class TvNowPlayingTest {
 
+    // ---------------------------------------------------- tvForwardTarget
+
+    @Test
+    fun `forward skips ahead when duration is not resolved yet`() {
+        // durationMs == 0 while ExoPlayer buffers; must not snap back to 0
+        assertEquals(20_000L, tvForwardTarget(positionMs = 5_000L, durationMs = 0L))
+    }
+
+    @Test
+    fun `forward is capped at the track duration once known`() {
+        assertEquals(60_000L, tvForwardTarget(positionMs = 50_000L, durationMs = 60_000L))
+        assertEquals(25_000L, tvForwardTarget(positionMs = 10_000L, durationMs = 60_000L))
+    }
+
     // ---------------------------------------------------- tvProgressFraction
 
     @Test

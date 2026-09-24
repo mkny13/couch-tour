@@ -52,6 +52,16 @@ internal fun tvProgressFraction(positionMs: Long, durationMs: Long): Float {
 }
 
 /**
+ * Pure helper for the Fast Forward 15s target. A duration of 0 means "not
+ * resolved yet" (the buffering window after a track starts), so it must not
+ * cap the seek, or Forward would snap back to the start of the track.
+ */
+internal fun tvForwardTarget(positionMs: Long, durationMs: Long): Long {
+    val target = positionMs + 15_000
+    return if (durationMs > 0L) target.coerceAtMost(durationMs) else target
+}
+
+/**
  * Pure helper combining artist, show date, and venue into a readable TV subtitle.
  */
 internal fun tvFormatTrackSubtitle(artistName: String, showDate: String, venueName: String): String {
@@ -257,7 +267,7 @@ fun TvNowPlayingScreen(
                     }
 
                     IconButton(
-                        onClick = { vm.seekTo((state.positionMs + 15_000).coerceAtMost(state.durationMs)) },
+                        onClick = { vm.seekTo(tvForwardTarget(state.positionMs, state.durationMs)) },
                         modifier = Modifier.padding(horizontal = 8.dp),
                     ) {
                         Icon(Icons.Default.FastForward, contentDescription = "Forward 15s")
