@@ -139,6 +139,22 @@ class FillerTracksTest {
     }
 
     @Test
+    fun `filterPlaybackTracks falls back to unfiltered list when every track is filler`() {
+        val tracks = listOf(
+            SimpleTrack("1", "Intro"),
+            SimpleTrack("2", "Tuning"),
+            SimpleTrack("3", "Stage Banter"),
+        )
+        val resultFromStart = filterPlaybackTracks(tracks, 0, skipFiller = true) { it.title }
+        assertEquals(tracks, resultFromStart.items)
+        assertEquals(0, resultFromStart.startIndex)
+
+        val resultFromMid = filterPlaybackTracks(tracks, 1, skipFiller = true) { it.title }
+        assertEquals(tracks, resultFromMid.items)
+        assertEquals(1, resultFromMid.startIndex)
+    }
+
+    @Test
     fun `playback settings persistence and toggle`() {
         PlaybackSettings.setSkipFiller(false)
         assertFalse(PlaybackSettings.skipFiller.value)

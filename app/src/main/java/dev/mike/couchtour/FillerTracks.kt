@@ -119,6 +119,12 @@ fun <T> filterPlaybackTracks(
         return FilteredTracks(tracks, startIndex)
     }
 
+    // When every track is filler, falling back to the unfiltered list is intended so
+    // playback can proceed rather than stalling on an empty queue or dropping the show.
+    if (tracks.all { isFillerTrack(titleOf(it)) }) {
+        return FilteredTracks(tracks, startIndex)
+    }
+
     var effectiveStartIndex = startIndex
     // If started from top (0) and track 0 is filler, find the first non-filler track
     if (effectiveStartIndex == 0 && isFillerTrack(titleOf(tracks[0]))) {

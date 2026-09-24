@@ -90,6 +90,27 @@ class QueueTest {
     }
 
     @Test
+    fun `recordingShowKey builds two-part key and parseQueueKey rejects it`() {
+        // recordingShowKey produces a two-part key ("relisten:artistSlug/date") for show-level matching.
+        val showKey = recordingShowKey("grateful-dead", "1977-05-08")
+        assertEquals("relisten:grateful-dead/1977-05-08", showKey)
+
+        // parseQueueKey must reject two-part show keys: a recording queue cannot be resumed
+        // without a specific source/tape id.
+        assertNull(parseQueueKey(showKey))
+    }
+
+    @Test
+    fun `rejects malformed recording ids with wrong part counts or empty segments`() {
+        assertNull(parseRecordingId("/artist/1977-05-08/src"))
+        assertNull(parseRecordingId("artist/1977-05-08/src/"))
+        assertNull(parseRecordingId("artist//src"))
+        assertNull(parseRecordingId("artist/1977-05-08/src/extra"))
+        assertNull(parseRecordingId("/"))
+        assertNull(parseRecordingId("//"))
+    }
+
+    @Test
     fun `a colon inside a recording part is not a delimiter`() {
         // Recording parts are split on "/" precisely so the first-colon-only rule that show
         // and playlist keys live under never applies here.

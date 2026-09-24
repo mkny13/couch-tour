@@ -3,6 +3,8 @@ package dev.mike.couchtour
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
 
 /**
@@ -52,8 +54,14 @@ internal const val MAX_ANNIVERSARY_SHOWS = 8
 
 /** "1997-11-17" -> "11-17"; null for anything that isn't a `YYYY-MM-DD` date. Dates stay
  *  opaque strings throughout the app — there is no date type to parse into. */
-internal fun monthDay(date: String): String? =
-    if (date.length == 10 && date[4] == '-' && date[7] == '-') date.substring(5) else null
+internal fun monthDay(date: String): String? {
+    if (date.length != 10 || date[4] != '-' || date[7] != '-') return null
+    for (i in 0 until 10) {
+        if (i == 4 || i == 7) continue
+        if (date[i] !in '0'..'9') return null
+    }
+    return date.substring(5)
+}
 
 /** "1997-11-17" -> "1997"; null on the same terms as [monthDay]. */
 private fun yearOf(date: String): String? =
@@ -104,17 +112,20 @@ private fun periodSpan(id: String): IntRange? {
  * whose existing `period.contains("-")` branch turns them into `year_range=` queries (D11).
  */
 internal fun phishInRanges(periods: List<PeriodRef>, cap: Int = PHISHIN_RANGE_CAP): List<PeriodRef> {
-    val spans = periods.mapNotNull { p -> periodSpan(p.id)?.let { it to p.showCount } }
+    val spans = periods
+        .mapNotNull { p -> periodSpan(p.id)?.let { it to p.showCount } }
+        .sortedWith(compareBy({ it.first.first }, { it.first.last }))
     if (spans.isEmpty()) return emptyList()
 
     val batches = mutableListOf<Pair<IntRange, Int>>()
     for ((span, count) in spans) {
         val last = batches.lastOrNull()
-        if (last == null || last.second + count > cap) {
-            batches += span to count
-        } else {
+        val isContiguousOrOverlapping = last != null && span.first <= last.first.last + 1
+        if (isContiguousOrOverlapping && last!!.second + count <= cap) {
             batches[batches.lastIndex] = (minOf(last.first.first, span.first)..maxOf(last.first.last, span.last)) to
                 (last.second + count)
+        } else {
+            batches += span to count
         }
     }
     return batches.map { (span, count) ->
@@ -206,6 +217,8 @@ private suspend fun showsFor(
  * hatch `PhishInApi.baseUrl` uses.
  */
 object OnThisDate {
+    private val mutex = Mutex()
+
     /** Key is the date plus the favorites it was computed for, so favoriting an artist
      *  invalidates it as surely as midnight does. */
     @Volatile internal var cached: Pair<String, List<ShowSummary>>? = null
@@ -213,12 +226,20 @@ object OnThisDate {
     internal fun cacheKey(favorites: List<ArtistRef>, today: String): String =
         today + "|" + favorites.map { it.key }.sorted().joinToString(",")
 
-    suspend fun load(favorites: List<ArtistRef>, today: String): List<ShowSummary> {
+    suspend fun load(
+        favorites: List<ArtistRef>,
+        today: String,
+        random: Random = Random,
+        source: (Backend) -> MusicSource = ::sourceFor,
+    ): List<ShowSummary> {
         if (favorites.isEmpty()) return emptyList()
         val key = cacheKey(favorites, today)
         cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
-        val shows = showsOnDate(favorites, today)
-        cached = key to shows
-        return shows
+        return mutex.withLock {
+            cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
+            val shows = showsOnDate(favorites, today, random = random, source = source)
+            cached = key to shows
+            shows
+        }
     }
 }
