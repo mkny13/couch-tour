@@ -62,6 +62,22 @@ final class LoudnessTests: XCTestCase {
         XCTAssertEqual(r.peakDbfs, -20.0, accuracy: 0.1)
     }
 
+    func testFullScaleSineExercisesMultipleBlockSlidesAndPinsLUFS() {
+        // A full-scale (0 dBFS) 997 Hz sine fed for 2 seconds.
+        // At 48 kHz, 2s = 96,000 frames. Initial block is 19,200 frames (0.4s).
+        // Each slide advances by 4,800 frames (0.1s), triggering 16 slideBlock() calls.
+        // Under ITU-R BS.1770-4, a full-scale stereo sine at 997 Hz integrates to -3.0 ± 0.1 LUFS
+        // and 0.0 dBFS sample peak. If slideBlock's overlapping memory move corrupts samples or fails
+        // to advance the buffer, subsequent blocks accumulate corrupted power and the LUFS diverges.
+        let meter = LoudnessMeter(sampleRate: 48000, channels: 2)
+        let mono = sine997(sampleRate: 48000, durationSec: 2, dbfs: 0)
+        meter.push(stereo(mono))
+        let r = meter.result()
+        XCTAssertNotNil(r.lufs, "Expected non-nil LUFS for full-scale sine")
+        XCTAssertEqual(r.lufs!, -3.0, accuracy: 0.1)
+        XCTAssertEqual(r.peakDbfs, 0.0, accuracy: 0.1)
+    }
+
     // MARK: - Silence → gated to no measurement
 
     func testSilenceGatedToNil() {

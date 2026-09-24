@@ -195,4 +195,9 @@ Long-standing items that predate this sprint.
   - **Queue navigation:** The right-hand queue pane shows the full show queue, with the current track highlighted (`▶`). D-pad up/down scrolls through tracks, and pressing Select/OK on any track immediately plays that track.
   - **Progress & Resume:** Returning to browse while playing displays a "▶ Now Playing" button in top headers. The TV home screen displays a "Continue listening" shelf with recent in-progress shows; selecting one resumes playback at the saved track and position. Reopening a previously played show's track screen shows a "▶ Resume" button in the header that resumes at the saved position.
 
+## CouchTourKit correctness scan & loudness leveling verification (#330)
+
+- [ ] `uat-066` **Volume leveling sanity check after slideBlock overlap copy fix** (macOS) — `LoudnessMeter.slideBlock()` now shifts overlapping sample buffers with `memmove` rather than undefined `update(from:count:)`. In Settings → Playback, turn on "Level volume across sources". Play tracks from several shows (including audience and soundboard sources) and confirm volume leveling gain remains natural, consistent, and free of audible artifacts or sudden volume jumps.
+
+
 

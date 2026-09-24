@@ -184,10 +184,10 @@ public final class LoudnessMeter {
     private func slideBlock() {
         let keep = blockSize - stepSize
         for ch in 0..<channels {
-            // Shift left by stepSize
+            // Shift left by stepSize with overlap-safe memmove.
             channelBlockBuf[ch].withUnsafeMutableBufferPointer { buf in
-                buf.baseAddress!.advanced(by: 0)
-                    .update(from: buf.baseAddress!.advanced(by: stepSize), count: keep)
+                guard let base = buf.baseAddress else { return }
+                memmove(base, base.advanced(by: stepSize), keep * MemoryLayout<Double>.stride)
             }
         }
         blockPos = keep
