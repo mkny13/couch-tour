@@ -111,4 +111,11 @@ class FormatTest {
         assertEquals("2020-1-32", formatShowDate("2020-1-32"))
         assertEquals("2020-99-99", formatShowDate("2020-99-99"))
     }
+
+    @Test
+    fun `formats remaining time with left suffix matching Format swift port`() {
+        assertEquals("7:32 left", formatRemainingTime(positionMs = 312_000, durationMs = 764_000))
+        assertEquals("0:00 left", formatRemainingTime(positionMs = 800_000, durationMs = 764_000))
+        assertEquals("0:00 left", formatRemainingTime(positionMs = 0, durationMs = 0))
+    }
 }

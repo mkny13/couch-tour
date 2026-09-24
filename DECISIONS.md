@@ -4819,15 +4819,16 @@ Addressed three correctness defects and audit findings across `CouchTourKit`:
 
 ### D272 — Android pure-logic correctness bug scan (#329)
 
-Addressed five seeded correctness defects and audit findings across Android pure-logic modules (`OnThisDate.kt`, `Format.kt`, `Queue.kt`, `FillerTracks.kt`):
+Addressed six seeded correctness defects and audit findings across Android pure-logic modules (`OnThisDate.kt`, `Format.kt`, `Queue.kt`, `FillerTracks.kt`):
 
 - **F1: `phishInRanges` contiguous and ascending span batching (`OnThisDate.kt`):** Spans are sorted ascending by start year before batching, and only merged into the current batch when contiguous or overlapping (`span.first <= last.first.last + 1`) and within `cap`. Prevents out-of-order or gapped input from spanning years not present or double-fetching shows. Added regression test in `OnThisDateTest.kt`.
 - **F2: `OnThisDate.load` concurrent deduplication (`OnThisDate.kt`):** Wrapped the cache miss path in a `kotlinx.coroutines.sync.Mutex` with double-checked locking so concurrent callers for the same key execute only a single fan-out. Added injectable `source` seam parameter and regression test in `OnThisDateTest.kt` verifying single fan-out.
 - **F3: `monthDay` digit validation (`OnThisDate.kt`):** Checked that all 8 non-hyphen positions in `YYYY-MM-DD` strings are ASCII digits, preventing non-digit malformed dates like `"abcd-ef-gh"` from matching anniversary shows. Added regression assertion in `OnThisDateTest.kt`.
 - **F4: `formatCompactDuration` KDoc alignment (`Format.kt`):** Retained `h:mm` for hour+ durations and `m:ss` for sub-hour durations to match `Format.swift` and keep set/show headers compact without duplicating `fmt()`. Corrected KDoc to state explicitly that seconds are dropped past an hour to fit headers and badges. Pinned behavior with regression tests in `FormatTest.kt`.
 - **F5: `formatShowDate` parity and bounds validation (`Format.kt`):** Extended `formatShowDate` to accept `YYYY/MM/DD`, unpadded month/day (e.g. `1997-5-8`), and standard date formats (e.g. `May 8, 1977`), while bounding month to 1..12 and day to 1..31, matching `Format.swift` (D271). Added regression tests in `FormatTest.kt`.
+- **F6: `formatRemainingTime` parity with `Format.swift` (`Format.kt`):** Resolved divergence where `Format.kt` returned a negative clock string (`"-7:32"`), whereas `Format.swift` returned a suffixed string (`"7:32 left"`). Aligned `Format.kt` to match `Format.swift` by returning `"${fmt(remainingMs)} left"` and guarding `durationMs <= 0L` to return `"0:00 left"`. Added parity test in `FormatTest.kt` and updated `LedgerLayoutTest.kt`.
 - **Queue and filler track logic (`Queue.kt`, `FillerTracks.kt`):** Documented in `Queue.kt` that `parseQueueKey` intentionally rejects two-part `recordingShowKey` because playback cannot resume without a specific tape id; added regression tests in `QueueTest.kt`. In `filterPlaybackTracks`, handled all-filler track lists by falling back to the unfiltered track list so playback does not stall or drop the show; added regression test in `FillerTracksTest.kt`.
-- **Tests:** 7 new Android unit tests in `OnThisDateTest.kt`, `FormatTest.kt`, `QueueTest.kt`, and `FillerTracksTest.kt`; Android suite at 640, macOS unchanged at 443.
+- **Tests:** 8 new Android unit tests in `OnThisDateTest.kt`, `FormatTest.kt`, `QueueTest.kt`, and `FillerTracksTest.kt`; Android suite at 641, macOS unchanged at 443.
 
 
 

@@ -91,10 +91,11 @@ fun formatShowDate(rawDate: String): String {
 }
 
 /**
- * Formats remaining playback time as negative clock: "-7:32", "-0:00".
+ * Formats remaining track time with a "left" suffix, e.g. "7:32 left".
  */
 fun formatRemainingTime(positionMs: Long, durationMs: Long): String {
+    if (durationMs <= 0L) return "0:00 left"
     val remainingMs = (durationMs - positionMs).coerceAtLeast(0L)
-    return "-${fmt(remainingMs)}"
+    return "${fmt(remainingMs)} left"
 }
 
