@@ -182,3 +182,17 @@ Long-standing items that predate this sprint.
 
 - [ ] `uat-063` **TV artist/year browse D-pad navigation** (Google TV / Android TV emulator or physical device) — Launch Couch Tour from the TV launcher (leanback entry point from #182). The artist screen shows rows grouped Phish / Favorites / All artists (mirroring Android Auto's grouping), each artist a focusable card; D-pad up/down moves between section rows, left/right moves within a row, and the focused card visibly scales up (tv-material3 `CardDefaults` focus behavior) with no dead focus traps. Selecting an artist opens a years grid (newest year first, "Popular" pinned first); D-pad navigation across the grid moves in the expected row/column directions. The Back button (remote) and the on-screen "← All artists" button both return to the artist screen. Confirm scrolling long rows/grids with the D-pad doesn't lose focus or visibly stutter.
 
+## Google TV show & track browse (#226)
+
+- [ ] `uat-064` **TV show/track browse D-pad navigation and playback stub** (Google TV / Android TV emulator or physical device) — From the years grid (#225), select a year: a shows grid opens (multi-row, newest show first), each card showing the date and venue/location. D-pad navigation moves in the expected row/column directions across the grid, with focus scaling and no dead traps, matching the years grid's feel. Selecting a show opens a track list (a single vertical D-pad lane, not a grid) grouped under set headers ("Set 1", "Set 2", "Encore" — no header at all for a tape with no real sets); each row shows position, title, and duration. Selecting a track does nothing audible yet (playback is Part 3 of #9, not yet filed) — confirm it doesn't crash or freeze focus. The remote's Back button and each screen's on-screen "← Years"/"← Shows" button both pop exactly one level (shows→years, tracks→shows), never skipping a level or exiting the app early.
+
+## Google TV playback & Now Playing (#184)
+
+- [ ] `uat-065` **TV Now Playing, remote transport controls, volume keys, and queue navigation** (Google TV / Android TV emulator or physical device) — Launch Couch Tour on a Google TV / Android TV device. Drill down to a show and select a track: playback begins and transitions to the Now Playing screen. Confirm:
+  - **Now Playing screen:** Shows cover artwork, track title, artist and show/venue metadata, audio format badge (FLAC/MP3), and a live progress scrubber that advances during playback.
+  - **Remote transport controls:** D-pad navigation can focus and activate on-screen transport buttons (Previous, Rewind 15s, Play/Pause, Fast Forward 15s, Next). Physical TV remote media keys (Play/Pause, Skip, Fast Forward, Rewind) control playback directly.
+  - **Volume keys:** Hardware volume up/down/mute keys on the remote adjust the playback volume on the TV.
+  - **Queue navigation:** The right-hand queue pane shows the full show queue, with the current track highlighted (`▶`). D-pad up/down scrolls through tracks, and pressing Select/OK on any track immediately plays that track.
+  - **Progress & Resume:** Returning to browse while playing displays a "▶ Now Playing" button in top headers. The TV home screen displays a "Continue listening" shelf with recent in-progress shows; selecting one resumes playback at the saved track and position. Reopening a previously played show's track screen shows a "▶ Resume" button in the header that resumes at the saved position.
+
+

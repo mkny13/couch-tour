@@ -52,6 +52,7 @@ object Keys {
     const val TAPE_LINEAGE = "tape_lineage"
     const val SET_NAME = "set_name"
     const val TRACK_POSITION = "track_position"
+    const val DURATION_MS = "duration_ms"
 
     /** YouTube playback (#234): the resolved stream URLs and the current playback mode. */
     const val YOUTUBE_AUDIO_URL = "youtube_audio_url"
@@ -62,7 +63,7 @@ object Keys {
     val ALL = listOf(
         QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID,
         LIKED, LIKES_COUNT, FLAC_URL, MP3_URL, SHOW_DATE, VENUE_NAME, ARTIST_NAME, ARTIST_ID,
-        SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION,
+        SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION, DURATION_MS,
         YOUTUBE_AUDIO_URL, YOUTUBE_VIDEO_URL, YOUTUBE_MODE
     )
 }
