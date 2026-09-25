@@ -134,7 +134,7 @@ flowchart LR
 
     subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]
         direction TB
-        L1["#18 Volume Leveling — #265/#266/#268 shipped; #267, #269 open"]
+        L1["#18 Volume Leveling — Shipped (#265-#269, D237)"]
     end
 
     Shipped --> NearTerm --> LongTerm
@@ -196,15 +196,15 @@ preserved. The work is split into:
 
 1. #265 — BS.1770 loudness meter, gain rule, and a per-track leveling key (both platforms) — **shipped**
 2. #266 — `source_loudness` cache table (Room `MIGRATION_9_10`, GRDB v10) — **shipped**
-3. #267 — Android: background measurement, `AudioProcessor` gain, and a Settings toggle — **open**
+3. #267 — Android: background measurement, `AudioProcessor` gain, and a Settings toggle — **shipped**
 4. #268 — macOS: background measurement, `MTAudioProcessingTap` gain, and a Settings toggle — **shipped**
-5. #269 — after beta UAT: decide whether it's on by default, add a clear-cache action, update docs — **open**
+5. #269 — after beta UAT: decide whether it's on by default, add a clear-cache action, update docs — **shipped**
 
 #265 and #266 can be built in parallel. #267 and #268 both need them, but not each other.
 
 | Issue | Feature | Description | Platforms | Status |
 |---|---|---|---|---|
-| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. Strategy: on-device measurement cached per source (D237), split into #265-#269. | Android, macOS | In flight (#265, #266, #268 shipped; #267, #269 open) |
+| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. Strategy: on-device measurement cached per source (D237), split into #265-#269. | Android, macOS | Shipped (#265–#269) |
 | **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation, D233), Part 2 (browse UI — artist/year D266, show/track D269), and Part 3 (Now Playing / transport / playback, D270) shipped. | Android TV | Shipped (D233, D266, D269, D270) |
 
 ---

@@ -1,14 +1,18 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 private const val PREFS = "playback_settings"
 private const val KEY_SKIP_FILLER = "skip_filler"
 private const val KEY_GAPLESS = "gapless"
 private const val KEY_AUDIO_QUALITY = "audio_quality"
+private const val KEY_LEVEL_VOLUME = "level_volume"
 
 /**
  * Which encoding a stream that offers both should play (#141). Only tapes with a
@@ -49,11 +53,20 @@ object PlaybackSettings {
     private val _audioQuality = MutableStateFlow(AudioQuality.LOSSLESS)
     val audioQuality: StateFlow<AudioQuality> = _audioQuality.asStateFlow()
 
+    /**
+     * Volume leveling (#267). Off by default so the first beta can be A/B tested against
+     * raw playback. When on, [PlaybackService] measures queued sources in the background
+     * and applies the resulting gain through an AudioProcessor — see [VolumeLeveler].
+     */
+    private val _levelVolume = MutableStateFlow(false)
+    val levelVolume: StateFlow<Boolean> = _levelVolume.asStateFlow()
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         _skipFiller.value = prefs.getBoolean(KEY_SKIP_FILLER, false)
         _gapless.value = prefs.getBoolean(KEY_GAPLESS, true)
         _audioQuality.value = AudioQuality.fromStorage(prefs.getString(KEY_AUDIO_QUALITY, null))
+        _levelVolume.value = prefs.getBoolean(KEY_LEVEL_VOLUME, false)
     }
 
     fun setSkipFiller(enabled: Boolean) {
@@ -79,5 +92,23 @@ object PlaybackSettings {
         if (::prefs.isInitialized) {
             prefs.edit().putString(KEY_AUDIO_QUALITY, quality.storageValue).apply()
         }
+    }
+
+    fun setLevelVolume(enabled: Boolean) {
+        _levelVolume.value = enabled
+        if (::prefs.isInitialized) {
+            prefs.edit().putBoolean(KEY_LEVEL_VOLUME, enabled).apply()
+        }
+    }
+
+    /**
+     * Signal to running playback components (e.g. [PlaybackService]) to cancel any in-flight
+     * loudness measurement and clear in-memory state (#269).
+     */
+    private val _clearCacheRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val clearCacheRequests: SharedFlow<Unit> = _clearCacheRequests.asSharedFlow()
+
+    fun clearMeasuredLoudness() {
+        _clearCacheRequests.tryEmit(Unit)
     }
 }
