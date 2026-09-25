@@ -131,7 +131,7 @@ variant (D233).
 
 ## Tests
 
-641 Android unit tests, no device or emulator required:
+666 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest

@@ -100,6 +100,11 @@ internal fun mediaItem(
         setName = track.setName,
         trackPosition = track.position,
         durationMs = track.duration,
+        // A playlist queue spans shows, so the per-track date — not info.key — is what the
+        // leveling cache is keyed on. Nested show tracks have a null showDate (Api.kt), but
+        // a show queue's key already *is* show:<date>, so the fallback below agrees.
+        levelingKey = (track.showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) })
+            ?.let { showQueueKey(it) },
     )
 }
 
@@ -127,6 +132,7 @@ internal fun recordingMediaItem(
     setName = track.setName,
     trackPosition = track.position,
     durationMs = track.durationMs,
+    levelingKey = track.levelingKey,
 )
 
 /**
@@ -157,7 +163,10 @@ private fun coreMediaItem(
     tapeLineage: String? = null,
     setName: String = "",
     trackPosition: Int = 0,
+    /** Track length — the leveling measurer's byte-rate estimate when the server won't say. */
     durationMs: Long = 0,
+    /** The source-level loudness-cache key (#267); null = don't level this track. */
+    levelingKey: String? = null,
 ): MediaItem {
     val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
     val resolvedVenue = venueName ?: info.subtitle
@@ -182,6 +191,7 @@ private fun coreMediaItem(
         setName = setName,
         trackPosition = trackPosition,
         durationMs = durationMs,
+        levelingKey = levelingKey,
     )
     val meta = mediaMetadata(title, artist, art, showDate, venueName, info, extras)
 
@@ -246,6 +256,7 @@ private fun mediaItemExtras(
     setName: String,
     trackPosition: Int,
     durationMs: Long = 0,
+    levelingKey: String? = null,
 ): Bundle = Bundle().apply {
     info.key?.let { putString(Keys.QUEUE_KEY, it) }
     putString(Keys.QUEUE_TITLE, info.title)
@@ -266,6 +277,7 @@ private fun mediaItemExtras(
     tapeLineage?.let { putString(Keys.TAPE_LINEAGE, it) }
     if (setName.isNotBlank()) putString(Keys.SET_NAME, setName)
     if (trackPosition > 0) putInt(Keys.TRACK_POSITION, trackPosition)
+    levelingKey?.let { putString(Keys.LEVELING_KEY, it) }
     if (durationMs > 0) putLong(Keys.DURATION_MS, durationMs)
 }
 
@@ -374,6 +386,11 @@ internal fun localPlaylistTrackItems(playlistId: String, name: String, resolved:
             likedByUser = it.likedByUser,
             likesCount = it.likesCount,
             flacUrl = it.flacUrl,
+            // Only phish.in rows can form a leveling key here: a resolved Relisten row
+            // carries no recording identity (ResolvedLocalTrack), and keying its tape
+            // under show:<date> would leak the measurement into phish.in shows of the
+            // same night. Un-leveled beats mis-leveled.
+            levelingKey = if (it.backend == Backend.PHISHIN.id) it.showDate?.let(::showQueueKey) else null,
         )
     }
 }
@@ -459,6 +476,7 @@ internal fun youtubeMediaItem(
         setName = "",
         trackPosition = 0,
         durationMs = video.durationMs ?: 0L,
+        levelingKey = null,
     ).apply {
         putString(Keys.YOUTUBE_AUDIO_URL, audioUrl)
         putString(Keys.YOUTUBE_VIDEO_URL, videoUrl)

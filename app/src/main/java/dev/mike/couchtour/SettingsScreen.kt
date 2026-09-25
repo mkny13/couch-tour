@@ -62,6 +62,7 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
     val isSyncing by SyncSession.syncing.collectAsState()
     val username by Session.username.collectAsState()
     val skipFiller by PlaybackSettings.skipFiller.collectAsState()
+    val levelVolume by PlaybackSettings.levelVolume.collectAsState()
     var showSignOutDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -131,6 +132,14 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             label = "Gapless playback",
             checked = gapless,
             onCheckedChange = { PlaybackSettings.setGapless(it) }
+        )
+        SettingsToggleRow(
+            label = "Level volume across sources",
+            checked = levelVolume,
+            onCheckedChange = { PlaybackSettings.setLevelVolume(it) },
+            help = "Evens out loudness across shows and tapes. " +
+                "Measures each source once in the background (some data and battery the " +
+                "first time it plays); doesn't apply while casting.",
         )
         SettingsValueRow(
             label = "Audio quality",
@@ -388,7 +397,8 @@ private fun SettingsValueRow(
 private fun SettingsToggleRow(
     label: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    help: String? = null,
 ) {
     val ledger = LocalLedgerColors.current
     Column(
@@ -417,6 +427,14 @@ private fun SettingsToggleRow(
                     uncheckedThumbColor = ledger.textSubtle,
                     uncheckedTrackColor = ledger.cardSurface,
                 )
+            )
+        }
+        help?.let {
+            Text(
+                text = it,
+                fontSize = 12.sp,
+                color = ledger.textSubtle,
+                modifier = Modifier.padding(top = 1.dp, bottom = 6.dp)
             )
         }
         Box(
