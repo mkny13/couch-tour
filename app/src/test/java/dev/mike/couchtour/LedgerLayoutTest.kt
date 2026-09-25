@@ -32,10 +32,11 @@ class LedgerLayoutTest {
     }
 
     @Test
-    fun `remaining time clock produces formatted negative string`() {
-        assertEquals("-7:32", formatRemainingTime(positionMs = 312_000, durationMs = 764_000))
-        assertEquals("-0:00", formatRemainingTime(positionMs = 100_000, durationMs = 100_000))
-        assertEquals("-1:15", formatRemainingTime(positionMs = 0, durationMs = 75_000))
+    fun `remaining time formatting produces formatted string with left suffix`() {
+        assertEquals("7:32 left", formatRemainingTime(positionMs = 312_000, durationMs = 764_000))
+        assertEquals("0:00 left", formatRemainingTime(positionMs = 100_000, durationMs = 100_000))
+        assertEquals("1:15 left", formatRemainingTime(positionMs = 0, durationMs = 75_000))
+        assertEquals("0:00 left", formatRemainingTime(positionMs = 0, durationMs = 0))
     }
 
     @Test

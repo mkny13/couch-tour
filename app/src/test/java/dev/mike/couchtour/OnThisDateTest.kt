@@ -1,5 +1,8 @@
 package dev.mike.couchtour
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
@@ -25,6 +28,7 @@ class OnThisDateTest {
     fun `monthDay is null for a malformed date`() {
         assertNull(monthDay("11-17-1997"))
         assertNull(monthDay("not-a-date"))
+        assertNull(monthDay("abcd-ef-gh"))
     }
 
     @Test
@@ -113,6 +117,33 @@ class OnThisDateTest {
     fun `phishInRanges ignores a period that isn't a year or year range`() {
         val periods = listOf(PeriodRef(POPULAR_PERIOD_ID, POPULAR_PERIOD_LABEL, showCount = 100))
         assertTrue(phishInRanges(periods).isEmpty())
+    }
+
+    @Test
+    fun `phishInRanges produces non-overlapping ascending batches from unsorted or gapped periods`() {
+        val periods = listOf(
+            PeriodRef("2022", "2022", showCount = 10),
+            PeriodRef("1989", "1989", showCount = 10),
+            PeriodRef("1993", "1993", showCount = 10),
+            PeriodRef("1990", "1990", showCount = 10),
+            PeriodRef("2021", "2021", showCount = 10),
+        )
+        val ranges = phishInRanges(periods, cap = 900)
+        // 1989-1990 contiguous; 1993 gapped; 2021-2022 contiguous.
+        assertEquals(
+            listOf(
+                PeriodRef("1989-1990", "1989-1990", showCount = 20),
+                PeriodRef("1993-1993", "1993-1993", showCount = 10),
+                PeriodRef("2021-2022", "2021-2022", showCount = 20),
+            ),
+            ranges,
+        )
+        // Assert no year appears in two batches
+        val allYears = ranges.flatMap { r ->
+            val parts = r.id.split("-").map { it.toInt() }
+            (parts[0]..parts[1]).toList()
+        }
+        assertEquals(allYears.distinct(), allYears)
     }
 
     // ------------------------------------------------------------------ pickAnniversaryShows
@@ -246,6 +277,34 @@ class OnThisDateTest {
         OnThisDate.cached = null
         val result = OnThisDate.load(emptyList(), today = "2026-11-17")
         assertEquals(emptyList<ShowSummary>(), result)
+        OnThisDate.cached = null
+    }
+
+    @Test
+    fun `concurrent OnThisDate load calls deduplicate to one fan-out`() = runBlocking {
+        OnThisDate.cached = null
+        var fetchCount = 0
+        val fakeSource = object : MusicSource {
+            override val backend = Backend.PHISHIN
+            override suspend fun artists() = emptyList<ArtistRef>()
+            override suspend fun periods(artist: ArtistRef): List<PeriodRef> {
+                fetchCount++
+                delay(50)
+                return listOf(PeriodRef("1996", "1996", showCount = 1))
+            }
+            override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> =
+                listOf(ShowSummary(artist = PHISH, date = "1996-11-17"))
+            override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) = error("unused")
+            override suspend fun search(term: String) = SearchHits()
+        }
+
+        val favs = listOf(PHISH)
+        val job1 = async { OnThisDate.load(favs, "2026-11-17", source = { fakeSource }) }
+        val job2 = async { OnThisDate.load(favs, "2026-11-17", source = { fakeSource }) }
+        val (res1, res2) = awaitAll(job1, job2)
+
+        assertEquals(res1, res2)
+        assertEquals(1, fetchCount)
         OnThisDate.cached = null
     }
 }

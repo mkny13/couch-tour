@@ -71,7 +71,10 @@ fun parseQueueKey(raw: String): QueueRef? = when {
             ?.let { QueueRef(QueueKind.YOUTUBE, it) }
 
     // Validated on the way in, unlike the others: a recording id that isn't all three
-    // parts is unusable, and failing here beats failing at fetch time.
+    // parts is unusable, and failing here beats failing at fetch time. Note that
+    // recordingShowKey produces a two-part key ("relisten:artist/date"); rejecting it
+    // here in parseQueueKey is intentional because a two-part key cannot identify a
+    // specific tape to play/resume.
     raw.startsWith(RECORDING_PREFIX) ->
         parseRecordingId(raw.removePrefix(RECORDING_PREFIX))?.let { QueueRef(QueueKind.RECORDING, it.id) }
 

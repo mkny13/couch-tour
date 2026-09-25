@@ -78,9 +78,44 @@ class FormatTest {
 
     @Test
     fun `formats compact duration sub-hour and hour-plus`() {
+        // Sub-hour: m:ss
         assertEquals("0:00", formatCompactDuration(0))
+        assertEquals("0:45", formatCompactDuration(45_000))
         assertEquals("1:06", formatCompactDuration(66_000))
         assertEquals("2:41", formatCompactDuration(161_000))
-        assertEquals("1:05", formatCompactDuration(3_930_000))
+        // Hour-plus: h:mm (seconds dropped for compactness in show/set headers, matching KDoc)
+        assertEquals("1:05", formatCompactDuration(3_930_000)) // 1h 5m 30s -> "1:05"
+        assertEquals("1:06", formatCompactDuration(66 * 60 * 1000L)) // 66m -> "1:06"
+        assertEquals("1:35", formatCompactDuration(95 * 60 * 1000L)) // 95m -> "1:35"
+        assertEquals("2:41", formatCompactDuration(161 * 60 * 1000L)) // 161m -> "2:41"
+    }
+
+    @Test
+    fun `formatShowDate accepts inputs matching Format swift port`() {
+        assertEquals("1997-11-17", formatShowDate("1997-11-17"))
+        assertEquals("1997-11-17", formatShowDate("1997/11/17"))
+        assertEquals("1997-05-08", formatShowDate("1997-5-8"))
+        assertEquals("1997-05-08", formatShowDate("1997/5/8"))
+        assertEquals("1977-05-08", formatShowDate("May 8, 1977"))
+    }
+
+    @Test
+    fun `formatShowDate rejects out of range month and day`() {
+        // Bounded to 1..12 and 1..31, matching Format.swift D271 behaviour
+        assertEquals("2020/99/99", formatShowDate("2020/99/99"))
+        assertEquals("2020/13/01", formatShowDate("2020/13/01"))
+        assertEquals("2020/01/32", formatShowDate("2020/01/32"))
+        assertEquals("2020/00/15", formatShowDate("2020/00/15"))
+        assertEquals("2020/05/00", formatShowDate("2020/05/00"))
+        assertEquals("2020-13-1", formatShowDate("2020-13-1"))
+        assertEquals("2020-1-32", formatShowDate("2020-1-32"))
+        assertEquals("2020-99-99", formatShowDate("2020-99-99"))
+    }
+
+    @Test
+    fun `formats remaining time with left suffix matching Format swift port`() {
+        assertEquals("7:32 left", formatRemainingTime(positionMs = 312_000, durationMs = 764_000))
+        assertEquals("0:00 left", formatRemainingTime(positionMs = 800_000, durationMs = 764_000))
+        assertEquals("0:00 left", formatRemainingTime(positionMs = 0, durationMs = 0))
     }
 }

@@ -6,7 +6,11 @@ fun fmt(ms: Long): String {
     val h = total / 3600
     val m = (total % 3600) / 60
     val s = total % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    return if (h > 0) {
+        "%d:%02d:%02d".format(java.util.Locale.ROOT, h, m, s)
+    } else {
+        "%d:%02d".format(java.util.Locale.ROOT, m, s)
+    }
 }
 
 fun plural(n: Int, word: String) = if (n == 1) word else "${word}s"
@@ -38,7 +42,8 @@ fun progressFraction(positionMs: Long, durationMs: Long): Float {
 }
 
 /**
- * Formats a duration in compact form: "1:06", "1:35", "2:41", or "0:45".
+ * Formats a duration compactly: m:ss for sub-hour (e.g. "0:45", "1:06"), h:mm for hour+ (e.g. "1:35", "2:41").
+ * Dropping seconds past an hour keeps show and set totals compact in headers and badges.
  */
 fun formatCompactDuration(ms: Long): String {
     val totalSec = (if (ms < 0) 0 else ms) / 1000
@@ -47,34 +52,54 @@ fun formatCompactDuration(ms: Long): String {
     val m = totalMin % 60
     val s = totalSec % 60
     return if (h > 0) {
-        "%d:%02d".format(h, m)
+        "%d:%02d".format(java.util.Locale.ROOT, h, m)
     } else {
-        "%d:%02d".format(m, s)
+        "%d:%02d".format(java.util.Locale.ROOT, m, s)
     }
 }
 
 /**
  * Ensures show date strictly adheres to YYYY-MM-DD (uat-006).
+ * Accepts YYYY-MM-DD, YYYY/MM/DD, unpadded month/day (e.g. "1997-5-8"),
+ * and standard text date formats (e.g. "May 8, 1977").
+ * Out-of-range months (not 1..12) and days (not 1..31) are rejected from formatting
+ * and returned as raw strings.
  */
 fun formatShowDate(rawDate: String): String {
     val trimmed = rawDate.trim()
-    // Standard ISO yyyy-MM-dd
-    if (trimmed.matches(Regex("^\\d{4}-\\d{2}-\\d{2}$"))) {
-        return trimmed
+    val parts = trimmed.split('-', '/')
+    if (parts.size == 3) {
+        val y = parts[0].toIntOrNull()
+        val m = parts[1].toIntOrNull()
+        val d = parts[2].toIntOrNull()
+        if (y != null && m != null && d != null &&
+            y in 1901..2099 &&
+            m in 1..12 &&
+            d in 1..31
+        ) {
+            return "%04d-%02d-%02d".format(java.util.Locale.ROOT, y, m, d)
+        }
     }
-    return try {
-        val parsed = java.time.LocalDate.parse(trimmed)
-        parsed.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
-    } catch (_: Exception) {
-        trimmed
+
+    // Try standard date formats
+    val formats = listOf("MMMM d, yyyy", "MMM d, yyyy", "yyyy-MM-dd", "yyyy/MM/dd")
+    for (fmtStr in formats) {
+        try {
+            val formatter = java.time.format.DateTimeFormatter.ofPattern(fmtStr, java.util.Locale.US)
+            val date = java.time.LocalDate.parse(trimmed, formatter)
+            return date.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+        } catch (_: Exception) {
+        }
     }
+    return trimmed
 }
 
 /**
- * Formats remaining playback time as negative clock: "-7:32", "-0:00".
+ * Formats remaining track time with a "left" suffix, e.g. "7:32 left".
  */
 fun formatRemainingTime(positionMs: Long, durationMs: Long): String {
+    if (durationMs <= 0L) return "0:00 left"
     val remainingMs = (durationMs - positionMs).coerceAtLeast(0L)
-    return "-${fmt(remainingMs)}"
+    return "${fmt(remainingMs)} left"
 }
 
