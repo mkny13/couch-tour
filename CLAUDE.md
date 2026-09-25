@@ -17,6 +17,7 @@ Tests are local (Robolectric + MockWebServer); run after any change.
 
 - **Cutting a beta release:** Dispatches `.github/workflows/build-debug-apk.yml` with `side_install: true` (`dev.mike.couchtour.beta`) and `prerelease: true`. Wrapper: `scripts/cut-beta.sh "notes"`. Cut a beta after every batch.
 - **Promoting beta to production:** Never automatic; requires explicit owner confirmation. Runs against the *confirmed* tag (`--ref <confirmed-tag>`), setting `prerelease=false` and `side_install=false` (`dev.mike.couchtour`). Wrapper: `scripts/promote-beta.sh <confirmed-beta-tag> <next-tag> "notes"`.
+- **Google TV:** The TV surface (`TvMainActivity`) is a second Activity in this same `:app` module, not a separate module (D233). It builds and installs from the same `assembleDebug` / `installDebug`, and `app/src/main/AndroidManifest.xml` carries both launcher entries, so manifest edits affect phone and TV together.
 
 ## Building (macOS)
 
@@ -32,6 +33,7 @@ Tests are local (Robolectric + MockWebServer); run after any change.
 `sync/` is a Cloudflare Worker + D1 service (`https://couch-tour-sync.mkastellec.workers.dev`).
 - **Local dev:** `cd sync && npm install && npm run db:migrate:local && npm run dev` (runs local D1 at `http://localhost:8787`).
 - **Typecheck:** `cd sync && npm run typecheck`.
+- **Tests:** `cd sync && npm test` (14 tests, real Miniflare D1, not a mock). CI runs typecheck and tests before any deploy.
 - **Deployments:** Never deploy by hand. `.github/workflows/sync-deploy.yml` deploys to staging, runs smoke tests, applies migrations, and promotes to prod on push to `main` for `sync/**`. Dispatch on demand with `gh workflow run sync-deploy.yml`.
 
 ## Names that look wrong and are not
@@ -45,7 +47,7 @@ Renamed from "Phish.in for Android" to "Couch Tour" (`c2b99e2`) for user-facing 
 ## Room migrations
 
 The `progress` table stores listening history. Destructive migrations are never permitted.
-- Add `MIGRATION_n_n+1` in `PhishInDb.kt` and register in `addMigrations(...)`.
+- `PhishInDb` is declared in `app/src/main/java/dev/mike/couchtour/Progress.kt`, alongside the tables it manages. Add `MIGRATION_n_n+1` there and register in `addMigrations(...)`.
 - Bump DB `version`, commit generated schema JSON in `app/schemas/dev.mike.couchtour.PhishInDb/`, and test in `MigrationTest.kt`.
 
 ## Project conventions
