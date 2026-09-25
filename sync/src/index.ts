@@ -364,7 +364,15 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   // has bumped the counter) rather than from `cursor` (read before) keeps that true even when
   // another device in the group pushes in between: whatever committed by the time this SELECT
   // runs is reflected in both `results` and the seq computed from it, together.
-  const currentSeq = results.length > 0 ? results[results.length - 1].seq : since;
+  //
+  // It must also never fall below `cursor.retentionFloorSeq`. When old tombstones have been purged,
+  // active rows created before the purge still have seq < retentionFloorSeq. A client doing a full
+  // resync (since = 0) has now received every surviving row up through retentionFloorSeq; advancing
+  // the cursor to at least retentionFloorSeq prevents its follow-up sync (since = returned seq)
+  // from tripping HTTP 410 at line 331 and permanently trapping the client in an infinite 410
+  // resync loop (defeating D126 full-resync recovery).
+  const lastRowSeq = results.length > 0 ? results[results.length - 1].seq : since;
+  const currentSeq = Math.max(lastRowSeq, cursor.retentionFloorSeq);
   console.log(`handleSync elapsed: ${Date.now() - startMs}ms (in: ${incoming.length}, out: ${results.length})`);
 
   return json(

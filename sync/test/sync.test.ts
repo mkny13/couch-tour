@@ -157,6 +157,61 @@ describe("happy paths", () => {
     const fresh = await sync(tokenA, 0, []);
     expect(fresh.status).toBe(200);
   });
+
+  test("full resync (since = 0) with active rows below retentionFloorSeq advances cursor to at least retentionFloorSeq", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const device = await deviceRowForToken(tokenA);
+
+    // Active row created before the purge raised retentionFloorSeq
+    await env.DB.prepare(
+      `INSERT INTO progress
+         (groupId, queueKey, title, subtitle, artUrl, trackIndex, positionMs, trackTitle,
+          updatedAt, finished, dismissed, artist, deletedAt, seq, lastWriterDeviceId)
+       VALUES (?, 'active-1', 't', 's', NULL, 0, 0, 't', ?, 0, 0, 'a', NULL, 1, ?)`
+    )
+      .bind(device.groupId, Date.now(), device.id)
+      .run();
+
+    // Retention floor is raised to 5 (e.g. by purgeOldTombstones)
+    await env.DB.prepare("UPDATE seqs SET next = 6, retentionFloorSeq = 5 WHERE groupId = ?")
+      .bind(device.groupId)
+      .run();
+
+    // Client performs a full resync with since = 0
+    const resync = await sync(tokenA, 0, []);
+    expect(resync.status).toBe(200);
+    const body = (await resync.json()) as { seq: number; changes: { queueKey: string }[] };
+    expect(body.changes).toHaveLength(1);
+    expect(body.changes[0].queueKey).toBe("active-1");
+    // Returned seq must be bounded by retentionFloorSeq (5), not the active row's seq (1)
+    expect(body.seq).toBeGreaterThanOrEqual(5);
+
+    // Follow-up sync with the returned seq must succeed (200), not trigger a 410 resync loop
+    const followUp = await sync(tokenA, body.seq, []);
+    expect(followUp.status).toBe(200);
+    const followUpBody = (await followUp.json()) as { changes: unknown[] };
+    expect(followUpBody.changes).toHaveLength(0);
+  });
+
+  test("full resync (since = 0) with empty table under non-zero retentionFloorSeq advances cursor to retentionFloorSeq", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const device = await deviceRowForToken(tokenA);
+
+    await env.DB.prepare("UPDATE seqs SET next = 6, retentionFloorSeq = 5 WHERE groupId = ?")
+      .bind(device.groupId)
+      .run();
+
+    const resync = await sync(tokenA, 0, []);
+    expect(resync.status).toBe(200);
+    const body = (await resync.json()) as { seq: number; changes: unknown[] };
+    expect(body.changes).toHaveLength(0);
+    expect(body.seq).toBe(5);
+
+    const followUp = await sync(tokenA, body.seq, []);
+    expect(followUp.status).toBe(200);
+    const followUpBody = (await followUp.json()) as { changes: unknown[] };
+    expect(followUpBody.changes).toHaveLength(0);
+  });
 });
 
 describe("F1: duplicate queueKey within one push", () => {
