@@ -210,6 +210,18 @@ function optionalInt(value: unknown, field: string): number | null {
   return int(value, field);
 }
 
+/** `trackIndex`, `positionMs`, and `deletedAt` (an epoch ms timestamp) are never negative. */
+function nonNegativeInt(value: unknown, field: string): number {
+  const n = int(value, field);
+  if (n < 0) throw new ValidationError(`${field} must not be negative`);
+  return n;
+}
+
+function optionalNonNegativeInt(value: unknown, field: string): number | null {
+  if (value === null || value === undefined) return null;
+  return nonNegativeInt(value, field);
+}
+
 function bool(value: unknown, field: string): boolean {
   if (typeof value !== "boolean") throw new ValidationError(`${field} must be a boolean`);
   return value;
@@ -245,14 +257,14 @@ function parseProgressFields(value: unknown, index: number): ProgressFields {
     title: text(c.title, at("title"), MAX_TEXT_CHARS),
     subtitle: text(c.subtitle, at("subtitle"), MAX_TEXT_CHARS),
     artUrl: optionalText(c.artUrl, at("artUrl"), MAX_TEXT_CHARS),
-    trackIndex: int(c.trackIndex, at("trackIndex")),
-    positionMs: int(c.positionMs, at("positionMs")),
+    trackIndex: nonNegativeInt(c.trackIndex, at("trackIndex")),
+    positionMs: nonNegativeInt(c.positionMs, at("positionMs")),
     trackTitle: text(c.trackTitle, at("trackTitle"), MAX_TEXT_CHARS),
     updatedAt: int(c.updatedAt, at("updatedAt")),
     finished: bool(c.finished, at("finished")),
     dismissed: bool(c.dismissed, at("dismissed")),
     artist: text(c.artist, at("artist"), MAX_TEXT_CHARS),
-    deletedAt: optionalInt(c.deletedAt, at("deletedAt")),
+    deletedAt: optionalNonNegativeInt(c.deletedAt, at("deletedAt")),
   };
 }
 
@@ -302,9 +314,9 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   const requestTokenHash = await sha256Hex(requestToken);
   const usingPreviousToken = device.previousTokenHash === requestTokenHash;
 
-  const cursor = await env.DB.prepare("SELECT next, retentionFloorSeq FROM seqs WHERE groupId = ?")
+  const cursor = await env.DB.prepare("SELECT retentionFloorSeq FROM seqs WHERE groupId = ?")
     .bind(device.groupId)
-    .first<{ next: number; retentionFloorSeq: number }>();
+    .first<{ retentionFloorSeq: number }>();
   if (!cursor) throw new Error(`no seq counter for group ${device.groupId}`);
 
   // `since` is a seq value, not a timestamp — it can only be compared against another seq.
@@ -335,9 +347,8 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     responseHeaders["X-Sync-Token-Rotated"] = newToken;
   }
 
-  let appliedCount = 0;
   if (incoming.length > 0) {
-    appliedCount = await applyIncomingChanges(env, device, incoming, now);
+    await applyIncomingChanges(env, device, incoming, now);
   }
 
   const rows = await env.DB.prepare(
@@ -346,14 +357,28 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     .bind(device.groupId, since)
     .all<ProgressRow>();
 
-  const currentSeq = cursor.next - 1 + appliedCount;
-  const outCount = rows.results ? rows.results.length : 0;
-  console.log(`handleSync elapsed: ${Date.now() - startMs}ms (in: ${incoming.length}, out: ${outCount})`);
+  const results = rows.results ?? [];
+  // The reported cursor must never be lower than the seq of any row in this same response,
+  // or the client stores a cursor that undercounts what it just received and re-pulls those
+  // rows on every subsequent sync. Deriving it from `results` (read after `applyIncomingChanges`
+  // has bumped the counter) rather than from `cursor` (read before) keeps that true even when
+  // another device in the group pushes in between: whatever committed by the time this SELECT
+  // runs is reflected in both `results` and the seq computed from it, together.
+  //
+  // It must also never fall below `cursor.retentionFloorSeq`. When old tombstones have been purged,
+  // active rows created before the purge still have seq < retentionFloorSeq. A client doing a full
+  // resync (since = 0) has now received every surviving row up through retentionFloorSeq; advancing
+  // the cursor to at least retentionFloorSeq prevents its follow-up sync (since = returned seq)
+  // from tripping HTTP 410 at line 331 and permanently trapping the client in an infinite 410
+  // resync loop (defeating D126 full-resync recovery).
+  const lastRowSeq = results.length > 0 ? results[results.length - 1].seq : since;
+  const currentSeq = Math.max(lastRowSeq, cursor.retentionFloorSeq);
+  console.log(`handleSync elapsed: ${Date.now() - startMs}ms (in: ${incoming.length}, out: ${results.length})`);
 
   return json(
     {
       seq: Math.max(currentSeq, since),
-      changes: (rows.results ?? []).map(toWireRow),
+      changes: results.map(toWireRow),
     },
     200,
     responseHeaders
@@ -369,17 +394,49 @@ function toWireRow(row: ProgressRow): ProgressFields {
   };
 }
 
-async function applyIncomingChanges(
+export async function applyIncomingChanges(
   env: Env,
   device: DeviceRow,
   incoming: ProgressFields[],
   now: number
 ): Promise<number> {
+  // Normalize before dedup and lookup: a badly clock-skewed device can't permanently pin a
+  // row into the future, and the clamped value is what both dedup and LWW compare against.
+  // Absent nullable fields are normalized to explicit null here too. Both clients omit
+  // null-valued optionals by default rather than sending them — kotlinx.serialization only
+  // writes properties differing from their default unless `encodeDefaults` is set, and
+  // Swift's synthesized `Codable` uses `encodeIfPresent` for Optionals. D1's `.bind()`
+  // rejects `undefined` outright, so an omitted `artUrl`/`deletedAt` threw and the whole push
+  // 500'd. Both clients now send explicit nulls, but the server accepting either shape is the
+  // actual fix: a client that gets this wrong should not be able to 500 the endpoint.
+  const normalized = incoming.map((change) => ({
+    ...change,
+    updatedAt: change.updatedAt > now + FUTURE_CLOCK_CLAMP_MS ? now : change.updatedAt,
+    artUrl: change.artUrl ?? null,
+    deletedAt: change.deletedAt ?? null,
+  }));
+
+  // A single push can contain the same queueKey twice. D1 applies a `env.DB.batch()` in
+  // array order regardless of `updatedAt`, so without this dedup step the last occurrence
+  // would always win the row — even if an earlier occurrence in the same push has the newer
+  // `updatedAt` — and both would consume a seq slot, permanently orphaning one that the pull
+  // query would never return. Keeping the highest `updatedAt` (ties go to whichever occurs
+  // later in the array, matching "whichever arrives later wins") means exactly one statement
+  // and one seq get allocated per key, and the outcome no longer depends on array order.
+  const dedupedByKey = new Map<string, ProgressFields>();
+  for (const change of normalized) {
+    const existing = dedupedByKey.get(change.queueKey);
+    if (!existing || change.updatedAt >= existing.updatedAt) {
+      dedupedByKey.set(change.queueKey, change);
+    }
+  }
+  const deduped = [...dedupedByKey.values()];
+
   // Chunked because D1 allows at most 100 bound parameters per query and this binds one per
   // key plus the groupId. A single `IN (...)` over every incoming key 500'd the whole push
   // the moment a client had 100+ changed rows — which is exactly what a first pair with a
   // long listening history looks like.
-  const keys = incoming.map((c) => c.queueKey);
+  const keys = deduped.map((c) => c.queueKey);
   const existingByKey = new Map<string, number>();
   for (let i = 0; i < keys.length; i += KEY_LOOKUP_CHUNK) {
     const chunk = keys.slice(i, i + KEY_LOOKUP_CHUNK);
@@ -392,30 +449,12 @@ async function applyIncomingChanges(
     for (const r of existingRows.results ?? []) existingByKey.set(r.queueKey, r.updatedAt);
   }
 
-  const accepted = incoming
-    .map((change) => {
-      // A badly clock-skewed device can't permanently pin a row into the future.
-      const updatedAt = change.updatedAt > now + FUTURE_CLOCK_CLAMP_MS ? now : change.updatedAt;
-      // Normalize absent nullable fields to explicit null. Both clients omit null-valued
-      // optionals by default rather than sending them — kotlinx.serialization only writes
-      // properties differing from their default unless `encodeDefaults` is set, and Swift's
-      // synthesized `Codable` uses `encodeIfPresent` for Optionals. D1's `.bind()` rejects
-      // `undefined` outright, so an omitted `artUrl`/`deletedAt` threw and the whole push
-      // 500'd. Both clients now send explicit nulls, but the server accepting either shape is
-      // the actual fix: a client that gets this wrong should not be able to 500 the endpoint.
-      return {
-        ...change,
-        updatedAt,
-        artUrl: change.artUrl ?? null,
-        deletedAt: change.deletedAt ?? null,
-      };
-    })
-    .filter((change) => {
-      const existingUpdatedAt = existingByKey.get(change.queueKey);
-      // >= rather than >: on an exact tie, whichever push reaches the server wins, since it
-      // is — by definition — the one arriving now. That's the seq tie-break in practice.
-      return existingUpdatedAt === undefined || change.updatedAt >= existingUpdatedAt;
-    });
+  const accepted = deduped.filter((change) => {
+    const existingUpdatedAt = existingByKey.get(change.queueKey);
+    // >= rather than >: on an exact tie, whichever push reaches the server wins, since it
+    // is — by definition — the one arriving now. That's the seq tie-break in practice.
+    return existingUpdatedAt === undefined || change.updatedAt >= existingUpdatedAt;
+  });
 
   if (accepted.length === 0) return 0;
 
@@ -485,26 +524,32 @@ async function handleHealth(env: Env): Promise<Response> {
  * a gap it can no longer trust exists (D121), but nothing yet told it to distrust it. Raising
  * the floor first means that gap always 410s (D126's `since = 0` exemption still applies to
  * anyone doing a full resync anyway) rather than silently under-syncing.
+ *
+ * `rowsPurged` (this job's only observability) comes from the DELETE statement's own
+ * `meta.changes` rather than a separate `COUNT(*)` taken before the batch runs — a tombstone
+ * crossing `cutoff` between the two reads used to be counted (or not) inconsistently with
+ * whether it was actually deleted. Reading the count off the delete itself closes that gap:
+ * the number reported is, by construction, the number of rows that statement removed.
  */
-async function purgeOldTombstones(
+export async function purgeOldTombstones(
   env: Env,
   now: number
 ): Promise<{ groupsPurged: number; rowsPurged: number }> {
   const cutoff = now - TOMBSTONE_RETENTION_MS;
   const candidates = await env.DB.prepare(
-    `SELECT groupId, MAX(seq) as maxSeq, COUNT(*) as count
+    `SELECT groupId, MAX(seq) as maxSeq
      FROM progress
      WHERE deletedAt IS NOT NULL AND deletedAt < ?
      GROUP BY groupId`
   )
     .bind(cutoff)
-    .all<{ groupId: string; maxSeq: number; count: number }>();
+    .all<{ groupId: string; maxSeq: number }>();
 
   const groups = candidates.results ?? [];
   let rowsPurged = 0;
 
   for (const group of groups) {
-    await env.DB.batch([
+    const [, deleteResult] = await env.DB.batch([
       env.DB.prepare(
         "UPDATE seqs SET retentionFloorSeq = MAX(retentionFloorSeq, ?) WHERE groupId = ?"
       ).bind(group.maxSeq, group.groupId),
@@ -512,7 +557,7 @@ async function purgeOldTombstones(
         "DELETE FROM progress WHERE groupId = ? AND deletedAt IS NOT NULL AND deletedAt < ?"
       ).bind(group.groupId, cutoff),
     ]);
-    rowsPurged += group.count;
+    rowsPurged += deleteResult.meta.changes;
   }
 
   return { groupsPurged: groups.length, rowsPurged };

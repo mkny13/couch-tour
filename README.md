@@ -122,6 +122,12 @@ Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML r
 cd macos/Packages/CouchTourKit && swift test
 ```
 
+14 sync backend tests, run against real Miniflare D1 rather than a mock:
+
+```bash
+cd sync && npm test
+```
+
 Install to a connected device or running emulator:
 
 ```bash
