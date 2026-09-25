@@ -1,9 +1,10 @@
 # Couch Tour
 
-An unofficial native Android client for [phish.in](https://phish.in), the open-source live
-Phish archive, and [Relisten](https://relisten.net), the open-source live-music archive
-covering roughly 200 more bands. Built for two things above all: real Android media
-controls, and never losing your place.
+An unofficial native client across Android phone, Google TV, and macOS, plus a sync
+backend, for [phish.in](https://phish.in), the open-source live Phish archive, and
+[Relisten](https://relisten.net), the open-source live-music archive covering roughly 200
+more bands. Built for two things above all: real native media controls, and never losing
+your place.
 
 Not affiliated with phish.in, Relisten, Phish, or any of the artists whose shows they
 archive. Audio for Phish streams from phish.in's public API, used with the maintainer's
@@ -38,8 +39,12 @@ hosted on archive.org.
 - Cast to a Chromecast or a Google TV: the cast button appears once a device is on the
   network, playback moves to it mid-track, and the same controls, progress saving, and
   scrobbling carry on
+- Google TV surface: remote-driven browse and playback from the TV home screen, with the same
+  playback controls and resume as the phone
 - Android Auto: browse Years → shows → tracks and Continue Listening from the car head
   unit, with the same playback controls as the phone
+- Cross-device progress sync: pair devices with a QR code so your resume positions and
+  listening history follow you between phone and Mac
 - Home is an artist list — Phish first, then Grateful Dead, Widespread Panic, and the rest
   of Relisten's ~200, most-recorded first — with the same resume, history, and Android Auto
   support across all of them. Shows with more than one taped recording get a tape switcher,
@@ -55,10 +60,11 @@ hosted on archive.org.
 
 ## Not in yet
 
-Volume leveling across sources (#18) is designed but not built yet: the app will measure each
-source's loudness on the device and cache the result (D237), split into #265-#269. Offline
-downloads and crossfade are **not planned** — deliberately out of scope, not pending. See [ROADMAP.md](ROADMAP.md) for the full list and open questions, and
-[DECISIONS.md](DECISIONS.md) for why the app looks the way it does today.
+Volume leveling across sources (#18) is in progress: the loudness meter and the per-source
+cache are built, and the macOS control ships; the Android control and the default-on
+decision are still open (#267, #269). Offline downloads and crossfade are **not planned** —
+deliberately out of scope, not pending. See [ROADMAP.md](ROADMAP.md) for the full list and
+open questions, and [DECISIONS.md](DECISIONS.md) for why the app looks the way it does today.
 
 ## Casting
 
@@ -103,7 +109,25 @@ Debug APK:
 ./gradlew assembleDebug
 ```
 
-Output lands at `app/build/outputs/apk/debug/app-debug.apk`.
+Output lands at `app/build/outputs/apk/debug/app-debug.apk`. Google TV builds from the same
+`:app` module and the same `assembleDebug` output — there is no separate TV module or
+variant (D233).
+
+### macOS
+
+- **CouchTourKit package:** `cd macos/Packages/CouchTourKit && swift test`. If it fails with `__allocating_init`, Xcode itself (not just Command Line Tools) is required (D115).
+- **App target:** Regenerate project with `cd macos && xcodegen generate`, then build:
+  ```bash
+  xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build
+  ```
+- **Install & Relaunch:** `macos/scripts/install.sh` (builds, ad-hoc signs, installs to `/Applications`, relaunches).
+
+### Sync backend
+
+`sync/` is a Cloudflare Worker + D1 service (`https://couch-tour-sync.mkastellec.workers.dev`).
+- **Local dev:** `cd sync && npm install && npm run db:migrate:local && npm run dev` (runs local D1 at `http://localhost:8787`).
+- **Typecheck:** `cd sync && npm run typecheck`.
+- **Deployments:** Never deploy by hand. `.github/workflows/sync-deploy.yml` deploys to staging, runs smoke tests, applies migrations, and promotes to prod on push to `main` for `sync/**`. Dispatch on demand with `gh workflow run sync-deploy.yml`.
 
 ## Tests
 
@@ -148,14 +172,24 @@ Install to a connected device or running emulator:
 | `MediaItems.kt` | Builds the queue items — metadata, extras, clipping, MIME type |
 | `Cast.kt` | Cast options, the session state, and the queue-item converter |
 | `CastButton.kt` | Cast button and device picker, driving `MediaRouter` directly |
-| `Progress.kt` | Room table of per-queue playback positions |
+| `Progress.kt` | Declares PhishInDb and the progress and source_loudness tables |
+| `Loudness.kt` | ITU-R BS.1770 integrated loudness meter and gain calculation |
+| `SourceLoudness.kt` | source_loudness cache and Room DAO |
+| `Sync.kt` | Cloudflare Worker sync client, mutation tracking, and background worker |
+| `Qr.kt` | QR code generation and camera scanning for cross-device sync pairing |
+| `YouTube.kt` | YouTube Data API v3 client and video metadata DTOs |
+| `YouTubeCatalog.kt` | Curated artist-to-channel mapping and catalog source |
+| `YouTubeStreams.kt` | Stream extraction and playback URL resolver for YouTube media |
 | `Waveform.kt` | Waveform peak & envelope extraction and caching from phish.in and archive.org |
 | `DesignComponents.kt` | Ledger design tokens and reusable components (hairlines, badges, waveform scrubber, play buttons) |
 | `NowPlaying.kt` | Full-screen Now Playing sheet with ambient artwork glow, tape specs, waveform scrubber, and transport controls |
 | `Format.kt` | Formatting helpers for durations, progress fractions, timestamps, and show dates |
 | `MainActivity.kt` | Compose UI — home, search, shows, artists, recordings, mini player |
+| `TvMainActivity.kt` | Google TV entry Activity (Leanback launcher) |
+| `TvBrowse.kt` | Google TV browse UI across artists, years, shows, and tracks |
+| `TvNowPlaying.kt` | Google TV Now Playing screen and remote transport controls |
 
-For the macOS client, see `macos/Packages/CouchTourKit` for the shared Swift package and `macos/CouchTour` for the SwiftUI app.
+For the macOS client, see `macos/Packages/CouchTourKit` for the shared Swift package and `macos/CouchTour` for the SwiftUI app. For the sync backend, see `sync`.
 
 ## API notes
 
