@@ -3,10 +3,10 @@ name: Deploy sync backend
 # Every merge to main touching sync/** deploys to staging, smoke-tests the real pairing path
 # against it, and only on success promotes the same commit to production (issue #249) — no
 # manual step, unlike the native apps' beta-gate release flow (CLAUDE.md). This is a stateless
-# API with existing typecheck coverage and no UI a human needs to click through, which is why
-# it gets auto-deploy-on-green instead of a beta channel: a red smoke test against staging is
-# the entire gate, and the workflow going red *is* the failure notification (no prod deploy
-# step runs after it).
+# API with typecheck and vitest coverage and no UI a human needs to click through, which is
+# why it gets auto-deploy-on-green instead of a beta channel: a red test run or smoke test
+# against staging is the entire gate, and the workflow going red *is* the failure notification
+# (no prod deploy step runs after it).
 on:
   push:
     branches: [main]
@@ -40,6 +40,7 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
 
       - name: Check whether schema.sql changed
         id: schema
