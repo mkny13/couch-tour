@@ -2,7 +2,7 @@
 
 Working document for branch `claude/desktop-android-parity-d41f72` (now merged and shipped). Covers issues #56–#59, the personal-library/account cluster that was out of scope for the desktop MVP.
 
-Archived decision log entries are in [DECISIONS.md](DECISIONS.md) (D179–D180 / Iteration 44) and tracked in [ROADMAP.md](ROADMAP.md).
+Archived decision log entries are in [DECISIONS.md](../../DECISIONS.md) (D179–D180 / Iteration 44) and tracked in [ROADMAP.md](../../ROADMAP.md).
 
 ## Scope & Status
 
@@ -58,4 +58,4 @@ Archived decision log entries are in [DECISIONS.md](DECISIONS.md) (D179–D180 /
 
 - All package unit tests passing in `CouchTourKitTests` (`swift test`).
 - macOS Debug & Beta build targets verified cleanly (`xcodebuild`).
-- Documented in [ROADMAP.md](ROADMAP.md) and logged in [DECISIONS.md](DECISIONS.md).
+- Documented in [ROADMAP.md](../../ROADMAP.md) and logged in [DECISIONS.md](../../DECISIONS.md).
