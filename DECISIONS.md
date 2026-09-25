@@ -4843,3 +4843,12 @@ Fixed four seeded correctness defects in `sync/src/index.ts`:
 
 - **Tests:** 14 new vitest tests in `sync/test/sync.test.ts` covering the four fixes above plus the existing happy paths (pair → claim → push/pull round trip, 410 on a stale cursor with the `since = 0` exemption, and retention floor cursor bounding). Android suite unchanged at 641, macOS unchanged at 443.
 
+### D274 — Android volume leveling: AudioProcessor gain in PlaybackService, decode-ahead measurement in VolumeLeveler (#267)
+
+Completes Part 3/5 of #18 (Android counterpart to macOS D259):
+- **Custom `LevelingAudioProcessor` in Media3 sink:** installed via `DefaultRenderersFactory.buildAudioSink` in `PlaybackService`. Sits after decode, applying to both MP3 and FLAC. Applies static linear gain clamped between -12 dB and +12 dB with a 50 ms ramp to eliminate clicks at track boundaries and transitions. Float writes are atomic on the JVM, avoiding locks in the realtime audio path.
+- **Background decode-ahead measurement (`LoudnessMeasurer` + `VolumeLeveler`):** on queue start, if volume leveling is enabled, `VolumeLeveler` checks Room's `source_loudness` table (`SourceLoudnessDao.getCurrent`). On cache miss, it starts playback at 0 dB (unity) and pulls 30-second slices from the middle of up to 3 tracks using HTTP Range requests against MP3 URLs, decoding via `MediaCodecSegmentDecoder`, and measuring loudness using `LoudnessMeter`. When measurement completes, the result is cached and the gain is dynamically updated in-place mid-playback.
+- **Cast excluded:** Google Cast receivers decode the audio directly; the local AudioProcessor gain is bypassed while casting. Help text on the settings toggle notes this.
+- **Settings toggle:** "Level volume across sources" (`PlaybackSettings.levelVolume`) off by default, persisted across app restarts. Toggling off resets gain to 0 dB immediately with a smooth ramp; toggling on applies cached gain or triggers decode-ahead measurement.
+- **Tests:** 25 unit tests in `VolumeLevelingTest` (gain math, int16 clamping, float PCM, 50ms ramp, track spread, HTTP Range pooling and fallback) and `VolumeLevelerTest` (cache hit/miss, stale version, failed measurement leaving no row, dynamic update, disabled setting); Android suite at 666, macOS unchanged at 443.
+

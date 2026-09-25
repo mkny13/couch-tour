@@ -199,5 +199,10 @@ Long-standing items that predate this sprint.
 
 - [ ] `uat-066` **Volume leveling sanity check after slideBlock overlap copy fix** (macOS) — `LoudnessMeter.slideBlock()` now shifts overlapping sample buffers with `memmove` rather than undefined `update(from:count:)`. In Settings → Playback, turn on "Level volume across sources". Play tracks from several shows (including audience and soundboard sources) and confirm volume leveling gain remains natural, consistent, and free of audible artifacts or sudden volume jumps.
 
+## Volume leveling (#267, Android)
+
+- [ ] `uat-067` **AUD/SBD leveling end-to-end** (Android) — In Settings → Playback, turn on "Level volume across sources". Play a quiet audience (AUD) tape of a show, then switch to a loud soundboard (SBD) source of the same show (Source picker): the loudness of the two should be comparable — the hot soundboard should no longer jump out, with no clicks at track boundaries. First play of a source takes a moment (30-second decode-ahead slices measured in the background) — a switch made immediately after the toggle may still play at 0 dB until the measurement lands mid-track (gain applies in place ramped over 50 ms). Repeat the comparison after both sources are cached (relaunch): the gain applies immediately at queue start.
+- [ ] `uat-068` **Leveling toggle off / Cast exclusion** (Android) — Toggle "Level volume across sources" off while a leveled source is playing: loudness returns to the raw recording (0 dB) immediately without clicks or stalls. Toggle back on: the previously measured gain reapplies quickly (cache hit), without re-measuring network traffic. Start a Google Cast session with leveling enabled: the Cast receiver plays the raw stream (the receiver decodes; local AudioProcessor gain bypassed) — cast volume is controlled solely by the cast volume bar, and disconnecting returns local playback with leveling intact.
+
 
 
