@@ -6,7 +6,11 @@ fun fmt(ms: Long): String {
     val h = total / 3600
     val m = (total % 3600) / 60
     val s = total % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    return if (h > 0) {
+        "%d:%02d:%02d".format(java.util.Locale.ROOT, h, m, s)
+    } else {
+        "%d:%02d".format(java.util.Locale.ROOT, m, s)
+    }
 }
 
 fun plural(n: Int, word: String) = if (n == 1) word else "${word}s"
@@ -48,9 +52,9 @@ fun formatCompactDuration(ms: Long): String {
     val m = totalMin % 60
     val s = totalSec % 60
     return if (h > 0) {
-        "%d:%02d".format(h, m)
+        "%d:%02d".format(java.util.Locale.ROOT, h, m)
     } else {
-        "%d:%02d".format(m, s)
+        "%d:%02d".format(java.util.Locale.ROOT, m, s)
     }
 }
 
@@ -73,7 +77,7 @@ fun formatShowDate(rawDate: String): String {
             m in 1..12 &&
             d in 1..31
         ) {
-            return "%04d-%02d-%02d".format(y, m, d)
+            return "%04d-%02d-%02d".format(java.util.Locale.ROOT, y, m, d)
         }
     }
 
