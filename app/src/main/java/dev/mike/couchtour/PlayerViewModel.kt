@@ -10,6 +10,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,6 +103,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val artistTourPreferenceDao = PhishInDb.get(app).artistTourPreferenceDao()
     val externalReleaseDao = PhishInDb.get(app).externalReleaseDao()
     val taperPreferenceDao = PhishInDb.get(app).taperPreferenceDao()
+    val sourceLoudnessDao = PhishInDb.get(app).sourceLoudnessDao()
 
     init {
         val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
@@ -538,6 +540,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun progressFor(key: String): Progress? = progressDao.get(key)
+
+    /**
+     * Clear all cached source loudness measurements and cancel in-flight measurement (#269).
+     */
+    fun clearMeasuredLoudness() {
+        viewModelScope.launch(Dispatchers.IO) {
+            sourceLoudnessDao.clearAll()
+        }
+        PlaybackSettings.clearMeasuredLoudness()
+    }
 
     fun setArtistTourPreference(artistKey: String, tourName: String?, year: String?) {
         viewModelScope.launch {

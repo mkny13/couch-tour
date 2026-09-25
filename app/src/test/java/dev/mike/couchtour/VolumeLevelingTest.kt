@@ -537,4 +537,34 @@ class VolumeLevelerTest {
         assertNotNull(row)
         assertEquals(-12.5, row!!.lufs, 0.001)
     }
+
+    @Test
+    fun `clearAll empties cache and cancels in-flight measurement`() = runBlocking {
+        val dao = db.sourceLoudnessDao()
+        dao.upsert(entity("show:1997-11-22", lufs = -14.0))
+        dao.upsert(entity("show:1998-07-15", lufs = -18.0))
+        assertNotNull(dao.getCurrent("show:1997-11-22", LEVELING_ALGORITHM_VERSION))
+        assertNotNull(dao.getCurrent("show:1998-07-15", LEVELING_ALGORITHM_VERSION))
+
+        val slowMeasurer = object : TestMeasurer(LoudnessMeasurement(lufs = -20.0, peakDb = -1.0, sampledTracks = 1)) {
+            override suspend fun measure(tracks: List<LevelingSample>): LoudnessMeasurement? {
+                measureCallCount++
+                kotlinx.coroutines.delay(500)
+                return super.measure(tracks)
+            }
+        }
+        val leveler = VolumeLeveler(scope, db, slowMeasurer)
+        val gains = mutableListOf<Double>()
+        val job = leveler.onQueueChanged("show:1999-12-31", listOf(sample())) { gains.add(it) }
+        assertNotNull(job)
+        assertTrue(job!!.isActive)
+
+        leveler.clearAll { gains.add(it) }
+
+        assertTrue(job.isCancelled)
+        assertNull(dao.getCurrent("show:1997-11-22", LEVELING_ALGORITHM_VERSION))
+        assertNull(dao.getCurrent("show:1998-07-15", LEVELING_ALGORITHM_VERSION))
+        assertNull(dao.getCurrent("show:1999-12-31", LEVELING_ALGORITHM_VERSION))
+        assertEquals(0.0, gains.last(), 0.001)
+    }
 }

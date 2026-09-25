@@ -250,6 +250,11 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
         }
+        scope.launch {
+            PlaybackSettings.clearCacheRequests.collect {
+                volumeLeveler.clearAll { levelingProcessor.resetGain() }
+            }
+        }
 
         // Tapping the notification opens the app, which then navigates to whatever is
         // playing at that moment. The PendingIntent is built once and the queue changes as

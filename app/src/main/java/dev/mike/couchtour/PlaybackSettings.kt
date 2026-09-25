@@ -1,8 +1,11 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 private const val PREFS = "playback_settings"
@@ -96,5 +99,16 @@ object PlaybackSettings {
         if (::prefs.isInitialized) {
             prefs.edit().putBoolean(KEY_LEVEL_VOLUME, enabled).apply()
         }
+    }
+
+    /**
+     * Signal to running playback components (e.g. [PlaybackService]) to cancel any in-flight
+     * loudness measurement and clear in-memory state (#269).
+     */
+    private val _clearCacheRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val clearCacheRequests: SharedFlow<Unit> = _clearCacheRequests.asSharedFlow()
+
+    fun clearMeasuredLoudness() {
+        _clearCacheRequests.tryEmit(Unit)
     }
 }
