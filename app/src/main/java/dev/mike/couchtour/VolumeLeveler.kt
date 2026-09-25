@@ -2,6 +2,7 @@ package dev.mike.couchtour
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -55,6 +56,7 @@ class VolumeLeveler(
                 return@launch
             }
             val result = measurer.measure(samples) ?: return@launch // stays at 0 dB, no cache write
+            if (!isActive) return@launch
             runCatching {
                 dao.upsert(
                     SourceLoudnessEntity(
@@ -67,6 +69,7 @@ class VolumeLeveler(
                     )
                 )
             }
+            if (!isActive) return@launch
             onGain(levelingGainDb(result.lufs, result.peakDb))
         }
         measurement = job
@@ -79,5 +82,17 @@ class VolumeLeveler(
         measurement = null
         activeKey = null
         onGain(0.0)
+    }
+
+    /**
+     * Clears all cached loudness measurements from the database and cancels any
+     * in-flight background measurement (#269). Resets the active gain to unity (0 dB).
+     */
+    suspend fun clearAll(onGain: ((Double) -> Unit)? = null) {
+        measurement?.cancel()
+        measurement = null
+        activeKey = null
+        onGain?.invoke(0.0)
+        db.sourceLoudnessDao().clearAll()
     }
 }

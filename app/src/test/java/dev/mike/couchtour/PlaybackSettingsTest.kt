@@ -30,6 +30,22 @@ class PlaybackSettingsTest {
         assertEquals(AudioQuality.LOSSLESS, PlaybackSettings.audioQuality.value)
         assertTrue(PlaybackSettings.gapless.value)
         assertEquals(false, PlaybackSettings.skipFiller.value)
+        assertFalse(PlaybackSettings.levelVolume.value)
+    }
+
+    @Test
+    fun `levelVolume updates and persists across init`() {
+        assertFalse(PlaybackSettings.levelVolume.value)
+
+        PlaybackSettings.setLevelVolume(true)
+        assertTrue(PlaybackSettings.levelVolume.value)
+
+        PlaybackSettings.init(ApplicationProvider.getApplicationContext())
+        assertTrue(PlaybackSettings.levelVolume.value)
+
+        PlaybackSettings.setLevelVolume(false)
+        PlaybackSettings.init(ApplicationProvider.getApplicationContext())
+        assertFalse(PlaybackSettings.levelVolume.value)
     }
 
     @Test
