@@ -96,6 +96,7 @@ public enum LoudnessMeasurerError: Error, Equatable {
 public protocol SourceLoudnessCache: AnyObject {
     func current(key: String) throws -> SourceLoudness?
     func save(_ loudness: SourceLoudness) throws
+    func clearAll() throws
 }
 
 extension ProgressStore: SourceLoudnessCache {
@@ -105,6 +106,10 @@ extension ProgressStore: SourceLoudnessCache {
 
     public func save(_ loudness: SourceLoudness) throws {
         try saveSourceLoudness(loudness)
+    }
+
+    public func clearAll() throws {
+        try clearAllSourceLoudness()
     }
 }
 
@@ -174,6 +179,16 @@ public actor LoudnessMeasurer {
     /// The temp files still on disk, for diagnostics and tests.
     public func tempFiles() -> [URL] {
         (try? FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil)) ?? []
+    }
+
+    /// Clears all cached loudness measurements from the database and cancels any
+    /// in-flight background measurement (#269).
+    public func clearAll() throws {
+        for (_, task) in inFlight {
+            task.cancel()
+        }
+        inFlight.removeAll()
+        try cache.clearAll()
     }
 
     /// Measure one source (or hand back its cached measurement).
@@ -248,6 +263,7 @@ public actor LoudnessMeasurer {
                 peakDb: result.peakDbfs,
                 sampledTracks: measuredSegments
             )
+            guard !Task.isCancelled else { return nil }
             try? cache.save(row)
             return row
         } catch {

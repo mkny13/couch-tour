@@ -6,6 +6,8 @@ struct PlaybackSettingsView: View {
     @ObservedObject var settings: PlaybackSettings
     @ObservedObject var updater: UpdaterViewModel
     @ObservedObject var themeSettings: ThemeSettings
+    var onClearMeasuredLoudness: (() -> Void)? = nil
+    @State private var loudnessCleared = false
 
     var body: some View {
         Form {
@@ -26,6 +28,22 @@ struct PlaybackSettingsView: View {
                 Text("Measures each recording's loudness in the background (30-second decoded slices, EBU R128 / BS.1770) and plays it back with a constant gain, so a quiet audience tape and a hot soundboard mix play at the same loudness. Google Cast sessions are excluded — the receiver decodes the audio.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                HStack {
+                    Button("Clear Measured Loudness") {
+                        if let onClearMeasuredLoudness {
+                            onClearMeasuredLoudness()
+                        } else {
+                            settings.clearMeasuredLoudness()
+                        }
+                        loudnessCleared = true
+                    }
+                    if loudnessCleared {
+                        Spacer()
+                        Text("Cleared")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             Section("Software Updates") {
                 Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)

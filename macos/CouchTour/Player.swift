@@ -156,6 +156,7 @@ final class Player: NSObject, ObservableObject {
     private var loudnessMeasurer: LoudnessMeasurer?
     private var levelingTask: Task<Void, Never>?
     private var levelVolumeObservation: AnyCancellable?
+    private var clearCacheObservation: AnyCancellable?
     /// Linear gain held for taps that attach after a measurement lands.
     private var pendingLevelingGainLinear: Float = 1.0
     /// Per-queue-item tap gain storage, keyed by item identity.
@@ -174,6 +175,9 @@ final class Player: NSObject, ObservableObject {
         super.init()
         levelVolumeObservation = playbackSettings?.$levelVolume.sink { [weak self] enabled in
             self?.levelVolumeDidChange(enabled)
+        }
+        clearCacheObservation = playbackSettings?.clearCacheSubject.sink { [weak self] in
+            self?.clearMeasuredLoudness()
         }
         queuePlayer.volume = volume
         configureRemoteCommands()
@@ -836,6 +840,23 @@ final class Player: NSObject, ObservableObject {
         if enabled {
             scheduleGainTaps()
             scheduleLeveling()
+        }
+    }
+
+    /// Clears all cached loudness measurements from the database, cancels any
+    /// in-flight background measurement, and resets active gain to unity (#269).
+    public func clearMeasuredLoudness() {
+        levelingTask?.cancel()
+        levelingTask = nil
+        pendingLevelingGainLinear = 1.0
+        for storage in gainStorageByItem.values { storage.gain = 1.0 }
+        Task { [weak self] in
+            guard let self else { return }
+            if let measurer = self.loudnessMeasurer {
+                try? await measurer.clearAll()
+            } else {
+                try? self.progressStore?.clearAllSourceLoudness()
+            }
         }
     }
 

@@ -129,7 +129,10 @@ struct CouchTourApp: App {
                 PlaybackSettingsView(
                     settings: appModel.playbackSettings,
                     updater: appModel.updater,
-                    themeSettings: appModel.themeSettings
+                    themeSettings: appModel.themeSettings,
+                    onClearMeasuredLoudness: {
+                        player.clearMeasuredLoudness()
+                    }
                 )
                     .tabItem { Label("Playback", systemImage: "play.circle") }
                     .tag(SettingsTab.playback)

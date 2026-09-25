@@ -57,14 +57,15 @@ hosted on archive.org.
 - Where a show matches an officially released live album on Spotify or Tidal, a link on the
   show page opens it in that app — playback stays in Couch Tour, this is just a pointer to
   the official release
+- Volume leveling across sources: background decode-ahead measurement (EBU R128 / BS.1770)
+  applies a static gain per recording so audience tapes and hot soundboard mixes play back at
+  consistent loudness across both Android and macOS (opt-in toggle in Settings)
 
 ## Not in yet
 
-Volume leveling across sources (#18) is in progress: the loudness meter and the per-source
-cache are built, and the macOS control ships; the Android control and the default-on
-decision are still open (#267, #269). Offline downloads and crossfade are **not planned** —
-deliberately out of scope, not pending. See [ROADMAP.md](ROADMAP.md) for the full list and
-open questions, and [DECISIONS.md](DECISIONS.md) for why the app looks the way it does today.
+Offline downloads and crossfade are **not planned** — deliberately out of scope, not pending.
+See [ROADMAP.md](ROADMAP.md) for the full list and open questions, and [DECISIONS.md](DECISIONS.md)
+for why the app looks the way it does today.
 
 ## Casting
 
@@ -131,7 +132,7 @@ variant (D233).
 
 ## Tests
 
-666 Android unit tests, no device or emulator required:
+668 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
@@ -140,7 +141,7 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML report lands in
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-443 macOS package tests under `macos/Packages/CouchTourKit`:
+448 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test

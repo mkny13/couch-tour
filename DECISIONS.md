@@ -4852,3 +4852,14 @@ Completes Part 3/5 of #18 (Android counterpart to macOS D259):
 - **Settings toggle:** "Level volume across sources" (`PlaybackSettings.levelVolume`) off by default, persisted across app restarts. Toggling off resets gain to 0 dB immediately with a smooth ramp; toggling on applies cached gain or triggers decode-ahead measurement.
 - **Tests:** 25 unit tests in `VolumeLevelingTest` (gain math, int16 clamping, float PCM, 50ms ramp, track spread, HTTP Range pooling and fallback) and `VolumeLevelerTest` (cache hit/miss, stale version, failed measurement leaving no row, dynamic update, disabled setting); Android suite at 666, macOS unchanged at 443.
 
+
+### D276 — Volume leveling post-beta decisions: default-off, clear-cache action, constant confirmation (#269)
+
+Completes Part 5/5 of #18 (#269):
+- **Default state:** "Level volume across sources" toggle defaults to OFF on both Android (`PlaybackSettings.levelVolume = false`) and macOS (`PlaybackSettings.levelVolume = false`). The feature remains opt-in until broader field evaluation.
+- **Constants and algorithm confirmed:** constants remain exactly as defined in #265 — target -18 LUFS, clamp ±12 dB, peak headroom cap at -1 dBFS (`-1.0 - samplePeakDb`), and `algorithmVersion = 1`. No changes to meter math or version bump needed.
+- **Clear measured loudness action:** added "Clear measured loudness" action next to the toggle in Settings on both Android (`SettingsScreen.kt` via `SettingsActionRow`) and macOS (`PlaybackSettingsView.swift` via "Clear Measured Loudness" button). Triggers database deletion (`SourceLoudnessDao.clearAll()` on Android, `ProgressStore.clearAllSourceLoudness()` on macOS) and cancels any in-flight background measurement tasks (`VolumeLeveler.clearAll()`, `LoudnessMeasurer.clearAll()`), resetting active player gain to unity (0 dB / 1.0 linear).
+- **Applied-gain display:** owner chose to make applied-gain display optional; deferred and not added to the UI.
+- **Cast exemption:** confirmed settings help text explicitly states Cast sessions receive no volume leveling on both platforms.
+- **Tests:** unit tests covering clear-cache action and in-flight cancellation on both platforms (`VolumeLevelerTest.clearAll empties cache and cancels in-flight measurement` on Android; `LoudnessMeasurerTests.testClearAllEmptiesCacheAndCancelsInFlightMeasurement` on macOS), plus fresh-install default-off and toggle persistence (`PlaybackSettingsTest.kt` on Android, `PlaybackSettingsTests.swift` on macOS); Android suite at 668, macOS suite at 448.
+

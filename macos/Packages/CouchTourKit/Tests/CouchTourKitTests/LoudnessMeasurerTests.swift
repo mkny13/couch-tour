@@ -73,10 +73,23 @@ final class LoudnessMeasurerTests: XCTestCase {
         }
     }
 
+    private struct SlowFixtureDecoder: SegmentDecoder {
+        var pcm: DecodedPCM
+        var delaySeconds: TimeInterval
+
+        func decode(fileURL: URL) throws -> DecodedPCM {
+            try Task.checkCancellation()
+            Thread.sleep(forTimeInterval: delaySeconds)
+            try Task.checkCancellation()
+            return pcm
+        }
+    }
+
     private final class MemoryLoudnessCache: SourceLoudnessCache {
         var rows: [String: SourceLoudness] = [:]
         func current(key: String) throws -> SourceLoudness? { rows[key] }
         func save(_ loudness: SourceLoudness) throws { rows[loudness.key] = loudness }
+        func clearAll() throws { rows.removeAll() }
     }
 
     // MARK: - Fixtures
@@ -328,6 +341,37 @@ final class LoudnessMeasurerTests: XCTestCase {
         XCTAssertNil(result)
         XCTAssertTrue(cache.rows.isEmpty)
         XCTAssertEqual(RangeStubURLProtocol.requestCount, 0)
+    }
+
+    func testClearAllEmptiesCacheAndCancelsInFlightMeasurement() async throws {
+        let row1 = SourceLoudness(key: "show:1997-11-22", lufs: -14.0, peakDb: -0.5, sampledTracks: 3)
+        let row2 = SourceLoudness(key: "show:1998-07-15", lufs: -18.0, peakDb: -1.0, sampledTracks: 3)
+        try cache.save(row1)
+        try cache.save(row2)
+        XCTAssertNotNil(try cache.current(key: "show:1997-11-22"))
+        XCTAssertNotNil(try cache.current(key: "show:1998-07-15"))
+
+        for i in 1...3 { stub(track: "t\(i)") }
+        let slowDecoder = SlowFixtureDecoder(pcm: fixturePCM(), delaySeconds: 0.5)
+        let measurer = makeMeasurer(decoder: slowDecoder)
+        let tracks = (1...3).map { track("t\($0)") }
+
+        let task = Task {
+            await measurer.measure(key: "show:1999-12-31", tracks: tracks)
+        }
+
+        // Allow background measurement task to start
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // Clear all measurements
+        try await measurer.clearAll()
+
+        let result = await task.value
+        XCTAssertNil(result, "In-flight task should be cancelled and return nil")
+        XCTAssertTrue(cache.rows.isEmpty, "Cache must be completely empty after clearAll")
+        XCTAssertNil(try cache.current(key: "show:1997-11-22"))
+        XCTAssertNil(try cache.current(key: "show:1998-07-15"))
+        XCTAssertNil(try cache.current(key: "show:1999-12-31"))
     }
 }
 
