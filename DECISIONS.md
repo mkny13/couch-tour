@@ -2927,7 +2927,7 @@ worktree's job (`desktop-android-parity`) is exactly to find and close gaps like
 macOS diverges from an already-correct Android behavior.
 
 **Fix:** wrap the `saveProgress(force: false)` call inside the periodic time observer in
-`if self.isPlaying { ... }` ([Player.swift](../macos/CouchTour/Player.swift)) — mirroring
+`if self.isPlaying { ... }` ([Player.swift](macos/CouchTour/Player.swift)) — mirroring
 Android's gate. `positionMs` is still updated unconditionally (harmless — it doesn't move while
 paused), only the store write and its throttle-tracked `lastSaveTime` are skipped. All other
 `saveProgress(force: true)` call sites (play/pause toggle, track change, seek, cast handoff)
@@ -2946,7 +2946,7 @@ manual check on the next beta.
 
 Four independent Home-screen fixes filed from Mike's own testing of macOS beta v0.57-beta
 (2026-08-26), worked as Batch A of the macOS UX polish pass (see
-[prompts/macos-ux-polish-batches.md](../prompts/macos-ux-polish-batches.md)).
+[prompts/macos-ux-polish-batches.md](prompts/macos-ux-polish-batches.md)).
 
 - **#100 — Next Stop shelf stale after saving a tour/year (`HomeView.swift`):**
   `.sheet(item: $tourPickerArtist)` had no `onDismiss:`, so `TourPickerSheet.savePreference()`/

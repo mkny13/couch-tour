@@ -1,7 +1,7 @@
 # Multi-artist support via Relisten — working plan
 
 Working document for the in-progress branch `claude/multi-artist-relisten-archive-2kxmzh`.
-Delete or fold into [DECISIONS.md](DECISIONS.md) when the work lands.
+Delete or fold into [DECISIONS.md](../../DECISIONS.md) when the work lands.
 
 ## Goal
 
@@ -269,7 +269,7 @@ nothing further to build blind without a device in hand.
 
 ## Open questions — conservative choice taken, flagged for discussion
 
-O3, O4, and O5 are also tracked in [ROADMAP.md](ROADMAP.md) as forward-looking work; this
+O3, O4, and O5 are also tracked in [ROADMAP.md](../../ROADMAP.md) as forward-looking work; this
 section keeps the full reasoning behind each.
 
 **O1 — resolved.** Fixtures were going to be reconstructed from Relisten's OpenAPI schema

@@ -11,6 +11,7 @@ Historical implementation details and architectural choices are logged separatel
 - **Android Client**: Full-featured native app (Jetpack Compose, Media3, Room, Android Auto) supporting the complete phish.in and Relisten catalog (~200+ artists), personal library (likes, local playlists, favorites, on-this-date discovery, next tour stop), filler-track skipping, playback history, and listened/completion indicators.
 - **macOS Client**: Native SwiftUI + AVFoundation app matching Android's core browse, playback, source switching, search, inspector, settings, filler-track skipping, and full personal library parity (login, likes, favorites, cross-backend local playlists).
 - **Sync Backend**: Cloudflare Worker + D1 live in production (`https://couch-tour-sync.mkastellec.workers.dev`), syncing playback progress, history, and resume positions across paired devices with QR pairing, token rotation, and 180-day tombstone cleanup.
+- **Google TV**: Remote-driven browse (artist/year, show/track), Now Playing with transport, queue navigation, volume routing, and progress/resume, built as a second Activity in `:app` (D233, D266, D269, D270).
 
 ---
 
@@ -122,6 +123,7 @@ flowchart LR
         S8["YouTube Audio/Video Support (#16, #177, #178, D251, D253, D262)"]
         S9["Spotify/Tidal Live Release Links (#15, #179-#181)"]
         S10["Taper Intelligence & Source Comparison (#24, #171-#173)"]
+        S11["Google TV App (#9, D233, D266, D269, D270)"]
     end
 
     subgraph NearTerm ["Phase 2 Remaining"]
@@ -132,8 +134,7 @@ flowchart LR
 
     subgraph LongTerm ["Phase 3: New Surfaces & Extended Ecosystem"]
         direction TB
-        L1["#18 Volume Leveling Across Sources (#265-#269)"]
-        L3["#9 Google TV App"]
+        L1["#18 Volume Leveling — #265/#266/#268 shipped; #267, #269 open"]
     end
 
     Shipped --> NearTerm --> LongTerm
@@ -193,18 +194,18 @@ samples from each source ahead of playback, measures their loudness, and caches 
 source. It then applies one static gain per source, with no compressor, so dynamic range is
 preserved. The work is split into:
 
-1. #265 — BS.1770 loudness meter, gain rule, and a per-track leveling key (both platforms)
-2. #266 — `source_loudness` cache table (Room `MIGRATION_9_10`, GRDB v10)
-3. #267 — Android: background measurement, `AudioProcessor` gain, and a Settings toggle
-4. #268 — macOS: background measurement, `MTAudioProcessingTap` gain, and a Settings toggle
-5. #269 — after beta UAT: decide whether it's on by default, add a clear-cache action, update docs
+1. #265 — BS.1770 loudness meter, gain rule, and a per-track leveling key (both platforms) — **shipped**
+2. #266 — `source_loudness` cache table (Room `MIGRATION_9_10`, GRDB v10) — **shipped**
+3. #267 — Android: background measurement, `AudioProcessor` gain, and a Settings toggle — **open**
+4. #268 — macOS: background measurement, `MTAudioProcessingTap` gain, and a Settings toggle — **shipped**
+5. #269 — after beta UAT: decide whether it's on by default, add a clear-cache action, update docs — **open**
 
 #265 and #266 can be built in parallel. #267 and #268 both need them, but not each other.
 
-| Issue | Feature | Description | Platforms |
-|---|---|---|---|
-| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. Strategy: on-device measurement cached per source (D237), split into #265-#269. | Android, macOS |
-| **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation, D233), Part 2 (browse UI — artist/year D266, show/track D269), and Part 3 (Now Playing / transport / playback, D270) shipped. | Android TV |
+| Issue | Feature | Description | Platforms | Status |
+|---|---|---|---|---|
+| **#18** | **Source & Show Volume Leveling** | Normalize playback loudness across quiet audience tapes and hot soundboard recordings without distorting dynamic range. Strategy: on-device measurement cached per source (D237), split into #265-#269. | Android, macOS | In flight (#265, #266, #268 shipped; #267, #269 open) |
+| **#9** | **Google TV App** | Dedicated 10-foot Leanback UI optimized for Android TV / Google TV remotes and living room playback. Part 1 (foundation, D233), Part 2 (browse UI — artist/year D266, show/track D269), and Part 3 (Now Playing / transport / playback, D270) shipped. | Android TV | Shipped (D233, D266, D269, D270) |
 
 ---
 
