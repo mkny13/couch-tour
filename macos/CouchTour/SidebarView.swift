@@ -52,6 +52,14 @@ struct SidebarView: View {
                 }
 
                 SidebarNavItem(
+                    title: "Artists",
+                    icon: "music.mic",
+                    isSelected: appModel.path.last == .artists
+                ) {
+                    appModel.jump(to: .artists)
+                }
+
+                SidebarNavItem(
                     title: "Search",
                     icon: "magnifyingglass",
                     isSelected: appModel.path.last == .search
