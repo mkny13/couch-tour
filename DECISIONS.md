@@ -4875,3 +4875,15 @@ This issue restores discoverability for artist browsing on macOS. `Route.artists
 - Selection predicate mirrors siblings; row does not stay lit while drilling into an individual artist — flagged for owner rather than silently changed.
 - D203’s claim that the sidebar was removed is superseded for navigation chrome. The one-stack, breadcrumb, and search-as-chrome parts of D203 remain in force.
 
+
+
+### D279 — macOS stays sandboxed everywhere; local installs keep entitlements; one-time merge from unsandboxed stores (#345)
+
+The Sparkle (CI) build is App Sandbox'd (D104), but `install.sh` / `install-beta.sh` re-signed with `codesign --force --deep --sign -` and no entitlements, silently stripping the sandbox. The two builds then used different stores (container vs `~/Library/Preferences` + `~/Library/Application Support`), so favorites, liked tracks, settings, sync cursors and history swapped or vanished when moving between them. D104 stands; the fix is to make the two paths identical and fold the stranded data in.
+
+- **Install scripts:** after the existing deep ad-hoc sign, a second shallow `codesign --force --sign - --entitlements Generated/...entitlements` pass puts the entitlements on the app executable only (`--deep` would push them onto Sparkle's nested helpers).
+- **Migration:** `UnsandboxedMigration.migrateIfNeeded` (`Migration.swift`) runs first in `AppModel.init()`, before any store reads `UserDefaults` or opens the database. Sandboxed launches only, once per bundle (`migration_done_v1` in the container's defaults; left unset if a source couldn't be read, so it retries). Beta and prod migrate independently from their own plist and Application Support directory.
+- **Merge rules, never discarding either side:** favorites and liked tracks are unioned. Playback/theme/volume settings are copied only where the container has no value. Sync `lastSeq` / `lastPushWatermark` take the lower value (worst case is a re-pull or re-push, never a skipped row); `lastSyncedAt` takes the higher. `progress`, `artist_tour_preferences` and `taper_preferences` rows merge by higher `updatedAt`, tombstones included, so a deletion on either side survives. The source database is copied to a scratch directory first (WAL needs a writable `-shm`) and opened through `ProgressStore` so an older schema is upgraded.
+- **Entitlement:** reading the unsandboxed files from inside the sandbox needs `com.apple.security.temporary-exception.files.home-relative-path.read-only`, scoped to exactly that bundle's plist and Application Support directory. This is a Mac App Store blocker (temporary exceptions are generally rejected there); the exception should be dropped once the migration has had time to run on the owner's Macs.
+- **Not covered:** the runtime behavior of the read exception under a real sandbox was not exercised in the unattended run (no UI automation); it is listed for UAT.
+- **Tests:** `MigrationTests` (7): unsandboxed no-op, set union, scalar fill, sync cursor rules, row merge by `updatedAt` incl. tombstones and preference tables, idempotency, no-source completion. macOS suite 448 → 455.

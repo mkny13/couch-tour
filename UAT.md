@@ -210,3 +210,7 @@ Long-standing items that predate this sprint.
 
 
 
+
+## macOS sandbox data-store unification (#345)
+
+- [ ] `uat-070` **Local install and Sparkle build share one data store** (macOS) — Quit Couch Tour, then run `macos/scripts/install.sh` (and `install-beta.sh` for the beta). Check `codesign -d --entitlements - "/Applications/Couch Tour.app"` shows `com.apple.security.app-sandbox`. On first launch, confirm favorites (including any that only existed in the old unsandboxed store, e.g. Grateful Dead), liked tracks, playback/theme settings, sync pairing and listening history are all present, with no duplicated history rows. Then install a Sparkle build over it (or vice versa) and confirm nothing swaps or vanishes. If favorites/history from the unsandboxed store are missing, the read-only sandbox exception in `project.yml` isn't taking effect (see D279).

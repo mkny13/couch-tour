@@ -56,8 +56,18 @@ if [ ! -d "$built_app" ]; then
     exit 1
 fi
 
+# --entitlements keeps the App Sandbox on (D104), so this install reads and writes the same
+# container as the Sparkle build instead of a parallel unsandboxed data store (#345).
+entitlements="$macos_dir/Generated/CouchTour.entitlements"
+if [ ! -f "$entitlements" ]; then
+    echo "Couldn't find $entitlements (xcodegen should have generated it)." >&2
+    exit 1
+fi
 echo "Signing application bundle and embedded frameworks..."
 codesign --force --deep --sign - "$built_app"
+# Second, shallow pass: entitlements go on the app's own executable only. `--deep` would push
+# them onto Sparkle's nested helpers, which must not be sandboxed by our entitlements.
+codesign --force --sign - --entitlements "$entitlements" "$built_app"
 
 echo "Installing to $dest..."
 rm -rf "$dest"

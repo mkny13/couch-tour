@@ -22,18 +22,15 @@ final class AppModel: ObservableObject {
     /// nil under the same condition `progressStore` is — local playlists share its
     /// `phishin.db` connection (#59), so there's nothing to open independently.
     let localPlaylistStore: LocalPlaylistStore?
-    #if BETA
-    let syncSession = SyncSession(store: SyncTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.sync")))
-    #else
-    let syncSession = SyncSession()
-    #endif
+    let syncSession: SyncSession
     /// `UserDefaults.standard` is already per-bundle-id, so the beta target's favorites don't
     /// need the explicit namespacing Keychain services and the GRDB file do (Player.swift's
-    /// volume setting relies on the same fact).
-    let favorites = Favorites()
-    let likedTracks = LikedTracks()
-    let playbackSettings = PlaybackSettings()
-    let themeSettings = ThemeSettings()
+    /// volume setting relies on the same fact). Assigned in `init` because the unsandboxed
+    /// migration (#345) has to run before any of them read `UserDefaults`.
+    let favorites: Favorites
+    let likedTracks: LikedTracks
+    let playbackSettings: PlaybackSettings
+    let themeSettings: ThemeSettings
     #if BETA
     let phishInSession = PhishInSession(store: PhishInTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.phishin")))
     #else
@@ -68,12 +65,29 @@ final class AppModel: ObservableObject {
     private var themeCancellable: AnyCancellable?
 
     init() {
+        #if BETA
+        let appSupportDirName = "dev.mike.couchtour.beta"
+        let bundleID = "dev.mike.couchtour.mac.beta"
+        #else
+        let appSupportDirName = "dev.mike.couchtour"
+        let bundleID = "dev.mike.couchtour.mac"
+        #endif
+        let databaseURL = ProgressStore.defaultURL(appSupportDirName: appSupportDirName)
+        UnsandboxedMigration.migrateIfNeeded(
+            bundleID: bundleID, appSupportDirName: appSupportDirName, destinationDatabase: databaseURL)
+
+        favorites = Favorites()
+        likedTracks = LikedTracks()
+        playbackSettings = PlaybackSettings()
+        themeSettings = ThemeSettings()
+        #if BETA
+        syncSession = SyncSession(store: SyncTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.sync")))
+        #else
+        syncSession = SyncSession()
+        #endif
+
         do {
-            #if BETA
-            progressStore = try ProgressStore(url: ProgressStore.defaultURL(appSupportDirName: "dev.mike.couchtour.beta"))
-            #else
-            progressStore = try ProgressStore()
-            #endif
+            progressStore = try ProgressStore(url: databaseURL)
             progressStoreError = nil
         } catch {
             progressStore = nil

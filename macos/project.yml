@@ -56,6 +56,10 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.cs.disable-library-validation: true
+        # Read-only, for the one-time unsandboxed -> container merge (#345, Migration.swift).
+        com.apple.security.temporary-exception.files.home-relative-path.read-only:
+          - /Library/Preferences/dev.mike.couchtour.mac.plist
+          - /Library/Application Support/dev.mike.couchtour/
 
   # Side-installable beta, mirroring Android's sideInstall build (D137): a distinct bundle id
   # and display name so it installs alongside the regular app instead of replacing it. The
@@ -101,3 +105,7 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.cs.disable-library-validation: true
+        # Read-only, for the one-time unsandboxed -> container merge (#345, Migration.swift).
+        com.apple.security.temporary-exception.files.home-relative-path.read-only:
+          - /Library/Preferences/dev.mike.couchtour.mac.beta.plist
+          - /Library/Application Support/dev.mike.couchtour.beta/
