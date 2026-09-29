@@ -4863,3 +4863,15 @@ Completes Part 5/5 of #18 (#269):
 - **Cast exemption:** confirmed settings help text explicitly states Cast sessions receive no volume leveling on both platforms.
 - **Tests:** unit tests covering clear-cache action and in-flight cancellation on both platforms (`VolumeLevelerTest.clearAll empties cache and cancels in-flight measurement` on Android; `LoudnessMeasurerTests.testClearAllEmptiesCacheAndCancelsInFlightMeasurement` on macOS), plus fresh-install default-off and toggle persistence (`PlaybackSettingsTest.kt` on Android, `PlaybackSettingsTests.swift` on macOS); Android suite at 668, macOS suite at 448.
 
+
+### D278 — Sidebar remains and Artists nav row added; D203 superseded (#348)
+
+The Ledger redesign added `SidebarView.swift` (2a6b2cc) and `ThreePaneRootView` still mounts it at `ThreePaneRootView.swift:23`. D203 — “No sidebar: Home is the hub…” — and the `Navigation.swift` header comment claiming “The sidebar is gone (D203)” are doc drift: the sidebar was never removed, it was redesigned.
+
+This issue restores discoverability for artist browsing on macOS. `Route.artists`, `ArtistsView` and its navigation destination already existed and worked; only the sidebar chrome was missing.
+
+- Added a primary nav row “Artists” second after Home in `SidebarView.swift`. Icon `music.mic`, `isSelected: appModel.path.last == .artists`, action `appModel.jump(to: .artists)` to match the existing ⌘2 menu binding.
+- Position matches the two-places / four-tools ordering decided in the sort pass; no other rows moved.
+- Selection predicate mirrors siblings; row does not stay lit while drilling into an individual artist — flagged for owner rather than silently changed.
+- D203’s claim that the sidebar was removed is superseded for navigation chrome. The one-stack, breadcrumb, and search-as-chrome parts of D203 remain in force.
+
