@@ -11,6 +11,7 @@ class CouchTourApp : Application() {
         super.onCreate()
         CrashCapture.install(this)
         DiagnosticsLog.init(this)
+        detectPreviousCrash()
         // Restore the session before any screen or the playback service issues a request.
         Session.init(this)
         CuratedMatches.init(this)
@@ -43,5 +44,11 @@ class CouchTourApp : Application() {
             }
         }
         schedulePeriodicSync(this)
+    }
+
+    internal fun detectPreviousCrash() {
+        if (CrashCapture.previousCrash() != null) {
+            CrashCapture.detectPreviousCrash()
+        }
     }
 }
