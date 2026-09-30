@@ -4887,3 +4887,12 @@ The Sparkle (CI) build is App Sandbox'd (D104), but `install.sh` / `install-beta
 - **Entitlement:** reading the unsandboxed files from inside the sandbox needs `com.apple.security.temporary-exception.files.home-relative-path.read-only`, scoped to exactly that bundle's plist and Application Support directory. This is a Mac App Store blocker (temporary exceptions are generally rejected there); the exception should be dropped once the migration has had time to run on the owner's Macs.
 - **Not covered:** the runtime behavior of the read exception under a real sandbox was not exercised in the unattended run (no UI automation); it is listed for UAT.
 - **Tests:** `MigrationTests` (7): unsandboxed no-op, set union, scalar fill, sync cursor rules, row merge by `updatedAt` incl. tombstones and preference tables, idempotency, no-source completion. macOS suite 448 → 455.
+
+### D282 — Ledger redesign audit recorded; four regressions filed, mockup sweep at HEAD clean (#356)
+
+Audited the Ledger redesign (#133, D214; commits 2a6b2cc / 28fa02c / c0c0912 + reconcile 68d179a) against pre-redesign baseline `2a6b2cc^` for leftover mockup data and dropped or miswired features. Full report in `docs/LEDGER_REDESIGN_AUDIT.md`; checklist on #356.
+
+- **Findings filed:** #384 (macOS ⌘F dead + cleared search never closes the route), #383 (macOS transport prev/next lost accessibility labels), #385 (Android fake 0.41f scrubber progress), #386 (Android Now Playing dropped artwork/format/cast-indicator displays — owner decision).
+- **Known issues re-verified at HEAD, not at the redesign commits**, because ≈50 intermediate fix rounds (#139-#149 and later) already repaired early redesign defects: #347 live, #348 fixed, #349 live (and confirmed as a redesign regression — pre-redesign SearchView rendered artist rows), #354 unchanged, #355 Android side unchanged / macOS side correct.
+- **Mockup sweep result:** after the intermediate rounds, the only mock data leaks left at HEAD are the Android `0.41f` progress fallback (#385) and the pre-existing #347 sidebar fallback; the Android JAM CHART hardcoded note is tracked under #355/#378. The macOS WaveformScrubber 95-point envelope was re-classified as a documented offline fallback behind a real loader, not mock data.
+- **No behavior changed by the audit itself** — docs-only; all fixes live in the filed issues. Compare Sources rail-button reachability added to UAT (uat-071).
