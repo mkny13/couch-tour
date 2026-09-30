@@ -233,3 +233,14 @@ Long-standing items that predate this sprint.
   - When the GitHub issue page opens in browser, confirm the prefilled body carries the unchanged `## Environment` section followed by `## Diagnostics` with library counts, last sync result, and last crash (if any).
   - Paste into the issue body under `## Log`: confirm the 200-line diagnostics tail is pasted and includes the favorite write and Library counts.
   - In Settings → ABOUT, verify "Include diagnostics" toggle is ON by default. Turn it OFF, press Feedback again: confirm no Toast appears, clipboard is untouched, and the prefilled issue URL contains no `## Diagnostics` section.
+
+## macOS Cast & AirPlay toolbar button (#311)
+
+- [ ] `uat-077` **Cast and AirPlay button on Home with empty player, second-device cast, and VoiceOver** (macOS) — Verify persistent Cast and AirPlay control in window toolbar:
+  - **Cold launch on Home with empty player:** Launch Couch Tour on macOS with nothing playing. Confirm the Cast/AirPlay button is visible in the top-right window toolbar on Home, search, artist, show, and playlist screens.
+  - **Player rail footer:** When playback begins, confirm the player rail footer shows only the volume control slider and mute toggle; no duplicate cast button is shown in the rail.
+  - **Receiver discovery & AirPlay popover:** Click the toolbar button. Verify the popover opens, showing searching status or discovered Google Cast receivers (with checkmark for active receiver, and Disconnect button if active), plus the system AirPlay picker at the bottom. AirPlay speaker selection works even if no Cast receivers exist.
+  - **Cast while idle:** Connect to a Cast device from the toolbar button before playing a show, then start playback. Confirm the button updates to show the filled icon and device name, with audio routing to the Cast target.
+  - **VoiceOver & tooltip:** Hover over the button to confirm tooltip reads "Cast and AirPlay destinations". Enable VoiceOver and verify the button announces "Cast and AirPlay destinations".
+  - **Expanded player sheet:** Open the expanded Now Playing sheet. Confirm it still displays its own Cast/AirPlay button in the footer.
+

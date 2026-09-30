@@ -40,6 +40,9 @@ struct ThreePaneRootView: View {
                         Breadcrumb()
                     }
                     ToolbarItem(placement: .primaryAction) {
+                        CastRoutePickerButton()
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         searchField
                     }
                     ToolbarItem(placement: .primaryAction) {
