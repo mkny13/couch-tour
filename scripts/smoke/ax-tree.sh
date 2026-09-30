@@ -57,6 +57,7 @@ VALID_IDS=$(grep -o 'public static let [a-zA-Z0-9_]* = "[^"]*"' "$SWIFT_FILE" | 
 # JXA handles the max-depth and timeout bounds.
 OUTPUT=$(osascript -l JavaScript - "$MAX_DEPTH" "$ALL" "$IDS_ONLY" "$VALID_IDS" "$BUNDLE_ID" << 'JXA'
 ObjC.import('Foundation');
+ObjC.import('stdlib');
 
 function run(argv) {
     var maxDepth = parseInt(argv[0], 10);
@@ -98,12 +99,12 @@ function run(argv) {
         $.exit(3);
     }
 
-    var startTime = $.NSDate.date().timeIntervalSince1970;
-    var timeoutSeconds = 5.0;
+    var startTime = Date.now();
+    var timeoutMs = 5000;
     var matches = [];
 
     function walk(element, depth) {
-        if ($.NSDate.date().timeIntervalSince1970 - startTime > timeoutSeconds) {
+        if (Date.now() - startTime > timeoutMs) {
             return;
         }
 
