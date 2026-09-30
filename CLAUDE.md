@@ -17,6 +17,7 @@ Tests are local (Robolectric + MockWebServer); run after any change.
 
 - **Cutting a beta release:** Dispatches `.github/workflows/build-debug-apk.yml` with `side_install: true` (`dev.mike.couchtour.beta`) and `prerelease: true`. Wrapper: `scripts/cut-beta.sh "notes"`. Cut a beta after every batch.
 - **Promoting beta to production:** Never automatic; requires explicit owner confirmation. Runs against the *confirmed* tag (`--ref <confirmed-tag>`), setting `prerelease=false` and `side_install=false` (`dev.mike.couchtour`). Wrapper: `scripts/promote-beta.sh <confirmed-beta-tag> <next-tag> "notes"`.
+- **Beta promotion guard:** Daily CI cron (`.github/workflows/beta-guard.yml`) checks the beta/production gap and files or updates one issue when the gap passes 7 days. Flags only — promotion remains an explicit human decision.
 - **Google TV:** The TV surface (`TvMainActivity`) is a second Activity in this same `:app` module, not a separate module (D233). It builds and installs from the same `assembleDebug` / `installDebug`, and `app/src/main/AndroidManifest.xml` carries both launcher entries, so manifest edits affect phone and TV together.
 
 ## Building (macOS)
