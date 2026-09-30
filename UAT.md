@@ -244,3 +244,12 @@ Long-standing items that predate this sprint.
   - **VoiceOver & tooltip:** Hover over the button to confirm tooltip reads "Cast and AirPlay destinations". Enable VoiceOver and verify the button announces "Cast and AirPlay destinations".
   - **Expanded player sheet:** Open the expanded Now Playing sheet. Confirm it still displays its own Cast/AirPlay button in the footer.
 
+## macOS tour picker entry point (#361)
+
+- [ ] `uat-078` **Tour picker reachable from macOS Next Tour Stops card** (macOS) — On Home, find the "NEXT TOUR STOPS" card with favorite artists:
+  - **Inline button & sheet presentation:** Click "Track tour…" on any artist row. Confirm `TourPickerSheet` opens for that artist.
+  - **Context menu:** Right-click anywhere on the row and select "Track tour…". Confirm the sheet opens for that artist as well.
+  - **Row layout:** Verify that "Track tour…" does not crowd or clip the artist name, date, rating, or play button.
+  - **Save preference:** In `TourPickerSheet`, select a past year/tour (e.g. 1977 for Grateful Dead) and click Save. Verify the card updates its tour stop for that artist without requiring an app relaunch (D200/#100 refresh path).
+  - **Clear preference:** Reopen the sheet for that artist, click "Clear / Default", and confirm the setting clears, the sheet dismisses, and the card updates back to default tour stops.
+

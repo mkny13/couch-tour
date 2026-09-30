@@ -407,6 +407,23 @@ struct HomeView: View {
             }
             .buttonStyle(.plain)
 
+            // Target resolution for "Track tour…" is direct (`show.artist`) since the control lives
+            // directly on the per-artist `tourStopRow`, unlike Android's header action which resolves
+            // across focused artist / show / favorites (#354). Extracting a one-line getter into CouchTourKit
+            // is not worth it (and NextStop.swift is out of scope for #361); verified via UAT (uat-078)
+            // and build checks.
+            Button {
+                tourPickerArtist = show.artist
+            } label: {
+                Text("Track tour…")
+                    .font(.system(size: 12))
+                    .foregroundStyle(colors.accentTintText)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(AXIdentifiers.homeTrackTour)
+            .accessibilityLabel("Track tour for \(show.artist.name)")
+
             Button {
                 Task {
                     await tapPlayShow(show)
@@ -427,6 +444,13 @@ struct HomeView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .border(width: 1, edges: [.top], color: colors.divider)
+        .contextMenu {
+            Button {
+                tourPickerArtist = show.artist
+            } label: {
+                Label("Track tour…", systemImage: "mappin.and.ellipse")
+            }
+        }
     }
 
     // MARK: - On This Date Shelf

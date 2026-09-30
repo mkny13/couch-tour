@@ -4983,3 +4983,12 @@ Fixes #311. Moves the desktop Cast and AirPlay picker (`CastRoutePickerButton`) 
 - **Always Visible**: Unlike Android (which hides the cast button until a cast receiver is discovered), macOS keeps `CastRoutePickerButton` visible even with zero discovered Cast receivers, because it also acts as the system audio-output / AirPlay picker (`AirRoutePickerView`).
 - **Accessible Name and Hover Help**: Added `.accessibilityLabel("Cast and AirPlay destinations")` and `.help("Cast and AirPlay destinations")` to `CastRoutePickerButton`, providing a readable name for VoiceOver and a hover tooltip while preserving the dynamic connected device label and icon.
 
+### D298: Per-artist-row entry point for macOS tour picker
+
+Fixes #361. Resolves unreachable macOS tour picker by attaching entry points to NEXT TOUR STOPS card rows.
+
+- **Per-Artist-Row Placement**: On Android (#354), the Next Tour Stop card displays a single focused show alongside an artist chip row, placing the "Change tour…" affordance in the card header. On macOS, the card displays up to three distinct artist rows with no chip selector. Placing the entry point in the card header would lack a clear artist target; instead, each `tourStopRow` provides a direct "Track tour…" action and a matching `.contextMenu` item targeting `show.artist`.
+- **Dual Affordance**: Provides both an inline text button (`Track tour…`) styled with `accentTintText` and a right-click `.contextMenu` item (`Label("Track tour…", systemImage: "mappin.and.ellipse")`). This keeps the action discoverable without cluttering the row layout (artist, date, venue/tour subtitle, rating, play button).
+- **Direct Target Resolution**: Target resolution is immediate (`show.artist`), avoiding complex focus-state fallbacks.
+- **Reused Sheet and Refresh Pipeline**: `TourPickerSheet` (from #68/D190) and its post-save/clear cache reset and refresh path (`NextStop.resetCache()` → `reloadProgress()` → `reloadDiscovery()`, D200/#100) are reused completely unchanged.
+
