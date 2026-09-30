@@ -116,7 +116,7 @@ class SyncException(message: String, val code: Int = 0) : Exception(message) {
  * an unrelated service with an unrelated identity.
  */
 object SyncApi {
-    private val DEFAULT_BASE = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
+    internal val DEFAULT_BASE = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
 
     /** Overridden by tests to point at a local mock server. */
     internal var baseUrl: HttpUrl = DEFAULT_BASE
@@ -132,24 +132,25 @@ object SyncApi {
         override: String? = null,
         store: SyncTokenStore? = null,
     ): HttpUrl {
-        val parsedOverride = override?.takeIf { it.isNotBlank() }?.let { raw ->
+        val tokenStore = store ?: if (SyncSession.isStoreInitialized()) SyncSession.currentStore() else null
+        if (override != null && override.isNotBlank()) {
+            tokenStore?.baseUrlOverride = override
+        }
+
+        val activeOverride = tokenStore?.baseUrlOverride ?: override
+        val parsedOverride = activeOverride?.takeIf { it.isNotBlank() }?.let { raw ->
             raw.toHttpUrlOrNull()
         }
         val target = parsedOverride ?: defaultUrl.toHttpUrl()
         val targetHost = target.host
         baseUrl = target
 
-        val tokenStore = store ?: if (SyncSession.isStoreInitialized()) SyncSession.currentStore() else null
+        // If this is the first token, record its host so we can check for mismatches later.
+        // We do NOT wipe the token here; doing so on launch races with MainActivity receiving
+        // the override intent. The actual mismatch check happens in SyncSession.sync().
         tokenStore?.let { s ->
-            val currentToken = s.deviceToken
-            if (currentToken != null) {
-                val issuingHost = s.tokenHost ?: DEFAULT_BASE.host
-                if (issuingHost != targetHost) {
-                    s.clear()
-                    SyncSession.updatePairedFromStore()
-                } else if (s.tokenHost == null) {
-                    s.tokenHost = targetHost
-                }
+            if (s.deviceToken != null && s.tokenHost == null) {
+                s.tokenHost = targetHost
             }
         }
 
@@ -255,6 +256,7 @@ private const val KEY_TOKEN_HOST = "tokenHost"
 private const val KEY_LAST_SEQ = "lastSeq"
 private const val KEY_LAST_PUSH_WATERMARK = "lastPushWatermark"
 private const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
+private const val KEY_BASE_URL_OVERRIDE = "baseUrlOverride"
 
 /**
  * Encrypted-at-rest storage for the sync device token — its own prefs file, deliberately NOT
@@ -319,6 +321,13 @@ class SyncTokenStore(context: Context) {
             memoryTokenHost = value
             prefs?.edit()?.apply { if (value == null) remove(KEY_TOKEN_HOST) else putString(KEY_TOKEN_HOST, value) }?.apply()
         }
+
+    var baseUrlOverride: String?
+        get() = prefs?.getString(KEY_BASE_URL_OVERRIDE, null)
+        set(value) {
+            prefs?.edit()?.apply { if (value == null) remove(KEY_BASE_URL_OVERRIDE) else putString(KEY_BASE_URL_OVERRIDE, value) }?.apply()
+        }
+
 
     var deviceId: String?
         get() = prefs?.getString(KEY_DEVICE_ID, null) ?: memoryDeviceId
@@ -486,6 +495,14 @@ object SyncSession {
      */
     suspend fun sync(progressDao: ProgressDao) {
         val token = store.deviceToken ?: return
+
+        // Prevent cross-environment token replay if the base URL changed.
+        val issuingHost = store.tokenHost ?: SyncApi.DEFAULT_BASE.host
+        if (issuingHost != SyncApi.baseUrl.host) {
+            store.clear()
+            updatePairedFromStore()
+            return
+        }
 
         DiagnosticsLog.log("sync.start")
         val startTime = System.currentTimeMillis()

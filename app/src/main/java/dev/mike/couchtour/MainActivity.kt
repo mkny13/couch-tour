@@ -165,6 +165,19 @@ class MainActivity : ComponentActivity() {
             SyncApi.applyConfiguredBaseUrl(this, override = override)
         }
 
+        if (savedInstanceState == null) {
+            // An immediate catch-up on launch, on top of the periodic background job.
+            // Fire-and-forget: sync() is a no-op if unpaired.
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                try {
+                    SyncSession.sync(PhishInDb.get(this@MainActivity).progressDao())
+                } catch (e: Exception) {
+                    android.util.Log.w("Sync", "Launch sync failed; the periodic job will retry", e)
+                    DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to syncErrorCode(e))
+                }
+            }
+        }
+
         // Without this the media notification (and therefore the lockscreen controls)
         // is silently suppressed on Android 13+.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
