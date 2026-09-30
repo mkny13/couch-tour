@@ -27,6 +27,7 @@ class CouchTourApp : Application() {
         // turns up, and never, on a device without Play services.
         Casting.init(this)
 
+        SyncApi.applyConfiguredBaseUrl(this)
         SyncSession.init(this)
         // An immediate catch-up on launch, on top of the periodic background job — a device
         // that was just opened shouldn't have to wait up to 15 minutes to see what changed

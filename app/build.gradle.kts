@@ -76,6 +76,11 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField(
+                "String",
+                "SYNC_BASE_URL",
+                "\"https://couch-tour-sync-staging.mkastellec.workers.dev\""
+            )
             // Opt-in only (-PsideInstall=true): a distinct applicationId so this build
             // installs alongside the regular debug sideload rather than updating over it —
             // for trying a risky change without disturbing the working install. Every
@@ -93,6 +98,11 @@ android {
             }
         }
         release {
+            buildConfigField(
+                "String",
+                "SYNC_BASE_URL",
+                "\"https://couch-tour-sync.mkastellec.workers.dev\""
+            )
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

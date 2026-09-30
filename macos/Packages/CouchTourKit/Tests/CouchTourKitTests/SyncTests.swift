@@ -60,9 +60,132 @@ final class SyncTokenStoreTests: XCTestCase {
 
         XCTAssertNil(store.deviceToken)
         XCTAssertNil(store.deviceId)
+        XCTAssertNil(store.tokenHost)
         XCTAssertEqual(0, store.lastSeq)
         XCTAssertEqual(0, store.lastPushWatermark)
         XCTAssertEqual(0, store.lastSyncedAt)
+    }
+
+    func testRoundTripsTokenHost() {
+        let store = store()
+        store.tokenHost = "staging.example.com"
+        XCTAssertEqual("staging.example.com", store.tokenHost)
+    }
+}
+
+final class SyncConfigTests: XCTestCase {
+    private let defaultBase = URL(string: "https://default.example.com")!
+
+    func testLaunchArgBeatsEnvVarBeatsDefault() {
+        let url = SyncConfig.resolveBaseURL(
+            defaultBase: defaultBase,
+            arguments: ["MyApp", "--sync-base-url=https://arg.example.com"],
+            environment: ["COUCHTOUR_SYNC_BASE_URL": "https://env.example.com"]
+        )
+        XCTAssertEqual(URL(string: "https://arg.example.com"), url)
+    }
+
+    func testEnvVarBeatsDefault() {
+        let url = SyncConfig.resolveBaseURL(
+            defaultBase: defaultBase,
+            arguments: ["MyApp"],
+            environment: ["COUCHTOUR_SYNC_BASE_URL": "https://env.example.com"]
+        )
+        XCTAssertEqual(URL(string: "https://env.example.com"), url)
+    }
+
+    func testDefaultWhenNeitherPresent() {
+        let url = SyncConfig.resolveBaseURL(
+            defaultBase: defaultBase,
+            arguments: ["MyApp"],
+            environment: [:]
+        )
+        XCTAssertEqual(defaultBase, url)
+    }
+
+    func testEmptyLaunchArgFallsBackToDefault() {
+        let url = SyncConfig.resolveBaseURL(
+            defaultBase: defaultBase,
+            arguments: ["MyApp", "--sync-base-url="],
+            environment: [:]
+        )
+        XCTAssertEqual(defaultBase, url)
+    }
+
+    func testGarbageLaunchArgFallsBackToDefault() {
+        let url = SyncConfig.resolveBaseURL(
+            defaultBase: defaultBase,
+            arguments: ["MyApp", "--sync-base-url=not a valid url"],
+            environment: [:]
+        )
+        XCTAssertEqual(defaultBase, url)
+    }
+
+    func testEmptyEnvVarFallsBackToDefault() {
+        let url = SyncConfig.resolveBaseURL(
+            defaultBase: defaultBase,
+            arguments: ["MyApp"],
+            environment: ["COUCHTOUR_SYNC_BASE_URL": "   "]
+        )
+        XCTAssertEqual(defaultBase, url)
+    }
+
+    func testGarbageEnvVarFallsBackToDefault() {
+        let url = SyncConfig.resolveBaseURL(
+            defaultBase: defaultBase,
+            arguments: ["MyApp"],
+            environment: ["COUCHTOUR_SYNC_BASE_URL": "ftp://not-http.example.com"]
+        )
+        XCTAssertEqual(defaultBase, url)
+    }
+}
+
+final class SyncSessionHostChangeTests: XCTestCase {
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "SyncSessionHostChangeTests.\(UUID())"
+    }
+
+    override func tearDown() {
+        UserDefaults().removePersistentDomain(forName: suiteName)
+        SyncAPI.baseURL = SyncConfig.prodBaseURL
+        super.tearDown()
+    }
+
+    private func store() -> SyncTokenStore {
+        SyncTokenStore(keychain: InMemoryKeychain(), defaults: UserDefaults(suiteName: suiteName)!)
+    }
+
+    func testSwitchingHostClearsTokenStore() {
+        let store = store()
+        store.tokenHost = "old-host.example.com"
+        store.deviceToken = "token-123"
+        store.deviceId = "device-123"
+
+        SyncAPI.baseURL = URL(string: "https://new-host.example.com")!
+        let session = SyncSession(store: store)
+
+        XCTAssertFalse(session.paired)
+        XCTAssertNil(store.deviceToken)
+        XCTAssertNil(store.deviceId)
+        XCTAssertNil(store.tokenHost)
+    }
+
+    func testReapplyingSameHostDoesNotClearStore() {
+        let store = store()
+        store.tokenHost = "same-host.example.com"
+        store.deviceToken = "token-123"
+        store.deviceId = "device-123"
+
+        SyncAPI.baseURL = URL(string: "https://same-host.example.com")!
+        let session = SyncSession(store: store)
+
+        XCTAssertTrue(session.paired)
+        XCTAssertEqual("token-123", store.deviceToken)
+        XCTAssertEqual("device-123", store.deviceId)
+        XCTAssertEqual("same-host.example.com", store.tokenHost)
     }
 }
 

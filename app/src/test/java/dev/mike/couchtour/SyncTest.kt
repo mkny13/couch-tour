@@ -75,9 +75,102 @@ class SyncTokenStoreTest {
 
         assertNull(store.deviceToken)
         assertNull(store.deviceId)
+        assertNull(store.tokenHost)
         assertEquals(0L, store.lastSeq)
         assertEquals(0L, store.lastPushWatermark)
         assertEquals(0L, store.lastSyncedAt)
+    }
+
+    @Test
+    fun `round-trips the token host`() {
+        val store = store()
+        store.tokenHost = "example.com"
+        assertEquals("example.com", store.tokenHost)
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class SyncConfigTest {
+
+    private fun store() = SyncTokenStore(ApplicationProvider.getApplicationContext<Context>())
+
+    @After
+    fun tearDown() {
+        SyncApi.baseUrl = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
+    }
+
+    @Test
+    fun `buildConfig sync base url for debug is the staging host`() {
+        assertEquals("https://couch-tour-sync-staging.mkastellec.workers.dev", BuildConfig.SYNC_BASE_URL)
+    }
+
+    @Test
+    fun `applyConfiguredBaseUrl honours an override`() {
+        val resolved = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://default.example.com",
+            override = "https://custom.example.com",
+            store = store(),
+        )
+        assertEquals("https://custom.example.com".toHttpUrl(), resolved)
+        assertEquals("https://custom.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+    @Test
+    fun `switching to a host that differs from the token's issuing host clears the token store`() {
+        val store = store()
+        store.tokenHost = "old-host.example.com"
+        store.deviceToken = "token-123"
+        store.deviceId = "device-123"
+
+        SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://new-host.example.com",
+            override = null,
+            store = store,
+        )
+
+        assertNull(store.deviceToken)
+        assertNull(store.deviceId)
+        assertNull(store.tokenHost)
+        assertEquals("https://new-host.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+    @Test
+    fun `re-applying the same host does not clear it`() {
+        val store = store()
+        store.tokenHost = "same-host.example.com"
+        store.deviceToken = "token-123"
+        store.deviceId = "device-123"
+
+        SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://same-host.example.com",
+            override = null,
+            store = store,
+        )
+
+        assertEquals("token-123", store.deviceToken)
+        assertEquals("device-123", store.deviceId)
+        assertEquals("same-host.example.com", store.tokenHost)
+        assertEquals("https://same-host.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+    @Test
+    fun `a malformed override URL is ignored and falls back to configured default`() {
+        val resolved = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://default.example.com",
+            override = "not a valid url",
+            store = store(),
+        )
+        assertEquals("https://default.example.com".toHttpUrl(), resolved)
+        assertEquals("https://default.example.com".toHttpUrl(), SyncApi.baseUrl)
+
+        val resolvedBlank = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://default.example.com",
+            override = "   ",
+            store = store(),
+        )
+        assertEquals("https://default.example.com".toHttpUrl(), resolvedBlank)
+        assertEquals("https://default.example.com".toHttpUrl(), SyncApi.baseUrl)
     }
 }
 
