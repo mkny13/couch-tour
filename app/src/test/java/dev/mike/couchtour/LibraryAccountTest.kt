@@ -187,7 +187,7 @@ class LibraryAccountTest {
     }
 
     @Test
-    fun `track liked on phish in and in local playlist dedupes keeping dated item`() {
+    fun `track liked on phish in and in local playlist preserves both rows and distinct navigation targets`() {
         val localTrack = LibraryItem(
             key = "trk_1",
             rawKey = "1",
@@ -216,9 +216,49 @@ class LibraryAccountTest {
             local = listOf(localTrack),
             account = listOf(accountTrack)
         )
-        assertEquals(1, merged.size)
-        assertEquals(999999L, merged[0].addedAt)
-        assertEquals("Ghost", merged[0].title)
+        assertEquals(2, merged.size)
+        val playlistItem = merged.first { it.target is LibraryTarget.LocalPlaylist }
+        val accountItem = merged.first { it.target is LibraryTarget.AccountTrack }
+        assertEquals("pl-1", (playlistItem.target as LibraryTarget.LocalPlaylist).id)
+        assertEquals(42L, (accountItem.target as LibraryTarget.AccountTrack).track.id)
+    }
+
+    @Test
+    fun `track in multiple local playlists preserves all playlist rows without deduplicating away navigation targets`() {
+        val trackInPl1 = LibraryItem(
+            key = "trk_1",
+            rawKey = "1",
+            badge = "TRACK",
+            title = "Ghost",
+            subtitle = "1997-11-17 · McNichols Sports Arena",
+            addedAt = null,
+            sortKey = "Ghost",
+            target = LibraryTarget.LocalPlaylist("pl-1"),
+            backend = "phishin",
+            trackId = "42"
+        )
+        val trackInPl2 = LibraryItem(
+            key = "trk_2",
+            rawKey = "2",
+            badge = "TRACK",
+            title = "Ghost",
+            subtitle = "1997-11-17 · McNichols Sports Arena",
+            addedAt = null,
+            sortKey = "Ghost",
+            target = LibraryTarget.LocalPlaylist("pl-2"),
+            backend = "phishin",
+            trackId = "42"
+        )
+
+        val merged = mergeLibraryTracks(
+            local = listOf(trackInPl1, trackInPl2),
+            account = emptyList()
+        )
+        assertEquals(2, merged.size)
+        assertEquals(
+            setOf("pl-1", "pl-2"),
+            merged.mapNotNull { (it.target as? LibraryTarget.LocalPlaylist)?.id }.toSet()
+        )
     }
 
     @Test

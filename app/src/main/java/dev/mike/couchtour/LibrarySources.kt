@@ -336,23 +336,14 @@ fun mergeLibraryTracks(
     relisten: List<LibraryItem> = emptyList()
 ): List<LibraryItem> {
     val items = local + account + relisten
-    val groups = LinkedHashMap<String, MutableList<LibraryItem>>()
+    val seen = mutableSetOf<String>()
+    val result = mutableListOf<LibraryItem>()
     for (item in items) {
-        val key = if (item.backend != null && item.trackId != null) {
-            "${item.backend}:${item.trackId}"
-        } else {
-            item.key
-        }
-        groups.getOrPut(key) { mutableListOf() }.add(item)
-    }
-    return groups.values.map { group ->
-        if (group.size == 1) {
-            group.first()
-        } else {
-            val dated = group.filter { it.addedAt != null }.maxByOrNull { it.addedAt!! }
-            dated ?: group.first()
+        if (seen.add(item.key)) {
+            result.add(item)
         }
     }
+    return result
 }
 
 fun sortLibraryItems(items: List<LibraryItem>, sortMode: LibrarySortMode): List<LibraryItem> =
