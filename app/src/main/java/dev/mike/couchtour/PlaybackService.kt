@@ -296,9 +296,15 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private val playerListener = object : Player.Listener {
+        private var wasPlaying = false
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             saveNow()
             SyncSession.requestDebouncedPush(progressDao())
+            if (wasPlaying && !isPlaying) {
+                DiagnosticsLog.log("playback.stop")
+            }
+            wasPlaying = isPlaying
             if (session?.player === localPlayer) {
                 if (isPlaying) requestAudioFocus() else if (!pausedByAudioFocusLoss) abandonAudioFocus()
             }
@@ -443,6 +449,10 @@ class PlaybackService : MediaLibraryService() {
             artist = item.mediaMetadata.artist?.toString().orEmpty(),
         )
         scope.launch { PhishInDb.get(applicationContext).progressDao().put(progress) }
+        val trackId = extras.getString(Keys.TRACK_ID) ?: item.mediaId
+        val duration = if (player.duration > 0) player.duration else extras.getLong(Keys.DURATION_MS, 0L)
+        val pct = if (duration > 0) ((progress.positionMs * 100) / duration).toInt().coerceIn(0, 100) else 0
+        DiagnosticsLog.log("playback.progress", "track" to trackId, "pct" to pct, "status" to "saved")
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session

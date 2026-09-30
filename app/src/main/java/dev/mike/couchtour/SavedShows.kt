@@ -28,9 +28,11 @@ object SavedShows {
     }
 
     fun toggle(key: String) {
+        val on = key !in _keys.value
         val updated = if (key in _keys.value) _keys.value - key else _keys.value + key
         _keys.value = updated
         prefs.edit().putStringSet(KEY_SHOWS, updated).apply()
+        DiagnosticsLog.log("library.favorite", "kind" to "show", "key" to key, "on" to on)
     }
 
     fun contains(key: String): Boolean = key in _keys.value

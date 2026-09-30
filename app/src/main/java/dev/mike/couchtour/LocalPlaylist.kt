@@ -114,19 +114,25 @@ interface LocalPlaylistDao {
     @Query("UPDATE local_playlist_tracks SET position = :position WHERE rowId = :rowId AND playlistId = :playlistId")
     suspend fun updateTrackPosition(rowId: Long, playlistId: String, position: Int)
 
+    @Query("SELECT trackId FROM local_playlist_tracks WHERE rowId = :rowId")
+    suspend fun trackIdByRow(rowId: Long): String?
+
     /** Appends [track] to the end of its playlist and bumps [LocalPlaylistEntity.trackCount]/`updatedAt`. */
     @Transaction
     suspend fun addTrack(track: LocalPlaylistTrackEntity, now: Long) {
         val position = maxPosition(track.playlistId) + 1
         insertTrack(track.copy(position = position))
         incrementTrackCount(track.playlistId, now)
+        DiagnosticsLog.log("library.playlist", "action" to "add", "track" to track.trackId, "playlist" to track.playlistId)
     }
 
     /** The inverse of [addTrack] — [rowId] is [LocalPlaylistTrackEntity.rowId]. */
     @Transaction
     suspend fun removeTrack(rowId: Long, playlistId: String, now: Long) {
+        val trackId = trackIdByRow(rowId) ?: rowId.toString()
         deleteTrackRow(rowId)
         decrementTrackCount(playlistId, now)
+        DiagnosticsLog.log("library.playlist", "action" to "remove", "track" to trackId, "playlist" to playlistId)
     }
 
     @Query("UPDATE local_playlists SET updatedAt = :now WHERE id = :id")

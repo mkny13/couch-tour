@@ -29,8 +29,10 @@ object Favorites {
     }
 
     fun toggle(key: String) {
+        val on = key !in _keys.value
         val updated = if (key in _keys.value) _keys.value - key else _keys.value + key
         _keys.value = updated
         prefs.edit().putStringSet(KEY_ARTISTS, updated).apply()
+        DiagnosticsLog.log("library.favorite", "kind" to "artist", "key" to key, "on" to on)
     }
 }

@@ -31,8 +31,10 @@ object LikedTracks {
     }
 
     fun toggle(id: String) {
+        val on = id !in _ids.value
         val updated = if (id in _ids.value) _ids.value - id else _ids.value + id
         _ids.value = updated
         prefs.edit().putStringSet(KEY_TRACKS, updated).apply()
+        DiagnosticsLog.log("library.favorite", "kind" to "track", "id" to id, "on" to on)
     }
 }

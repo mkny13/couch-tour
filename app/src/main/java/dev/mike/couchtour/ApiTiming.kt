@@ -20,6 +20,7 @@ import okhttp3.EventListener
 internal class TimingEventListener(private val tag: String) : EventListener() {
     private var callStartNanos = 0L
     private var connecting = false
+    private var connectionReused = false
 
     private fun elapsedMs() = (System.nanoTime() - callStartNanos) / 1_000_000
 
@@ -32,7 +33,15 @@ internal class TimingEventListener(private val tag: String) : EventListener() {
     override fun callStart(call: Call) {
         callStartNanos = System.nanoTime()
         connecting = false
+        connectionReused = false
         log { Log.d(tag, "${call.request().url.encodedPath}: call start") }
+        DiagnosticsLog.log(
+            "api.call",
+            "path" to call.request().url.encodedPath,
+            "phase" to "start",
+            "ms" to 0L,
+            "reused" to false
+        )
     }
 
     override fun connectStart(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy) {
@@ -42,14 +51,41 @@ internal class TimingEventListener(private val tag: String) : EventListener() {
     override fun connectionAcquired(call: Call, connection: Connection) {
         val reused = !connecting
         connecting = false
-        log { Log.d(tag, "${call.request().url.encodedPath}: connection acquired after ${elapsedMs()}ms (${if (reused) "reused" else "new"})") }
+        connectionReused = reused
+        val ms = elapsedMs()
+        log { Log.d(tag, "${call.request().url.encodedPath}: connection acquired after ${ms}ms (${if (reused) "reused" else "new"})") }
+        DiagnosticsLog.log(
+            "api.call",
+            "path" to call.request().url.encodedPath,
+            "phase" to "connected",
+            "ms" to ms,
+            "reused" to reused
+        )
     }
 
     override fun callEnd(call: Call) {
-        log { Log.d(tag, "${call.request().url.encodedPath}: call end after ${elapsedMs()}ms") }
+        val ms = elapsedMs()
+        log { Log.d(tag, "${call.request().url.encodedPath}: call end after ${ms}ms") }
+        DiagnosticsLog.log(
+            "api.call",
+            "path" to call.request().url.encodedPath,
+            "phase" to "end",
+            "ms" to ms,
+            "reused" to connectionReused
+        )
     }
 
     override fun callFailed(call: Call, ioe: IOException) {
-        log { Log.w(tag, "${call.request().url.encodedPath}: call failed after ${elapsedMs()}ms (${ioe.javaClass.simpleName}: ${ioe.message})") }
+        val ms = elapsedMs()
+        log { Log.w(tag, "${call.request().url.encodedPath}: call failed after ${ms}ms (${ioe.javaClass.simpleName}: ${ioe.message})") }
+        DiagnosticsLog.log(
+            "api.call",
+            DiagnosticsLog.Level.WARN,
+            "path" to call.request().url.encodedPath,
+            "phase" to "failed",
+            "ms" to ms,
+            "reused" to connectionReused,
+            "error" to ioe.javaClass.simpleName
+        )
     }
 }

@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -128,6 +129,10 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
     val showCount = filteredShows.size
     val trackCount = filteredTracks.size
     val totalCount = playlistCount + showCount + trackCount
+
+    LaunchedEffect(rawPlaylists, rawInProgressList, rawTracks) {
+        emitLibraryCounts(playlistCount, showCount, trackCount)
+    }
 
     Column(
         modifier = Modifier
@@ -545,3 +550,19 @@ private fun LibraryRowItem(
         )
     }
 }
+
+internal fun emitLibraryCounts(playlistCount: Int, showCount: Int, trackCount: Int) {
+    val totalCount = playlistCount + showCount + trackCount
+    DiagnosticsLog.log(
+        "library.counts",
+        "playlists" to playlistCount,
+        "shows" to showCount,
+        "tracks" to trackCount,
+        "total" to totalCount
+    )
+    DiagnosticsLog.mark(
+        "Library counts",
+        "playlists=$playlistCount shows=$showCount tracks=$trackCount total=$totalCount"
+    )
+}
+
