@@ -53,6 +53,7 @@ data class PlayerState(
     val trackPosition: Int = 0,
     /** Non-null only while a YouTube video (#234) is the current item. */
     val youTubeMode: YouTubePlaybackMode? = null,
+    val isJamChart: Boolean = false,
     val trackSlug: String? = null,
     val jamChartNotes: String? = null,
     /** Tracks currently queued in the player session. */
@@ -222,6 +223,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             setName = extras?.getString(Keys.SET_NAME).orEmpty(),
             trackPosition = extras?.getInt(Keys.TRACK_POSITION, 0) ?: 0,
             youTubeMode = youTubeMode,
+            isJamChart = extras?.getBoolean(Keys.IS_JAM_CHART, false) == true || extras?.getString(Keys.IS_JAM_CHART) == "true",
             trackSlug = extras?.getString(Keys.TRACK_SLUG),
             jamChartNotes = extras?.getString(Keys.JAM_CHART_NOTES),
             queue = queueItems,

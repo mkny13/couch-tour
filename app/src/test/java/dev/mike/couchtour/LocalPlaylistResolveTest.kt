@@ -8,6 +8,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -69,6 +70,42 @@ class LocalPlaylistResolveTest {
         // Not the (null, when nested in a show) Track field — the show's own date/venue.
         assertEquals("1997-11-17", resolved[0].showDate)
         assertEquals("The Centrum", resolved[0].venueName)
+    }
+
+    @Test
+    fun `resolves jam chart track carrying slug and notes`() = runBlocking {
+        phishInServer.enqueue(
+            MockResponse().setBody(
+                """{"date":"1997-11-17","venue_name":"The Centrum","tracks":[
+                    {"id":42,"title":"Tweezer","slug":"tweezer","mp3_url":"http://x/tweezer.mp3","audio_status":"complete","tags":[{"name":"Jam Chart","notes":"Legendary jam"}]}
+                ]}"""
+            )
+        )
+
+        val resolved = resolveLocalPlaylistTracks(listOf(phishRef("1997-11-17", "42", "Tweezer")))
+
+        assertEquals(1, resolved.size)
+        assertEquals("tweezer", resolved[0].slug)
+        assertTrue(resolved[0].isJamChart)
+        assertEquals("Legendary jam", resolved[0].jamChartNotes)
+    }
+
+    @Test
+    fun `resolves jam chart track with null notes setting isJamChart true`() = runBlocking {
+        phishInServer.enqueue(
+            MockResponse().setBody(
+                """{"date":"1997-11-17","venue_name":"The Centrum","tracks":[
+                    {"id":42,"title":"Tweezer","slug":"tweezer","mp3_url":"http://x/tweezer.mp3","audio_status":"complete","tags":[{"name":"Jam Chart","notes":null}]}
+                ]}"""
+            )
+        )
+
+        val resolved = resolveLocalPlaylistTracks(listOf(phishRef("1997-11-17", "42", "Tweezer")))
+
+        assertEquals(1, resolved.size)
+        assertEquals("tweezer", resolved[0].slug)
+        assertTrue(resolved[0].isJamChart)
+        assertNull(resolved[0].jamChartNotes)
     }
 
     @Test

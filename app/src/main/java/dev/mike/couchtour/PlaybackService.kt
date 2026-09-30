@@ -65,6 +65,7 @@ object Keys {
     const val YOUTUBE_VIDEO_URL = "youtube_video_url"
     const val YOUTUBE_MODE = "youtube_mode"
 
+    const val IS_JAM_CHART = "is_jam_chart"
     const val TRACK_SLUG = "track_slug"
     const val JAM_CHART_NOTES = "jam_chart_notes"
 
@@ -75,7 +76,7 @@ object Keys {
         SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION, DURATION_MS,
         LEVELING_KEY,
         YOUTUBE_AUDIO_URL, YOUTUBE_VIDEO_URL, YOUTUBE_MODE,
-        TRACK_SLUG, JAM_CHART_NOTES
+        IS_JAM_CHART, TRACK_SLUG, JAM_CHART_NOTES
     )
 }
 

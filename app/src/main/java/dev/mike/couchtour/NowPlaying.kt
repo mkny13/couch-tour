@@ -392,18 +392,22 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     modifier = Modifier.padding(top = 4.dp)
                 )
 
-                // Tags row: JAM CHART badge (if phish track) + Duration chip
+                // Tags row: JAM CHART badge (if jam chart track) + Duration chip
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
-                    if (state.jamChartNotes != null) {
+                    if (state.isJamChart) {
+                        val hasNotes = !state.jamChartNotes.isNullOrBlank()
                         Box(
                             modifier = Modifier
                                 .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
                                 .clip(RoundedCornerShape(4.dp))
-                                .clickable { showJamChartNote = !showJamChartNote }
+                                .then(
+                                    if (hasNotes) Modifier.clickable { showJamChartNote = !showJamChartNote }
+                                    else Modifier
+                                )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Row(
@@ -417,12 +421,14 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     letterSpacing = 1.sp,
                                     color = ledger.accentTintText
                                 )
-                                Icon(
-                                    if (showJamChartNote) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = ledger.accentTintText,
-                                    modifier = Modifier.size(11.dp)
-                                )
+                                if (hasNotes) {
+                                    Icon(
+                                        if (showJamChartNote) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = ledger.accentTintText,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -445,7 +451,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
 
                 // Expandable Jam Chart Note Card
                 val notes = state.jamChartNotes
-                if (showJamChartNote && !notes.isNullOrBlank()) {
+                if (state.isJamChart && showJamChartNote && !notes.isNullOrBlank()) {
                     Column(modifier = Modifier.padding(top = 10.dp)) {
                         JamChartNoteCard(
                             noteText = notes,
