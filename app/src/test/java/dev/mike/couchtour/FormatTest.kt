@@ -118,4 +118,25 @@ class FormatTest {
         assertEquals("0:00 left", formatRemainingTime(positionMs = 800_000, durationMs = 764_000))
         assertEquals("0:00 left", formatRemainingTime(positionMs = 0, durationMs = 0))
     }
+
+    @Test
+    fun `formats file sizes in human-readable bytes, KB, and MB`() {
+        assertEquals("0 B", formatFileSize(0))
+        assertEquals("500 B", formatFileSize(500))
+        assertEquals("1023 B", formatFileSize(1023))
+        assertEquals("1 KB", formatFileSize(1024))
+        assertEquals("1.5 KB", formatFileSize(1536))
+        assertEquals("10 KB", formatFileSize(10240))
+        assertEquals("1 MB", formatFileSize(1048576))
+        assertEquals("1.5 MB", formatFileSize(1572864))
+    }
+
+    @Test
+    fun `formats diagnostics summary label and size`() {
+        assertEquals("1 entry · 500 B", formatDiagnosticsSummary(1, 500))
+        assertEquals("0 entries · 0 B", formatDiagnosticsSummary(0, 0))
+        assertEquals("42 entries · 1.5 KB", formatDiagnosticsSummary(42, 1536))
+        assertEquals("200 entries · 1 MB", formatDiagnosticsSummary(200, 1048576))
+    }
 }
+

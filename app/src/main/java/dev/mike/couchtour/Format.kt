@@ -103,3 +103,22 @@ fun formatRemainingTime(positionMs: Long, durationMs: Long): String {
     return "${fmt(remainingMs)} left"
 }
 
+/** Formats byte count into human-readable size, e.g. 500 B, 1.2 KB, 1.0 MB. */
+fun formatFileSize(bytes: Long): String {
+    if (bytes < 1024) return "$bytes B"
+    val kb = bytes / 1024.0
+    if (kb < 1024) {
+        val s = "%.1f".format(java.util.Locale.US, kb)
+        return (if (s.endsWith(".0")) s.substringBefore(".0") else s) + " KB"
+    }
+    val mb = kb / 1024.0
+    val s = "%.1f".format(java.util.Locale.US, mb)
+    return (if (s.endsWith(".0")) s.substringBefore(".0") else s) + " MB"
+}
+
+/** Formats diagnostics summary string, e.g. "42 entries · 1.5 KB". */
+fun formatDiagnosticsSummary(count: Long, bytes: Long): String {
+    val countLabel = if (count == 1L) "1 entry" else "$count entries"
+    return "$countLabel · ${formatFileSize(bytes)}"
+}
+
