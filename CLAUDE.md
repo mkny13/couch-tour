@@ -28,6 +28,9 @@ Tests are local (Robolectric + MockWebServer); run after any change.
   ```
 - **Install & Relaunch:** `macos/scripts/install.sh` (builds, ad-hoc signs, installs to `/Applications`, relaunches).
 
+### Accessibility checks (macOS)
+Dump the running beta's accessibility tree (bounded, identifier-scoped): `scripts/smoke/ax-tree.sh`
+
 ## Building (sync backend)
 
 `sync/` is a Cloudflare Worker + D1 service (`https://couch-tour-sync.mkastellec.workers.dev`).

@@ -4907,3 +4907,8 @@ The artist chips on the Android Home "NEXT TOUR STOP" card now filter the card t
 **Date:** 2026-09-30
 
 When the Relisten/favorites fetch was loading or failed, the macOS sidebar fell back to rendering design-mockup artists (Goose, WSP, etc.) which could mislead users into thinking they favorited them. We removed the mock data and replaced it with a muted "Star artists to pin them here" hint. To prevent this hint from flashing on every cold launch while favorites resolve, `isFavoritesLoaded` explicitly tracks the fetch state, rendering an empty space under the header until `loadFavorites()` finishes.
+
+### D290: AX tree walking is bounded and identifier-scoped by construction
+- **Context:** Agent-driven UI testing on macOS requires querying the accessibility tree. Calling `entire contents` on "Couch Tour Beta" hangs AppleScript. Also, frontmost-window targeting is fragile in CI environments.
+- **Decision:** Smoke checks (`scripts/smoke/ax-tree.sh`) walk the UI tree using a bound of maximum depth (default 6) and a hard timeout (5 seconds), scoping output strictly to known IDs from `AXIdentifiers.swift`. Target is resolved strictly by window owner (`dev.mike.couchtour.mac.beta`) rather than screen coordinates or `frontmost`.
+- **Why:** Bounding prevents the walk from hanging (the exact issue that motivated #365). Identifier scoping keeps the output small enough for agent context windows. Window-owner targeting ensures the test queries the intended application even if another window steals focus.
