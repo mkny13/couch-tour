@@ -96,14 +96,19 @@ public func showsOnDate(
     favorites: [ArtistRef],
     today: String,
     source: @escaping (Backend) -> MusicSource = sourceFor
-) async -> [ShowSummary] {
+) async throws -> [ShowSummary] {
     let relisten = Array(favorites.filter { $0.backend == .relisten }.prefix(maxRelistenArtists))
     let yearsEach = relistenYearBudget(artistCount: relisten.count)
     let participating = favorites.filter { $0.backend != .relisten } + relisten
 
     if participating.isEmpty { return [] }
 
-    let perArtist = await withTaskGroup(of: [ShowSummary].self) { group in
+    enum ArtistResult {
+        case success([ShowSummary])
+        case failure(Error)
+    }
+
+    let perArtist = try await withThrowingTaskGroup(of: ArtistResult.self) { group in
         for artist in participating {
             group.addTask {
                 do {
@@ -123,17 +128,31 @@ public func showsOnDate(
                             artistShows.append(contentsOf: shows)
                         }
                     }
-                    return showsOnAnniversary(shows: artistShows, today: today)
+                    return .success(showsOnAnniversary(shows: artistShows, today: today))
                 } catch {
-                    return []
+                    return .failure(error)
                 }
             }
         }
 
         var allMatches: [ShowSummary] = []
-        for await shows in group {
-            allMatches.append(contentsOf: shows)
+        var successCount = 0
+        var firstError: Error?
+
+        for try await result in group {
+            switch result {
+            case .success(let shows):
+                allMatches.append(contentsOf: shows)
+                successCount += 1
+            case .failure(let error):
+                if firstError == nil { firstError = error }
+            }
         }
+        
+        if successCount == 0, let error = firstError {
+            throw error
+        }
+        
         return allMatches
     }
 
@@ -153,14 +172,16 @@ public enum OnThisDate {
         favorites: [ArtistRef],
         today: String,
         source: @escaping (Backend) -> MusicSource = sourceFor
-    ) async -> [ShowSummary] {
+    ) async throws -> [ShowSummary] {
         if favorites.isEmpty { return [] }
         let key = cacheKey(favorites: favorites, today: today)
         if let cached = cached, cached.key == key {
             return cached.shows
         }
-        let shows = await showsOnDate(favorites: favorites, today: today, source: source)
-        cached = (key, shows)
+        let shows = try await showsOnDate(favorites: favorites, today: today, source: source)
+        if !shows.isEmpty {
+            cached = (key, shows)
+        }
         return shows
     }
 

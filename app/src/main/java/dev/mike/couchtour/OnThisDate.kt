@@ -168,11 +168,30 @@ suspend fun showsOnDate(
     val yearsEach = relistenYearBudget(relisten.size)
     val participating = favorites.filter { it.backend != Backend.RELISTEN } + relisten
 
+    if (participating.isEmpty()) return@coroutineScope emptyList()
+
     val perArtist = participating
-        .map { artist -> async { runCatching { showsFor(artist, today, yearsEach, source) }.getOrDefault(emptyList()) } }
+        .map { artist -> async { runCatching { showsFor(artist, today, yearsEach, source) } } }
         .awaitAll()
 
-    pickAnniversaryShows(perArtist.flatten(), random = random)
+    var successCount = 0
+    var firstError: Throwable? = null
+    val allShows = mutableListOf<ShowSummary>()
+
+    for (result in perArtist) {
+        result.onSuccess { shows ->
+            allShows.addAll(shows)
+            successCount++
+        }.onFailure { error ->
+            if (firstError == null) firstError = error
+        }
+    }
+
+    if (successCount == 0 && firstError != null) {
+        throw firstError!!
+    }
+
+    pickAnniversaryShows(allShows, random = random)
 }
 
 /** One artist's anniversary matches. The period selection is where the two backends differ:
@@ -238,7 +257,9 @@ object OnThisDate {
         return mutex.withLock {
             cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
             val shows = showsOnDate(favorites, today, random = random, source = source)
-            cached = key to shows
+            if (shows.isNotEmpty()) {
+                cached = key to shows
+            }
             shows
         }
     }

@@ -135,13 +135,33 @@ suspend fun currentTours(
     val participating = favorites.groupBy { it.backend }
         .flatMap { (_, artists) -> artists.take(MAX_TOUR_ARTISTS) }
 
-    participating
+    if (participating.isEmpty()) return@coroutineScope emptyList()
+
+    val perArtist = participating
         .map { artist ->
             val pref = preferences[artist.key] ?: preferences[artist.id]
-            async { runCatching { tourFor(artist, pref, source) }.getOrDefault(emptyList()) }
+            async { runCatching { tourFor(artist, pref, source) } }
         }
         .awaitAll()
-        .flatten()
+
+    var successCount = 0
+    var firstError: Throwable? = null
+    val allShows = mutableListOf<ShowSummary>()
+
+    for (result in perArtist) {
+        result.onSuccess { shows ->
+            allShows.addAll(shows)
+            successCount++
+        }.onFailure { error ->
+            if (firstError == null) firstError = error
+        }
+    }
+
+    if (successCount == 0 && firstError != null) {
+        throw firstError!!
+    }
+
+    allShows
 }
 
 /**
@@ -168,7 +188,7 @@ internal suspend fun tourFor(
                 allPeriods
             }
             val shows = candidatePeriods
-                .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
+                .map { period -> async { runCatching { src.shows(artist, period) }.getOrThrow() } }
                 .awaitAll()
                 .flatten()
             val matches = shows.filter { it.tourName == prefTour }
@@ -181,7 +201,7 @@ internal suspend fun tourFor(
             val allPeriods = src.periods(artist).filter { it.id != POPULAR_PERIOD_ID }
             val yearPeriods = allPeriods.filter { it.label == prefYear || it.id == prefYear || it.label.contains(prefYear) }
             val shows = yearPeriods
-                .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
+                .map { period -> async { runCatching { src.shows(artist, period) }.getOrThrow() } }
                 .awaitAll()
                 .flatten()
             if (shows.isNotEmpty()) {
@@ -192,7 +212,7 @@ internal suspend fun tourFor(
 
     val periods = recentPeriods(src.periods(artist))
     val shows = periods
-        .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
+        .map { period -> async { runCatching { src.shows(artist, period) }.getOrThrow() } }
         .awaitAll()
         .flatten()
     currentTourShows(shows)
@@ -229,7 +249,9 @@ object NextStop {
         val key = cacheKey(favorites, today, preferences)
         cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
         val shows = currentTours(favorites, preferences, source)
-        cached = key to shows
+        if (shows.isNotEmpty()) {
+            cached = key to shows
+        }
         return shows
     }
 }

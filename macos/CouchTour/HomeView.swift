@@ -18,6 +18,9 @@ struct HomeView: View {
     @State private var nextStopShows: [ShowSummary] = []
     @State private var tourPreferences: [ArtistTourPreference] = []
 
+    @State private var onThisDateError: Bool = false
+    @State private var nextStopError: Bool = false
+
     @State private var artistsError: String?
     @State private var progressError: String?
     @State private var isFindingSurprise = false
@@ -330,7 +333,19 @@ struct HomeView: View {
             .padding(.bottom, 8)
 
             // Table rows
-            if !nextStopShows.isEmpty {
+            if nextStopError {
+                VStack(spacing: 12) {
+                    ContentUnavailableView(
+                        "Couldn't load tour stops",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text("There was a problem loading tour stops.")
+                    )
+                    Button("Retry") {
+                        Task { await reloadDiscovery() }
+                    }
+                }
+                .padding(.vertical, 24)
+            } else if !nextStopShows.isEmpty {
                 ForEach(nextStopShows.prefix(3), id: \.date) { show in
                     tourStopRow(show: show)
                 }
@@ -435,7 +450,20 @@ struct HomeView: View {
             GradientHairline(height: 1, opacity: 0.85)
                 .padding(.horizontal, 24)
 
-            if onThisDateShows.isEmpty {
+            if onThisDateError {
+                VStack(spacing: 12) {
+                    ContentUnavailableView(
+                        "Couldn't load shows",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text("There was a problem loading shows.")
+                    )
+                    Button("Retry") {
+                        Task { await reloadDiscovery() }
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+            } else if onThisDateShows.isEmpty {
                 ContentUnavailableView(
                     "No shows on this date",
                     systemImage: "calendar",
@@ -629,17 +657,30 @@ struct HomeView: View {
         let favs = favoritedArtists
         let dateStr = today
 
+        onThisDateError = false
+        nextStopError = false
+
         if !favs.isEmpty {
-            onThisDateShows = await OnThisDate.load(favorites: favs, today: dateStr)
+            do {
+                onThisDateShows = try await OnThisDate.load(favorites: favs, today: dateStr)
+            } catch {
+                onThisDateError = true
+                onThisDateShows = []
+            }
         } else {
             onThisDateShows = []
         }
 
         if !favs.isEmpty {
-            let candidateShows = await NextStop.load(
-                favorites: favs, today: dateStr, preferences: tourPreferences
-            )
-            nextStopShows = candidateShows
+            do {
+                let candidateShows = try await NextStop.load(
+                    favorites: favs, today: dateStr, preferences: tourPreferences
+                )
+                nextStopShows = candidateShows
+            } catch {
+                nextStopError = true
+                nextStopShows = []
+            }
         } else {
             nextStopShows = []
         }

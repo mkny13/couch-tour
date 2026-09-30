@@ -136,7 +136,7 @@ final class NextStopTests: XCTestCase {
         }
     }
 
-    func testTourForDefunctArtistWithoutPreferenceReturnsEmptyWhenUntoured() async {
+    func testTourForDefunctArtistWithoutPreferenceReturnsEmptyWhenUntoured() async throws {
         let mock = MockMusicSource(backend: .relisten)
         mock.periodsHandler = { _ in
             [PeriodRef(id: "1995", label: "1995"), PeriodRef(id: "1994", label: "1994")]
@@ -148,11 +148,11 @@ final class NextStopTests: XCTestCase {
             ]
         }
 
-        let shows = await tourFor(artist: GRATEFUL_DEAD, preference: nil, source: { _ in mock })
+        let shows = try await tourFor(artist: GRATEFUL_DEAD, preference: nil, source: { _ in mock })
         XCTAssertTrue(shows.isEmpty)
     }
 
-    func testTourForDefunctArtistWithTourPreferenceResolvesNamedTour() async {
+    func testTourForDefunctArtistWithTourPreferenceResolvesNamedTour() async throws {
         let mock = MockMusicSource(backend: .relisten)
         mock.periodsHandler = { _ in
             [
@@ -172,13 +172,13 @@ final class NextStopTests: XCTestCase {
         }
 
         let pref = ArtistTourPreference(artistKey: GRATEFUL_DEAD.key, tourName: "Spring 1977", year: "1977")
-        let shows = await tourFor(artist: GRATEFUL_DEAD, preference: pref, source: { _ in mock })
+        let shows = try await tourFor(artist: GRATEFUL_DEAD, preference: pref, source: { _ in mock })
 
         XCTAssertEqual(2, shows.count)
         XCTAssertEqual(["1977-05-08", "1977-05-09"], shows.map { $0.date })
     }
 
-    func testTourForDefunctArtistWithYearPreferenceResolvesAllShowsInYear() async {
+    func testTourForDefunctArtistWithYearPreferenceResolvesAllShowsInYear() async throws {
         let mock = MockMusicSource(backend: .relisten)
         mock.periodsHandler = { _ in
             [
@@ -197,13 +197,13 @@ final class NextStopTests: XCTestCase {
         }
 
         let pref = ArtistTourPreference(artistKey: GRATEFUL_DEAD.key, tourName: nil, year: "1972")
-        let shows = await tourFor(artist: GRATEFUL_DEAD, preference: pref, source: { _ in mock })
+        let shows = try await tourFor(artist: GRATEFUL_DEAD, preference: pref, source: { _ in mock })
 
         XCTAssertEqual(2, shows.count)
         XCTAssertEqual(["1972-04-08", "1972-08-27"], shows.map { $0.date })
     }
 
-    func testCurrentToursFansOutAndAppliesPreferencesPerArtist() async {
+    func testCurrentToursFansOutAndAppliesPreferencesPerArtist() async throws {
         let phishMock = MockMusicSource(backend: .phishin)
         phishMock.periodsHandler = { _ in [PeriodRef(id: "1997", label: "1997")] }
         phishMock.showsHandler = { artist, _ in
@@ -221,7 +221,7 @@ final class NextStopTests: XCTestCase {
             ArtistTourPreference(artistKey: GRATEFUL_DEAD.key, tourName: "Spring 1977", year: "1977")
         ]
 
-        let shows = await currentTours(favorites: favorites, preferences: preferences, source: { backend in
+        let shows = try await currentTours(favorites: favorites, preferences: preferences, source: { backend in
             switch backend {
             case .phishin: return phishMock
             case .relisten: return deadMock
@@ -233,7 +233,7 @@ final class NextStopTests: XCTestCase {
         XCTAssertTrue(dates.contains("1977-05-08"))
     }
 
-    func testNextStopCacheInvalidation() async {
+    func testNextStopCacheInvalidation() async throws {
         NextStop.resetCache()
 
         var phishFetchCount = 0
@@ -247,19 +247,41 @@ final class NextStopTests: XCTestCase {
         }
 
         let favs = [PHISH]
-        let res1 = await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
+        let res1 = try await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
         XCTAssertEqual(1, res1.count)
         XCTAssertEqual(1, phishFetchCount)
 
         // Cached call
-        let res2 = await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
+        let res2 = try await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
         XCTAssertEqual(1, res2.count)
         XCTAssertEqual(1, phishFetchCount)
 
         // Reset cache
         NextStop.resetCache()
-        let res3 = await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
+        let res3 = try await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
         XCTAssertEqual(1, res3.count)
+        XCTAssertEqual(2, phishFetchCount)
+    }
+
+    func testNextStopEmptyNotCached() async throws {
+        NextStop.resetCache()
+        
+        var phishFetchCount = 0
+        let mock = MockMusicSource(backend: .phishin)
+        mock.periodsHandler = { _ in
+            phishFetchCount += 1
+            return [PeriodRef(id: "1997", label: "1997")]
+        }
+        mock.showsHandler = { _, _ in [] } // Empty result
+        
+        let favs = [PHISH]
+        let res1 = try await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
+        XCTAssertEqual(0, res1.count)
+        XCTAssertEqual(1, phishFetchCount)
+        
+        // Not cached, so should fetch again
+        let res2 = try await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
+        XCTAssertEqual(0, res2.count)
         XCTAssertEqual(2, phishFetchCount)
     }
 }
