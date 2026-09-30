@@ -58,6 +58,11 @@ The `progress` table stores listening history. Destructive migrations are never 
 - **README.md:** Update test counts when adding or removing tests.
 - **UAT.md:** Record items requiring human verification (`scripts/uat-server.py`). Items marked "needs work" are active bug reports.
 
+## Accessibility identifiers
+
+macOS identifiers follow the naming convention `<surface>.<element>[.<variant>]` (lower-case, dot-separated).
+They are declared in `macos/CouchTour/AXIdentifiers.swift` and verified by `macos/scripts/check-ax-ids.sh` to prevent orphaning during view renames or deletions.
+
 ## Working under Mahler
 
 - **Worktrees & Branches:** Mahler owns worktrees and branches. Never run `git worktree add/remove`, `git reset`, or `git checkout -b`. Stay within your assigned worktree.

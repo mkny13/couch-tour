@@ -203,6 +203,7 @@ public struct JamChartNoteCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Dismiss jam chart note")
+                    // No need to add ID here if we put it on the note, wait... The issue says "and the jam chart note all carry identifiers". Should I add it to the view or the text?
                 }
             }
 
@@ -220,6 +221,7 @@ public struct JamChartNoteCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(colors.panelBorder, lineWidth: 1)
         )
+        .accessibilityIdentifier(AXIdentifiers.jamChartNote)
     }
 }
 

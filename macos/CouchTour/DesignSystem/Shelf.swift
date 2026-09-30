@@ -7,12 +7,13 @@ import SwiftUI
 struct Shelf<Content: View, Trailing: View>: View {
     let title: String
     var systemImage: String?
+    var identifier: String?
     @ViewBuilder var trailing: () -> Trailing
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: CardMetrics.headerSpacing) {
-            SectionHeader(title: title, systemImage: systemImage, trailing: trailing)
+            SectionHeader(title: title, systemImage: systemImage, identifier: identifier, trailing: trailing)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: CardMetrics.shelfSpacing) {
@@ -25,8 +26,8 @@ struct Shelf<Content: View, Trailing: View>: View {
 }
 
 extension Shelf where Trailing == EmptyView {
-    init(_ title: String, systemImage: String? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.init(title: title, systemImage: systemImage, trailing: { EmptyView() }, content: content)
+    init(_ title: String, systemImage: String? = nil, identifier: String? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, systemImage: systemImage, identifier: identifier, trailing: { EmptyView() }, content: content)
     }
 }
 
@@ -34,9 +35,10 @@ extension Shelf {
     init(
         _ title: String,
         systemImage: String? = nil,
+        identifier: String? = nil,
         @ViewBuilder trailing: @escaping () -> Trailing,
         @ViewBuilder content: @escaping () -> Content
     ) {
-        self.init(title: title, systemImage: systemImage, trailing: trailing, content: content)
+        self.init(title: title, systemImage: systemImage, identifier: identifier, trailing: trailing, content: content)
     }
 }

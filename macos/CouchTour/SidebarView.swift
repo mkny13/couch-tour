@@ -27,7 +27,8 @@ struct SidebarView: View {
                 SidebarNavItem(
                     title: "Home",
                     icon: "house",
-                    isSelected: appModel.path.isEmpty
+                    isSelected: appModel.path.isEmpty,
+                    identifier: AXIdentifiers.sidebarNavHome
                 ) {
                     appModel.path.removeAll()
                 }
@@ -35,7 +36,8 @@ struct SidebarView: View {
                 SidebarNavItem(
                     title: "Artists",
                     icon: "music.mic",
-                    isSelected: appModel.path.last == .artists
+                    isSelected: appModel.path.last == .artists,
+                    identifier: AXIdentifiers.sidebarNavArtists
                 ) {
                     appModel.jump(to: .artists)
                 }
@@ -43,7 +45,8 @@ struct SidebarView: View {
                 SidebarNavItem(
                     title: "Search",
                     icon: "magnifyingglass",
-                    isSelected: appModel.path.last == .search
+                    isSelected: appModel.path.last == .search,
+                    identifier: AXIdentifiers.sidebarNavSearch
                 ) {
                     if appModel.path.last != .search {
                         appModel.path.append(.search)
@@ -53,7 +56,8 @@ struct SidebarView: View {
                 SidebarNavItem(
                     title: "Library",
                     icon: "books.vertical",
-                    isSelected: appModel.path.last == .playlists
+                    isSelected: appModel.path.last == .playlists,
+                    identifier: AXIdentifiers.sidebarNavLibrary
                 ) {
                     if appModel.path.last != .playlists {
                         appModel.path.append(.playlists)
@@ -63,7 +67,8 @@ struct SidebarView: View {
                 SidebarNavItem(
                     title: "History",
                     icon: "clock",
-                    isSelected: appModel.path.last == .listening
+                    isSelected: appModel.path.last == .listening,
+                    identifier: AXIdentifiers.sidebarNavHistory
                 ) {
                     if appModel.path.last != .listening {
                         appModel.path.append(.listening)
@@ -73,7 +78,8 @@ struct SidebarView: View {
                 SidebarNavItem(
                     title: "Settings",
                     icon: "gearshape",
-                    isSelected: false
+                    isSelected: false,
+                    identifier: AXIdentifiers.sidebarNavSettings
                 ) {
                     openSettings()
                 }
@@ -88,6 +94,7 @@ struct SidebarView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 26)
                 .padding(.bottom, 8)
+                .accessibilityIdentifier(AXIdentifiers.sidebarFavoritesHeader)
 
             GradientHairline(height: 1, opacity: 0.9)
                 .padding(.horizontal, 18)
@@ -127,11 +134,13 @@ struct SidebarView: View {
                                 .background(Color.clear, in: RoundedRectangle(cornerRadius: 7))
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("\(AXIdentifiers.sidebarFavoritesRow).\(artist.backend.rawValue).\(artist.id)")
                         }
                     }
                     .padding(.horizontal, 8)
                 }
             }
+            .accessibilityIdentifier(AXIdentifiers.sidebarFavoritesList)
 
             Spacer()
 
@@ -187,6 +196,7 @@ private struct SidebarNavItem: View {
     let title: String
     let icon: String
     let isSelected: Bool
+    let identifier: String
     let action: () -> Void
 
     @Environment(\.ledgerColors) private var colors
@@ -213,5 +223,6 @@ private struct SidebarNavItem: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
