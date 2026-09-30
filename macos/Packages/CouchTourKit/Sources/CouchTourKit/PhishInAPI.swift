@@ -133,6 +133,7 @@ public struct Show: Codable, Equatable {
 
 public struct Track: Codable, Equatable, Sendable {
     public let id: Int64
+    public let slug: String?
     public let title: String
     public let likesCount: Int
     public let likedByUser: Bool
@@ -156,7 +157,7 @@ public struct Track: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title
+        case id, slug, title
         case likesCount = "likes_count"
         case likedByUser = "liked_by_user"
         case position, duration
@@ -172,12 +173,13 @@ public struct Track: Codable, Equatable, Sendable {
     }
 
     public init(
-        id: Int64, title: String, likesCount: Int = 0, likedByUser: Bool = false, position: Int = 0,
+        id: Int64, slug: String? = nil, title: String, likesCount: Int = 0, likedByUser: Bool = false, position: Int = 0,
         duration: Int64 = 0, setName: String = "", audioStatus: String = "missing", mp3Url: String? = nil,
         waveformImageUrl: String? = nil, showDate: String? = nil, venueName: String? = nil,
         venueLocation: String? = nil, showAlbumCoverUrl: String? = nil, tags: [Tag] = []
     ) {
         self.id = id
+        self.slug = slug
         self.title = title
         self.likesCount = likesCount
         self.likedByUser = likedByUser
@@ -197,6 +199,7 @@ public struct Track: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int64.self, forKey: .id)
+        slug = try c.decodeIfPresent(String.self, forKey: .slug)
         title = try c.decode(String.self, forKey: .title)
         likesCount = try c.decodeIfPresent(Int.self, forKey: .likesCount) ?? 0
         likedByUser = try c.decodeIfPresent(Bool.self, forKey: .likedByUser) ?? false

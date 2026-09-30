@@ -41,6 +41,7 @@ final class CatalogTests: XCTestCase {
 
     private func track(
         id: Int64 = 1,
+        slug: String? = "tweezer",
         title: String = "Tweezer",
         setName: String = "Set 2",
         duration: Int64 = 1_200_000,
@@ -52,7 +53,7 @@ final class CatalogTests: XCTestCase {
         showAlbumCoverUrl: String? = nil
     ) -> Track {
         Track(
-            id: id, title: title, position: 0, duration: duration, setName: setName,
+            id: id, slug: slug, title: title, position: 0, duration: duration, setName: setName,
             audioStatus: audioStatus, mp3Url: mp3Url, waveformImageUrl: waveformImageUrl,
             showDate: showDate, venueName: venueName, showAlbumCoverUrl: showAlbumCoverUrl
         )
@@ -158,6 +159,15 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual("1997-11-17", t.showDate)
         XCTAssertEqual("McNichols Arena", t.venueName)
         XCTAssertEqual("https://phish.in/w.png", t.waveformURL)
+    }
+
+    func testATrackKeepsItsSlug() {
+        let t = track(slug: "tweezer").toPlayableTrack(showArt: nil)
+        XCTAssertEqual("tweezer", t.slug)
+    }
+
+    func testTrackSourceUrlBuildsPhishInWebPage() {
+        XCTAssertEqual("https://phish.in/1997-11-17/tweezer", trackSourceUrl(date: "1997-11-17", slug: "tweezer"))
     }
 
     // -------------------------------------------------------------- queue key

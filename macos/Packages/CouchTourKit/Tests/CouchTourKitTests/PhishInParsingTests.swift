@@ -20,6 +20,12 @@ final class PhishInParsingTests: XCTestCase {
         XCTAssertEqual("complete", show.audioStatus)
         XCTAssertEqual(3, show.tracks.count)
         XCTAssertEqual("Tweezer", show.tracks[0].title)
+        XCTAssertEqual("tweezer", show.tracks[0].slug)
+    }
+
+    func testParsesTrackSlug() throws {
+        let show = try decoder.decode(Show.self, from: try fixture("show.json"))
+        XCTAssertEqual("tweezer", show.tracks[0].slug)
     }
 
     func testTreatsATrackWithNoAudioAsUnplayable() throws {
