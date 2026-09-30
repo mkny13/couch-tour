@@ -18,9 +18,11 @@ struct SearchView: View {
 
     enum SearchTab: String, CaseIterable {
         case all = "All"
+        case artists = "Artists"
         case tracks = "Tracks"
         case shows = "Shows"
         case songs = "Songs"
+        case venues = "Venues"
     }
 
     private var term: String { appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -111,15 +113,21 @@ struct SearchView: View {
 
             // Tabs with counts and underline
             HStack(spacing: 22) {
+                let artistCount = activeHits?.artists.count ?? 0
                 let trackCount = activeHits?.tracks.count ?? 0
                 let showCount = activeHits?.shows.count ?? 0
-                let songCount = activeHits?.slices.count ?? 0
-                let allCount = trackCount + showCount + songCount
+                let songSlices = activeHits?.slices.filter { $0.kind == .song } ?? []
+                let venueSlices = activeHits?.slices.filter { $0.kind == .venue } ?? []
+                let songCount = songSlices.count
+                let venueCount = venueSlices.count
+                let allCount = artistCount + trackCount + showCount + songCount + venueCount
 
                 searchTabItem(title: "All", count: allCount, tab: .all, identifier: AXIdentifiers.searchTabAll)
+                searchTabItem(title: "Artists", count: artistCount, tab: .artists, identifier: AXIdentifiers.searchTabArtists)
                 searchTabItem(title: "Tracks", count: trackCount, tab: .tracks, identifier: AXIdentifiers.searchTabTracks)
                 searchTabItem(title: "Shows", count: showCount, tab: .shows, identifier: AXIdentifiers.searchTabShows)
                 searchTabItem(title: "Songs", count: songCount, tab: .songs, identifier: AXIdentifiers.searchTabSongs)
+                searchTabItem(title: "Venues", count: venueCount, tab: .venues, identifier: AXIdentifiers.searchTabVenues)
 
                 Spacer()
             }
@@ -223,7 +231,9 @@ struct SearchView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 60)
                     } else if let activeHits {
-                        let totalHits = activeHits.tracks.count + activeHits.shows.count + activeHits.slices.count
+                        let songSlices = activeHits.slices.filter { $0.kind == .song }
+                        let venueSlices = activeHits.slices.filter { $0.kind == .venue }
+                        let totalHits = activeHits.artists.count + activeHits.tracks.count + activeHits.shows.count + activeHits.slices.count
                         if totalHits == 0 {
                             VStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
@@ -238,14 +248,24 @@ struct SearchView: View {
                         } else {
                             switch selectedTab {
                             case .all:
+                                ForEach(activeHits.artists, id: \.self) { artist in
+                                    searchArtistRow(artist: artist)
+                                }
                                 ForEach(activeHits.tracks, id: \.id) { track in
                                     searchTrackRow(track: track)
                                 }
                                 ForEach(activeHits.shows, id: \.self) { show in
                                     searchShowRow(show: show)
                                 }
-                                ForEach(activeHits.slices, id: \.self) { slice in
+                                ForEach(songSlices, id: \.self) { slice in
                                     searchSliceRow(slice: slice)
+                                }
+                                ForEach(venueSlices, id: \.self) { slice in
+                                    searchSliceRow(slice: slice)
+                                }
+                            case .artists:
+                                ForEach(activeHits.artists, id: \.self) { artist in
+                                    searchArtistRow(artist: artist)
                                 }
                             case .tracks:
                                 ForEach(activeHits.tracks, id: \.id) { track in
@@ -256,7 +276,11 @@ struct SearchView: View {
                                     searchShowRow(show: show)
                                 }
                             case .songs:
-                                ForEach(activeHits.slices, id: \.self) { slice in
+                                ForEach(songSlices, id: \.self) { slice in
+                                    searchSliceRow(slice: slice)
+                                }
+                            case .venues:
+                                ForEach(venueSlices, id: \.self) { slice in
                                     searchSliceRow(slice: slice)
                                 }
                             }
@@ -486,6 +510,46 @@ struct SearchView: View {
         .border(width: 1, edges: [.bottom], color: colors.divider)
     }
 
+    private func searchArtistRow(artist: ArtistRef) -> some View {
+        HStack(spacing: 10) {
+            Text(artist.name)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+                .lineLimit(1)
+
+            Spacer()
+                .frame(width: 100)
+
+            Spacer()
+                .frame(width: 150)
+
+            Spacer()
+                .frame(maxWidth: .infinity)
+
+            Group {
+                if artist.showCount > 0 {
+                    Text("\(artist.showCount) \(plural(artist.showCount, "show"))")
+                        .font(.system(size: 13))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(width: 90, alignment: .trailing)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundStyle(colors.textMuted)
+                .frame(width: 34, alignment: .trailing)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            appModel.path.append(.artist(artist))
+        }
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.bottom], color: colors.divider)
+    }
+
     private func searchSliceRow(slice: SliceHit) -> some View {
         HStack(spacing: 10) {
             Text(ArtistAbbreviations.label(for: slice.artist.name))
@@ -494,10 +558,8 @@ struct SearchView: View {
                 .frame(width: 110, alignment: .leading)
                 .lineLimit(1)
 
-            Text(slice.kind.heading)
-                .font(.system(size: 13))
-                .foregroundStyle(colors.textMuted)
-                .frame(width: 100, alignment: .leading)
+            Spacer()
+                .frame(width: 100)
 
             Text(slice.period.label)
                 .font(.system(size: 15, weight: .medium))
@@ -505,14 +567,18 @@ struct SearchView: View {
                 .frame(width: 150, alignment: .leading)
                 .lineLimit(1)
 
-            Text("\(slice.period.showCount) \(plural(slice.period.showCount, "show"))")
-                .font(.system(size: 14))
-                .foregroundStyle(colors.textSecondary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             Spacer()
-                .frame(width: 90)
+                .frame(maxWidth: .infinity)
+
+            Group {
+                if slice.period.showCount > 0 {
+                    Text("\(slice.period.showCount) \(plural(slice.period.showCount, "show"))")
+                        .font(.system(size: 13))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(width: 90, alignment: .trailing)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 12))

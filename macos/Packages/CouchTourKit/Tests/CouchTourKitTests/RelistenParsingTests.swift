@@ -2,7 +2,7 @@ import XCTest
 @testable import CouchTourKit
 
 /// Decodes real Relisten responses, trimmed, plus the pure mapping into the backend-neutral
-/// model — port of RelistenParsingTest.kt, plus search (D169). See the Android repo's
+/// model — port of RelistenParsingTest.kt, plus search (D169, D309). See the Android repo's
 /// MULTI-ARTIST-PLAN.md "Verified against the live API" for where the facts pinned here
 /// came from.
 final class RelistenParsingTests: XCTestCase {
@@ -245,5 +245,59 @@ final class RelistenParsingTests: XCTestCase {
         XCTAssertEqual(3, summaries.count)
         XCTAssertEqual("Barton Hall, Cornell University", summaries.first?.venue)
         XCTAssertEqual("Ithaca, NY, USA", summaries.first?.location)
+    }
+
+    func testVenueSearchHitCarriesZeroShowCountBecausePayloadHasNoCountField() throws {
+        // Relisten's /v3/search Venues bucket provides no count of shows played at the venue,
+        // unlike /v3/venues/:uuid, so the PeriodRef defaults to 0. The UI omits it rather
+        // than displaying "0 shows" (D309).
+        let results = try decoder.decode(RelistenSearchResults.self, from: try fixture("relisten_search.json"))
+        let hits = results.toSearchHits()
+        let venue = hits.slices.first { $0.kind == .venue }!
+        XCTAssertEqual(0, venue.period.showCount)
+    }
+
+    func testSearchArtistHitCarriesZeroShowCountWhenShowCountIsMissingFromPayload() throws {
+        // Live GET /v3/search?q=moe returns artist objects without a show_count key.
+        // It decodes with showCount = 0 rather than fabricating a count (D309).
+        let raw = """
+            {
+                "Artists": [
+                    {
+                        "uuid": "6226fac7-51f5-f85a-ad30-90c3e28686a2",
+                        "slug": "moe",
+                        "name": "moe."
+                    }
+                ],
+                "Shows": [],
+                "Songs": [],
+                "Venues": []
+            }
+            """
+        let results = try decoder.decode(RelistenSearchResults.self, from: Data(raw.utf8))
+        let hits = results.toSearchHits()
+        XCTAssertEqual(1, hits.artists.count)
+        XCTAssertEqual(0, hits.artists.first?.showCount)
+    }
+
+    func testSearchArtistHitsJoinShowCountAgainstInMemoryCachedArtists() throws {
+        let raw = """
+            {
+                "Artists": [
+                    {
+                        "uuid": "6226fac7-51f5-f85a-ad30-90c3e28686a2",
+                        "slug": "moe",
+                        "name": "moe."
+                    }
+                ],
+                "Shows": [],
+                "Songs": [],
+                "Venues": []
+            }
+            """
+        let results = try decoder.decode(RelistenSearchResults.self, from: Data(raw.utf8))
+        let cached = [ArtistRef(backend: .relisten, id: "moe", name: "moe.", showCount: 179)]
+        let hits = results.toSearchHits(cachedArtists: cached)
+        XCTAssertEqual(179, hits.artists.first?.showCount)
     }
 }
