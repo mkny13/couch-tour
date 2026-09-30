@@ -449,16 +449,16 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
 
             // Waveform Scrubber
-            val progressFraction = if (state.durationMs > 0) {
-                (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
-            } else 0.41f
+            val progressFraction = progressFraction(state.positionMs, state.durationMs)
 
             WaveformScrubber(
                 progress = progressFraction,
                 waveformUrl = state.waveformUrl,
                 onSeek = { fraction ->
-                    val seekMs = (fraction * state.durationMs).toLong()
-                    vm.seekTo(seekMs)
+                    if (state.durationMs > 0) {
+                        val seekMs = (fraction * state.durationMs).toLong()
+                        vm.seekTo(seekMs)
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()

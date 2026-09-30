@@ -16,6 +16,24 @@ class LedgerLayoutTest {
     }
 
     @Test
+    fun `progress fraction returns zero for unknown duration and never returns mock 0_41f`() {
+        assertEquals(0f, progressFraction(0, 0), 0.001f)
+        assertEquals(0f, progressFraction(10_000, 0), 0.001f)
+        assertEquals(0f, progressFraction(10_000, -1), 0.001f)
+        assertEquals(0f, progressFraction(50_000, -100), 0.001f)
+        // Ensure the historic mockup artifact is not returned
+        val samples = listOf(
+            progressFraction(0, 0),
+            progressFraction(1_000, 0),
+            progressFraction(1_000, -1)
+        )
+        samples.forEach { value ->
+            assertTrue("progressFraction must never be 0.41f", Math.abs(value - 0.41f) > 0.001f)
+            assertEquals(0f, value, 0.001f)
+        }
+    }
+
+    @Test
     fun `set duration formatting formats minutes and hours compactly`() {
         assertEquals("0:45", formatCompactDuration(45 * 1000L))
         assertEquals("1:06", formatCompactDuration(66 * 60 * 1000L))
