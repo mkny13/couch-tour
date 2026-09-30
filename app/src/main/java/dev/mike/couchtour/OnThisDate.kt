@@ -169,6 +169,8 @@ internal suspend fun showsOnDate(
                     showsFor(artist, today, source)
                 } catch (e: IOException) {
                     Fetched(emptyList(), false)
+                } catch (e: ApiException) {
+                    Fetched(emptyList(), false)
                 }
             }
         }
@@ -193,6 +195,8 @@ private suspend fun showsFor(
                 src.periods(artist)
             } catch (e: IOException) {
                 return@coroutineScope Fetched(emptyList(), false)
+            } catch (e: ApiException) {
+                return@coroutineScope Fetched(emptyList(), false)
             }
             val periods = phishInRanges(all)
             val semaphore = Semaphore(PHISHIN_CONCURRENCY)
@@ -201,15 +205,17 @@ private suspend fun showsFor(
                 .map { period ->
                     async {
                         val fetch = suspend {
-                            try {
+                            suspend fun tryFetch(): Fetched<List<ShowSummary>>? = try {
                                 Fetched(src.shows(artist, period), true)
                             } catch (e: IOException) {
+                                null
+                            } catch (e: ApiException) {
+                                null
+                            }
+                            
+                            tryFetch() ?: run {
                                 delay(250)
-                                try {
-                                    Fetched(src.shows(artist, period), true)
-                                } catch (e2: IOException) {
-                                    Fetched(emptyList(), false)
-                                }
+                                tryFetch() ?: Fetched(emptyList(), false)
                             }
                         }
                         semaphore.withPermit { fetch() }
@@ -228,6 +234,8 @@ private suspend fun showsFor(
             val shows = try {
                 src.showsOnDate(artist, month, day)
             } catch (e: IOException) {
+                return@coroutineScope Fetched(emptyList(), false)
+            } catch (e: ApiException) {
                 return@coroutineScope Fetched(emptyList(), false)
             }
             Fetched(showsOnAnniversary(shows, today), true)
