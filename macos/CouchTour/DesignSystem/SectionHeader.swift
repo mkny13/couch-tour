@@ -7,6 +7,7 @@ import SwiftUI
 struct SectionHeader<Trailing: View>: View {
     let title: String
     var systemImage: String?
+    var identifier: String?
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
@@ -24,17 +25,30 @@ struct SectionHeader<Trailing: View>: View {
             Spacer()
             trailing()
         }
+        .modifier(OptionalAccessibilityIdentifier(identifier: identifier))
+    }
+}
+
+private struct OptionalAccessibilityIdentifier: ViewModifier {
+    let identifier: String?
+
+    func body(content: Content) -> some View {
+        if let identifier = identifier {
+            content.accessibilityIdentifier(identifier)
+        } else {
+            content
+        }
     }
 }
 
 extension SectionHeader where Trailing == EmptyView {
-    init(_ title: String, systemImage: String? = nil) {
-        self.init(title: title, systemImage: systemImage) { EmptyView() }
+    init(_ title: String, systemImage: String? = nil, identifier: String? = nil) {
+        self.init(title: title, systemImage: systemImage, identifier: identifier) { EmptyView() }
     }
 }
 
 extension SectionHeader {
-    init(_ title: String, systemImage: String? = nil, @ViewBuilder trailing: @escaping () -> Trailing) {
-        self.init(title: title, systemImage: systemImage, trailing: trailing)
+    init(_ title: String, systemImage: String? = nil, identifier: String? = nil, @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.init(title: title, systemImage: systemImage, identifier: identifier, trailing: trailing)
     }
 }

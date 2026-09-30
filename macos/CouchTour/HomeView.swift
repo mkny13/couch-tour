@@ -58,14 +58,17 @@ struct HomeView: View {
                 // In Progress Shelf
                 inProgressShelf
                     .padding(.bottom, 20)
+                    .accessibilityIdentifier(AXIdentifiers.homeInProgress)
 
                 // Next Tour Stops Card
                 nextTourStopsCard
                     .padding(.bottom, 20)
+                    .accessibilityIdentifier(AXIdentifiers.homeNextTourStops)
 
                 // On This Date Shelf
                 onThisDateShelf
                     .padding(.bottom, 24)
+                    .accessibilityIdentifier(AXIdentifiers.homeOnThisDate)
             }
         }
         .background(colors.background)

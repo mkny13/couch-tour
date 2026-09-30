@@ -72,6 +72,7 @@ struct SearchView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(colors.textPrimary)
+                    .accessibilityIdentifier(AXIdentifiers.searchField)
 
                 if !appModel.searchQuery.isEmpty {
                     Button {
@@ -83,6 +84,7 @@ struct SearchView: View {
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier(AXIdentifiers.searchClear)
                 }
             }
             .padding(.horizontal, 24)
@@ -114,10 +116,10 @@ struct SearchView: View {
                 let songCount = activeHits?.slices.count ?? 0
                 let allCount = trackCount + showCount + songCount
 
-                searchTabItem(title: "All", count: allCount, tab: .all)
-                searchTabItem(title: "Tracks", count: trackCount, tab: .tracks)
-                searchTabItem(title: "Shows", count: showCount, tab: .shows)
-                searchTabItem(title: "Songs", count: songCount, tab: .songs)
+                searchTabItem(title: "All", count: allCount, tab: .all, identifier: AXIdentifiers.searchTabAll)
+                searchTabItem(title: "Tracks", count: trackCount, tab: .tracks, identifier: AXIdentifiers.searchTabTracks)
+                searchTabItem(title: "Shows", count: showCount, tab: .shows, identifier: AXIdentifiers.searchTabShows)
+                searchTabItem(title: "Songs", count: songCount, tab: .songs, identifier: AXIdentifiers.searchTabSongs)
 
                 Spacer()
             }
@@ -276,7 +278,7 @@ struct SearchView: View {
         }
     }
 
-    private func searchTabItem(title: String, count: Int, tab: SearchTab) -> some View {
+    private func searchTabItem(title: String, count: Int, tab: SearchTab, identifier: String) -> some View {
         Button {
             selectedTab = tab
         } label: {
@@ -291,6 +293,7 @@ struct SearchView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     private func filterPill(_ title: String, isSelected: Bool = false) -> some View {
