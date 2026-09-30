@@ -9,8 +9,8 @@ import org.junit.Test
 
 /**
  * Decodes real Relisten responses, trimmed, plus the pure mapping into the backend-neutral
- * model. See MULTI-ARTIST-PLAN.md "Verified against the live API" for where the facts pinned
- * here came from — several of them contradicted what seemed obvious before checking.
+ * model. See MULTI-ARTIST-PLAN.md "Verified against the live API" and D309 for where the facts
+ * pinned here came from — several of them contradicted what seemed obvious before checking.
  */
 class RelistenParsingTest {
 
@@ -317,5 +317,61 @@ class RelistenParsingTest {
         assertEquals("1977-05-08", summaries.first().date)
         assertEquals("Barton Hall, Cornell University", summaries.first().venue)
         assertEquals(10, summaries.first().recordingCount)
+    }
+
+    @Test
+    fun `a venue search hit carries a zero show count because the payload has no count field`() {
+        // Relisten's /v3/search Venues bucket provides no count of shows played at the venue,
+        // unlike /v3/venues/:uuid, so the PeriodRef defaults to 0. The UI omits it rather
+        // than displaying "0 shows" (D309).
+        val hits = json.decodeFromString<RelistenSearchResults>(fixture("relisten_search.json")).toSearchHits()
+        val venue = hits.slices.first { it.kind == SliceKind.VENUE }
+        assertEquals(0, venue.period.showCount)
+    }
+
+    @Test
+    fun `a search artist hit carries a zero show count when show_count is missing from payload`() {
+        // Live GET /v3/search?q=moe returns artist objects without a show_count key.
+        // It decodes with showCount = 0 rather than fabricating a count (D309).
+        val raw = """
+            {
+                "Artists": [
+                    {
+                        "uuid": "6226fac7-51f5-f85a-ad30-90c3e28686a2",
+                        "slug": "moe",
+                        "name": "moe."
+                    }
+                ],
+                "Shows": [],
+                "Songs": [],
+                "Venues": []
+            }
+        """.trimIndent()
+        val results = json.decodeFromString<RelistenSearchResults>(raw)
+        val hits = results.toSearchHits()
+        assertEquals(1, hits.artists.size)
+        assertEquals(0, hits.artists.first().showCount)
+    }
+
+    @Test
+    fun `search artist hits join show count against in-memory cached artists`() {
+        val raw = """
+            {
+                "Artists": [
+                    {
+                        "uuid": "6226fac7-51f5-f85a-ad30-90c3e28686a2",
+                        "slug": "moe",
+                        "name": "moe."
+                    }
+                ],
+                "Shows": [],
+                "Songs": [],
+                "Venues": []
+            }
+        """.trimIndent()
+        val results = json.decodeFromString<RelistenSearchResults>(raw)
+        val cached = listOf(ArtistRef(Backend.RELISTEN, "moe", "moe.", showCount = 179))
+        val hits = results.toSearchHits(cachedArtists = cached)
+        assertEquals(179, hits.artists.first().showCount)
     }
 }

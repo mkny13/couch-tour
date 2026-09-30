@@ -3029,7 +3029,7 @@ internal fun SearchResultsList(
                         r.artists.forEach { artist ->
                             RowItem(
                                 title = artist.name,
-                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                                subtitle = if (artist.showCount > 0) "${artist.showCount} ${plural(artist.showCount, "show")}" else null,
                                 artUrl = null,
                                 onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
                             )
@@ -3072,7 +3072,11 @@ internal fun SearchResultsList(
                     items(slices, key = { "${kind.name}-${it.artist.backend.id}-${it.artist.id}-${it.period.id}" }) { slice ->
                         RowItem(
                             title = slice.period.label,
-                            subtitle = "${slice.artist.name} · ${slice.period.showCount} ${plural(slice.period.showCount, "show")}",
+                            subtitle = if (slice.period.showCount > 0) {
+                                "${slice.artist.name} · ${slice.period.showCount} ${plural(slice.period.showCount, "show")}"
+                            } else {
+                                slice.artist.name
+                            },
                             artUrl = null,
                             onClick = {
                                 val encodedPeriod = android.net.Uri.encode(slice.period.id)
@@ -4537,7 +4541,7 @@ private fun SectionHeader(text: String, divided: Boolean = false) {
 @Composable
 private fun RowItem(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     artUrl: String? = null,
     tags: List<TagRef> = emptyList(),
     onTagClick: ((String) -> Unit)? = null,
@@ -4568,7 +4572,7 @@ private fun RowItem(
                 show = show,
                 artistName = artistName ?: show?.artist?.name,
                 date = date ?: show?.date ?: title.takeIf { it.matches(Regex("""\d{4}-\d{2}-\d{2}""")) },
-                venue = venue ?: show?.venue ?: subtitle,
+                venue = venue ?: show?.venue ?: subtitle?.ifBlank { null },
                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)),
             )
             Spacer(Modifier.width(12.dp))
@@ -4583,7 +4587,7 @@ private fun RowItem(
                     }
                 }
             }
-            if (subtitle.isNotBlank()) Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         if (trailing != null) {
             Column(horizontalAlignment = Alignment.End) {

@@ -354,11 +354,17 @@ internal fun RelistenShowWithSources.toShowDetail(artist: ArtistRef, recordingId
  * artist-projection [ArtistRef]s built from [RelistenSlimArtist] rather than a full lookup —
  * every screen they lead to re-resolves the real one anyway.
  */
-internal fun RelistenSearchResults.toSearchHits(): SearchHits {
+internal fun RelistenSearchResults.toSearchHits(cachedArtists: List<ArtistRef>? = null): SearchHits {
     fun RelistenSlimArtist.toRef() = ArtistRef(Backend.RELISTEN, slug, name)
 
+    val countsBySlug = cachedArtists?.associate { it.id to it.showCount } ?: emptyMap()
+
     return SearchHits(
-        artists = artists.filter { it.slug != PHISH.id }.map { it.toArtistRef() },
+        artists = artists.filter { it.slug != PHISH.id }.map {
+            val ref = it.toArtistRef()
+            val cachedCount = countsBySlug[ref.id] ?: 0
+            if (cachedCount > 0) ref.copy(showCount = cachedCount) else ref
+        },
         shows = shows.filter { it.slimArtist.slug != PHISH.id }.map {
             ShowSummary(
                 artist = it.slimArtist.toRef(),
@@ -369,6 +375,8 @@ internal fun RelistenSearchResults.toSearchHits(): SearchHits {
         slices = songs.filter { it.slimArtist.slug != PHISH.id }.map {
             SliceHit(SliceKind.SONG, it.slimArtist.toRef(), PeriodRef(songPeriodId(it.uuid), it.name, it.showsPlayedAt))
         } + venues.filter { it.slimArtist.slug != PHISH.id }.map {
+            // /v3/search's Venues bucket has no count field (unlike /v3/venues/:uuid),
+            // so PeriodRef has no showCount and defaults to 0. The UI omits unknown counts.
             SliceHit(SliceKind.VENUE, it.slimArtist.toRef(), PeriodRef(venuePeriodId(it.uuid), it.name))
         },
     )
@@ -505,7 +513,10 @@ object RelistenCatalogSource : MusicSource {
             .also { showDetailCache.put(cacheKey, it) }
     }
 
-    override suspend fun search(term: String): SearchHits = RelistenApi.search(term).toSearchHits()
+    override suspend fun search(term: String): SearchHits {
+        val cached = cachedArtists?.takeIf { System.currentTimeMillis() - cachedArtistsAt < CATALOG_CACHE_TTL_MS }
+        return RelistenApi.search(term).toSearchHits(cached)
+    }
 
     override suspend fun showsOnDate(artist: ArtistRef, month: Int, day: Int): List<ShowSummary> =
         RelistenApi.showsOnDate(artist.id, month, day).map { it.toShowSummary(artist) }

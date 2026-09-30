@@ -22,9 +22,11 @@ public enum AXIdentifiers {
     public static let searchField = "search.field"
     public static let searchClear = "search.clear"
     public static let searchTabAll = "search.tab.all"
+    public static let searchTabArtists = "search.tab.artists"
     public static let searchTabTracks = "search.tab.tracks"
     public static let searchTabShows = "search.tab.shows"
     public static let searchTabSongs = "search.tab.songs"
+    public static let searchTabVenues = "search.tab.venues"
 
     // Jam Chart
     public static let jamChartNote = "jam_chart.note"

@@ -697,13 +697,24 @@ extension RelistenSearchResults {
     /// be a near-duplicate row missing likes, waveforms, and cover art. Shows and slices
     /// carry artist-projection `ArtistRef`s built from `RelistenSlimArtist` rather than a
     /// full lookup — every screen they lead to re-resolves the real one anyway.
-    public func toSearchHits() -> SearchHits {
+    public func toSearchHits(cachedArtists: [ArtistRef]? = nil) -> SearchHits {
         func ref(_ slim: RelistenSlimArtist) -> ArtistRef {
             ArtistRef(backend: .relisten, id: slim.slug, name: slim.name)
         }
+        let countsBySlug: [String: Int] = {
+            guard let cachedArtists else { return [:] }
+            return Dictionary(cachedArtists.map { ($0.id, $0.showCount) }, uniquingKeysWith: { first, _ in first })
+        }()
 
         return SearchHits(
-            artists: artists.filter { $0.slug != PHISH.id }.map { $0.toArtistRef() },
+            artists: artists.filter { $0.slug != PHISH.id }.map {
+                let base = $0.toArtistRef()
+                let cachedCount = countsBySlug[base.id] ?? 0
+                if cachedCount > 0 {
+                    return ArtistRef(backend: base.backend, id: base.id, name: base.name, showCount: cachedCount, hasSets: base.hasSets, hasMultipleSources: base.hasMultipleSources)
+                }
+                return base
+            },
             shows: shows.filter { $0.slimArtist.slug != PHISH.id }.map {
                 ShowSummary(artist: ref($0.slimArtist), date: $0.displayDate, recordingCount: max($0.sourceCount, 1))
             },
@@ -713,6 +724,8 @@ extension RelistenSearchResults {
                     period: PeriodRef(id: songPeriodID($0.uuid), label: $0.name, showCount: $0.showsPlayedAt)
                 )
             } + venues.filter { $0.slimArtist.slug != PHISH.id }.map {
+                // /v3/search's Venues bucket has no count field (unlike /v3/venues/:uuid),
+                // so PeriodRef has no showCount and defaults to 0. The UI omits unknown counts.
                 SliceHit(kind: .venue, artist: ref($0.slimArtist), period: PeriodRef(id: venuePeriodID($0.uuid), label: $0.name))
             }
         )
@@ -875,7 +888,8 @@ public actor RelistenCatalogSource: MusicSource {
     }
 
     public func search(term: String) async throws -> SearchHits {
-        try await RelistenAPI.search(term).toSearchHits()
+        let cached = (cachedArtistsAt != nil && Date().timeIntervalSince(cachedArtistsAt!) < catalogCacheTTL) ? cachedArtists : nil
+        return try await RelistenAPI.search(term).toSearchHits(cachedArtists: cached)
     }
 
     public func showsOnDate(artist: ArtistRef, month: Int, day: Int) async throws -> [ShowSummary] {
