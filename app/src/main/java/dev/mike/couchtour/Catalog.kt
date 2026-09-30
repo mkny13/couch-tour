@@ -26,6 +26,7 @@ data class TagRef(
     val description: String? = null,
     val color: String? = null,
     val priority: Int = 0,
+    val notes: String? = null,
 )
 
 val SYNTHETIC_TAG_SBD = TagRef(name = "SBD", description = "Soundboard recording", priority = 100)
@@ -51,7 +52,7 @@ fun deriveSyntheticTags(recording: RecordingRef): List<TagRef> =
         hasFlac = recording.hasFlac,
     )
 
-fun Tag.toTagRef() = TagRef(name = name, description = description, color = color, priority = priority)
+fun Tag.toTagRef() = TagRef(name = name, description = description, color = color, priority = priority, notes = notes)
 
 @Serializable
 data class Popularity(
@@ -320,6 +321,7 @@ data class PlayableTrack(
     /** Non-null for Relisten tracks — carries the source identity needed for queue keys
      *  and the loudness-leveling cache key (#265). */
     val recordingId: RecordingId? = null,
+    val slug: String? = null,
 )
 
 data class ShowDetail(
@@ -730,6 +732,7 @@ internal fun Track.toPlayableTrack(showArt: String?) = PlayableTrack(
     venueName = venueName,
     artUrl = showAlbumCoverUrl ?: showArt,
     tags = tags.map { it.toTagRef() },
+    slug = slug,
 )
 
 // -------------------------------------------------------------------- sharing

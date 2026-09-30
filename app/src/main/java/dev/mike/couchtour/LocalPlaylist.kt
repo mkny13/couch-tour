@@ -197,6 +197,7 @@ internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEnt
             Backend.PHISHIN.id -> {
                 val show = phishShows[ref.showDate] ?: return@mapNotNull null
                 val track = show.tracks.firstOrNull { it.id.toString() == ref.trackId } ?: return@mapNotNull null
+                val jamTag = track.tags.firstOrNull { it.name.contains("jam", ignoreCase = true) }
                 ResolvedLocalTrack(
                     id = track.id.toString(),
                     title = track.title,
@@ -212,12 +213,16 @@ internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEnt
                     backend = Backend.PHISHIN.id,
                     likedByUser = track.likedByUser,
                     likesCount = track.likesCount,
+                    slug = track.slug,
+                    isJamChart = jamTag != null,
+                    jamChartNotes = jamTag?.notes,
                 )
             }
             Backend.RELISTEN.id -> {
                 val slug = ref.artistSlug ?: return@mapNotNull null
                 val detail = relistenShows[Triple(slug, ref.showDate, ref.recordingId)] ?: return@mapNotNull null
                 val track = detail.tracks.firstOrNull { it.id == ref.trackId } ?: return@mapNotNull null
+                val jamTag = track.tags.firstOrNull { it.name.contains("jam", ignoreCase = true) }
                 ResolvedLocalTrack(
                     id = track.id,
                     title = track.title,
@@ -229,6 +234,9 @@ internal suspend fun resolveLocalPlaylistTracks(refs: List<LocalPlaylistTrackEnt
                     artistName = detail.summary.artist.name,
                     backend = Backend.RELISTEN.id,
                     flacUrl = track.flacUrl,
+                    slug = track.slug,
+                    isJamChart = jamTag != null,
+                    jamChartNotes = jamTag?.notes,
                 )
             }
             else -> null

@@ -433,4 +433,82 @@ class MediaItemsTest {
         val items = recordingTrackItems(detail())
         assertEquals(325_000L, items.first().mediaMetadata.extras?.getLong(Keys.DURATION_MS))
     }
+
+    // ----------------------------------------------------------- jam chart metadata
+
+    @Test
+    fun `mediaItem propagates slug, isJamChart and jamChartNotes to extras`() {
+        val info = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "Denver", art = null)
+        val trackWithNotes = Track(
+            id = 1, title = "Tweezer", slug = "tweezer", mp3Url = "https://phish.in/tweezer.mp3",
+            tags = listOf(Tag(name = "Jam Chart", notes = "Top tier version")), audioStatus = "complete"
+        )
+        val item = mediaItem(trackWithNotes, info)
+        val extras = item.mediaMetadata.extras
+        assertEquals("tweezer", extras?.getString(Keys.TRACK_SLUG))
+        assertEquals(true, extras?.getBoolean(Keys.IS_JAM_CHART))
+        assertEquals("Top tier version", extras?.getString(Keys.JAM_CHART_NOTES))
+    }
+
+    @Test
+    fun `mediaItem sets isJamChart true even when jam chart tag has null notes`() {
+        val info = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "Denver", art = null)
+        val trackWithoutNotes = Track(
+            id = 1, title = "Ghost", slug = "ghost", mp3Url = "https://phish.in/ghost.mp3",
+            tags = listOf(Tag(name = "Jam Chart", notes = null)), audioStatus = "complete"
+        )
+        val item = mediaItem(trackWithoutNotes, info)
+        val extras = item.mediaMetadata.extras
+        assertEquals("ghost", extras?.getString(Keys.TRACK_SLUG))
+        assertEquals(true, extras?.getBoolean(Keys.IS_JAM_CHART))
+        assertNull(extras?.getString(Keys.JAM_CHART_NOTES))
+    }
+
+    @Test
+    fun `mediaItem sets isJamChart false when no jam tag present`() {
+        val info = QueueInfo(key = showQueueKey("1997-11-17"), title = "1997-11-17", subtitle = "Denver", art = null)
+        val regularTrack = Track(
+            id = 1, title = "Farmhouse", slug = "farmhouse", mp3Url = "https://phish.in/farmhouse.mp3",
+            tags = listOf(Tag(name = "SBD")), audioStatus = "complete"
+        )
+        val item = mediaItem(regularTrack, info)
+        val extras = item.mediaMetadata.extras
+        assertEquals(false, extras?.getBoolean(Keys.IS_JAM_CHART))
+        assertNull(extras?.getString(Keys.JAM_CHART_NOTES))
+    }
+
+    @Test
+    fun `localPlaylistTrackItems propagates slug, isJamChart and jamChartNotes to extras`() {
+        val resolved = listOf(
+            ResolvedLocalTrack(
+                id = "1", title = "Tweezer", url = "https://phish.in/a.mp3", waveformUrl = null,
+                showDate = "1997-11-17", venueName = "McNichols Arena", artUrl = null, artistName = "Phish",
+                slug = "tweezer", isJamChart = true, jamChartNotes = "Great jam",
+            ),
+            ResolvedLocalTrack(
+                id = "2", title = "Ghost", url = "https://phish.in/b.mp3", waveformUrl = null,
+                showDate = "1997-11-17", venueName = "McNichols Arena", artUrl = null, artistName = "Phish",
+                slug = "ghost", isJamChart = true, jamChartNotes = null,
+            ),
+            ResolvedLocalTrack(
+                id = "3", title = "Sample", url = "https://phish.in/c.mp3", waveformUrl = null,
+                showDate = "1997-11-17", venueName = "McNichols Arena", artUrl = null, artistName = "Phish",
+                slug = "sample", isJamChart = false, jamChartNotes = null,
+            ),
+        )
+
+        val items = localPlaylistTrackItems("p1", "Jam Chart Favorites", resolved)
+
+        assertEquals("tweezer", items[0].mediaMetadata.extras?.getString(Keys.TRACK_SLUG))
+        assertEquals(true, items[0].mediaMetadata.extras?.getBoolean(Keys.IS_JAM_CHART))
+        assertEquals("Great jam", items[0].mediaMetadata.extras?.getString(Keys.JAM_CHART_NOTES))
+
+        assertEquals("ghost", items[1].mediaMetadata.extras?.getString(Keys.TRACK_SLUG))
+        assertEquals(true, items[1].mediaMetadata.extras?.getBoolean(Keys.IS_JAM_CHART))
+        assertNull(items[1].mediaMetadata.extras?.getString(Keys.JAM_CHART_NOTES))
+
+        assertEquals("sample", items[2].mediaMetadata.extras?.getString(Keys.TRACK_SLUG))
+        assertEquals(false, items[2].mediaMetadata.extras?.getBoolean(Keys.IS_JAM_CHART))
+        assertNull(items[2].mediaMetadata.extras?.getString(Keys.JAM_CHART_NOTES))
+    }
 }

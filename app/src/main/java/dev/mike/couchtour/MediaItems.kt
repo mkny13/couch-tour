@@ -105,6 +105,9 @@ internal fun mediaItem(
         // a show queue's key already *is* show:<date>, so the fallback below agrees.
         levelingKey = (track.showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) })
             ?.let { showQueueKey(it) },
+        trackSlug = track.slug,
+        isJamChart = track.tags.any { it.name.contains("jam", ignoreCase = true) },
+        jamChartNotes = track.tags.firstOrNull { it.name.contains("jam", ignoreCase = true) }?.notes,
     )
 }
 
@@ -133,6 +136,9 @@ internal fun recordingMediaItem(
     trackPosition = track.position,
     durationMs = track.durationMs,
     levelingKey = track.levelingKey,
+    trackSlug = track.slug,
+    isJamChart = track.tags.any { it.name.contains("jam", ignoreCase = true) },
+    jamChartNotes = track.tags.firstOrNull { it.name.contains("jam", ignoreCase = true) }?.notes,
 )
 
 /**
@@ -167,6 +173,9 @@ private fun coreMediaItem(
     durationMs: Long = 0,
     /** The source-level loudness-cache key (#267); null = don't level this track. */
     levelingKey: String? = null,
+    trackSlug: String? = null,
+    isJamChart: Boolean = false,
+    jamChartNotes: String? = null,
 ): MediaItem {
     val resolvedDate = showDate ?: info.title.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
     val resolvedVenue = venueName ?: info.subtitle
@@ -192,6 +201,9 @@ private fun coreMediaItem(
         trackPosition = trackPosition,
         durationMs = durationMs,
         levelingKey = levelingKey,
+        trackSlug = trackSlug,
+        isJamChart = isJamChart,
+        jamChartNotes = jamChartNotes,
     )
     val meta = mediaMetadata(title, artist, art, showDate, venueName, info, extras)
 
@@ -257,6 +269,9 @@ private fun mediaItemExtras(
     trackPosition: Int,
     durationMs: Long = 0,
     levelingKey: String? = null,
+    trackSlug: String? = null,
+    isJamChart: Boolean = false,
+    jamChartNotes: String? = null,
 ): Bundle = Bundle().apply {
     info.key?.let { putString(Keys.QUEUE_KEY, it) }
     putString(Keys.QUEUE_TITLE, info.title)
@@ -279,6 +294,9 @@ private fun mediaItemExtras(
     if (trackPosition > 0) putInt(Keys.TRACK_POSITION, trackPosition)
     levelingKey?.let { putString(Keys.LEVELING_KEY, it) }
     if (durationMs > 0) putLong(Keys.DURATION_MS, durationMs)
+    putBoolean(Keys.IS_JAM_CHART, isJamChart)
+    trackSlug?.let { putString(Keys.TRACK_SLUG, it) }
+    jamChartNotes?.let { putString(Keys.JAM_CHART_NOTES, it) }
 }
 
 /** The [MediaMetadata] shown in system UI (notifications, Android Auto, scrobblers). */
@@ -355,6 +373,9 @@ internal data class ResolvedLocalTrack(
     val likedByUser: Boolean = false,
     val likesCount: Int = 0,
     val flacUrl: String? = null,
+    val slug: String? = null,
+    val isJamChart: Boolean = false,
+    val jamChartNotes: String? = null,
 )
 
 /**
@@ -391,6 +412,9 @@ internal fun localPlaylistTrackItems(playlistId: String, name: String, resolved:
             // under show:<date> would leak the measurement into phish.in shows of the
             // same night. Un-leveled beats mis-leveled.
             levelingKey = if (it.backend == Backend.PHISHIN.id) it.showDate?.let(::showQueueKey) else null,
+            trackSlug = it.slug,
+            isJamChart = it.isJamChart,
+            jamChartNotes = it.jamChartNotes,
         )
     }
 }

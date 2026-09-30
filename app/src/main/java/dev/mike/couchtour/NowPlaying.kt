@@ -20,15 +20,20 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -72,7 +77,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
     val isComparing = compareState?.isComparing == true
     val ledger = LocalLedgerColors.current
     var menuOpen by remember { mutableStateOf(false) }
-    var showJamChartNote by remember { mutableStateOf(true) }
+    var showJamChartNote by remember { mutableStateOf(false) }
 
     val onGoToShow = {
         val key = state.queueKey
@@ -387,18 +392,22 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     modifier = Modifier.padding(top = 4.dp)
                 )
 
-                // Tags row: JAM CHART badge (if phish track) + Duration chip
+                // Tags row: JAM CHART badge (if jam chart track) + Duration chip
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
-                    if (state.backend == Backend.PHISHIN.id || state.backend == null) {
+                    if (state.isJamChart) {
+                        val hasNotes = !state.jamChartNotes.isNullOrBlank()
                         Box(
                             modifier = Modifier
                                 .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
                                 .clip(RoundedCornerShape(4.dp))
-                                .clickable { showJamChartNote = !showJamChartNote }
+                                .then(
+                                    if (hasNotes) Modifier.clickable { showJamChartNote = !showJamChartNote }
+                                    else Modifier
+                                )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Row(
@@ -412,12 +421,14 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     letterSpacing = 1.sp,
                                     color = ledger.accentTintText
                                 )
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = ledger.accentTintText,
-                                    modifier = Modifier.size(11.dp)
-                                )
+                                if (hasNotes) {
+                                    Icon(
+                                        if (showJamChartNote) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = ledger.accentTintText,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -439,12 +450,44 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
 
                 // Expandable Jam Chart Note Card
-                if (showJamChartNote && (state.backend == Backend.PHISHIN.id || state.backend == null)) {
-                    JamChartNoteCard(
-                        noteText = "Notable version from phish.in archive records.",
-                        onDismiss = { showJamChartNote = false },
-                        modifier = Modifier.padding(top = 10.dp)
-                    )
+                val notes = state.jamChartNotes
+                if (state.isJamChart && showJamChartNote && !notes.isNullOrBlank()) {
+                    Column(modifier = Modifier.padding(top = 10.dp)) {
+                        JamChartNoteCard(
+                            noteText = notes,
+                            onDismiss = { showJamChartNote = false }
+                        )
+                        val sourceUrl = if (state.showDate.isNotBlank()) trackShareUrl(PHISH, state.showDate, state.trackSlug) else null
+                        if (sourceUrl != null) {
+                            val context = LocalContext.current
+                            Row(
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .clickable {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl))
+                                        try {
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {
+                                        }
+                                    },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "View on phish.in",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = ledger.accentTintText
+                                )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                    contentDescription = null,
+                                    tint = ledger.accentTintText,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
