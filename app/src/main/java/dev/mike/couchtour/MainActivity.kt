@@ -152,12 +152,18 @@ class MainActivity : ComponentActivity() {
         // launchMode is singleTask, so a second tap re-enters through here, not onCreate.
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false)) openNowPlaying.value = true
+        intent.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
+            SyncApi.applyConfiguredBaseUrl(this, override = override)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         openNowPlaying.value = intent?.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false) == true
+        intent?.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
+            SyncApi.applyConfiguredBaseUrl(this, override = override)
+        }
 
         // Without this the media notification (and therefore the lockscreen controls)
         // is silently suppressed on Android 13+.
@@ -174,6 +180,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_NOW_PLAYING = "open_now_playing"
+        const val EXTRA_SYNC_BASE_URL = "syncBaseUrl"
     }
 }
 

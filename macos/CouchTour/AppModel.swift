@@ -81,6 +81,7 @@ final class AppModel: ObservableObject {
         playbackSettings = PlaybackSettings()
         themeSettings = ThemeSettings()
         #if BETA
+        SyncAPI.baseURL = SyncConfig.resolveBaseURL(defaultBase: SyncConfig.stagingBaseURL)
         syncSession = SyncSession(store: SyncTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.sync")))
         #else
         syncSession = SyncSession()

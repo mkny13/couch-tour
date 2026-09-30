@@ -180,11 +180,66 @@ public struct SyncException: Error, LocalizedError {
     public var gone: Bool { code == 410 }
 }
 
+/// Base URL resolution and configuration for sync.
+public enum SyncConfig {
+    public static let prodBaseURL = URL(string: "https://couch-tour-sync.mkastellec.workers.dev")!
+    public static let stagingBaseURL = URL(string: "https://couch-tour-sync-staging.mkastellec.workers.dev")!
+
+    /// Resolves the sync base URL with precedence: launch argument > environment variable > defaultBase.
+    /// Empty or malformed values fall back to defaultBase.
+    public static func resolveBaseURL(
+        defaultBase: URL = prodBaseURL,
+        arguments: [String] = CommandLine.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        if let argValue = extractArg(from: arguments) {
+            if let url = parseValidHttpURL(argValue) {
+                return url
+            }
+            return defaultBase
+        }
+        if let envValue = environment["COUCHTOUR_SYNC_BASE_URL"] {
+            if let url = parseValidHttpURL(envValue) {
+                return url
+            }
+            return defaultBase
+        }
+        return defaultBase
+    }
+
+    private static func extractArg(from arguments: [String]) -> String? {
+        var i = 0
+        while i < arguments.count {
+            let arg = arguments[i]
+            if arg.hasPrefix("--sync-base-url=") {
+                return String(arg.dropFirst("--sync-base-url=".count))
+            } else if arg == "--sync-base-url" && i + 1 < arguments.count {
+                return arguments[i + 1]
+            }
+            i += 1
+        }
+        return nil
+    }
+
+    private static func parseValidHttpURL(_ raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              let host = url.host,
+              !host.isEmpty else {
+            return nil
+        }
+        return url
+    }
+}
+
 /// Client for the sync backend. Deliberately its own `URLSession` request layer and
 /// `Authorization: Bearer` scheme, separate from `PhishInAPI`/`RelistenAPI` — an unrelated
 /// service with an unrelated identity.
 public enum SyncAPI {
-    private static let defaultBase = URL(string: "https://couch-tour-sync.mkastellec.workers.dev")!
+    internal static let defaultBase = SyncConfig.prodBaseURL
 
     /// Overridden by tests to point at a local mock server.
     public static var baseURL: URL = defaultBase
@@ -271,6 +326,7 @@ public final class SyncTokenStore {
     private enum Key {
         static let deviceToken = "sync.deviceToken"
         static let deviceId = "sync.deviceId"
+        static let tokenHost = "sync.tokenHost"
         static let lastSeq = "sync.lastSeq"
         static let lastPushWatermark = "sync.lastPushWatermark"
         static let lastSyncedAt = "sync.lastSyncedAt"
@@ -283,7 +339,23 @@ public final class SyncTokenStore {
 
     public var deviceToken: String? {
         get { keychain.get(forKey: Key.deviceToken) }
-        set { keychain.set(newValue, forKey: Key.deviceToken) }
+        set {
+            keychain.set(newValue, forKey: Key.deviceToken)
+            if newValue != nil && tokenHost == nil {
+                tokenHost = SyncAPI.baseURL.host
+            }
+        }
+    }
+
+    public var tokenHost: String? {
+        get { defaults.string(forKey: Key.tokenHost) }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: Key.tokenHost)
+            } else {
+                defaults.removeObject(forKey: Key.tokenHost)
+            }
+        }
     }
 
     public var deviceId: String? {
@@ -313,6 +385,7 @@ public final class SyncTokenStore {
     public func clear() {
         keychain.set(nil, forKey: Key.deviceToken)
         keychain.set(nil, forKey: Key.deviceId)
+        defaults.removeObject(forKey: Key.tokenHost)
         defaults.removeObject(forKey: Key.lastSeq)
         defaults.removeObject(forKey: Key.lastPushWatermark)
         defaults.removeObject(forKey: Key.lastSyncedAt)
@@ -339,6 +412,15 @@ public final class SyncSession: ObservableObject {
 
     public init(store: SyncTokenStore = SyncTokenStore()) {
         self.store = store
+        let targetHost = SyncAPI.baseURL.host ?? ""
+        if store.deviceToken != nil {
+            let issuingHost = store.tokenHost ?? SyncAPI.defaultBase.host ?? ""
+            if !targetHost.isEmpty && issuingHost != targetHost {
+                store.clear()
+            } else if store.tokenHost == nil && !targetHost.isEmpty {
+                store.tokenHost = targetHost
+            }
+        }
         self.paired = store.deviceToken != nil
         self.lastSyncedAt = store.lastSyncedAt > 0 ? store.lastSyncedAt : nil
     }
@@ -348,6 +430,7 @@ public final class SyncSession: ObservableObject {
     public func startPairing(deviceName: String, platform: String) async throws -> PairStartResponse {
         let response = try await SyncAPI.pairStart(deviceName: deviceName, platform: platform, existingToken: store.deviceToken)
         if let token = response.deviceToken, let deviceId = response.deviceId {
+            store.tokenHost = SyncAPI.baseURL.host
             store.deviceToken = token
             store.deviceId = deviceId
             paired = true
@@ -358,6 +441,7 @@ public final class SyncSession: ObservableObject {
     /// Claims a code shown on another device, joining its group.
     public func claimPairing(code: String, deviceName: String, platform: String) async throws {
         let response = try await SyncAPI.pairClaim(code: code, deviceName: deviceName, platform: platform)
+        store.tokenHost = SyncAPI.baseURL.host
         store.deviceToken = response.deviceToken
         store.deviceId = response.deviceId
         store.lastSeq = 0
@@ -445,7 +529,10 @@ public final class SyncSession: ObservableObject {
         let toPush = chunk.map { $0.toWire() }
 
         let (response, rotatedToken) = try await SyncAPI.sync(token: token, since: store.lastSeq, changes: toPush)
-        if let rotatedToken { store.deviceToken = rotatedToken }
+        if let rotatedToken {
+            store.tokenHost = SyncAPI.baseURL.host
+            store.deviceToken = rotatedToken
+        }
 
         for change in response.changes { try progressStore.put(change.toEntity()) }
         store.lastSeq = response.seq
