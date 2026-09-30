@@ -111,6 +111,16 @@ internal fun oldestUnplayed(candidates: List<ShowSummary>, played: Set<String>):
         .minWithOrNull(compareBy({ it.date }, { it.artist.key }))
 
 /**
+ * Filters [shows] to only those matching [focusedArtistKey], or returns them unchanged if null.
+ * This is a filter-then-pick rather than a second picker, so it runs against the already-loaded list.
+ */
+internal fun focusedCandidates(
+    shows: List<ShowSummary>,
+    focusedArtistKey: String?,
+): List<ShowSummary> =
+    if (focusedArtistKey == null) shows else shows.filter { it.artist.key == focusedArtistKey }
+
+/**
  * Fetches every favorited artist's current-tour shows, within [MAX_TOUR_ARTISTS] per backend,
  * taking into account any configured [ArtistTourPreferenceEntity] for defunct or specific-tour tracking.
  * Artists are fanned out concurrently; each artist's own fetch is wrapped in [runCatching] so

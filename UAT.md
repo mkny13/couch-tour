@@ -214,3 +214,11 @@ Long-standing items that predate this sprint.
 ## macOS sandbox data-store unification (#345)
 
 - [ ] `uat-070` **Local install and Sparkle build share one data store** (macOS) — Quit Couch Tour, then run `macos/scripts/install.sh` (and `install-beta.sh` for the beta). Check `codesign -d --entitlements - "/Applications/Couch Tour.app"` shows `com.apple.security.app-sandbox`. On first launch, confirm favorites (including any that only existed in the old unsandboxed store, e.g. Grateful Dead), liked tracks, playback/theme settings, sync pairing and listening history are all present, with no duplicated history rows. Then install a Sparkle build over it (or vice versa) and confirm nothing swaps or vanishes. If favorites/history from the unsandboxed store are missing, the read-only sandbox exception in `project.yml` isn't taking effect (see D279).
+
+## Android Next Tour Stop artist focus (#354)
+
+- [ ] `uat-071` **Chip tap focuses artist** (Android) — On Home → NEXT TOUR STOP with multiple favorites, tap an artist's chip. Verify the chip highlights and the displayed show changes to that artist's next stop. Verify no dialog opens.
+- [ ] `uat-072` **Header action layout and copy** (Android) — Tap the "Change tour…" action in the card header. Verify the `TourPickerDialog` opens. Evaluate whether "Change tour…" and its placement feel discoverable and fit the Ledger design language, or if they need copy/icon tweaks.
+- [ ] `uat-073` **Caught-up message** (Android) — Focus an artist with no unplayed shows (or mark their whole tour played). Verify the card reads "Nothing to catch up on <artist>." Evaluate the tone and wording of this copy.
+- [ ] `uat-074` **Chip double-tap clears focus** (Android) — With an artist focused, tap their highlighted chip again. Verify focus clears, the cross-artist default show returns, and the chip deselects. Check if this is discoverable enough as a way back.
+- [ ] `uat-075` **Card layout with long names** (Android) — Verify that the focused card's show row (artist, date, rating, play button) still fits the card width properly for long artist names, now that the header is a `Row` and not a lone `Text`.

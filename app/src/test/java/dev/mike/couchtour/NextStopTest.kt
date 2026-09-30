@@ -163,6 +163,63 @@ class NextStopTest {
         assertNull(oldestUnplayed(emptyList(), played = emptySet()))
     }
 
+    // ------------------------------------------------------------------ focusedCandidates
+
+    @Test
+    fun `focusedCandidates returns the input list unchanged when focus is null`() {
+        val shows = listOf(
+            ShowSummary(artist = PHISH, date = "2025-06-01"),
+            ShowSummary(artist = ArtistRef(Backend.RELISTEN, "moe", "moe."), date = "2025-06-02")
+        )
+        val result = focusedCandidates(shows, focusedArtistKey = null)
+        assertEquals(shows, result)
+    }
+
+    @Test
+    fun `focusedCandidates returns only the focused artist's shows`() {
+        val moe = ArtistRef(Backend.RELISTEN, "moe", "moe.")
+        val shows = listOf(
+            ShowSummary(artist = PHISH, date = "2025-06-01"),
+            ShowSummary(artist = moe, date = "2025-06-02"),
+            ShowSummary(artist = PHISH, date = "2025-07-01")
+        )
+        val result = focusedCandidates(shows, focusedArtistKey = moe.key)
+        assertEquals(listOf(ShowSummary(artist = moe, date = "2025-06-02")), result)
+    }
+
+    @Test
+    fun `focusedCandidates returns an empty list when focus matches no candidate`() {
+        val shows = listOf(ShowSummary(artist = PHISH, date = "2025-06-01"))
+        val result = focusedCandidates(shows, focusedArtistKey = "relisten:moe")
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `focusedCandidates joins on artist key, never falling back to id`() {
+        // Phish id is "phish", key is "phishin:phish"
+        val shows = listOf(ShowSummary(artist = PHISH, date = "2025-06-01"))
+        // Supplying the id ("phish") instead of the key must match nothing.
+        val result = focusedCandidates(shows, focusedArtistKey = "phish")
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `end-to-end focus filter fixes the reported bug`() {
+        val moe = ArtistRef(Backend.RELISTEN, "moe", "moe.")
+        val shows = listOf(
+            ShowSummary(artist = PHISH, date = "2025-06-01"), // Older unplayed show
+            ShowSummary(artist = moe, date = "2025-06-02")
+        )
+        
+        // Without focus, Phish's older show wins
+        val unfocused = oldestUnplayed(focusedCandidates(shows, focusedArtistKey = null), played = emptySet())
+        assertEquals(shows[0], unfocused)
+        
+        // With focus on moe., moe.'s show wins even though Phish has an older unplayed one
+        val focused = oldestUnplayed(focusedCandidates(shows, focusedArtistKey = moe.key), played = emptySet())
+        assertEquals(shows[1], focused)
+    }
+
     // ------------------------------------------------------------------ currentTours
 
     private class FakeSource(
