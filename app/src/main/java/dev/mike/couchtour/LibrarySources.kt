@@ -1,5 +1,8 @@
 package dev.mike.couchtour
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
 enum class LibraryFilter {
     ALL, PLAYLISTS, SHOWS, TRACKS
 }
@@ -12,8 +15,10 @@ enum class LibrarySortMode(val label: String) {
 
 sealed interface LibraryTarget {
     data class LocalPlaylist(val id: String) : LibraryTarget
+    data class Playlist(val slug: String) : LibraryTarget
     data class Show(val date: String) : LibraryTarget
     data class Recording(val id: RecordingId) : LibraryTarget
+    data class AccountTrack(val track: Track) : LibraryTarget
 }
 
 data class LibraryItem(
@@ -28,6 +33,8 @@ data class LibraryItem(
     val trailingText: String? = null,
     val durationMs: Long = 0L,
     val searchTerms: List<String> = emptyList(),
+    val backend: String? = null,
+    val trackId: String? = null,
 )
 
 private val QUEUE_PREFIXES = listOf("show:", "relisten:", "playlist:", "local-playlist:", "youtube:")
@@ -109,8 +116,244 @@ fun trackItems(local: List<LocalPlaylistTrackEntity>): List<LibraryItem> =
             trailingText = if (track.durationMs > 0) fmt(track.durationMs) else null,
             durationMs = track.durationMs,
             searchTerms = listOfNotNull(track.showDate, track.venueName, track.backend),
+            backend = track.backend,
+            trackId = track.trackId,
         )
     }
+
+data class LibraryAccountData(
+    val playlists: List<Playlist> = emptyList(),
+    val shows: List<Show> = emptyList(),
+    val tracks: List<Track> = emptyList(),
+    val loaded: Boolean,
+    val error: Boolean = false,
+)
+
+suspend fun loadLibraryAccount(
+    api: PhishInApi = PhishInApi,
+    username: String? = Session.username.value
+): LibraryAccountData {
+    if (username.isNullOrBlank()) {
+        return LibraryAccountData(
+            playlists = emptyList(),
+            shows = emptyList(),
+            tracks = emptyList(),
+            loaded = true,
+            error = false,
+        )
+    }
+    return try {
+        coroutineScope {
+            val minePlaylistsDeferred = async { api.playlists(filter = "mine") }
+            val likedPlaylistsDeferred = async { api.playlists(filter = "liked") }
+            val showsDeferred = async { api.likedShows() }
+            val tracksDeferred = async { api.likedTracks() }
+
+            val playlists = (minePlaylistsDeferred.await() + likedPlaylistsDeferred.await())
+                .distinctBy { it.slug }
+            val shows = showsDeferred.await()
+            val tracks = tracksDeferred.await()
+
+            LibraryAccountData(
+                playlists = playlists,
+                shows = shows,
+                tracks = tracks,
+                loaded = true,
+                error = false,
+            )
+        }
+    } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        LibraryAccountData(
+            playlists = emptyList(),
+            shows = emptyList(),
+            tracks = emptyList(),
+            loaded = true,
+            error = true,
+        )
+    }
+}
+
+internal fun sanitizeLibraryTitle(title: String, fallback: String): String {
+    var trimmed = title.trim()
+    for (prefix in QUEUE_PREFIXES) {
+        if (trimmed.startsWith(prefix)) {
+            trimmed = trimmed.removePrefix(prefix).trim()
+        }
+    }
+    if (trimmed.isEmpty()) {
+        val fb = QUEUE_PREFIXES.fold(fallback.trim()) { acc, p -> acc.removePrefix(p).trim() }
+        return fb.ifEmpty { "Item" }
+    }
+    return trimmed
+}
+
+fun accountPlaylistItems(account: List<Playlist>): List<LibraryItem> =
+    account.distinctBy { it.slug }.map { playlist ->
+        val cleanTitle = sanitizeLibraryTitle(playlist.name, "Playlist")
+        LibraryItem(
+            key = "pl_${playlist.slug}",
+            rawKey = null,
+            badge = "LIST",
+            title = cleanTitle,
+            subtitle = "phish.in · ${playlist.tracksCount} ${plural(playlist.tracksCount, "track")}",
+            addedAt = null,
+            sortKey = cleanTitle,
+            target = LibraryTarget.Playlist(playlist.slug),
+            durationMs = playlist.duration,
+            searchTerms = listOfNotNull(cleanTitle, playlist.description, playlist.username, "phish.in"),
+        )
+    }
+
+fun accountShowItems(account: List<Show>): List<LibraryItem> =
+    account.map { show ->
+        val rawDate = sanitizeLibraryTitle(show.date, "Show")
+        val dateTitle = parseShowDate(rawDate) ?: formatShowDate(rawDate)
+        val cleanTitle = sanitizeLibraryTitle(dateTitle, rawDate)
+        val subtitle = listOfNotNull(
+            show.venueName?.trim()?.ifBlank { null },
+            show.location?.trim()?.ifBlank { null }
+        ).joinToString(" · ").ifBlank { "phish.in" }
+        LibraryItem(
+            key = "show_${cleanTitle}",
+            rawKey = null,
+            badge = "SHOW",
+            title = cleanTitle,
+            subtitle = subtitle,
+            addedAt = null,
+            sortKey = cleanTitle,
+            target = LibraryTarget.Show(cleanTitle),
+            durationMs = show.duration,
+            searchTerms = listOfNotNull(cleanTitle, show.venueName, show.location, show.tourName, "phish.in"),
+        )
+    }
+
+fun accountTrackItems(account: List<Track>): List<LibraryItem> =
+    account.map { track ->
+        val cleanTitle = sanitizeLibraryTitle(track.title, "Track")
+        val trackSubtitle = listOfNotNull(
+            track.showDate?.trim()?.ifBlank { null },
+            track.venueName?.trim()?.ifBlank { null },
+            track.venueLocation?.trim()?.ifBlank { null }
+        ).joinToString(" · ").ifBlank { "phish.in" }
+        LibraryItem(
+            key = "trk_phishin_${track.id}",
+            rawKey = null,
+            badge = "TRACK",
+            title = cleanTitle,
+            subtitle = trackSubtitle,
+            addedAt = null,
+            sortKey = cleanTitle,
+            target = LibraryTarget.AccountTrack(track),
+            trailingText = if (track.duration > 0) fmt(track.duration) else null,
+            durationMs = track.duration,
+            searchTerms = listOfNotNull(cleanTitle, track.showDate, track.venueName, track.venueLocation, "phish.in"),
+            backend = "phishin",
+            trackId = track.id.toString(),
+        )
+    }
+
+fun relistenLikedTrackItems(entries: List<LikedTrackRef>): List<LibraryItem> =
+    entries.sortedByDescending { it.likedAt }.map { ref ->
+        val cleanTitle = sanitizeLibraryTitle(ref.title, "Track")
+        val subtitle = listOfNotNull(
+            ref.artistName.trim().ifBlank { null },
+            ref.showDate.trim().ifBlank { null },
+            ref.venueName?.trim()?.ifBlank { null }
+        ).joinToString(" · ").ifBlank { ref.backend.ifBlank { Backend.RELISTEN.id } }
+        val target = if (!ref.recordingId.isNullOrBlank() && ref.artistSlug.isNotBlank()) {
+            LibraryTarget.Recording(RecordingId(ref.artistSlug, ref.showDate, ref.recordingId))
+        } else {
+            LibraryTarget.Show(ref.showDate)
+        }
+        LibraryItem(
+            key = "trk_relisten_${ref.id}",
+            rawKey = null,
+            badge = "TRACK",
+            title = cleanTitle,
+            subtitle = subtitle,
+            addedAt = if (ref.likedAt > 0) ref.likedAt else null,
+            sortKey = cleanTitle,
+            target = target,
+            trailingText = if (ref.durationMs > 0) fmt(ref.durationMs) else null,
+            durationMs = ref.durationMs,
+            searchTerms = listOfNotNull(cleanTitle, ref.artistName, ref.showDate, ref.venueName, ref.backend),
+            backend = ref.backend.ifBlank { Backend.RELISTEN.id },
+            trackId = ref.id,
+        )
+    }
+
+fun mergeLibraryPlaylists(local: List<LibraryItem>, account: List<LibraryItem>): List<LibraryItem> {
+    val items = local + account
+    val seen = mutableSetOf<String>()
+    val result = mutableListOf<LibraryItem>()
+    val sorted = items.sortedWith(compareByDescending { it.addedAt ?: Long.MIN_VALUE })
+    for (item in sorted) {
+        val dedupeKey = when (val t = item.target) {
+            is LibraryTarget.Playlist -> "slug:${t.slug}"
+            is LibraryTarget.LocalPlaylist -> "local:${t.id}"
+            else -> item.key
+        }
+        if (seen.add(dedupeKey)) {
+            result.add(item)
+        }
+    }
+    return result
+}
+
+fun mergeLibraryShows(local: List<LibraryItem>, account: List<LibraryItem>): List<LibraryItem> {
+    val items = local + account
+    val groups = LinkedHashMap<String, MutableList<LibraryItem>>()
+    for (item in items) {
+        val key = when (val t = item.target) {
+            is LibraryTarget.Show -> "show:${t.date}"
+            is LibraryTarget.Recording -> "relisten:${t.id.artistSlug}/${t.id.date}"
+            else -> item.key
+        }
+        groups.getOrPut(key) { mutableListOf() }.add(item)
+    }
+    return groups.values.map { group ->
+        if (group.size == 1) {
+            group.first()
+        } else {
+            val dated = group.filter { it.addedAt != null }.maxByOrNull { it.addedAt!! }
+            if (dated != null) {
+                val rawKey = dated.rawKey ?: group.firstOrNull { it.rawKey != null }?.rawKey
+                dated.copy(rawKey = rawKey)
+            } else {
+                val accountShow = group.firstOrNull { it.subtitle != "Saved show" } ?: group.first()
+                val rawKey = accountShow.rawKey ?: group.firstOrNull { it.rawKey != null }?.rawKey
+                accountShow.copy(rawKey = rawKey)
+            }
+        }
+    }
+}
+
+fun mergeLibraryTracks(
+    local: List<LibraryItem>,
+    account: List<LibraryItem>,
+    relisten: List<LibraryItem> = emptyList()
+): List<LibraryItem> {
+    val items = local + account + relisten
+    val groups = LinkedHashMap<String, MutableList<LibraryItem>>()
+    for (item in items) {
+        val key = if (item.backend != null && item.trackId != null) {
+            "${item.backend}:${item.trackId}"
+        } else {
+            item.key
+        }
+        groups.getOrPut(key) { mutableListOf() }.add(item)
+    }
+    return groups.values.map { group ->
+        if (group.size == 1) {
+            group.first()
+        } else {
+            val dated = group.filter { it.addedAt != null }.maxByOrNull { it.addedAt!! }
+            dated ?: group.first()
+        }
+    }
+}
 
 fun sortLibraryItems(items: List<LibraryItem>, sortMode: LibrarySortMode): List<LibraryItem> =
     when (sortMode) {

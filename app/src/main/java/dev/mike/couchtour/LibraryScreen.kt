@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -71,6 +72,15 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
     var sortMenuOpen by remember { mutableStateOf(false) }
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
 
+    val username by Session.username.collectAsState()
+    val accountData by produceState(
+        initialValue = LibraryAccountData(loaded = false),
+        key1 = username
+    ) {
+        value = loadLibraryAccount(username = username)
+    }
+    val relistenLikedTracks by LikedTracks.entries.collectAsState()
+
     val rawPlaylists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
     val rawShows by SavedShows.keys.collectAsState()
     val rawTracks by vm.localPlaylistDao.allTracks().collectAsState(initial = emptyList())
@@ -78,20 +88,35 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
 
     val queryTrimmed = searchQuery.trim()
 
-    val playlistItems = remember(rawPlaylists) { playlistItems(rawPlaylists) }
-    val showItems = remember(rawShows) { savedShowItems(rawShows) }
-    val trackItems = remember(rawTracks) { trackItems(rawTracks) }
-
-    val filteredPlaylists = remember(playlistItems, queryTrimmed, sortMode) {
-        sortLibraryItems(filterLibraryItems(playlistItems, queryTrimmed), sortMode)
+    val localPlaylistItems = remember(rawPlaylists) { playlistItems(rawPlaylists) }
+    val accountPlaylistItems = remember(accountData.playlists) { accountPlaylistItems(accountData.playlists) }
+    val mergedPlaylistItems = remember(localPlaylistItems, accountPlaylistItems) {
+        mergeLibraryPlaylists(localPlaylistItems, accountPlaylistItems)
     }
 
-    val filteredShows = remember(showItems, queryTrimmed, sortMode) {
-        sortLibraryItems(filterLibraryItems(showItems, queryTrimmed), sortMode)
+    val localShowItems = remember(rawShows) { savedShowItems(rawShows) }
+    val accountShowItems = remember(accountData.shows) { accountShowItems(accountData.shows) }
+    val mergedShowItems = remember(localShowItems, accountShowItems) {
+        mergeLibraryShows(localShowItems, accountShowItems)
     }
 
-    val filteredTracks = remember(trackItems, queryTrimmed, sortMode) {
-        sortLibraryItems(filterLibraryItems(trackItems, queryTrimmed), sortMode)
+    val localTrackItems = remember(rawTracks) { trackItems(rawTracks) }
+    val accountTrackItems = remember(accountData.tracks) { accountTrackItems(accountData.tracks) }
+    val relistenTrackItems = remember(relistenLikedTracks) { relistenLikedTrackItems(relistenLikedTracks) }
+    val mergedTrackItems = remember(localTrackItems, accountTrackItems, relistenTrackItems) {
+        mergeLibraryTracks(localTrackItems, accountTrackItems, relistenTrackItems)
+    }
+
+    val filteredPlaylists = remember(mergedPlaylistItems, queryTrimmed, sortMode) {
+        sortLibraryItems(filterLibraryItems(mergedPlaylistItems, queryTrimmed), sortMode)
+    }
+
+    val filteredShows = remember(mergedShowItems, queryTrimmed, sortMode) {
+        sortLibraryItems(filterLibraryItems(mergedShowItems, queryTrimmed), sortMode)
+    }
+
+    val filteredTracks = remember(mergedTrackItems, queryTrimmed, sortMode) {
+        sortLibraryItems(filterLibraryItems(mergedTrackItems, queryTrimmed), sortMode)
     }
 
     val playlistCount = filteredPlaylists.size
@@ -212,6 +237,36 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
             )
         }
 
+        if (username.isNullOrBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { nav.navigate("login") }
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Sign in to phish.in to see your liked shows, tracks and playlists",
+                    fontSize = 13.sp,
+                    color = ledger.accentIcon,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        } else if (accountData.error) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Couldn't load your phish.in account items.",
+                    fontSize = 13.sp,
+                    color = ledger.textSubtle
+                )
+            }
+        }
+
         // When Shows tab is empty and history is not, provide navigation to History
         if (selectedFilter == LibraryFilter.SHOWS && showCount == 0 && historyCount > 0) {
             Row(
@@ -323,8 +378,10 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                             CircularPlayButton(
                                 isPlaying = false,
                                 onClick = {
-                                    if (item.target is LibraryTarget.LocalPlaylist) {
-                                        nav.navigate("local-playlist/${item.target.id}")
+                                    when (val target = item.target) {
+                                        is LibraryTarget.LocalPlaylist -> nav.navigate("local-playlist/${target.id}")
+                                        is LibraryTarget.Playlist -> nav.navigate("playlist/${target.slug}")
+                                        else -> {}
                                     }
                                 },
                                 size = 30.dp,
@@ -332,8 +389,10 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                             )
                         },
                         onClick = {
-                            if (item.target is LibraryTarget.LocalPlaylist) {
-                                nav.navigate("local-playlist/${item.target.id}")
+                            when (val target = item.target) {
+                                is LibraryTarget.LocalPlaylist -> nav.navigate("local-playlist/${target.id}")
+                                is LibraryTarget.Playlist -> nav.navigate("playlist/${target.slug}")
+                                else -> {}
                             }
                         }
                     )
@@ -352,6 +411,8 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 openQueueKey(key, nav)
                             }
                             is LibraryTarget.LocalPlaylist -> nav.navigate("local-playlist/${target.id}")
+                            is LibraryTarget.Playlist -> nav.navigate("playlist/${target.slug}")
+                            is LibraryTarget.AccountTrack -> vm.playTrack(target.track)
                         }
                     }
                     Box {
@@ -375,14 +436,16 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     openShow()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text("Remove from Library") },
-                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    item.rawKey?.let { SavedShows.toggle(it) }
-                                }
-                            )
+                            if (item.rawKey != null && SavedShows.contains(item.rawKey)) {
+                                DropdownMenuItem(
+                                    text = { Text("Remove from Library") },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        SavedShows.toggle(item.rawKey)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -397,8 +460,15 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                         subtitle = item.subtitle,
                         trailingText = item.trailingText,
                         onClick = {
-                            if (item.target is LibraryTarget.LocalPlaylist) {
-                                nav.navigate("local-playlist/${item.target.id}")
+                            when (val target = item.target) {
+                                is LibraryTarget.LocalPlaylist -> nav.navigate("local-playlist/${target.id}")
+                                is LibraryTarget.AccountTrack -> vm.playTrack(target.track)
+                                is LibraryTarget.Recording -> {
+                                    val key = recordingQueueKey(target.id.artistSlug, target.id.date, target.id.sourceId)
+                                    openQueueKey(key, nav)
+                                }
+                                is LibraryTarget.Show -> nav.navigate("show/${target.date}")
+                                is LibraryTarget.Playlist -> nav.navigate("playlist/${target.slug}")
                             }
                         }
                     )

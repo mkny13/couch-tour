@@ -181,10 +181,13 @@ final class OnThisDateTests: XCTestCase {
 
     func testShowsOnDateCapsAtTenRelistenArtists() async throws {
         let artists = (1...12).map { ArtistRef(backend: .relisten, id: "artist-\($0)", name: "Artist \($0)") }
+        let lock = NSLock()
         var queriedArtistIds: [String] = []
         let mock = MockMusicSource(backend: .relisten)
         mock.showsOnDateHandler = { artist, _, _ in
+            lock.lock()
             queriedArtistIds.append(artist.id)
+            lock.unlock()
             return [ShowSummary(artist: artist, date: "2000-09-29")]
         }
 
