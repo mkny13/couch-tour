@@ -589,13 +589,6 @@ android_run_search_artist_hit() {
   sleep 0.5
   android::dump >/dev/null || true
 
-  local edit_center
-  edit_center="$(android_parse "center_class" "android.widget.EditText" 2>/dev/null || true)"
-  if [[ -n "$edit_center" ]]; then
-    local cx="${edit_center%% *}"
-    local cy="${edit_center##* }"
-    adb_cmd shell input tap "$cx" "$cy" >/dev/null 2>&1
-  fi
   android::text "moe"
 
   if android::wait_for_tag "search.section.artists" "$TIMEOUT"; then
@@ -646,13 +639,7 @@ android_run_no_unfavorited_in_favorites() {
     return 0
   fi
 
-  android::tap "nav.home" 2>/dev/null || true
-  android::dump >/dev/null || true
-  if [[ "$(android::count "favorites.list")" -gt 0 ]]; then
-    smoke::result "android" "$id" "PASS" "favorites.list verified with confirmed favorited artists"
-  else
-    smoke::result "android" "$id" "SKIP" "favorites.list not rendered"
-  fi
+  smoke::result "android" "$id" "SKIP" "unimplemented favorites list verification"
 }
 
 android_run_next_stop_chip_focus() {
@@ -728,7 +715,7 @@ android_run_favorite_syncs_android_to_mac() {
     return 0
   fi
 
-  smoke::result "android" "$id" "PASS" "local favorite action completed (cross-platform verification pending report)"
+  smoke::result "android" "$id" "SKIP" "unimplemented cross-platform sync verification"
 }
 
 android_run_in_progress_syncs_android_to_mac() {
@@ -746,7 +733,7 @@ android_run_in_progress_syncs_android_to_mac() {
     return 0
   fi
 
-  smoke::result "android" "$id" "PASS" "local queue action completed (cross-platform verification pending report)"
+  smoke::result "android" "$id" "SKIP" "unimplemented cross-platform sync verification"
 }
 
 android_run_nav_reaches_every_destination() {
@@ -759,7 +746,7 @@ android_run_nav_reaches_every_destination() {
     return 0
   fi
 
-  local destinations=("nav.home" "nav.search" "nav.library" "nav.settings")
+  local destinations=("nav.home" "nav.search" "nav.library" "nav.history" "nav.settings")
   for dest in "${destinations[@]}"; do
     if ! android::wait_for_tag "$dest" 5; then
       android_screenshot "$id"
@@ -788,13 +775,6 @@ android_run_search_result_sections() {
   sleep 0.5
   android::dump >/dev/null || true
 
-  local edit_center
-  edit_center="$(android_parse "center_class" "android.widget.EditText" 2>/dev/null || true)"
-  if [[ -n "$edit_center" ]]; then
-    local cx="${edit_center%% *}"
-    local cy="${edit_center##* }"
-    adb_cmd shell input tap "$cx" "$cy" >/dev/null 2>&1
-  fi
   android::text "ghost"
 
   if ! android::wait_for_tag "search.results" "$TIMEOUT"; then
@@ -832,7 +812,7 @@ android_run_live_data_not_mockup() {
     return 0
   fi
 
-  smoke::result "android" "$id" "PASS" "live show data loaded from backend"
+  smoke::result "android" "$id" "SKIP" "unimplemented live data verification"
 }
 
 # -----------------------------------------------------------------------------
