@@ -132,7 +132,7 @@ variant (D233).
 
 ## Tests
 
-677 Android unit tests, no device or emulator required:
+690 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
@@ -141,7 +141,7 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML report lands in
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-462 macOS package tests under `macos/Packages/CouchTourKit`:
+464 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test
@@ -174,6 +174,7 @@ Install to a connected device or running emulator:
 | `Cast.kt` | Cast options, the session state, and the queue-item converter |
 | `CastButton.kt` | Cast button and device picker, driving `MediaRouter` directly |
 | `Progress.kt` | Declares PhishInDb and the progress and source_loudness tables |
+| `DiagnosticsLog.kt` | On-device rotating diagnostics log (retention, redaction, tail, summary) |
 | `Loudness.kt` | ITU-R BS.1770 integrated loudness meter and gain calculation |
 | `SourceLoudness.kt` | source_loudness cache and Room DAO |
 | `Sync.kt` | Cloudflare Worker sync client, mutation tracking, and background worker |

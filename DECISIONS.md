@@ -4912,3 +4912,16 @@ When the Relisten/favorites fetch was loading or failed, the macOS sidebar fell 
 - **Context:** Agent-driven UI testing on macOS requires querying the accessibility tree. Calling `entire contents` on "Couch Tour Beta" hangs AppleScript. Also, frontmost-window targeting is fragile in CI environments.
 - **Decision:** Smoke checks (`scripts/smoke/ax-tree.sh`) walk the UI tree using a bound of maximum depth (default 6) and a hard timeout (5 seconds), scoping output strictly to known IDs from `AXIdentifiers.swift`. Target is resolved strictly by window owner (`dev.mike.couchtour.mac.beta`) rather than screen coordinates or `frontmost`.
 - **Why:** Bounding prevents the walk from hanging (the exact issue that motivated #365). Identifier scoping keeps the output small enough for agent context windows. Window-owner targeting ensures the test queries the intended application even if another window steals focus.
+
+### D292: Core on-device diagnostics log (storage, rotation, retention, redaction)
+
+Part of #344 (#373). Foundation for on-device diagnostics and issue reporting.
+
+- **Storage Location**: `context.filesDir/diagnostics/` — internal storage, not `cacheDir`, because Android may evict cache under pressure and a diagnostics log that vanishes when the app crashes or runs low on memory is worthless. Not world-readable; the viewer (#376) and Feedback flow (#377) are the only exports.
+- **Files & Bounded Footprint**: `diagnostics.log` (current) and `diagnostics.log.1` (one previous generation). The cap is 1 MiB per file, bounding total on-disk diagnostics footprint at 2 MiB.
+- **Rotation**: On append, if `diagnostics.log` is already at or over the 1 MiB cap, `diagnostics.log.1` is deleted, `diagnostics.log` is renamed to `diagnostics.log.1`, a fresh `diagnostics.log` is started, and a `log.rotated` entry is written into it before the new event.
+- **Retention**: On `init`, if `diagnostics.log` is over the cap, lines older than 7 days are dropped. If the file is still over the cap after time-based pruning, it is truncated down to the last 2000 lines. Rotation handles the active app case; retention is the safety valve for a long-idle device.
+- **Line Format**: `<ISO-8601 UTC timestamp>\t<LEVEL>\t<event>\t<key>=<value> ...` (single line per entry, tab-separated). Parses cleanly with `split('\t')` and survives copy-paste into GitHub issue reports.
+- **Redaction Denylist**: Key names containing `token`, `secret`, `password`, `passwd`, `auth`, `credential`, `cookie`, `pairing`, `code`, or `key` (as whole words or compound names like `access_key` / `sync_key`) have their values replaced with `***` before writing. Callers logging token-shaped values can also pass them through `redactValue`.
+- **Asynchronous Writes with Synchronous Crash Exception**: `DiagnosticsLog.log(...)` is non-blocking and non-throwing on the main thread, dispatching via `Channel.trySend` to a single-writer coroutine on `Dispatchers.IO`. If writing fails, logging is latched off for the rest of the process. `recordCrash` is the deliberate single synchronous exception, appending directly inside `runCatching` because the process is dying and queued writes would be lost (#374).
+
