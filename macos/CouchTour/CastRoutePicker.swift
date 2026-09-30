@@ -23,6 +23,8 @@ struct CastRoutePickerButton: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Cast and AirPlay destinations")
+        .help("Cast and AirPlay destinations")
         .popover(isPresented: $showPicker, arrowEdge: .top) {
             CastRoutePickerMenu(isPresented: $showPicker)
                 .frame(width: 280)

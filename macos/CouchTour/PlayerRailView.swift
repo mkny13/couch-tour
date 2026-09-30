@@ -374,12 +374,9 @@ struct PlayerRailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
                     
-                    HStack(spacing: 16) {
-                        volumeControl
-                        CastRoutePickerButton()
-                    }
-                    .padding(.top, 12)
-                    .padding(.bottom, 26)
+                    volumeControl
+                        .padding(.top, 12)
+                        .padding(.bottom, 26)
 
                 } else {
                     // Empty state fallback when no show is loaded
