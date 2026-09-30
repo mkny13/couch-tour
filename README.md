@@ -25,7 +25,7 @@ hosted on archive.org.
   listening"; opening one again restarts it from the top
 - A History screen lists everything you've played — in progress, completed, or removed by
   hand — with the completed ones marked
-- A Library screen lists your saved items — saved shows, playlists, and tracks — cleanly separated from listening history
+- A Library screen lists your saved items across both backends — saved shows, local playlists, and Relisten liked tracks, plus live phish.in playlists, shows, and tracks when signed in
 - On a "Continue listening" card: tap to open it, tap the play button to resume, long-press
   for open / mark completed / remove
 - "Shuffle all" on My tracks plays your liked tracks in random order
@@ -133,7 +133,7 @@ variant (D233).
 
 ## Tests
 
-760 Android unit tests, no device or emulator required:
+772 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
