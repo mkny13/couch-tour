@@ -307,7 +307,8 @@ struct ExpandedNowPlayingView: View {
                                         onDismiss: { showJamChartNote = false }
                                     )
 
-                                    if let date = player.currentTrack?.showDate, let slug = player.currentTrack?.slug,
+                                    let date = player.show?.date ?? player.currentTrack?.showDate
+                                    if let date, let slug = player.currentTrack?.slug,
                                        let url = URL(string: trackSourceUrl(date: date, slug: slug)) {
                                         Button {
                                             NSWorkspace.shared.open(url)
