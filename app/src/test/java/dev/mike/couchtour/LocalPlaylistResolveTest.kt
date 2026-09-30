@@ -134,6 +134,37 @@ class LocalPlaylistResolveTest {
     }
 
     @Test
+    fun `resolves a relisten track converted from LikedTrackRef via toLocalPlaylistTrackRef`() = runBlocking {
+        relistenServer.enqueue(
+            MockResponse().setBody("""[{"uuid":"a1","slug":"goose","name":"Goose"}]""")
+        )
+        relistenServer.enqueue(
+            MockResponse().setBody(
+                """{"display_date":"2023-01-01","venue":{"name":"Venue X","location":"City Y"},
+                    "sources":[{"uuid":"src1","sets":[{"index":0,"name":"Set 1","tracks":[
+                        {"uuid":"track-uuid-1","title":"Jibberish","track_position":1,
+                         "duration":300,"mp3_url":"http://x/jibberish.mp3"}
+                    ]}]}]}"""
+            )
+        )
+
+        val likedRef = LikedTrackRef(
+            id = "track-uuid-1",
+            title = "Jibberish",
+            showDate = "2023-01-01",
+            artistSlug = "goose",
+            artistName = "Goose",
+            recordingId = "src1",
+        )
+        val resolved = resolveLocalPlaylistTracks(listOf(likedRef.toLocalPlaylistTrackRef()))
+
+        assertEquals(1, resolved.size)
+        assertEquals("http://x/jibberish.mp3", resolved[0].url)
+        assertEquals("Goose", resolved[0].artistName)
+        assertEquals("Venue X", resolved[0].venueName)
+    }
+
+    @Test
     fun `a mixed playlist resolves both backends and keeps each track's own artist`() = runBlocking {
         phishInServer.enqueue(
             MockResponse().setBody(
