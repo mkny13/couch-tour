@@ -39,6 +39,7 @@ class CouchTourApp : Application() {
                 SyncSession.sync(PhishInDb.get(this@CouchTourApp).progressDao())
             } catch (e: Exception) {
                 Log.w("Sync", "Launch sync failed; the periodic job will retry", e)
+                DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to syncErrorCode(e))
             }
         }
         schedulePeriodicSync(this)

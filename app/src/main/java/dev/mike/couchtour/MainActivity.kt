@@ -96,6 +96,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -126,6 +127,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -214,6 +216,18 @@ fun App(
             }
         }
     ) { padding ->
+        DisposableEffect(nav) {
+            val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+                val route = destination.route?.substringBefore('?')
+                if (route != null) {
+                    DiagnosticsLog.log("nav.route", "route" to route)
+                }
+            }
+            nav.addOnDestinationChangedListener(listener)
+            onDispose {
+                nav.removeOnDestinationChangedListener(listener)
+            }
+        }
         NavHost(nav, startDestination = "home", modifier = Modifier.padding(padding)) {
             composable("home") { HomeScreen(vm, nav) }
             composable("artists") { ArtistsScreen(nav) }

@@ -73,6 +73,9 @@ object DiagnosticsLog {
     fun redactValue(value: Any?): String = "***"
 
     internal fun isRedactedKey(key: String): Boolean {
+        if (key.equals("key", ignoreCase = true) || key.equals("code", ignoreCase = true)) {
+            return false
+        }
         val tokens = key.split(Regex("(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|[^a-zA-Z0-9]+"))
             .filter { it.isNotEmpty() }
             .map { it.lowercase() }
@@ -204,7 +207,11 @@ object DiagnosticsLog {
         }
     }
 
-    fun log(event: String, level: Level = Level.INFO, vararg fields: Pair<String, Any?>) {
+    fun log(event: String, vararg fields: Pair<String, Any?>) {
+        log(event, Level.INFO, *fields)
+    }
+
+    fun log(event: String, level: Level, vararg fields: Pair<String, Any?>) {
         if (!initialized.get() || disabled.get()) return
         val timestamp = timestampFormatter.format(Instant.now())
         val line = formatLine(timestamp, level, event, fields)

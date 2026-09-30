@@ -4934,3 +4934,21 @@ Part of #344 (#376). Dedicated diagnostics viewer in Settings → About → Diag
 - **Off-main-thread I/O**: All disk operations (`tailLines`, `summaryLines`, `exportText`, `clear`, `onDiskBytes`, `countEntries`) execute on `Dispatchers.IO`. In `SettingsScreen`, the entry count and byte size are asynchronously loaded via coroutines so composition remains entirely non-blocking. `CrashCapture.install()` registers the uncaught handler synchronously without disk I/O, dispatching previous crash file detection to `Dispatchers.IO`.
 - **Confirmable clear with crash notice erasure**: Clearing requires explicit user confirmation in a dialog. On confirmation, both `diagnostics.log` and `diagnostics.log.1` are removed, `marks` are cleared, and `last_crash.txt` is deleted via `CrashCapture.consumePreviousCrash()`, preventing stale crash traces from persisting. Dismissing the crash notice card runs `CrashCapture.consumePreviousCrash()` on a coroutine, clearing UI state immediately and deleting the file on `Dispatchers.IO`.
 
+### D294: Diagnostics event vocabulary and privacy bounds
+
+Part of #344 (#375). Instruments library, playback, sync, API, and navigation events into on-device diagnostics.
+
+- **Event Vocabulary**: Stable, lowercase, dot-separated event names across all client subsystems:
+  - `library.favorite`: changes to favorited tracks (`kind=track id=<id> on=<bool>`), saved shows (`kind=show key=<key> on=<bool>`), and favorited artists (`kind=artist key=<key> on=<bool>`).
+  - `library.counts`: aggregated counts upon completed Library loads (`playlists=<n> shows=<n> tracks=<n> total=<n>`), also marked in summary. Fires on every load including the empty/zero case to diagnose missing-item defects (#343).
+  - `library.playlist`: local playlist membership updates (`action=add|remove track=<id> playlist=<id>`).
+  - `playback.start`: queue start and unpause events (`track=<id> show=<show> source=<backend> resume=<bool>`).
+  - `playback.stop`: playback pause, stop, or track completion.
+  - `playback.progress`: low-frequency debounced progress saves (`track=<id> pct=<0-100> status=saved`).
+  - `sync.start` & `sync.end`: sync lifecycle (`pushed=<n> pulled=<n> ms=<n> pushed_upto=<watermark> pulled_seq=<seq>`) and summary mark.
+  - `sync.error`: sync failure with short classification codes (`unauthorized`, `gone`, `network`, `server`, `other`). Never raw exception messages.
+  - `api.call`: request telemetry from `TimingEventListener` (`path=<encodedPath> phase=start|connected|end|failed ms=<n> reused=<bool>` and on failure `error=<exception simple name>`).
+  - `nav.route`: destination changes in Navigation (`route=<route pattern>`).
+- **Privacy Bounds ("Counts, IDs, Routes, Timings Only")**: Diagnostics logs never record request/response bodies, HTTP headers, query strings, authorization tokens, secrets, or user-typed text. Full URLs are strictly disallowed; API events record `encodedPath` only. Navigation events record route templates only (stripping query parameters and argument values). Bare keys `code` (error classifications) and `key` (show dates/artist identifiers) are preserved while compound credentials (`apiKey`, `syncKey`, `pairingCode`, `accessToken`, etc.) remain redacted to `***`.
+
+

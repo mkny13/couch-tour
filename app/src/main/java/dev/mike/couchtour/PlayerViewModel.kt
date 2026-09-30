@@ -274,7 +274,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------ play
 
-    fun playShow(show: Show, startIndex: Int = 0, startPositionMs: Long = 0) {
+    fun playShow(show: Show, startIndex: Int = 0, startPositionMs: Long = 0, isResume: Boolean = false) {
         activeShowSummary = ShowSummary(artist = PHISH, date = show.date, venue = show.venueName, location = show.location, tourName = show.tourName)
         _postShowPrompt.value = null
         lastResolvedEndedShowDate = null
@@ -283,10 +283,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val subtitle = listOfNotNull(show.venueName, show.location).joinToString(" · ")
         val art = show.albumCoverUrl ?: show.coverArtUrls?.medium
         val info = QueueInfo(showQueueKey(show.date), show.date, subtitle, art)
-        start(filtered.items.map { mediaItem(it, info) }, filtered.startIndex, startPositionMs)
+        start(filtered.items.map { mediaItem(it, info) }, filtered.startIndex, startPositionMs, isResume = isResume)
     }
 
-    fun playPlaylist(playlist: Playlist, startIndex: Int = 0, startPositionMs: Long = 0) {
+    fun playPlaylist(playlist: Playlist, startIndex: Int = 0, startPositionMs: Long = 0, isResume: Boolean = false) {
         activeShowSummary = null
         _postShowPrompt.value = null
         lastResolvedEndedShowDate = null
@@ -302,11 +302,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             subtitle,
             playable.firstOrNull()?.track?.showAlbumCoverUrl,
         )
-        start(filtered.items.map { mediaItem(it.track, info, it) }, filtered.startIndex, startPositionMs)
+        start(filtered.items.map { mediaItem(it.track, info, it) }, filtered.startIndex, startPositionMs, isResume = isResume)
     }
 
     /** Play one tape of a Relisten show. [detail] already picked the recording (P3). */
-    fun playRecording(detail: ShowDetail, startIndex: Int = 0, startPositionMs: Long = 0) {
+    fun playRecording(detail: ShowDetail, startIndex: Int = 0, startPositionMs: Long = 0, isResume: Boolean = false) {
         activeShowSummary = detail.summary
         _postShowPrompt.value = null
         lastResolvedEndedShowDate = null
@@ -320,7 +320,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             artist = summary.artist.name,
             artistId = summary.artist.id,
         )
-        start(filtered.items.map { recordingMediaItem(it, info) }, filtered.startIndex, startPositionMs)
+        start(filtered.items.map { recordingMediaItem(it, info) }, filtered.startIndex, startPositionMs, isResume = isResume)
     }
 
     /**
@@ -350,13 +350,25 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun start(items: List<MediaItem>, startIndex: Int, startPositionMs: Long) {
+    private fun start(items: List<MediaItem>, startIndex: Int, startPositionMs: Long, isResume: Boolean = false) {
         val c = controller ?: run {
             Log.w("PlayerViewModel", "start() called before MediaController connected; dropping the tap")
             return
         }
         if (items.isEmpty()) return
-        c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), startPositionMs)
+        
+        val modifiedItems = if (isResume && startIndex in items.indices) {
+            val list = items.toMutableList()
+            val item = list[startIndex]
+            val extras = android.os.Bundle(item.mediaMetadata.extras ?: android.os.Bundle()).apply {
+                putBoolean(Keys.IS_RESUME, true)
+            }
+            val meta = item.mediaMetadata.buildUpon().setExtras(extras).build()
+            list[startIndex] = item.buildUpon().setMediaMetadata(meta).build()
+            list
+        } else items
+
+        c.setMediaItems(modifiedItems, startIndex.coerceIn(0, modifiedItems.lastIndex), startPositionMs)
         c.prepare()
         c.play()
     }
@@ -371,7 +383,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
      * or Auto) reconstructs it from the progress row, since there is no YouTube detail
      * fetch to rebuild the rest — the stream URLs come from [youtubeStreamResolver] here.
      */
-    fun playYouTube(video: YouTubeVideo, artistName: String = "Phish", artistId: String = "phish") {
+    fun playYouTube(video: YouTubeVideo, artistName: String = "Phish", artistId: String = "phish", isResume: Boolean = false) {
         activeShowSummary = null
         _postShowPrompt.value = null
         lastResolvedEndedShowDate = null
@@ -381,7 +393,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 .onSuccess { resolved ->
                     start(
                         listOf(youtubeMediaItem(video.withStreams(resolved), YouTubePlaybackMode.AUDIO, artistName, artistId)),
-                        0, 0,
+                        0, 0, isResume = isResume,
                     )
                 }
                 .onFailure { e ->
@@ -457,14 +469,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { localPlaylistDao.deletePlaylist(id) }
     }
 
-    fun playLocalPlaylist(playlistId: String, startIndex: Int = 0, startPositionMs: Long = 0) {
+    fun playLocalPlaylist(playlistId: String, startIndex: Int = 0, startPositionMs: Long = 0, isResume: Boolean = false) {
         viewModelScope.launch {
             runCatching {
                 val resolved = resolveLocalPlaylistTracks(localPlaylistDao.tracksOnce(playlistId))
                 val filtered = filterPlaybackTracks(resolved, startIndex, PlaybackSettings.skipFiller.value) { it.title }
                 val name = localPlaylistDao.playlist(playlistId)?.name.orEmpty()
                 localPlaylistTrackItems(playlistId, name, filtered.items) to filtered.startIndex
-            }.onSuccess { (items, index) -> start(items, index, startPositionMs) }
+            }.onSuccess { (items, index) -> start(items, index, startPositionMs, isResume = isResume) }
         }
     }
 
@@ -485,9 +497,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             runCatching {
                 when (ref.kind) {
                     QueueKind.PLAYLIST ->
-                        playPlaylist(PhishInApi.playlist(ref.id), index, position)
+                        playPlaylist(PhishInApi.playlist(ref.id), index, position, isResume = true)
                     QueueKind.SHOW ->
-                        playShow(PhishInApi.show(ref.id), index, position)
+                        playShow(PhishInApi.show(ref.id), index, position, isResume = true)
                     QueueKind.RECORDING -> {
                         val rec = parseRecordingId(ref.id) ?: return@runCatching
                         // The real ArtistRef, not a name-only stand-in: hasSets controls
@@ -500,9 +512,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                             ?: ArtistRef(Backend.RELISTEN, rec.artistSlug, progress.artist)
                         // The stored source id, not the current default tape — resuming
                         // must reopen the exact tape the position was recorded against.
-                        playRecording(RelistenCatalogSource.show(artist, rec.date, rec.sourceId), index, position)
+                        playRecording(RelistenCatalogSource.show(artist, rec.date, rec.sourceId), index, position, isResume = true)
                     }
-                    QueueKind.LOCAL_PLAYLIST -> start(localPlaylistItems(ref.id), index, position)
+                    QueueKind.LOCAL_PLAYLIST -> start(localPlaylistItems(ref.id), index, position, isResume = true)
                     QueueKind.YOUTUBE -> playYouTube(
                         YouTubeVideo(
                             id = ref.id,
@@ -511,6 +523,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                             thumbnailUrl = progress.artUrl,
                         ),
                         artistName = progress.artist.ifBlank { "Phish" },
+                        isResume = true,
                     )
                 }
             }.onSuccess {
@@ -595,7 +608,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun togglePlayPause() {
         val c = controller ?: return
-        if (c.isPlaying) c.pause() else c.play()
+        if (c.isPlaying) {
+            c.pause()
+        } else {
+            c.play()
+        }
     }
 
     fun next() = controller?.seekToNextMediaItem()

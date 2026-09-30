@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,10 +53,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 
 enum class LibraryFilter {
     ALL, PLAYLISTS, SHOWS, TRACKS
@@ -128,6 +129,14 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
     val showCount = filteredShows.size
     val trackCount = filteredTracks.size
     val totalCount = playlistCount + showCount + trackCount
+
+    LaunchedEffect(Unit) {
+        recordLibraryCounts(
+            vm.localPlaylistDao.playlists(),
+            vm.progressDao.inProgress(),
+            vm.localPlaylistDao.allTracks()
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -545,3 +554,31 @@ private fun LibraryRowItem(
         )
     }
 }
+
+internal suspend fun recordLibraryCounts(
+    playlistsFlow: Flow<List<*>>,
+    inProgressFlow: Flow<List<*>>,
+    tracksFlow: Flow<List<*>>
+) {
+    combine(playlistsFlow, inProgressFlow, tracksFlow) { playlists, shows, tracks ->
+        Triple(playlists.size, shows.size, tracks.size)
+    }.first().let { (playlistCount, showCount, trackCount) ->
+        emitLibraryCounts(playlistCount, showCount, trackCount)
+    }
+}
+
+internal fun emitLibraryCounts(playlistCount: Int, showCount: Int, trackCount: Int) {
+    val totalCount = playlistCount + showCount + trackCount
+    DiagnosticsLog.log(
+        "library.counts",
+        "playlists" to playlistCount,
+        "shows" to showCount,
+        "tracks" to trackCount,
+        "total" to totalCount
+    )
+    DiagnosticsLog.mark(
+        "Library counts",
+        "playlists=$playlistCount shows=$showCount tracks=$trackCount total=$totalCount"
+    )
+}
+

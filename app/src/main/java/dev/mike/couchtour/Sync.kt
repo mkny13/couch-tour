@@ -350,6 +350,7 @@ object SyncSession {
         if (store.recoveredFromReset) {
             _lastError.value = "This device's secure storage was reset by the system — if " +
                 "sync was paired, you'll need to pair it again."
+            DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to "other")
         }
     }
 
@@ -400,6 +401,8 @@ object SyncSession {
         _lastSyncedAt.value = 0L
     }
 
+    private data class SyncOnceResult(val pushed: Int, val pulled: Int, val hasMore: Boolean)
+
     /**
      * Push-then-pull until the local backlog is drained. Pushes every local row touched since
      * the last successful push (tombstones included — see [ProgressDao.changedSince]), applies
@@ -411,11 +414,31 @@ object SyncSession {
     suspend fun sync(progressDao: ProgressDao) {
         val token = store.deviceToken ?: return
 
+        DiagnosticsLog.log("sync.start")
+        val startTime = System.currentTimeMillis()
+        var totalPushed = 0
+        var totalPulled = 0
         _syncing.value = true
         try {
-            @Suppress("ControlFlowWithEmptyBody")
-            while (syncOnce(token, progressDao)) { }
+            while (true) {
+                val res = syncOnce(token, progressDao)
+                totalPushed += res.pushed
+                totalPulled += res.pulled
+                if (!res.hasMore) break
+            }
             _lastError.value = null
+            val elapsedMs = System.currentTimeMillis() - startTime
+            val watermark = store.lastPushWatermark
+            val seq = store.lastSeq
+            DiagnosticsLog.log(
+                "sync.end",
+                "pushed" to totalPushed,
+                "pulled" to totalPulled,
+                "ms" to elapsedMs,
+                "pushed_upto" to watermark,
+                "pulled_seq" to seq
+            )
+            DiagnosticsLog.mark("Last sync", "pushed=$totalPushed pulled=$totalPulled ms=$elapsedMs pushed_upto=$watermark pulled_seq=$seq")
         } catch (e: SyncException) {
             when {
                 // Revoked from another device (or the token is simply bad): stop trying
@@ -426,12 +449,18 @@ object SyncSession {
                     unlink()
                     _lastError.value = "This device was unlinked — its pairing was revoked " +
                         "or expired. Re-pair to resume syncing."
+                    DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to "unauthorized")
                 }
                 // Cursor predates the tombstone retention floor: start over from scratch.
                 // since = 0 never 410s (D126), so this terminates in one extra round trip.
-                e.gone -> { store.lastSeq = 0; sync(progressDao) }
+                e.gone -> {
+                    store.lastSeq = 0
+                    DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to "gone")
+                    sync(progressDao)
+                }
                 else -> {
                     _lastError.value = e.message ?: "Sync failed"
+                    DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to syncErrorCode(e))
                     throw e
                 }
             }
@@ -446,6 +475,7 @@ object SyncSession {
             // DNS, timeout) never reached the catch above, so it used to escape this function
             // with nothing recorded — the periodic worker retried, but silently, forever.
             _lastError.value = e.message ?: "Sync failed"
+            DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to syncErrorCode(e))
             throw e
         } finally {
             _syncing.value = false
@@ -456,7 +486,7 @@ object SyncSession {
      * One push-then-pull round trip. Returns true when the push hit [MAX_PUSH_BATCH] and more
      * local rows are still waiting, so [sync] knows to come back for them.
      */
-    private suspend fun syncOnce(token: String, progressDao: ProgressDao): Boolean {
+    private suspend fun syncOnce(token: String, progressDao: ProgressDao): SyncOnceResult {
         val pending = progressDao.changedSince(store.lastPushWatermark).sortedBy { it.updatedAt }
         val chunk = pending.chunkToPush()
         val toPush = chunk.map { it.toWire() }
@@ -472,7 +502,7 @@ object SyncSession {
         store.lastSyncedAt = now
         _lastSyncedAt.value = now
 
-        return pending.size > chunk.size
+        return SyncOnceResult(pushed = toPush.size, pulled = response.changes.size, hasMore = pending.size > chunk.size)
     }
 
     private var pushJob: Job? = null
@@ -587,3 +617,17 @@ fun schedulePeriodicSync(context: Context) {
         Log.w("Sync", "Could not schedule periodic sync", e)
     }
 }
+
+internal fun syncErrorCode(e: Throwable): String {
+    return when (e) {
+        is SyncException -> when {
+            e.unauthorized -> "unauthorized"
+            e.gone -> "gone"
+            e.code in 500..599 -> "server"
+            else -> "other"
+        }
+        is java.io.IOException -> "network"
+        else -> "other"
+    }
+}
+
