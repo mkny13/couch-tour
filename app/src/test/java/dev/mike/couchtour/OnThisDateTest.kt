@@ -163,38 +163,38 @@ class OnThisDateTest {
         assertEquals(2, picked.size)
     }
 
-    // ------------------------------------------------------------------ relistenYearBudget
-
-    @Test
-    fun `relistenYearBudget splits the budget across artists`() {
-        assertEquals(12, relistenYearBudget(1))
-        assertEquals(4, relistenYearBudget(3))
-        assertEquals(2, relistenYearBudget(5))
-    }
-
-    @Test
-    fun `relistenYearBudget is zero for no artists`() {
-        assertEquals(0, relistenYearBudget(0))
-    }
-
     // ------------------------------------------------------------------ showsOnDate
 
     private class FakeSource(
         private val backendId: Backend,
-        private val periodsByArtist: Map<String, List<PeriodRef>>,
-        private val showsByPeriod: Map<String, List<ShowSummary>>,
+        private val periodsByArtist: Map<String, List<PeriodRef>> = emptyMap(),
+        private val showsByPeriod: Map<String, List<ShowSummary>> = emptyMap(),
+        private val showsOnDateByArtist: Map<String, List<ShowSummary>> = emptyMap(),
         private val failing: Set<String> = emptySet(),
     ) : MusicSource {
         override val backend = backendId
+        var periodsCalled = false
+        var showsCalled = false
+        val showsOnDateCalls = mutableListOf<Triple<String, Int, Int>>()
+
         override suspend fun artists() = emptyList<ArtistRef>()
         override suspend fun periods(artist: ArtistRef): List<PeriodRef> {
+            periodsCalled = true
             if (artist.id in failing) error("boom")
             return periodsByArtist.getValue(artist.id)
         }
-        override suspend fun shows(artist: ArtistRef, period: PeriodRef) = showsByPeriod.getValue(period.id)
+        override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+            showsCalled = true
+            return showsByPeriod.getValue(period.id)
+        }
         override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) =
             error("not used by showsOnDate")
         override suspend fun search(term: String) = SearchHits()
+        override suspend fun showsOnDate(artist: ArtistRef, month: Int, day: Int): List<ShowSummary> {
+            showsOnDateCalls.add(Triple(artist.id, month, day))
+            if (artist.id in failing) error("boom")
+            return showsOnDateByArtist[artist.id].orEmpty()
+        }
     }
 
     @Test
@@ -215,36 +215,49 @@ class OnThisDateTest {
     }
 
     @Test
-    fun `showsOnDate caps at three relisten artists and splits the year budget`() = runBlocking {
-        val artists = (1..5).map { ArtistRef(Backend.RELISTEN, "artist-$it", "Artist $it") }
-        val years = (2000..2025).map { PeriodRef(it.toString(), it.toString(), showCount = 10) }
-        var maxPeriodsRequested = 0
-        val relistenSource = object : MusicSource {
-            override val backend = Backend.RELISTEN
-            override suspend fun artists() = emptyList<ArtistRef>()
-            override suspend fun periods(artist: ArtistRef) = years
-            override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
-                maxPeriodsRequested++
-                return emptyList()
-            }
-            override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) = error("unused")
-            override suspend fun search(term: String) = SearchHits()
-        }
-        showsOnDate(artists, today = "2026-11-17") { relistenSource }
-        // Only the first MAX_RELISTEN_ARTISTS participate, each fetching relistenYearBudget(3) years.
-        val expectedYearsPerArtist = relistenYearBudget(MAX_RELISTEN_ARTISTS)
-        assertEquals(MAX_RELISTEN_ARTISTS * expectedYearsPerArtist, maxPeriodsRequested)
+    fun `showsOnDate returns old-year Relisten anniversaries, excludes today's year, and never calls periods or shows`() = runBlocking {
+        val moe = ArtistRef(Backend.RELISTEN, "moe", "moe.")
+        val shows = listOf(
+            ShowSummary(artist = moe, date = "1995-09-29"),
+            ShowSummary(artist = moe, date = "1998-09-29"),
+            ShowSummary(artist = moe, date = "2001-09-29"),
+            ShowSummary(artist = moe, date = "2007-09-29"),
+            ShowSummary(artist = moe, date = "2013-09-29"),
+            ShowSummary(artist = moe, date = "2026-09-29"), // Today's year, must be excluded
+        )
+        val source = FakeSource(
+            Backend.RELISTEN,
+            showsOnDateByArtist = mapOf("moe" to shows),
+        )
+        val result = showsOnDate(listOf(moe), today = "2026-09-29") { source }
+
+        assertEquals(listOf("2013-09-29", "2007-09-29", "2001-09-29", "1998-09-29", "1995-09-29"), result.map { it.date })
+        org.junit.Assert.assertFalse(source.periodsCalled)
+        org.junit.Assert.assertFalse(source.showsCalled)
+        assertEquals(listOf(Triple("moe", 9, 29)), source.showsOnDateCalls)
+    }
+
+    @Test
+    fun `showsOnDate caps at ten relisten artists`() = runBlocking {
+        val artists = (1..12).map { ArtistRef(Backend.RELISTEN, "artist-$it", "Artist $it") }
+        val source = FakeSource(
+            Backend.RELISTEN,
+            showsOnDateByArtist = artists.associate { it.id to listOf(ShowSummary(artist = it, date = "2000-09-29")) },
+        )
+        val result = showsOnDate(artists, today = "2026-09-29") { source }
+
+        assertEquals(10, source.showsOnDateCalls.size)
+        assertEquals((1..10).map { "artist-$it" }, source.showsOnDateCalls.map { it.first })
+        assertEquals(8, result.size) // Capped at MAX_ANNIVERSARY_SHOWS (8)
     }
 
     @Test
     fun `showsOnDate ignores a favorited artist whose fetch fails`() = runBlocking {
         val ok = ArtistRef(Backend.RELISTEN, "ok", "Ok Artist")
         val bad = ArtistRef(Backend.RELISTEN, "bad", "Bad Artist")
-        val period = PeriodRef("2020", "2020", showCount = 10)
         val source = FakeSource(
             Backend.RELISTEN,
-            periodsByArtist = mapOf("ok" to listOf(period)),
-            showsByPeriod = mapOf("2020" to listOf(ShowSummary(artist = ok, date = "2020-11-17"))),
+            showsOnDateByArtist = mapOf("ok" to listOf(ShowSummary(artist = ok, date = "2020-11-17"))),
             failing = setOf("bad"),
         )
         val result = showsOnDate(listOf(ok, bad), today = "2026-11-17") { source }

@@ -4992,3 +4992,14 @@ Fixes #361. Resolves unreachable macOS tour picker by attaching entry points to 
 - **Direct Target Resolution**: Target resolution is immediate (`show.artist`), avoiding complex focus-state fallbacks.
 - **Reused Sheet and Refresh Pipeline**: `TourPickerSheet` (from #68/D190) and its post-save/clear cache reset and refresh path (`NextStop.resetCache()` → `reloadProgress()` → `reloadDiscovery()`, D200/#100) are reused completely unchanged.
 
+### D300: On This Date uses Relisten's on-date endpoint, removing year budget and raising artist cap to 10
+
+Part of #350. Supersedes the Relisten half of D162 (D162's phish.in range-batching and daily caching design remains active; do not rewrite D162).
+
+- **The Problem with D162's Relisten Year Budget**: D162 assumed neither backend had a cross-year date query, requiring client-side period fetches. For Relisten, which has no multi-year range queries, D162 introduced `RELISTEN_YEAR_BUDGET` (12) year-fetches split evenly across at most `MAX_RELISTEN_ARTISTS` (3) favorited artists, taking the most recent years first. For deep-catalog artists like moe. (active since 1990) or the Grateful Dead (1965–1995), anniversaries in older decades were never queried and never appeared on the Home screen's "On this date" shelf.
+- **Dedicated Relisten On-Date Endpoint**: Relisten provides `GET /v2/artists/{slug}/shows/on-date?month=M&day=D` (with integer `month` and `day` query parameters), returning all shows played on that month and day across every recorded year in a single HTTP request. Response objects match `RelistenShowSummary` and map with `toShowSummary(artist:)`.
+- **MusicSource Seam Extension**: Added `showsOnDate(artist: ArtistRef, month: Int, day: Int)` to `MusicSource` on both Android and macOS with default empty implementations so existing mock sources continue compiling. `RelistenCatalogSource` overrides this to call `RelistenApi.showsOnDate` / `RelistenAPI.showsOnDate`.
+- **Elimination of Relisten Year Budget**: `RELISTEN_YEAR_BUDGET` / `relistenYearBudget` and the year-splitting calculations are removed entirely. Relisten anniversary discovery now executes exactly one request per favorited artist instead of walking individual years.
+- **Raised Artist Cap**: Since each favorited Relisten artist costs only a single request per day rather than up to 12, `MAX_RELISTEN_ARTISTS` / `maxRelistenArtists` is raised from 3 to 10. Worst-case daily network cost is now ~14 requests (10 Relisten + ~4 phish.in batched ranges), fully cached per date+favorites in `OnThisDate`.
+- **Same-Year Exclusion Preserved**: The endpoint returns shows from the current year if any occurred; `showsOnAnniversary` continues to filter out shows from today's own year, ensuring "On this date" remains strictly retrospective. The 8-show cap (`MAX_ANNIVERSARY_SHOWS`), randomized selection, and newest-first display order are preserved unchanged.
+

@@ -3,11 +3,8 @@ import Foundation
 /// Past this many shows in one `year_range=` request, phish.in's `per_page=1000` would truncate the page.
 public let phishInRangeCap = 900
 
-/// Total Relisten year-fetches allowed across every favorited artist, split evenly between them.
-public let relistenYearBudget = 12
-
-/// Relisten artists beyond this many don't participate at all.
-public let maxRelistenArtists = 3
+/// Relisten artists beyond this many don't participate at all. Each favorite costs one on-date request.
+public let maxRelistenArtists = 10
 
 /// How many matches the anniversary shelf shows.
 public let maxAnniversaryShows = 8
@@ -31,12 +28,6 @@ public func showsOnAnniversary(shows: [ShowSummary], today: String) -> [ShowSumm
     guard let md = monthDay(today) else { return [] }
     let thisYear = yearOf(today)
     return shows.filter { monthDay($0.date) == md && yearOf($0.date) != thisYear }
-}
-
-/// Years per artist, once `relistenYearBudget` is split between them.
-public func relistenYearBudget(artistCount: Int, budget: Int = relistenYearBudget) -> Int {
-    if artistCount <= 0 { return 0 }
-    return max(1, budget / artistCount)
 }
 
 /// A phish.in period id is either "1997" or "1983-1987"; this is its span.
@@ -98,7 +89,6 @@ public func showsOnDate(
     source: @escaping (Backend) -> MusicSource = sourceFor
 ) async throws -> [ShowSummary] {
     let relisten = Array(favorites.filter { $0.backend == .relisten }.prefix(maxRelistenArtists))
-    let yearsEach = relistenYearBudget(artistCount: relisten.count)
     let participating = favorites.filter { $0.backend != .relisten } + relisten
 
     if participating.isEmpty { return [] }
@@ -113,20 +103,23 @@ public func showsOnDate(
             group.addTask {
                 do {
                     let src = source(artist.backend)
-                    let allPeriods = try await src.periods(artist: artist)
-                    let periods: [PeriodRef]
+                    let artistShows: [ShowSummary]
                     switch artist.backend {
                     case .phishin:
-                        periods = phishInRanges(periods: allPeriods)
-                    case .relisten:
-                        periods = Array(allPeriods.sorted { $0.label > $1.label }.prefix(yearsEach))
-                    }
-
-                    var artistShows: [ShowSummary] = []
-                    for period in periods {
-                        if let shows = try? await src.shows(artist: artist, period: period) {
-                            artistShows.append(contentsOf: shows)
+                        let allPeriods = try await src.periods(artist: artist)
+                        let periods = phishInRanges(periods: allPeriods)
+                        var shows: [ShowSummary] = []
+                        for period in periods {
+                            if let s = try? await src.shows(artist: artist, period: period) {
+                                shows.append(contentsOf: s)
+                            }
                         }
+                        artistShows = shows
+                    case .relisten:
+                        guard let md = monthDay(today) else { return .success([]) }
+                        let parts = md.split(separator: "-").compactMap { Int($0) }
+                        guard parts.count == 2 else { return .success([]) }
+                        artistShows = try await src.showsOnDate(artist: artist, month: parts[0], day: parts[1])
                     }
                     return .success(showsOnAnniversary(shows: artistShows, today: today))
                 } catch {

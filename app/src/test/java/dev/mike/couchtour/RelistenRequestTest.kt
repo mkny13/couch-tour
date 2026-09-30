@@ -91,6 +91,23 @@ class RelistenRequestTest {
     }
 
     @Test
+    fun `requests on-date shows by artist slug with month and day query params under v2`() = runBlocking {
+        enqueue("""[{"display_date":"1995-09-29"}]""")
+
+        val shows = RelistenApi.showsOnDate("moe", 9, 29)
+
+        val request = take()
+        assertEquals(
+            listOf("api", "v2", "artists", "moe", "shows", "on-date"),
+            request.requestUrl!!.pathSegments
+        )
+        assertEquals("9", request.requestUrl!!.queryParameter("month"))
+        assertEquals("29", request.requestUrl!!.queryParameter("day"))
+        assertEquals(1, shows.size)
+        assertEquals("1995-09-29", shows[0].displayDate)
+    }
+
+    @Test
     fun `sends no auth header, because Relisten needs none`() = runBlocking {
         enqueue("[]")
 

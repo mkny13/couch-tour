@@ -11,28 +11,22 @@ import kotlin.random.Random
  * The Home screen's "On this date" row (#13): shows the user's favorited artists played on
  * today's month/day, in years gone by.
  *
- * Neither backend can answer this question. phish.in's `/shows` filters by `year=` or
- * `year_range=` and nothing else ([PhishInApi.showsForPeriod]); Relisten's catalog is a
- * per-year fetch ([RelistenApi.year]). There is no search parameter and no "on this day"
- * endpoint on either side, so the only way to find matches is to pull down shows a period at
- * a time and compare the month/day of each date string. That makes this a *cost* problem
- * rather than a UI one, and the cost is lopsided:
+ * Backends answer this differently:
+ * - **phish.in** has no month/day endpoint; `/shows` filters by `year=` or `year_range=`.
+ *   The whole archive is under 2,000 shows with audio across ~35 periods, and consecutive
+ *   periods can be batched into `year_range=` requests ([phishInRanges]) capped at 900 shows.
+ *   Every Phish year costs about four requests, so it gets no year bound at all.
+ * - **Relisten** provides a dedicated on-date endpoint ([RelistenApi.showsOnDate]:
+ *   `GET /v2/artists/{slug}/shows/on-date?month=M&day=D`) that returns all matching shows
+ *   across all years in a single request. Favorited Relisten artists are capped at
+ *   [MAX_RELISTEN_ARTISTS] (10).
  *
- * - **phish.in** is small and range-queryable. The whole archive is under 2,000 shows with
- *   audio across ~35 periods, and consecutive periods can be batched into one `year_range=`
- *   request. Every Phish year costs about four requests, so it gets no year bound at all —
- *   and the pre-1996 years are exactly the ones worth surfacing here.
- * - **Relisten** has no range endpoint: one request per year per artist. A thirty-year
- *   archive is thirty requests, multiplied by however many artists are favorited. That is
- *   the thing that has to be capped, and [RELISTEN_YEAR_BUDGET] is the cap.
- *
- * Worst case is about nineteen requests, run once a day (see [OnThisDate]) and off the
- * critical path of the Home screen's first paint. See D162.
+ * Worst case is about fourteen requests, run once a day (see [OnThisDate]) and off the
+ * critical path of the Home screen's first paint. See D162 and D300.
  *
  * Everything here works through the [MusicSource] seam rather than the two API clients, so
- * the whole path — including the phish.in range batching, which rides
- * [PhishInSource.shows]'s existing `year_range=` branch — is testable with a fake source and
- * no network, the same way [pickRandomShow] is (D36).
+ * the whole path — including the phish.in range batching and the Relisten on-date fetch — is
+ * testable with a fake source and no network, the same way [pickRandomShow] is (D36).
  */
 
 /** Past this many shows in one `year_range=` request, phish.in's `per_page=1000` would
@@ -40,14 +34,9 @@ import kotlin.random.Random
  *  the bound keeps holding as the archive grows rather than needing a hardcoded year list. */
 private const val PHISHIN_RANGE_CAP = 900
 
-/** Total Relisten year-fetches allowed across every favorited artist, split evenly between
- *  them. Favoriting a dozen Relisten artists costs exactly what favoriting three costs. */
-internal const val RELISTEN_YEAR_BUDGET = 12
-
-/** Relisten artists beyond this many don't participate at all — splitting the budget any
- *  finer would fetch too few years each to find anything. Favorites are taken in the order
- *  the Home screen already shows them, so the choice isn't arbitrary from the user's side. */
-internal const val MAX_RELISTEN_ARTISTS = 3
+/** Relisten artists beyond this many don't participate at all. Each favorite costs one
+ *  on-date request. */
+internal const val MAX_RELISTEN_ARTISTS = 10
 
 /** How many matches the row shows. "A random selection", not every anniversary ever. */
 internal const val MAX_ANNIVERSARY_SHOWS = 8
@@ -81,10 +70,6 @@ internal fun showsOnAnniversary(shows: List<ShowSummary>, today: String): List<S
     val thisYear = yearOf(today)
     return shows.filter { monthDay(it.date) == md && yearOf(it.date) != thisYear }
 }
-
-/** Years per artist, once [RELISTEN_YEAR_BUDGET] is split between them. */
-internal fun relistenYearBudget(artistCount: Int, budget: Int = RELISTEN_YEAR_BUDGET): Int =
-    if (artistCount <= 0) 0 else maxOf(1, budget / artistCount)
 
 /** A phish.in period id is either "1997" or "1983-1987" ([Period]); this is its span, or
  *  null for [POPULAR_PERIOD_ID] and anything else that isn't a year or year range. */
@@ -165,13 +150,12 @@ suspend fun showsOnDate(
     source: (Backend) -> MusicSource = ::sourceFor,
 ): List<ShowSummary> = coroutineScope {
     val relisten = favorites.filter { it.backend == Backend.RELISTEN }.take(MAX_RELISTEN_ARTISTS)
-    val yearsEach = relistenYearBudget(relisten.size)
     val participating = favorites.filter { it.backend != Backend.RELISTEN } + relisten
 
     if (participating.isEmpty()) return@coroutineScope emptyList()
 
     val perArtist = participating
-        .map { artist -> async { runCatching { showsFor(artist, today, yearsEach, source) } } }
+        .map { artist -> async { runCatching { showsFor(artist, today, source) } } }
         .awaitAll()
 
     var successCount = 0
@@ -194,32 +178,36 @@ suspend fun showsOnDate(
     pickAnniversaryShows(allShows, random = random)
 }
 
-/** One artist's anniversary matches. The period selection is where the two backends differ:
- *  phish.in batches its whole archive into ranges, Relisten takes its most recent
- *  [yearsEach] years — the same backend dispatch [showShareUrl] and [ShowDetail.queueKey]
- *  already do, rather than a capability flag on [MusicSource] with two possible answers. */
+/** One artist's anniversary matches. The fetch is where the backends differ:
+ *  phish.in batches its archive into `year_range=` queries, Relisten queries its
+ *  on-date endpoint ([MusicSource.showsOnDate]) in a single request. */
 private suspend fun showsFor(
     artist: ArtistRef,
     today: String,
-    yearsEach: Int,
     source: (Backend) -> MusicSource,
 ): List<ShowSummary> = coroutineScope {
     val src = source(artist.backend)
-    val all = src.periods(artist)
-    val periods = when (artist.backend) {
-        Backend.PHISHIN -> phishInRanges(all)
-        // Labels are plain years, so descending order is most-recent-first. Relisten's
-        // archives are deep enough that the budget always binds long before the list ends.
-        Backend.RELISTEN -> all.sortedByDescending { it.label }.take(yearsEach)
+    val shows = when (artist.backend) {
+        Backend.PHISHIN -> {
+            val all = src.periods(artist)
+            val periods = phishInRanges(all)
+            periods
+                .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
+                .awaitAll()
+                .flatten()
+        }
+        Backend.RELISTEN -> {
+            val md = monthDay(today) ?: return@coroutineScope emptyList()
+            val parts = md.split("-")
+            val month = parts.getOrNull(0)?.toIntOrNull() ?: return@coroutineScope emptyList()
+            val day = parts.getOrNull(1)?.toIntOrNull() ?: return@coroutineScope emptyList()
+            src.showsOnDate(artist, month, day)
+        }
         // YouTube artists have no anniversary tape; they can't be favorited anyway
         // (they never appear in any artist list), so this branch is purely exhaustive-when.
         Backend.YOUTUBE -> emptyList()
     }
-    periods
-        .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
-        .awaitAll()
-        .flatten()
-        .let { showsOnAnniversary(it, today) }
+    showsOnAnniversary(shows, today)
 }
 
 /**

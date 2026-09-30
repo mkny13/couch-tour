@@ -33,15 +33,6 @@ final class OnThisDateTests: XCTestCase {
         XCTAssertEqual(["1997-11-17", "1998-11-17"], matches.map { $0.date })
     }
 
-    func testRelistenYearBudgetSplitsEvenly() {
-        XCTAssertEqual(0, relistenYearBudget(artistCount: 0, budget: 12))
-        XCTAssertEqual(12, relistenYearBudget(artistCount: 1, budget: 12))
-        XCTAssertEqual(6, relistenYearBudget(artistCount: 2, budget: 12))
-        XCTAssertEqual(4, relistenYearBudget(artistCount: 3, budget: 12))
-        XCTAssertEqual(3, relistenYearBudget(artistCount: 4, budget: 12))
-        XCTAssertEqual(1, relistenYearBudget(artistCount: 20, budget: 12))
-    }
-
     func testPhishInRangesBatchesConsecutivePeriodsUnderCap() {
         let periods = [
             PeriodRef(id: "1983-1987", label: "1983-1987", showCount: 50),
@@ -79,8 +70,11 @@ final class OnThisDateTests: XCTestCase {
 
     private final class MockMusicSource: MusicSource {
         let backend: Backend
-        var periodsHandler: ((ArtistRef) -> [PeriodRef])?
-        var showsHandler: ((ArtistRef, PeriodRef) -> [ShowSummary])?
+        var periodsHandler: ((ArtistRef) throws -> [PeriodRef])?
+        var showsHandler: ((ArtistRef, PeriodRef) throws -> [ShowSummary])?
+        var showsOnDateHandler: ((ArtistRef, Int, Int) throws -> [ShowSummary])?
+        var periodsCalled = false
+        var showsCalled = false
 
         init(backend: Backend) {
             self.backend = backend
@@ -88,16 +82,24 @@ final class OnThisDateTests: XCTestCase {
 
         func artists() async throws -> [ArtistRef] { [] }
         func periods(artist: ArtistRef) async throws -> [PeriodRef] {
-            periodsHandler?(artist) ?? []
+            periodsCalled = true
+            if let handler = periodsHandler { return try handler(artist) }
+            return []
         }
         func shows(artist: ArtistRef, period: PeriodRef) async throws -> [ShowSummary] {
-            showsHandler?(artist, period) ?? []
+            showsCalled = true
+            if let handler = showsHandler { return try handler(artist, period) }
+            return []
         }
         func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
             fatalError("Not used")
         }
         func search(term: String) async throws -> SearchHits {
             SearchHits()
+        }
+        func showsOnDate(artist: ArtistRef, month: Int, day: Int) async throws -> [ShowSummary] {
+            if let handler = showsOnDateHandler { return try handler(artist, month, day) }
+            return []
         }
     }
 
@@ -114,11 +116,10 @@ final class OnThisDateTests: XCTestCase {
         }
 
         let deadMock = MockMusicSource(backend: .relisten)
-        deadMock.periodsHandler = { _ in
-            [PeriodRef(id: "1977", label: "1977", showCount: 60)]
-        }
-        deadMock.showsHandler = { artist, _ in
-            [
+        deadMock.showsOnDateHandler = { artist, month, day in
+            XCTAssertEqual(11, month)
+            XCTAssertEqual(17, day)
+            return [
                 ShowSummary(artist: artist, date: "1977-11-17"),
             ]
         }
@@ -138,6 +139,86 @@ final class OnThisDateTests: XCTestCase {
         let dates = Set(results.map { $0.date })
         XCTAssertTrue(dates.contains("1997-11-17"))
         XCTAssertTrue(dates.contains("1977-11-17"))
+    }
+
+    func testShowsOnDateReturnsRelistenOlderAnniversariesExcludesTodayYearAndNeverCallsPeriodsOrShows() async throws {
+        let moe = ArtistRef(backend: .relisten, id: "moe", name: "moe.")
+        let mock = MockMusicSource(backend: .relisten)
+        mock.periodsHandler = { _ in
+            XCTFail("periods should never be called for Relisten On This Date")
+            return []
+        }
+        mock.showsHandler = { _, _ in
+            XCTFail("shows should never be called for Relisten On This Date")
+            return []
+        }
+        mock.showsOnDateHandler = { artist, month, day in
+            XCTAssertEqual(9, month)
+            XCTAssertEqual(29, day)
+            return [
+                ShowSummary(artist: artist, date: "1995-09-29"),
+                ShowSummary(artist: artist, date: "1998-09-29"),
+                ShowSummary(artist: artist, date: "2001-09-29"),
+                ShowSummary(artist: artist, date: "2007-09-29"),
+                ShowSummary(artist: artist, date: "2013-09-29"),
+                ShowSummary(artist: artist, date: "2026-09-29"), // Today's year, must be excluded
+            ]
+        }
+
+        let results = try await showsOnDate(
+            favorites: [moe],
+            today: "2026-09-29",
+            source: { _ in mock }
+        )
+
+        XCTAssertFalse(mock.periodsCalled)
+        XCTAssertFalse(mock.showsCalled)
+        let dates = results.map { $0.date }
+        XCTAssertEqual(5, dates.count)
+        XCTAssertEqual(["2013-09-29", "2007-09-29", "2001-09-29", "1998-09-29", "1995-09-29"], dates)
+        XCTAssertFalse(dates.contains("2026-09-29"))
+    }
+
+    func testShowsOnDateCapsAtTenRelistenArtists() async throws {
+        let artists = (1...12).map { ArtistRef(backend: .relisten, id: "artist-\($0)", name: "Artist \($0)") }
+        var queriedArtistIds: [String] = []
+        let mock = MockMusicSource(backend: .relisten)
+        mock.showsOnDateHandler = { artist, _, _ in
+            queriedArtistIds.append(artist.id)
+            return [ShowSummary(artist: artist, date: "2000-09-29")]
+        }
+
+        let results = try await showsOnDate(
+            favorites: artists,
+            today: "2026-09-29",
+            source: { _ in mock }
+        )
+
+        XCTAssertEqual(10, queriedArtistIds.count)
+        XCTAssertEqual(Set((1...10).map { "artist-\($0)" }), Set(queriedArtistIds))
+        XCTAssertEqual(8, results.count) // Capped at maxAnniversaryShows (8)
+    }
+
+    func testShowsOnDateOneFailingArtistDoesNotDropOthers() async throws {
+        let ok = ArtistRef(backend: .relisten, id: "ok", name: "Ok")
+        let bad = ArtistRef(backend: .relisten, id: "bad", name: "Bad")
+        let mock = MockMusicSource(backend: .relisten)
+        mock.showsOnDateHandler = { artist, _, _ in
+            if artist.id == "bad" {
+                throw APIException("500", code: 500)
+            }
+            return [ShowSummary(artist: artist, date: "1999-09-29")]
+        }
+
+        let results = try await showsOnDate(
+            favorites: [ok, bad],
+            today: "2026-09-29",
+            source: { _ in mock }
+        )
+
+        XCTAssertEqual(1, results.count)
+        XCTAssertEqual("1999-09-29", results[0].date)
+        XCTAssertEqual("ok", results[0].artist.id)
     }
 
     func testOnThisDateCacheInvalidation() async throws {
