@@ -344,6 +344,7 @@ struct PlayerRailView: View {
                                 .frame(width: 58, height: 58)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Previous track")
 
                         // 72x72 Filled Circle Play/Pause Button
                         Button {
@@ -371,6 +372,7 @@ struct PlayerRailView: View {
                                 .frame(width: 58, height: 58)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Next track")
 
                         // Add to playlist button
                         if let currentTrack = player.currentTrack {

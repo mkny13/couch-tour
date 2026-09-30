@@ -385,6 +385,7 @@ struct ExpandedNowPlayingView: View {
                             .frame(width: 64, height: 64)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Previous track")
 
                     Button {
                         player.togglePlayPause()
@@ -410,6 +411,7 @@ struct ExpandedNowPlayingView: View {
                             .frame(width: 64, height: 64)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Next track")
 
                     if let show = player.show, let currentTrack = player.currentTrack {
                         AddToPlaylistButton {
