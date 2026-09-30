@@ -117,7 +117,7 @@ class SyncConfigTest {
     }
 
     @Test
-    fun `switching to a host that differs from the token's issuing host clears the token store`() {
+    fun `switching hosts defers token clearing to the sync phase`() {
         val store = store()
         store.tokenHost = "old-host.example.com"
         store.deviceToken = "token-123"
@@ -129,11 +129,12 @@ class SyncConfigTest {
             store = store,
         )
 
-        assertNull(store.deviceToken)
-        assertNull(store.deviceId)
-        assertNull(store.tokenHost)
+        // Token must survive here so we don't wipe it before MainActivity processes an override intent.
+        assertNotNull(store.deviceToken)
+        assertEquals("old-host.example.com", store.tokenHost)
         assertEquals("https://new-host.example.com".toHttpUrl(), SyncApi.baseUrl)
     }
+
 
     @Test
     fun `re-applying the same host does not clear it`() {
@@ -384,6 +385,20 @@ class SyncSessionTest {
         SyncSession.sync(db.progressDao())
 
         assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `sync clears the token store if the host changed`() = runBlocking {
+        claim()
+        
+        // Change the API base URL so it mismatches the stored tokenHost
+        SyncApi.baseUrl = "https://different-host.example.com".toHttpUrl()
+        
+        SyncSession.sync(db.progressDao())
+        
+        // Assert token is cleared
+        assertFalse(SyncSession.paired.value)
+        assertEquals(1, server.requestCount)
     }
 
     @Test
