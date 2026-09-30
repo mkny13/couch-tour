@@ -4096,14 +4096,15 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
         LazyColumn {
             items(history, key = { it.queueKey }) { p ->
+                val displayTitle = historyDisplayTitle(p.title, p.queueKey)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         RowItem(
-                            title = p.title,
+                            title = displayTitle,
                             subtitle = p.subtitle,
                             artUrl = p.artUrl,
                             artistName = p.artist,
-                            date = p.title,
+                            date = displayTitle,
                             venue = p.subtitle,
                             onClick = { openQueue(p, nav) },
                             trailing = when {
@@ -4117,7 +4118,7 @@ fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
                     IconButton(onClick = { vm.forget(p) }) {
                         Icon(
                             Icons.Default.Close,
-                            "Delete ${p.title} from history",
+                            "Delete $displayTitle from history",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

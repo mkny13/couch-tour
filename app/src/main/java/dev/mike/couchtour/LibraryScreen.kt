@@ -21,13 +21,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -58,16 +56,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-enum class LibraryFilter {
-    ALL, PLAYLISTS, SHOWS, TRACKS
-}
-
-enum class LibrarySortMode(val label: String) {
-    RECENTLY_ADDED("Recently added"),
-    TITLE_ASC("Title (A–Z)"),
-    TITLE_DESC("Title (Z–A)"),
-}
-
 /**
  * Library screen from the Ledger design handoff:
  * Title, search field, filter chips (All, Playlists, Shows, Tracks), sort control, and
@@ -84,45 +72,26 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
     var showNewPlaylistDialog by remember { mutableStateOf(false) }
 
     val rawPlaylists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
-    val rawInProgressList by vm.progressDao.inProgress().collectAsState(initial = emptyList())
+    val rawShows by SavedShows.keys.collectAsState()
     val rawTracks by vm.localPlaylistDao.allTracks().collectAsState(initial = emptyList())
+    val historyCount by vm.progressDao.historyCount().collectAsState(initial = 0)
 
     val queryTrimmed = searchQuery.trim()
 
-    // Filter by search query
-    val filteredPlaylists = remember(rawPlaylists, queryTrimmed, sortMode) {
-        val filtered = if (queryTrimmed.isBlank()) rawPlaylists else rawPlaylists.filter { it.name.contains(queryTrimmed, ignoreCase = true) }
-        when (sortMode) {
-            LibrarySortMode.RECENTLY_ADDED -> filtered.sortedByDescending { it.updatedAt }
-            LibrarySortMode.TITLE_ASC -> filtered.sortedBy { it.name.lowercase() }
-            LibrarySortMode.TITLE_DESC -> filtered.sortedByDescending { it.name.lowercase() }
-        }
+    val playlistItems = remember(rawPlaylists) { playlistItems(rawPlaylists) }
+    val showItems = remember(rawShows) { savedShowItems(rawShows) }
+    val trackItems = remember(rawTracks) { trackItems(rawTracks) }
+
+    val filteredPlaylists = remember(playlistItems, queryTrimmed, sortMode) {
+        sortLibraryItems(filterLibraryItems(playlistItems, queryTrimmed), sortMode)
     }
 
-    val filteredShows = remember(rawInProgressList, queryTrimmed, sortMode) {
-        val filtered = if (queryTrimmed.isBlank()) rawInProgressList else rawInProgressList.filter {
-            it.title.contains(queryTrimmed, ignoreCase = true) ||
-            it.artist.contains(queryTrimmed, ignoreCase = true) ||
-            it.trackTitle.contains(queryTrimmed, ignoreCase = true)
-        }
-        when (sortMode) {
-            LibrarySortMode.RECENTLY_ADDED -> filtered.sortedByDescending { it.updatedAt }
-            LibrarySortMode.TITLE_ASC -> filtered.sortedBy { it.title.lowercase() }
-            LibrarySortMode.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
-        }
+    val filteredShows = remember(showItems, queryTrimmed, sortMode) {
+        sortLibraryItems(filterLibraryItems(showItems, queryTrimmed), sortMode)
     }
 
-    val filteredTracks = remember(rawTracks, queryTrimmed, sortMode) {
-        val filtered = if (queryTrimmed.isBlank()) rawTracks else rawTracks.filter {
-            it.title.contains(queryTrimmed, ignoreCase = true) ||
-            it.showDate.contains(queryTrimmed, ignoreCase = true) ||
-            (it.venueName != null && it.venueName.contains(queryTrimmed, ignoreCase = true))
-        }
-        when (sortMode) {
-            LibrarySortMode.RECENTLY_ADDED -> filtered.sortedByDescending { it.rowId }
-            LibrarySortMode.TITLE_ASC -> filtered.sortedBy { it.title.lowercase() }
-            LibrarySortMode.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
-        }
+    val filteredTracks = remember(trackItems, queryTrimmed, sortMode) {
+        sortLibraryItems(filterLibraryItems(trackItems, queryTrimmed), sortMode)
     }
 
     val playlistCount = filteredPlaylists.size
@@ -133,7 +102,7 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
     LaunchedEffect(Unit) {
         recordLibraryCounts(
             vm.localPlaylistDao.playlists(),
-            vm.progressDao.inProgress(),
+            SavedShows.keys,
             vm.localPlaylistDao.allTracks()
         )
     }
@@ -243,6 +212,24 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
             )
         }
 
+        // When Shows tab is empty and history is not, provide navigation to History
+        if (selectedFilter == LibraryFilter.SHOWS && showCount == 0 && historyCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { nav.navigate("history") }
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Shows you have played are in History",
+                    fontSize = 13.sp,
+                    color = ledger.accentIcon,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
         // Action row: Sort and "New playlist"
         Row(
             modifier = Modifier
@@ -327,83 +314,73 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
         ) {
             // Playlists
             if (selectedFilter == LibraryFilter.ALL || selectedFilter == LibraryFilter.PLAYLISTS) {
-                items(filteredPlaylists, key = { "pl_${it.id}" }) { playlist ->
+                items(filteredPlaylists, key = { it.key }) { item ->
                     LibraryRowItem(
-                        badgeType = "LIST",
-                        title = playlist.name,
-                        subtitle = "${playlist.trackCount} ${plural(playlist.trackCount, "track")}",
+                        badgeType = item.badge,
+                        title = item.title,
+                        subtitle = item.subtitle,
                         trailingAction = {
                             CircularPlayButton(
                                 isPlaying = false,
-                                onClick = { nav.navigate("local-playlist/${playlist.id}") },
+                                onClick = {
+                                    if (item.target is LibraryTarget.LocalPlaylist) {
+                                        nav.navigate("local-playlist/${item.target.id}")
+                                    }
+                                },
                                 size = 30.dp,
                                 iconSize = 14.dp
                             )
                         },
-                        onClick = { nav.navigate("local-playlist/${playlist.id}") }
+                        onClick = {
+                            if (item.target is LibraryTarget.LocalPlaylist) {
+                                nav.navigate("local-playlist/${item.target.id}")
+                            }
+                        }
                     )
                 }
             }
 
-            // Shows from in-progress history
+            // Shows
             if (selectedFilter == LibraryFilter.ALL || selectedFilter == LibraryFilter.SHOWS) {
-                items(filteredShows, key = { "ip_${it.queueKey}" }) { item ->
-                    val showDate = item.queueKey.removePrefix("show:").removePrefix("recording:relisten:")
-                    val subtitleText = listOfNotNull(item.artist.ifBlank { null }, item.title.ifBlank { null }).joinToString(" · ")
-                    val trailing = if (item.positionMs > 0) "${fmt(item.positionMs)} elapsed" else null
+                items(filteredShows, key = { it.key }) { item ->
                     var menuOpen by remember { mutableStateOf(false) }
+                    val openShow = {
+                        when (val target = item.target) {
+                            is LibraryTarget.Show -> nav.navigate("show/${target.date}")
+                            is LibraryTarget.Recording -> {
+                                val key = item.rawKey ?: "relisten:${target.id.id}"
+                                openQueueKey(key, nav)
+                            }
+                            is LibraryTarget.LocalPlaylist -> nav.navigate("local-playlist/${target.id}")
+                        }
+                    }
                     Box {
                         LibraryRowItem(
-                            badgeType = "SHOW",
-                            title = formatShowDate(showDate),
-                            subtitle = subtitleText.ifBlank { item.trackTitle },
-                            trailingText = trailing,
-                            onClick = { openQueueKey(item.queueKey, nav) },
+                            badgeType = item.badge,
+                            title = item.title,
+                            subtitle = item.subtitle,
+                            trailingText = null,
+                            onClick = openShow,
                             onLongClick = { menuOpen = true }
                         )
                         DropdownMenu(
                             expanded = menuOpen,
                             onDismissRequest = { menuOpen = false }
                         ) {
-                            val isPlaylist = item.queueKey.startsWith("playlist:") || item.queueKey.startsWith("local-playlist:")
                             DropdownMenuItem(
-                                text = { Text("Resume playback") },
-                                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    vm.resume(item)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (isPlaylist) "Open playlist" else "Open show") },
+                                text = { Text("Open show") },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
-                                    openQueueKey(item.queueKey, nav)
+                                    openShow()
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Mark completed") },
-                                leadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    vm.markCompleted(item)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Remove from In Progress") },
-                                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
-                                onClick = {
-                                    menuOpen = false
-                                    vm.dismiss(item)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete from history") },
+                                text = { Text("Remove from Library") },
                                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
-                                    vm.forget(item)
+                                    item.rawKey?.let { SavedShows.toggle(it) }
                                 }
                             )
                         }
@@ -411,28 +388,41 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
-            // Tracks tab
+            // Tracks
             if (selectedFilter == LibraryFilter.ALL || selectedFilter == LibraryFilter.TRACKS) {
-                items(filteredTracks, key = { "trk_${it.rowId}" }) { track ->
-                    val trackSubtitle = listOfNotNull(track.showDate.ifBlank { null }, track.venueName?.ifBlank { null }).joinToString(" · ")
+                items(filteredTracks, key = { it.key }) { item ->
                     LibraryRowItem(
-                        badgeType = "TRACK",
-                        title = track.title,
-                        subtitle = trackSubtitle.ifBlank { track.backend },
-                        trailingText = if (track.durationMs > 0) fmt(track.durationMs) else null,
+                        badgeType = item.badge,
+                        title = item.title,
+                        subtitle = item.subtitle,
+                        trailingText = item.trailingText,
                         onClick = {
-                            nav.navigate("local-playlist/${track.playlistId}")
+                            if (item.target is LibraryTarget.LocalPlaylist) {
+                                nav.navigate("local-playlist/${item.target.id}")
+                            }
                         }
                     )
                 }
             }
 
-            // If empty
-            if (filteredPlaylists.isEmpty() && filteredShows.isEmpty() && filteredTracks.isEmpty()) {
+            // Empty state per tab
+            val isEmpty = when (selectedFilter) {
+                LibraryFilter.ALL -> totalCount == 0
+                LibraryFilter.PLAYLISTS -> playlistCount == 0
+                LibraryFilter.SHOWS -> showCount == 0
+                LibraryFilter.TRACKS -> trackCount == 0
+            }
+            if (isEmpty) {
                 item {
+                    val emptyMessage = when {
+                        queryTrimmed.isNotEmpty() -> "No results matching \"$queryTrimmed\"."
+                        selectedFilter == LibraryFilter.PLAYLISTS -> "Create a playlist to see it here."
+                        selectedFilter == LibraryFilter.SHOWS -> "Save a show from its page to see it here."
+                        selectedFilter == LibraryFilter.TRACKS -> "Add tracks to playlists to see them here."
+                        else -> "Your library is empty. Save a show from its page, add tracks to playlists, or create playlists to see them here."
+                    }
                     Text(
-                        text = if (queryTrimmed.isNotEmpty()) "No results matching \"$queryTrimmed\"."
-                            else "Your library is empty. Play shows, save tracks, or create playlists to see them here.",
+                        text = emptyMessage,
                         fontSize = 14.sp,
                         color = ledger.textMuted,
                         modifier = Modifier.padding(vertical = 32.dp)
@@ -556,11 +546,11 @@ private fun LibraryRowItem(
 }
 
 internal suspend fun recordLibraryCounts(
-    playlistsFlow: Flow<List<*>>,
-    inProgressFlow: Flow<List<*>>,
-    tracksFlow: Flow<List<*>>
+    playlistsFlow: Flow<Collection<*>>,
+    showsFlow: Flow<Collection<*>>,
+    tracksFlow: Flow<Collection<*>>
 ) {
-    combine(playlistsFlow, inProgressFlow, tracksFlow) { playlists, shows, tracks ->
+    combine(playlistsFlow, showsFlow, tracksFlow) { playlists, shows, tracks ->
         Triple(playlists.size, shows.size, tracks.size)
     }.first().let { (playlistCount, showCount, trackCount) ->
         emitLibraryCounts(playlistCount, showCount, trackCount)
@@ -581,4 +571,3 @@ internal fun emitLibraryCounts(playlistCount: Int, showCount: Int, trackCount: I
         "playlists=$playlistCount shows=$showCount tracks=$trackCount total=$totalCount"
     )
 }
-
