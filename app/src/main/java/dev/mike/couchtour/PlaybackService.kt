@@ -58,6 +58,7 @@ object Keys {
     const val TRACK_POSITION = "track_position"
     const val DURATION_MS = "duration_ms"
     const val LEVELING_KEY = "leveling_key"
+    const val IS_RESUME = "is_resume"
 
     /** YouTube playback (#234): the resolved stream URLs and the current playback mode. */
     const val YOUTUBE_AUDIO_URL = "youtube_audio_url"
@@ -297,12 +298,18 @@ class PlaybackService : MediaLibraryService() {
 
     private val playerListener = object : Player.Listener {
         private var wasPlaying = false
+        private var currentTrackId: String? = null
+        private var justChangedTracks = false
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             saveNow()
             SyncSession.requestDebouncedPush(progressDao())
             if (wasPlaying && !isPlaying) {
                 DiagnosticsLog.log("playback.stop")
+            } else if (!wasPlaying && isPlaying) {
+                val isUnpause = !justChangedTracks
+                logPlaybackStart(isUnpause = isUnpause)
+                justChangedTracks = false
             }
             wasPlaying = isPlaying
             if (session?.player === localPlayer) {
@@ -311,6 +318,21 @@ class PlaybackService : MediaLibraryService() {
         }
 
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
+            val trackId = item?.mediaMetadata?.extras?.getString(Keys.TRACK_ID) ?: item?.mediaId
+            if (currentTrackId != trackId) {
+                if (wasPlaying && currentTrackId != null) {
+                    DiagnosticsLog.log("playback.stop")
+                }
+                currentTrackId = trackId
+                justChangedTracks = true
+
+                val player = session?.player
+                if (player != null && player.isPlaying) {
+                    logPlaybackStart(isUnpause = false)
+                    justChangedTracks = false
+                }
+            }
+
             saveNow()
             SyncSession.requestDebouncedPush(progressDao())
             updateLeveling(item)
@@ -319,6 +341,22 @@ class PlaybackService : MediaLibraryService() {
         override fun onPlaybackStateChanged(state: Int) {
             saveNow()
             SyncSession.requestDebouncedPush(progressDao())
+        }
+
+        private fun logPlaybackStart(isUnpause: Boolean) {
+            val item = session?.player?.currentMediaItem ?: return
+            val extras = item.mediaMetadata.extras
+            val trackId = extras?.getString(Keys.TRACK_ID) ?: item.mediaId
+            val show = extras?.getString(Keys.SHOW_DATE) ?: extras?.getString(Keys.QUEUE_KEY).orEmpty()
+            val source = extras?.getString(Keys.BACKEND) ?: "phishin"
+            val isResume = isUnpause || (extras?.getBoolean(Keys.IS_RESUME, false) == true)
+            DiagnosticsLog.log(
+                "playback.start",
+                "track" to trackId,
+                "show" to show,
+                "source" to source,
+                "resume" to isResume
+            )
         }
     }
 

@@ -356,19 +356,19 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (items.isEmpty()) return
-        val current = items.getOrNull(startIndex) ?: items.firstOrNull()
-        val extras = current?.mediaMetadata?.extras
-        val trackId = extras?.getString(Keys.TRACK_ID) ?: current?.mediaId.orEmpty()
-        val show = extras?.getString(Keys.SHOW_DATE) ?: extras?.getString(Keys.QUEUE_KEY).orEmpty()
-        val source = extras?.getString(Keys.BACKEND) ?: "phishin"
-        DiagnosticsLog.log(
-            "playback.start",
-            "track" to trackId,
-            "show" to show,
-            "source" to source,
-            "resume" to isResume
-        )
-        c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), startPositionMs)
+        
+        val modifiedItems = if (isResume && startIndex in items.indices) {
+            val list = items.toMutableList()
+            val item = list[startIndex]
+            val extras = android.os.Bundle(item.mediaMetadata.extras ?: android.os.Bundle()).apply {
+                putBoolean(Keys.IS_RESUME, true)
+            }
+            val meta = item.mediaMetadata.buildUpon().setExtras(extras).build()
+            list[startIndex] = item.buildUpon().setMediaMetadata(meta).build()
+            list
+        } else items
+
+        c.setMediaItems(modifiedItems, startIndex.coerceIn(0, modifiedItems.lastIndex), startPositionMs)
         c.prepare()
         c.play()
     }
@@ -611,18 +611,6 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         if (c.isPlaying) {
             c.pause()
         } else {
-            val item = c.currentMediaItem
-            val extras = item?.mediaMetadata?.extras
-            val trackId = extras?.getString(Keys.TRACK_ID) ?: item?.mediaId.orEmpty()
-            val show = extras?.getString(Keys.SHOW_DATE) ?: extras?.getString(Keys.QUEUE_KEY).orEmpty()
-            val source = extras?.getString(Keys.BACKEND) ?: "phishin"
-            DiagnosticsLog.log(
-                "playback.start",
-                "track" to trackId,
-                "show" to show,
-                "source" to source,
-                "resume" to true
-            )
             c.play()
         }
     }
