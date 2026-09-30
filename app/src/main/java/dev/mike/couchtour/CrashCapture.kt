@@ -2,6 +2,11 @@ package dev.mike.couchtour
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +25,7 @@ object CrashCapture {
     internal var crashFile: File? = null
 
     @Synchronized
-    fun install(context: Context) {
+    fun install(context: Context, scope: CoroutineScope = CoroutineScope(Dispatchers.IO)): Job {
         val dir = File(context.filesDir, "diagnostics")
         crashFile = File(dir, "last_crash.txt")
 
@@ -30,13 +35,17 @@ object CrashCapture {
             Thread.setDefaultUncaughtExceptionHandler(CrashCaptureHandler(context.applicationContext, existing))
         }
 
-        val prev = previousCrash()
-        if (prev != null) {
-            _lastCrashNotice.value = prev
+        // Asynchronously check for previous crash notice on Dispatchers.IO (#376, D293)
+        // to prevent any blocking disk I/O in Application.onCreate.
+        return scope.launch(Dispatchers.IO) {
+            val prev = readCrashFileInternal()
+            if (prev != null) {
+                _lastCrashNotice.value = prev
+            }
         }
     }
 
-    fun previousCrash(): String? {
+    internal fun readCrashFileInternal(): String? {
         val file = crashFile
             ?: DiagnosticsLog.lastCrashFile
             ?: DiagnosticsLog.diagnosticsDir?.let { File(it, "last_crash.txt") }
@@ -51,8 +60,32 @@ object CrashCapture {
         }.getOrNull()
     }
 
-    fun consumePreviousCrash(): String? {
-        val text = _lastCrashNotice.value ?: previousCrash()
+    suspend fun previousCrash(): String? = withContext(Dispatchers.IO) {
+        readCrashFileInternal()
+    }
+
+    suspend fun consumePreviousCrash(): String? {
+        val text = _lastCrashNotice.value
+        _lastCrashNotice.value = null
+        return withContext(Dispatchers.IO) {
+            val resolvedText = text ?: readCrashFileInternal()
+            val file = crashFile
+                ?: DiagnosticsLog.lastCrashFile
+                ?: DiagnosticsLog.diagnosticsDir?.let { File(it, "last_crash.txt") }
+
+            file?.let {
+                runCatching {
+                    if (it.exists()) {
+                        it.delete()
+                    }
+                }
+            }
+            resolvedText
+        }
+    }
+
+    fun consumePreviousCrashBlocking(): String? {
+        val text = _lastCrashNotice.value ?: readCrashFileInternal()
         _lastCrashNotice.value = null
         val file = crashFile
             ?: DiagnosticsLog.lastCrashFile

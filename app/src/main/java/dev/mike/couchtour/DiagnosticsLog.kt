@@ -300,7 +300,9 @@ object DiagnosticsLog {
         return lines.joinToString("\n")
     }
 
-    fun exportText(context: Context): String {
+    const val MAX_EXPORT_BYTES = 256 * 1024
+
+    fun exportText(context: Context, maxBytes: Int = MAX_EXPORT_BYTES): String {
         val dir = diagnosticsDir ?: File(context.filesDir, "diagnostics")
         val file1 = File(dir, "diagnostics.log.1")
         val file = File(dir, "diagnostics.log")
@@ -321,7 +323,20 @@ object DiagnosticsLog {
                 }
             }
         }
-        return sb.toString()
+        val full = sb.toString()
+        if (full.length <= maxBytes) {
+            return full
+        }
+
+        // Bounded export to avoid Binder TransactionTooLargeException (#376, D293).
+        // Take the tail (most recent entries), dropping incomplete leading lines.
+        val cutIndex = full.length - maxBytes
+        val nextNewline = full.indexOf('\n', cutIndex)
+        return if (nextNewline != -1 && nextNewline + 1 < full.length) {
+            full.substring(nextNewline + 1)
+        } else {
+            full.takeLast(maxBytes)
+        }
     }
 
     fun clear() {

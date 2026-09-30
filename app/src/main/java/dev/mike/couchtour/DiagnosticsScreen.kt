@@ -88,16 +88,16 @@ suspend fun clearDiagnosticsData(): DiagnosticsData = withContext(Dispatchers.IO
     )
 }
 
-fun copyDiagnosticsToClipboard(context: Context): String {
-    val text = DiagnosticsLog.exportText(context)
+fun copyDiagnosticsToClipboard(context: Context, maxBytes: Int = DiagnosticsLog.MAX_EXPORT_BYTES): String {
+    val text = DiagnosticsLog.exportText(context, maxBytes)
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
     val clip = android.content.ClipData.newPlainText("Couch Tour diagnostics", text)
     clipboard?.setPrimaryClip(clip)
     return text
 }
 
-fun createDiagnosticsShareIntent(context: Context): Intent {
-    val text = DiagnosticsLog.exportText(context)
+fun createDiagnosticsShareIntent(context: Context, maxBytes: Int = DiagnosticsLog.MAX_EXPORT_BYTES): Intent {
+    val text = DiagnosticsLog.exportText(context, maxBytes)
     return Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_SUBJECT, "Couch Tour diagnostics")
@@ -211,7 +211,9 @@ fun DiagnosticsScreen(
             CrashNoticeCard(
                 notice = notice,
                 onDismiss = {
-                    CrashCapture.consumePreviousCrash()
+                    scope.launch {
+                        CrashCapture.consumePreviousCrash()
+                    }
                 }
             )
         }

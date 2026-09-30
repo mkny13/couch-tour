@@ -157,7 +157,7 @@ class DiagnosticsScreenTest {
     }
 
     @Test
-    fun `lastCrashNotice that has been consumed does not reappear on second composition`() {
+    fun `lastCrashNotice that has been consumed does not reappear on second composition`() = runBlocking {
         val diagDir = File(testFilesDir, "diagnostics")
         val crashFile = File(diagDir, "last_crash.txt")
         val crashContent = "2026-09-30T02:00:00.000Z\tERROR\tcrash\tdetail=main · java.lang.RuntimeException: seeded\n\tat Test.run"
@@ -219,6 +219,7 @@ class DiagnosticsScreenTest {
 
         // Dismiss crash notice
         compose.onNodeWithTag("diagnostics.crash_dismiss").performClick()
+        compose.waitForIdle()
         assertNull("CrashCapture.lastCrashNotice should be null after clicking dismiss", CrashCapture.lastCrashNotice.value)
 
         // Summary header displayed
@@ -242,5 +243,59 @@ class DiagnosticsScreenTest {
 
         compose.onNodeWithTag("diagnostics.empty_state").assertIsDisplayed()
         compose.onNodeWithText("No diagnostics yet. They appear after you use the app for a while.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `exportText and copy and share bound text to MAX_EXPORT_BYTES avoiding TransactionTooLargeException`() {
+        val diagDir = File(testFilesDir, "diagnostics")
+        val current = File(diagDir, "diagnostics.log")
+        val previous = File(diagDir, "diagnostics.log.1")
+
+        // Seed 300 KiB across both files (exceeding MAX_EXPORT_BYTES = 256 KiB)
+        val sb1 = StringBuilder()
+        for (i in 0 until 3500) {
+            sb1.append("2026-09-30T01:00:00.000Z\tINFO\tlog1.event_$i\tindex=$i\n")
+        }
+        previous.writeText(sb1.toString(), Charsets.UTF_8)
+
+        val sb0 = StringBuilder()
+        for (i in 0 until 3500) {
+            sb0.append("2026-09-30T02:00:00.000Z\tINFO\tlog0.event_$i\tindex=$i\n")
+        }
+        current.writeText(sb0.toString(), Charsets.UTF_8)
+
+        val exported = DiagnosticsLog.exportText(context)
+        assertTrue("Exported size must be <= MAX_EXPORT_BYTES", exported.length <= DiagnosticsLog.MAX_EXPORT_BYTES)
+        assertTrue("Exported size must be substantial", exported.length > 200 * 1024)
+        // Verify line alignment (first line must start at timestamp)
+        assertTrue("Exported text must start on a clean line boundary", exported.startsWith("2026-09-30T"))
+        assertTrue("Exported text must contain recent log0 events", exported.contains("log0.event_1499"))
+
+        // Copy does not crash and populates clipboard with bounded text
+        val copied = copyDiagnosticsToClipboard(context)
+        assertEquals(exported, copied)
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = clipboard.primaryClip
+        assertNotNull(clip)
+        assertEquals(exported, clip!!.getItemAt(0).text.toString())
+
+        // Share intent has bounded text
+        val intent = createDiagnosticsShareIntent(context)
+        assertEquals(exported, intent.getStringExtra(Intent.EXTRA_TEXT))
+    }
+
+    @Test
+    fun `CrashCapture install loads previous crash asynchronously without blocking main thread`() = runBlocking {
+        val diagDir = File(testFilesDir, "diagnostics")
+        if (!diagDir.exists()) diagDir.mkdirs()
+        val crashFile = File(diagDir, "last_crash.txt")
+        val crashContent = "2026-09-30T00:30:00.000Z\tERROR\tcrash\tdetail=startup crash"
+        crashFile.writeText(crashContent, Charsets.UTF_8)
+
+        // Install with test scope and join
+        val job = CrashCapture.install(context, this)
+        job.join()
+
+        assertEquals(crashContent, CrashCapture.lastCrashNotice.value)
     }
 }
