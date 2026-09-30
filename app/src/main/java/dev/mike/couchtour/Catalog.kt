@@ -3,6 +3,7 @@ package dev.mike.couchtour
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
@@ -223,8 +224,12 @@ data class PeriodRef(
     val artUrl: String? = null,
 )
 
+@Serializable
 enum class ExternalReleasePlatform {
-    SPOTIFY, TIDAL
+    @SerialName("spotify")
+    SPOTIFY,
+    @SerialName("tidal")
+    TIDAL
 }
 
 @Serializable

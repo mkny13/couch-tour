@@ -466,3 +466,50 @@ final class CatalogTests: XCTestCase {
     }
 }
 
+
+extension CatalogTests {
+    func testDecodesBundledCuratedMatches() throws {
+        let url = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/CouchTourKit/Resources/curated_releases.json")
+        let data = try Data(contentsOf: url)
+        let mappings = try JSONDecoder().decode([String: ExternalRelease].self, from: data)
+
+        let match = mappings["phishin:phish:1995-11-14"]
+        XCTAssertNotNil(match)
+        XCTAssertEqual(match?.platform, .spotify)
+    }
+
+    func testDecodesBundledHeuristicMatches() throws {
+        let url = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/CouchTourKit/Resources/heuristic_matches.json")
+        let data = try Data(contentsOf: url)
+        let mappings = try JSONDecoder().decode([String: ExternalRelease].self, from: data)
+
+        let phishMatch = mappings["phishin:phish:1994-06-22"]
+        XCTAssertNotNil(phishMatch)
+        XCTAssertEqual(phishMatch?.platform, .spotify)
+        XCTAssertEqual(phishMatch?.isHeuristic, true)
+
+        let deadMatch = mappings["relisten:grateful-dead:1970-02-13"]
+        XCTAssertNotNil(deadMatch)
+        XCTAssertEqual(deadMatch?.platform, .spotify)
+        XCTAssertEqual(deadMatch?.isHeuristic, true)
+    }
+
+    func testDecodesTidalLiteral() throws {
+        let jsonStr = "{\"test:artist:date\": {\"platform\": \"tidal\", \"url\": \"https://tidal.com/browse/album/12345\"}}"
+        let data = jsonStr.data(using: .utf8)!
+        let mappings = try JSONDecoder().decode([String: ExternalRelease].self, from: data)
+
+        let match = mappings["test:artist:date"]
+        XCTAssertNotNil(match)
+        XCTAssertEqual(match?.platform, .tidal)
+        XCTAssertEqual(match?.url, "https://tidal.com/browse/album/12345")
+    }
+}
