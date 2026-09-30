@@ -122,4 +122,12 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual("E · Track 2", formatSetColumn(setName: "Encore", trackPosition: 2, fallbackIndex: 2))
         XCTAssertEqual("Track 5", formatSetColumn(setName: "", trackPosition: nil, fallbackIndex: 5))
     }
+
+    func testFormatShowCount() {
+        XCTAssertNil(formatShowCount(0))
+        XCTAssertNil(formatShowCount(-1))
+        XCTAssertEqual("1,884", formatShowCount(1884))
+        XCTAssertEqual("2,313", formatShowCount(2313))
+        XCTAssertEqual("412", formatShowCount(412))
+    }
 }
