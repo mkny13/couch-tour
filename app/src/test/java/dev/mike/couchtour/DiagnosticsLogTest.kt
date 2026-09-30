@@ -154,21 +154,131 @@ class DiagnosticsLogTest {
     }
 
     @Test
+    fun `retention drops lines older than 7 days even when active file is smaller than capBytes`() {
+        val diagnosticsDir = File(testFilesDir, "diagnostics")
+        val current = File(diagnosticsDir, "diagnostics.log")
+
+        val now = Instant.parse("2026-09-30T12:00:00.000Z")
+        val eightDaysAgo = now.minus(8, ChronoUnit.DAYS).toString()
+        val oneDayAgo = now.minus(1, ChronoUnit.DAYS).toString()
+
+        // Default cap is 1 MiB. Write a tiny 2 KB file with 10 old lines and 5 new lines.
+        current.bufferedWriter().use { writer ->
+            for (i in 1..10) {
+                writer.write("$eightDaysAgo\tINFO\tevent.old\tindex=$i\n")
+            }
+            for (i in 1..5) {
+                writer.write("$oneDayAgo\tINFO\tevent.new\tindex=$i\n")
+            }
+        }
+        assertTrue("File is much smaller than capBytes", current.length() < DiagnosticsLog.capBytes)
+
+        DiagnosticsLog.runRetention(current, now)
+
+        val lines = current.readLines()
+        assertEquals(5, lines.size)
+        assertTrue(lines.all { it.contains("event.new") })
+        assertFalse(lines.any { it.contains("event.old") })
+    }
+
+    @Test
+    fun `initDirectory runs retention on both active file and older generation 1`() {
+        val diagnosticsDir = File(testFilesDir, "diagnostics")
+        val current = File(diagnosticsDir, "diagnostics.log")
+        val previous = File(diagnosticsDir, "diagnostics.log.1")
+
+        val now = Instant.parse("2026-09-30T12:00:00.000Z")
+        val eightDaysAgo = now.minus(8, ChronoUnit.DAYS).toString()
+        val oneDayAgo = now.minus(1, ChronoUnit.DAYS).toString()
+
+        // Populate previous (.1) with lines older than 7 days
+        previous.bufferedWriter().use { writer ->
+            for (i in 1..10) {
+                writer.write("$eightDaysAgo\tINFO\tevent.prev.old\tindex=$i\n")
+            }
+            for (i in 1..5) {
+                writer.write("$oneDayAgo\tINFO\tevent.prev.new\tindex=$i\n")
+            }
+        }
+
+        // Populate current with lines older than 7 days, under cap
+        current.bufferedWriter().use { writer ->
+            for (i in 1..10) {
+                writer.write("$eightDaysAgo\tINFO\tevent.curr.old\tindex=$i\n")
+            }
+            for (i in 1..5) {
+                writer.write("$oneDayAgo\tINFO\tevent.curr.new\tindex=$i\n")
+            }
+        }
+
+        // Re-initialize directory as on app restart
+        DiagnosticsLog.resetForTest()
+        DiagnosticsLog.initDirectory(diagnosticsDir, "1.0-test", now)
+        DiagnosticsLog.flushBlocking()
+
+        // Previous file had old lines dropped, new lines retained
+        assertTrue("Previous log file should exist", previous.exists())
+        val prevLines = previous.readLines()
+        assertEquals(5, prevLines.size)
+        assertTrue(prevLines.all { it.contains("event.prev.new") })
+        assertFalse(prevLines.any { it.contains("event.prev.old") })
+
+        // Current file had old lines dropped, new lines retained, plus log.start appended
+        assertTrue("Current log file should exist", current.exists())
+        val currLines = current.readLines()
+        // 5 event.curr.new + 1 log.start
+        assertEquals(6, currLines.size)
+        assertTrue(currLines.any { it.contains("log.start") })
+        assertFalse(currLines.any { it.contains("event.curr.old") })
+        assertEquals(5, currLines.count { it.contains("event.curr.new") })
+    }
+
+    @Test
+    fun `retention deletes older generation when all its lines are older than 7 days`() {
+        val diagnosticsDir = File(testFilesDir, "diagnostics")
+        val previous = File(diagnosticsDir, "diagnostics.log.1")
+        val now = Instant.parse("2026-09-30T12:00:00.000Z")
+        val eightDaysAgo = now.minus(8, ChronoUnit.DAYS).toString()
+
+        previous.bufferedWriter().use { writer ->
+            for (i in 1..20) {
+                writer.write("$eightDaysAgo\tINFO\tevent.stale\tindex=$i\n")
+            }
+        }
+        assertTrue(previous.exists())
+
+        DiagnosticsLog.runRetention(previous, now)
+
+        assertFalse("Previous log file with only stale lines should be deleted", previous.exists())
+    }
+
+    @Test
     fun `redaction replaces credentials with asterisks while keeping non-credential fields`() {
         DiagnosticsLog.log(
             "auth.test",
             DiagnosticsLog.Level.INFO,
             "access_token" to "secret_access_token_123",
+            "accessToken" to "secret_access_token_camel_123",
             "pairing_code" to "998877",
+            "pairingCode" to "camel_code_9988",
             "sync_key" to "my_sync_key_456",
+            "syncKey" to "camel_sync_key_456",
             "auth" to "bearer_auth_jwt",
+            "authHeader" to "camel_bearer_jwt",
             "password" to "super_secret_pw",
+            "userPassword" to "camel_secret_pw",
             "passwd" to "secret_passwd",
             "client_secret" to "xyz_secret",
+            "clientSecret" to "camel_xyz_secret",
             "user_credential" to "user_cred_data",
+            "userCredential" to "camel_user_cred_data",
             "session_cookie" to "cookie_content",
+            "sessionCookie" to "camel_cookie_content",
+            "apiKey" to "camel_api_key_789",
             "track_id" to 411,
-            "show_date" to "1997-11-17"
+            "trackId" to 412,
+            "show_date" to "1997-11-17",
+            "showDate" to "1997-11-18"
         )
         DiagnosticsLog.flushBlocking()
 
@@ -176,7 +286,7 @@ class DiagnosticsLogTest {
         assertEquals(2, lines.size) // log.start from init + auth.test
         val line = lines.last()
 
-        // Redacted fields
+        // Redacted snake_case fields
         assertTrue(line.contains("access_token=***"))
         assertTrue(line.contains("pairing_code=***"))
         assertTrue(line.contains("sync_key=***"))
@@ -187,16 +297,41 @@ class DiagnosticsLogTest {
         assertTrue(line.contains("user_credential=***"))
         assertTrue(line.contains("session_cookie=***"))
 
+        // Redacted camelCase fields
+        assertTrue(line.contains("accessToken=***"))
+        assertTrue(line.contains("pairingCode=***"))
+        assertTrue(line.contains("syncKey=***"))
+        assertTrue(line.contains("authHeader=***"))
+        assertTrue(line.contains("userPassword=***"))
+        assertTrue(line.contains("clientSecret=***"))
+        assertTrue(line.contains("userCredential=***"))
+        assertTrue(line.contains("sessionCookie=***"))
+        assertTrue(line.contains("apiKey=***"))
+
         // Unredacted safe fields
         assertTrue(line.contains("track_id=411"))
+        assertTrue(line.contains("trackId=412"))
         assertTrue(line.contains("show_date=1997-11-17"))
+        assertTrue(line.contains("showDate=1997-11-18"))
 
         // Secrets must not appear anywhere
         assertFalse(line.contains("secret_access_token_123"))
+        assertFalse(line.contains("secret_access_token_camel_123"))
         assertFalse(line.contains("998877"))
+        assertFalse(line.contains("camel_code_9988"))
         assertFalse(line.contains("my_sync_key_456"))
+        assertFalse(line.contains("camel_sync_key_456"))
         assertFalse(line.contains("bearer_auth_jwt"))
+        assertFalse(line.contains("camel_bearer_jwt"))
         assertFalse(line.contains("super_secret_pw"))
+        assertFalse(line.contains("camel_secret_pw"))
+        assertFalse(line.contains("xyz_secret"))
+        assertFalse(line.contains("camel_xyz_secret"))
+        assertFalse(line.contains("user_cred_data"))
+        assertFalse(line.contains("camel_user_cred_data"))
+        assertFalse(line.contains("cookie_content"))
+        assertFalse(line.contains("camel_cookie_content"))
+        assertFalse(line.contains("camel_api_key_789"))
 
         assertEquals("***", DiagnosticsLog.redactValue("anything"))
     }

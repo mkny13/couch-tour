@@ -73,11 +73,12 @@ object DiagnosticsLog {
     fun redactValue(value: Any?): String = "***"
 
     internal fun isRedactedKey(key: String): Boolean {
-        val lower = key.lowercase()
-        val tokens = lower.split(Regex("(?<=[a-z])(?=[A-Z])|[^a-z0-9]+")).filter { it.isNotEmpty() }
+        val tokens = key.split(Regex("(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|[^a-zA-Z0-9]+"))
+            .filter { it.isNotEmpty() }
+            .map { it.lowercase() }
         return tokens.any { token ->
             REDACTED_KEYWORDS.any { kw ->
-                token == kw || (kw.length >= 4 && token.startsWith(kw))
+                token == kw || token == "${kw}s" || (kw.length >= 4 && (token.startsWith(kw) || token.endsWith(kw)))
             }
         }
     }
@@ -126,8 +127,13 @@ object DiagnosticsLog {
             logFile1 = previous
             lastCrashFile = crash
 
-            // Retention on init if file is over cap
-            runRetention(current, now)
+            // Run retention on both generations at startup to enforce 7-day policy and size caps
+            if (previous.exists()) {
+                runRetention(previous, now)
+            }
+            if (current.exists()) {
+                runRetention(current, now)
+            }
 
             writerJob?.cancel()
             val newChannel = Channel<WriterMessage>(capacity = 1000)
@@ -354,7 +360,7 @@ object DiagnosticsLog {
     }
 
     internal fun runRetention(file: File, now: Instant = Instant.now()) {
-        if (!file.exists() || file.length() < capBytes) return
+        if (!file.exists() || file.length() == 0L) return
 
         runCatching {
             synchronized(writeLock) {
@@ -370,6 +376,15 @@ object DiagnosticsLog {
                 val byteCount = filtered.sumOf { it.toByteArray(Charsets.UTF_8).size + 1L }
                 if (byteCount >= capBytes) {
                     filtered = filtered.takeLast(RETENTION_LINE_LIMIT)
+                }
+
+                if (filtered.size == lines.size) {
+                    return@synchronized
+                }
+
+                if (filtered.isEmpty()) {
+                    file.delete()
+                    return@synchronized
                 }
 
                 val tmp = File(file.parentFile, "${file.name}.tmp")
