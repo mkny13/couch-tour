@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.testTag
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -407,49 +408,49 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             // IN PROGRESS section
             if (recent.isNotEmpty()) {
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Column(Modifier.testTag(A11yTags.HOME_SECTION_IN_PROGRESS)) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { nav.navigate("history") }
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { nav.navigate("history") }
+                            ) {
+                                Text(
+                                    text = "IN PROGRESS",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                    color = ledger.textMuted
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = "History",
+                                    tint = ledger.textMuted,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                             Text(
-                                text = "IN PROGRESS",
+                                text = "${recent.size} of $historyCount",
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.2.sp,
-                                color = ledger.textMuted
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = "History",
-                                tint = ledger.textMuted,
-                                modifier = Modifier.size(14.dp)
+                                color = ledger.accentIcon,
+                                modifier = Modifier.clickable { nav.navigate("history") }
                             )
                         }
-                        Text(
-                            text = "${recent.size} of $historyCount",
-                            fontSize = 12.sp,
-                            color = ledger.accentIcon,
-                            modifier = Modifier.clickable { nav.navigate("history") }
+                        GradientHairline(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
                         )
+                        recent.take(4).forEach { p ->
+                            InProgressLedgerRow(p, vm, nav, Modifier.testTag(A11yTags.homeInProgressRow(p.queueKey)))
+                        }
                     }
-                }
-                item {
-                    GradientHairline(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                    )
-                }
-                items(recent.take(4), key = { it.queueKey }) { p ->
-                    InProgressLedgerRow(p, vm, nav)
                 }
             }
 
@@ -464,6 +465,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                             .clip(RoundedCornerShape(10.dp))
                             .background(ledger.cardSurface)
                             .border(1.dp, ledger.panelBorder, RoundedCornerShape(10.dp))
+                            .testTag(A11yTags.HOME_SECTION_NEXT_TOUR_STOPS)
                     ) {
                         Column {
                             // Top Amber/Pink hairline
@@ -566,7 +568,8 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                                        .testTag(A11yTags.homeNextTourStopRow("${show.artist.key}-${show.date}")),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(
@@ -631,36 +634,36 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             loadedWithRetry(onThisDate.value, onRetry = { onThisDateRetry++ }) { shows ->
                 if (shows.isNotEmpty()) {
                     item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "ON THIS DATE",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.2.sp,
-                                color = ledger.textMuted
+                        Column(Modifier.testTag(A11yTags.HOME_SECTION_ON_THIS_DATE)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "ON THIS DATE",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                    color = ledger.textMuted
+                                )
+                                Text(
+                                    text = "${shows.size} ${plural(shows.size, "show")}",
+                                    fontSize = 12.sp,
+                                    color = ledger.textSubtle
+                                )
+                            }
+                            GradientHairline(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp)
                             )
-                            Text(
-                                text = "${shows.size} ${plural(shows.size, "show")}",
-                                fontSize = 12.sp,
-                                color = ledger.textSubtle
-                            )
+                            shows.forEach { show ->
+                                OnThisDateLedgerRow(show, nav, Modifier.testTag(A11yTags.homeOnThisDateRow("${show.artist.key}-${show.date}")))
+                            }
                         }
-                    }
-                    item {
-                        GradientHairline(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp)
-                        )
-                    }
-                    items(shows, key = { "${it.artist.key}-${it.date}" }) { show ->
-                        OnThisDateLedgerRow(show, nav)
                     }
                 }
             }
@@ -670,14 +673,19 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             // that can run to hundreds of entries. Favoriting doesn't remove an artist from
             // that full list, so it still shows up in both places.
             if (favoritedArtists.isNotEmpty()) {
-                item { SectionHeader("Favorites", divided = true) }
-                items(favoritedArtists, key = { "favorite-${it.backend.id}-${it.id}" }) { artist ->
-                    RowItem(
-                        title = artist.name,
-                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                        artUrl = null,
-                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
-                    )
+                item {
+                    Column(Modifier.testTag(A11yTags.FAVORITES_LIST)) {
+                        SectionHeader("Favorites", divided = true)
+                        favoritedArtists.forEach { artist ->
+                            RowItem(
+                                title = artist.name,
+                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                                artUrl = null,
+                                modifier = Modifier.testTag(A11yTags.favoritesRow(artist.key)),
+                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -868,7 +876,7 @@ private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController) {
+private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController, modifier: Modifier = Modifier) {
     val ledger = LocalLedgerColors.current
     val playerState by vm.state.collectAsState()
     val isCurrentlyPlaying = playerState.hasQueue && playerState.queueKey == progress.queueKey
@@ -883,7 +891,7 @@ private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: Na
     var menuOpen by remember { mutableStateOf(false) }
     val isPlaylist = progress.queueKey.startsWith("playlist:") || progress.queueKey.startsWith("local-playlist:")
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { openQueue(progress, nav) },
@@ -998,9 +1006,9 @@ private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: Na
 }
 
 @Composable
-private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController) {
+private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController, modifier: Modifier = Modifier) {
     val ledger = LocalLedgerColors.current
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2977,21 +2985,27 @@ internal fun SearchResultsList(
             return
         }
 
-        LazyColumn {
+        LazyColumn(Modifier.testTag(A11yTags.SEARCH_RESULTS)) {
             if (r.artists.isNotEmpty()) {
-                item { SectionHeader("Artists") }
-                items(r.artists, key = { "artist-${it.backend.id}-${it.id}" }) { artist ->
-                    RowItem(
-                        title = artist.name,
-                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                        artUrl = null,
-                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
-                    )
+                item {
+                    Column(Modifier.testTag(A11yTags.SEARCH_SECTION_ARTISTS)) {
+                        SectionHeader("Artists")
+                        r.artists.forEach { artist ->
+                            RowItem(
+                                title = artist.name,
+                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                                artUrl = null,
+                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                            )
+                        }
+                    }
                 }
             }
             if (r.shows.isNotEmpty()) {
-                item { SectionHeader("Shows") }
-                items(r.shows.sortedByMode(sortMode), key = { "show-${it.artist.backend.id}-${it.artist.id}-${it.date}" }) { show ->
+                item {
+                    Column(Modifier.testTag(A11yTags.SEARCH_SECTION_SHOWS)) {
+                        SectionHeader("Shows")
+                        r.shows.sortedByMode(sortMode).forEach { show ->
                     RowItem(
                         title = show.date,
                         subtitle = listOfNotNull(
@@ -3011,6 +3025,8 @@ internal fun SearchResultsList(
                             }
                         }
                     )
+                }
+                    }
                 }
             }
             SliceKind.entries.forEach { kind ->
@@ -3036,8 +3052,10 @@ internal fun SearchResultsList(
                 items(r.playlists, key = { "pl-${it.slug}" }) { PlaylistRow(it, nav) }
             }
             if (r.tracks.isNotEmpty()) {
-                item { SectionHeader("Tracks") }
-                items(r.tracks.sortedByMode(sortMode), key = { "track-${it.id}" }) { track ->
+                item {
+                    Column(Modifier.testTag(A11yTags.SEARCH_SECTION_TRACKS)) {
+                        SectionHeader("Tracks")
+                        r.tracks.sortedByMode(sortMode).forEach { track ->
                     RowItem(
                         title = track.title,
                         subtitle = listOfNotNull(
@@ -3055,6 +3073,8 @@ internal fun SearchResultsList(
                         },
                         onClick = { vm.playTrack(track) }
                     )
+                }
+                    }
                 }
             }
         }
@@ -4359,6 +4379,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
             label = "Home",
             icon = Icons.Default.Home,
             selected = isHome,
+            testTag = A11yTags.NAV_HOME,
             onClick = {
                 if (!isHome) {
                     nav.navigate("home") {
@@ -4371,6 +4392,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
             label = "Search",
             icon = Icons.Default.Search,
             selected = isSearch,
+            testTag = A11yTags.NAV_SEARCH,
             onClick = {
                 if (!isSearch) {
                     nav.navigate("search")
@@ -4381,6 +4403,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
             label = "Library",
             icon = Icons.Default.Layers,
             selected = isLibrary,
+            testTag = A11yTags.NAV_LIBRARY,
             onClick = {
                 if (!isLibrary) {
                     nav.navigate("library")
@@ -4391,6 +4414,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
             label = "Settings",
             icon = Icons.Default.Tune,
             selected = isSettings,
+            testTag = A11yTags.NAV_SETTINGS,
             onClick = {
                 if (!isSettings) {
                     nav.navigate("settings")
@@ -4405,6 +4429,7 @@ private fun BottomNavItem(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
+    testTag: String,
     onClick: () -> Unit
 ) {
     val ledger = LocalLedgerColors.current
@@ -4413,6 +4438,7 @@ private fun BottomNavItem(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
+            .testTag(testTag)
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -4488,10 +4514,11 @@ private fun RowItem(
     date: String? = null,
     venue: String? = null,
     showArtwork: Boolean = (artUrl != null || show != null || (date != null && artistName != null)),
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(start = 16.dp, end = if (trailingContent != null) 4.dp else 16.dp, top = 10.dp, bottom = 10.dp),
