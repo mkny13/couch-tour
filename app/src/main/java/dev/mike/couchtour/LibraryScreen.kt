@@ -53,10 +53,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 
 enum class LibraryFilter {
     ALL, PLAYLISTS, SHOWS, TRACKS
@@ -130,8 +130,12 @@ fun LibraryScreen(vm: PlayerViewModel, nav: NavHostController) {
     val trackCount = filteredTracks.size
     val totalCount = playlistCount + showCount + trackCount
 
-    LaunchedEffect(rawPlaylists, rawInProgressList, rawTracks) {
-        emitLibraryCounts(playlistCount, showCount, trackCount)
+    LaunchedEffect(Unit) {
+        recordLibraryCounts(
+            vm.localPlaylistDao.playlists(),
+            vm.progressDao.inProgress(),
+            vm.localPlaylistDao.allTracks()
+        )
     }
 
     Column(
@@ -548,6 +552,18 @@ private fun LibraryRowItem(
                 .height(1.dp)
                 .background(ledger.listDivider)
         )
+    }
+}
+
+internal suspend fun recordLibraryCounts(
+    playlistsFlow: Flow<List<*>>,
+    inProgressFlow: Flow<List<*>>,
+    tracksFlow: Flow<List<*>>
+) {
+    combine(playlistsFlow, inProgressFlow, tracksFlow) { playlists, shows, tracks ->
+        Triple(playlists.size, shows.size, tracks.size)
+    }.first().let { (playlistCount, showCount, trackCount) ->
+        emitLibraryCounts(playlistCount, showCount, trackCount)
     }
 }
 

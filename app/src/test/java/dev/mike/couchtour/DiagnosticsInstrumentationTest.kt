@@ -19,6 +19,10 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.IOException
 
@@ -147,6 +151,61 @@ class DiagnosticsInstrumentationTest {
 
         val summary = DiagnosticsLog.summaryLines()
         assertTrue(summary.contains("Library counts: playlists=0 shows=0 tracks=0 total=0"))
+    }
+
+    @Test
+    fun `recordLibraryCounts waits for all three flows before emitting and emits only once`() = runBlocking {
+        val playlistsFlow = MutableSharedFlow<List<String>>(replay = 1)
+        val inProgressFlow = MutableSharedFlow<List<String>>(replay = 1)
+        val tracksFlow = MutableSharedFlow<List<String>>(replay = 1)
+
+        val job = launch {
+            recordLibraryCounts(playlistsFlow, inProgressFlow, tracksFlow)
+        }
+
+        DiagnosticsLog.flushBlocking()
+        var lines = DiagnosticsLog.tailLines(10).filter { it.contains("library.counts") }
+        assertTrue("No library.counts before flows emit", lines.isEmpty())
+
+        // 1st flow emits (playlists)
+        playlistsFlow.emit(listOf("p1", "p2"))
+        DiagnosticsLog.flushBlocking()
+        lines = DiagnosticsLog.tailLines(10).filter { it.contains("library.counts") }
+        assertTrue("No library.counts after only 1st flow emits", lines.isEmpty())
+
+        // 2nd flow emits (shows)
+        inProgressFlow.emit(listOf("s1"))
+        DiagnosticsLog.flushBlocking()
+        lines = DiagnosticsLog.tailLines(10).filter { it.contains("library.counts") }
+        assertTrue("No library.counts after only 2 flows emit", lines.isEmpty())
+
+        // 3rd flow emits (tracks) -> completed library load
+        tracksFlow.emit(listOf("t1", "t2", "t3"))
+        job.join()
+        DiagnosticsLog.flushBlocking()
+        lines = DiagnosticsLog.tailLines(10).filter { it.contains("library.counts") }
+        assertEquals(1, lines.size)
+        assertTrue(lines[0].contains("library.counts\tplaylists=2 shows=1 tracks=3 total=6"))
+
+        // Subsequent flow emission does not emit another library.counts on this load
+        playlistsFlow.emit(listOf("p1", "p2", "p3", "p4"))
+        DiagnosticsLog.flushBlocking()
+        lines = DiagnosticsLog.tailLines(10).filter { it.contains("library.counts") }
+        assertEquals("Should still only have 1 library.counts emission", 1, lines.size)
+    }
+
+    @Test
+    fun `recordLibraryCounts emits zeros when database queries return empty lists`() = runBlocking {
+        val playlistsFlow = flowOf(emptyList<String>())
+        val inProgressFlow = flowOf(emptyList<String>())
+        val tracksFlow = flowOf(emptyList<String>())
+
+        recordLibraryCounts(playlistsFlow, inProgressFlow, tracksFlow)
+        DiagnosticsLog.flushBlocking()
+
+        val lines = DiagnosticsLog.tailLines(5).filter { it.contains("library.counts") }
+        assertEquals(1, lines.size)
+        assertTrue(lines[0].contains("library.counts\tplaylists=0 shows=0 tracks=0 total=0"))
     }
 
     @Test
