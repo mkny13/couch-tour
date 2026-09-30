@@ -1,0 +1,8 @@
+task printSources {
+    doLast {
+        android.sourceSets.test.kotlin.srcDirs.each { println "SRC: " + it }
+        android.sourceSets.testDebug.kotlin.srcDirs.each { println "SRC: " + it }
+        def tree = android.sourceSets.test.kotlin.getSourceFiles()
+        tree.each { println "FILE: " + it }
+    }
+}
