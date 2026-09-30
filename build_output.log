@@ -1,0 +1,12 @@
+warning: 'grdb.swift': /Volumes/ExtSSD160/.mahler-worktrees/phish-in/346-run10178/macos/Packages/CouchTourKit/.build/checkouts/GRDB.swift/Package.swift:40:19: warning: 'v4' is deprecated: watchOS 9.0 is the oldest supported version [#DeprecatedDeclaration]
+38 |         .macOS(.v10_13),
+39 |         .tvOS(.v11),
+40 |         .watchOS(.v4),
+   |                   `- warning: 'v4' is deprecated: watchOS 9.0 is the oldest supported version [#DeprecatedDeclaration]
+41 |     ],
+42 |     products: [
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+Building for debugging...
+[Using on-disk description]
+Build complete! (0.38 sec)

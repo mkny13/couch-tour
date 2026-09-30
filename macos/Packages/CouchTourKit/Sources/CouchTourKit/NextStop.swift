@@ -72,9 +72,9 @@ public func tourFor(
     artist: ArtistRef,
     preference: ArtistTourPreference? = nil,
     source: (Backend) -> MusicSource = sourceFor
-) async -> [ShowSummary] {
+) async throws -> [ShowSummary] {
     let src = source(artist.backend)
-    guard let periods = try? await src.periods(artist: artist) else { return [] }
+    let periods = try await src.periods(artist: artist)
 
     if let pref = preference {
         if let year = pref.year, !year.isEmpty {
@@ -120,16 +120,16 @@ public func currentTours(
     favorites: [ArtistRef],
     preferences: [ArtistTourPreference] = [],
     source: @escaping (Backend) -> MusicSource = sourceFor
-) async -> [ShowSummary] {
+) async throws -> [ShowSummary] {
     let prefMap = Dictionary(uniqueKeysWithValues: preferences.map { ($0.artistKey, $0) })
-    return await currentTours(favorites: favorites, preferenceLookup: { prefMap[$0.key] }, source: source)
+    return try await currentTours(favorites: favorites, preferenceLookup: { prefMap[$0.key] }, source: source)
 }
 
 public func currentTours(
     favorites: [ArtistRef],
     preferenceLookup: @escaping (ArtistRef) -> ArtistTourPreference?,
     source: @escaping (Backend) -> MusicSource = sourceFor
-) async -> [ShowSummary] {
+) async throws -> [ShowSummary] {
     var participating: [ArtistRef] = []
     let grouped = Dictionary(grouping: favorites, by: \.backend)
     for backend in Backend.allCases {
@@ -140,17 +140,42 @@ public func currentTours(
 
     if participating.isEmpty { return [] }
 
-    return await withTaskGroup(of: [ShowSummary].self) { group in
+    enum ArtistResult {
+        case success([ShowSummary])
+        case failure(Error)
+    }
+
+    return try await withThrowingTaskGroup(of: ArtistResult.self) { group in
         for artist in participating {
             let pref = preferenceLookup(artist)
             group.addTask {
-                await tourFor(artist: artist, preference: pref, source: source)
+                do {
+                    let shows = try await tourFor(artist: artist, preference: pref, source: source)
+                    return .success(shows)
+                } catch {
+                    return .failure(error)
+                }
             }
         }
+        
         var allShows: [ShowSummary] = []
-        for await shows in group {
-            allShows.append(contentsOf: shows)
+        var successCount = 0
+        var firstError: Error?
+        
+        for try await result in group {
+            switch result {
+            case .success(let shows):
+                allShows.append(contentsOf: shows)
+                successCount += 1
+            case .failure(let error):
+                if firstError == nil { firstError = error }
+            }
         }
+        
+        if successCount == 0, let error = firstError {
+            throw error
+        }
+        
         return allShows
     }
 }
@@ -177,14 +202,16 @@ public enum NextStop {
         today: String,
         preferences: [ArtistTourPreference] = [],
         source: @escaping (Backend) -> MusicSource = sourceFor
-    ) async -> [ShowSummary] {
+    ) async throws -> [ShowSummary] {
         if favorites.isEmpty { return [] }
         let key = cacheKey(favorites: favorites, today: today, preferences: preferences)
         if let cached = cached, cached.key == key {
             return cached.shows
         }
-        let shows = await currentTours(favorites: favorites, preferences: preferences, source: source)
-        cached = (key, shows)
+        let shows = try await currentTours(favorites: favorites, preferences: preferences, source: source)
+        if !shows.isEmpty {
+            cached = (key, shows)
+        }
         return shows
     }
 

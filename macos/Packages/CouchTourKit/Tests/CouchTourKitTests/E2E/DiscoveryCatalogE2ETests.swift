@@ -95,7 +95,7 @@ final class DiscoveryCatalogE2ETests: XCTestCase {
         }
 
         let pref = ArtistTourPreference(artistKey: gratefulDead.key, tourName: "Spring 1977", year: "1977")
-        let tourShows = await tourFor(artist: gratefulDead, preference: pref, source: { _ in mock })
+        let tourShows = try await tourFor(artist: gratefulDead, preference: pref, source: { _ in mock })
         XCTAssertEqual(3, tourShows.count)
 
         // The soundboard-filtered surface picks only the SBD shows out of the tour.

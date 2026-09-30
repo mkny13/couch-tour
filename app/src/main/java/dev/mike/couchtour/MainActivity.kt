@@ -357,10 +357,15 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
         val ledger = LocalLedgerColors.current
         val todayStr = remember(today) { today.toString() }
-        val onThisDate = loadOnce(todayStr to favoritedArtists.map { it.key }) {
+        var onThisDateRetry by remember { mutableIntStateOf(0) }
+        val onThisDate = loadOnce(Triple(todayStr, favoritedArtists.map { it.key }, onThisDateRetry)) {
             OnThisDate.load(favoritedArtists, todayStr)
         }
-        val nextStopShows = loadOnce(Triple(todayStr, favoritedArtists.map { it.key }, preferencesMap)) {
+        var nextStopRetry by remember { mutableIntStateOf(0) }
+        val nextStopKey = remember(todayStr, favoritedArtists.map { it.key }, preferencesMap, nextStopRetry) {
+            listOf(todayStr, favoritedArtists.map { it.key }, preferencesMap, nextStopRetry)
+        }
+        val nextStopShows = loadOnce(nextStopKey) {
             NextStop.load(favoritedArtists, todayStr, preferencesMap)
         }
         val finishedKeys by vm.progressDao.finishedKeys().collectAsState(initial = emptyList())
@@ -532,7 +537,23 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     }
                                 }
                             }
-                            if (focusedArtistKey != null && show == null) {
+                            val nextStopError = nextStopShows.value?.isFailure == true
+                            if (nextStopError) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "Couldn't load tour stops.",
+                                        fontSize = 12.sp,
+                                        color = ledger.textSubtle,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                    Button(onClick = { nextStopRetry++ }) {
+                                        Text("Retry")
+                                    }
+                                }
+                            } else if (focusedArtistKey != null && show == null) {
                                 val artistName = favoritedArtists.firstOrNull { it.key == focusedArtistKey }?.name.orEmpty()
                                 Text(
                                     text = "Nothing to catch up on $artistName.",
@@ -541,7 +562,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     modifier = Modifier.padding(start = 14.dp, bottom = 12.dp)
                                 )
                             }
-                            if (show != null) {
+                            if (show != null && !nextStopError) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -607,7 +628,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
 
             // ON THIS DATE section
-            loaded(onThisDate.value) { shows ->
+            loadedWithRetry(onThisDate.value, onRetry = { onThisDateRetry++ }) { shows ->
                 if (shows.isNotEmpty()) {
                     item {
                         Row(
@@ -4547,6 +4568,32 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.loaded(
     when (result) {
         null -> item { Loading() }
         else -> result.fold(onSuccess = { content(it) }, onFailure = { item { ErrorText(it) } })
+    }
+}
+
+private fun <T> androidx.compose.foundation.lazy.LazyListScope.loadedWithRetry(
+    result: Result<T>?,
+    onRetry: () -> Unit,
+    content: androidx.compose.foundation.lazy.LazyListScope.(T) -> Unit,
+) {
+    when (result) {
+        null -> item { Loading() }
+        else -> result.fold(
+            onSuccess = { content(it) },
+            onFailure = { 
+                item { 
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ErrorText(it)
+                        Button(onClick = onRetry) {
+                            Text("Retry")
+                        }
+                    }
+                } 
+            }
+        )
     }
 }
 

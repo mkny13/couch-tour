@@ -101,7 +101,7 @@ final class OnThisDateTests: XCTestCase {
         }
     }
 
-    func testShowsOnDateQueriesFavoritedArtists() async {
+    func testShowsOnDateQueriesFavoritedArtists() async throws {
         let phishMock = MockMusicSource(backend: .phishin)
         phishMock.periodsHandler = { _ in
             [PeriodRef(id: "1997", label: "1997", showCount: 50)]
@@ -123,7 +123,7 @@ final class OnThisDateTests: XCTestCase {
             ]
         }
 
-        let results = await showsOnDate(
+        let results = try await showsOnDate(
             favorites: [PHISH, dead],
             today: "2026-11-17",
             source: { backend in
@@ -140,7 +140,7 @@ final class OnThisDateTests: XCTestCase {
         XCTAssertTrue(dates.contains("1977-11-17"))
     }
 
-    func testOnThisDateCacheInvalidation() async {
+    func testOnThisDateCacheInvalidation() async throws {
         OnThisDate.resetCache()
 
         var phishFetchCount = 0
@@ -154,19 +154,41 @@ final class OnThisDateTests: XCTestCase {
         }
 
         let favs = [PHISH]
-        let res1 = await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
         XCTAssertEqual(1, res1.count)
         XCTAssertEqual(1, phishFetchCount)
 
         // Cached call
-        let res2 = await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
         XCTAssertEqual(1, res2.count)
         XCTAssertEqual(1, phishFetchCount)
 
         // Reset cache
         OnThisDate.resetCache()
-        let res3 = await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res3 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
         XCTAssertEqual(1, res3.count)
+        XCTAssertEqual(2, phishFetchCount)
+    }
+
+    func testOnThisDateEmptyNotCached() async throws {
+        OnThisDate.resetCache()
+        
+        var phishFetchCount = 0
+        let mock = MockMusicSource(backend: .phishin)
+        mock.periodsHandler = { _ in
+            phishFetchCount += 1
+            return [PeriodRef(id: "1997", label: "1997", showCount: 50)]
+        }
+        mock.showsHandler = { _, _ in [] } // Empty result
+        
+        let favs = [PHISH]
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        XCTAssertEqual(0, res1.count)
+        XCTAssertEqual(1, phishFetchCount)
+        
+        // Not cached, so should fetch again
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        XCTAssertEqual(0, res2.count)
         XCTAssertEqual(2, phishFetchCount)
     }
 }
