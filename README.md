@@ -141,7 +141,7 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML report lands in
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-458 macOS package tests under `macos/Packages/CouchTourKit`:
+462 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test

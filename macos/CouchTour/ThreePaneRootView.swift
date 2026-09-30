@@ -14,13 +14,14 @@ struct ThreePaneRootView: View {
     @Environment(\.ledgerColors) private var colors
     @FocusState private var searchFieldFocused: Bool
 
+    @State private var favoritesLoaded = false
     @State private var favoritedArtists: [ArtistRef] = []
     @State private var relistenArtists: [ArtistRef] = []
 
     var body: some View {
         HStack(spacing: 0) {
             // Left Sidebar
-            SidebarView(favoritedArtists: favoritedArtists) { artist in
+            SidebarView(favoritedArtists: favoritedArtists, isFavoritesLoaded: favoritesLoaded) { artist in
                 appModel.navigate(to: .artist(artist))
             }
 
@@ -95,6 +96,7 @@ struct ThreePaneRootView: View {
         let merged = mergeArtists(relistenArtists: relistenArtists, favorites: appModel.favorites.keys)
         favoritedArtists = merged.filter { appModel.favorites.keys.contains($0.key) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        favoritesLoaded = true
     }
 
     @ViewBuilder

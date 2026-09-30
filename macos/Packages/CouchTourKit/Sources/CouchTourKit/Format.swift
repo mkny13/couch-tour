@@ -139,3 +139,11 @@ public func formatSetColumn(setName: String?, trackPosition: Int?, fallbackIndex
     }
     return "Track \(num)"
 }
+
+/// Formats a show count, returning nil for n <= 0, or decimal-grouped otherwise.
+public func formatShowCount(_ n: Int) -> String? {
+    guard n > 0 else { return nil }
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    return f.string(from: NSNumber(value: n))
+}

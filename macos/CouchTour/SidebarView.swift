@@ -11,27 +11,8 @@ struct SidebarView: View {
     @Environment(\.openSettings) private var openSettings
 
     let favoritedArtists: [ArtistRef]
+    let isFavoritesLoaded: Bool
     let onSelectArtist: (ArtistRef) -> Void
-
-    private static let fallbackFavoriteArtists: [ArtistRef] = [
-        ArtistRef(backend: .relisten, id: "goose", name: "Goose", showCount: 412),
-        ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead", showCount: 2313),
-        ArtistRef(backend: .relisten, id: "perpetual-groove", name: "pgroove", showCount: 276),
-        ArtistRef(backend: .phishin, id: "phish", name: "Phish", showCount: 1884),
-        ArtistRef(backend: .relisten, id: "trey-anastasio", name: "TAB", showCount: 308),
-        ArtistRef(backend: .relisten, id: "widespread-panic", name: "WSP", showCount: 1102)
-    ]
-
-    private var sortedArtists: [ArtistRef] {
-        let list = favoritedArtists.isEmpty ? Self.fallbackFavoriteArtists : favoritedArtists
-        return list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private static let countFormatter: NumberFormatter = {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        return f
-    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -113,29 +94,43 @@ struct SidebarView: View {
                 .padding(.bottom, 6)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(sortedArtists, id: \.key) { artist in
-                        Button {
-                            onSelectArtist(artist)
-                        } label: {
-                            HStack {
-                                Text(ArtistAbbreviations.label(for: artist.name))
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(colors.textPrimary)
-                                    .lineLimit(1)
-                                Spacer()
-                                Text(Self.countFormatter.string(from: NSNumber(value: artist.showCount)) ?? "\(artist.showCount)")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(colors.textMuted)
+                switch sidebarFavoritesState(artists: favoritedArtists, isLoaded: isFavoritesLoaded) {
+                case .loading:
+                    EmptyView()
+                case .empty:
+                    Text("Star artists to pin them here")
+                        .font(.system(size: 12))
+                        .foregroundStyle(colors.textSubtle)
+                        .padding(.horizontal, 18)
+                        .padding(.top, 4)
+                        .lineLimit(2)
+                case .artists(let sorted):
+                    LazyVStack(alignment: .leading, spacing: 1) {
+                        ForEach(sorted, id: \.key) { artist in
+                            Button {
+                                onSelectArtist(artist)
+                            } label: {
+                                HStack {
+                                    Text(ArtistAbbreviations.label(for: artist.name))
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(colors.textPrimary)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    if let showCountStr = formatShowCount(artist.showCount) {
+                                        Text(showCountStr)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(colors.textMuted)
+                                    }
+                                }
+                                .frame(height: 32)
+                                .padding(.horizontal, 10)
+                                .background(Color.clear, in: RoundedRectangle(cornerRadius: 7))
                             }
-                            .frame(height: 32)
-                            .padding(.horizontal, 10)
-                            .background(Color.clear, in: RoundedRectangle(cornerRadius: 7))
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
             }
 
             Spacer()

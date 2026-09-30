@@ -4901,3 +4901,9 @@ The artist chips on the Android Home "NEXT TOUR STOP" card now filter the card t
 - **Context:** The curated/heuristic matches for external releases (Spotify, Tidal) are bundled as JSON assets. Android's `ExternalReleasePlatform` enum lacked `@SerialName`, causing failures to decode the lowercase `"spotify"` string in the JSON because `ignoreUnknownKeys = true` swallows the `SerializationException`.
 - **Decision:** Align Android's enum to the JSON format by adding `@SerialName("spotify")` and `@SerialName("tidal")`.
 - **Why:** Lowercase is the canonical wire format. `scripts/generate_heuristic_matches.py` emits lowercase, and the macOS client expects lowercase (its raw string enum values are lowercase). Modifying the JSON would break the generator and the macOS decoder.
+
+### D288: Distinguish empty from loading states for macOS sidebar favorites
+
+**Date:** 2026-09-30
+
+When the Relisten/favorites fetch was loading or failed, the macOS sidebar fell back to rendering design-mockup artists (Goose, WSP, etc.) which could mislead users into thinking they favorited them. We removed the mock data and replaced it with a muted "Star artists to pin them here" hint. To prevent this hint from flashing on every cold launch while favorites resolve, `isFavoritesLoaded` explicitly tracks the fetch state, rendering an empty space under the header until `loadFavorites()` finishes.
