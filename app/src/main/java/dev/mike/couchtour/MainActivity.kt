@@ -2324,7 +2324,19 @@ private fun RecordingTrackRow(
         // Relisten has no per-track page (trackShareUrl always null for it) — the share
         // falls back to the show link, so no trackSlug to pass here.
         ShareButton(trackShareText(artist, date, track.title, trackSlug = null))
-        LikeTrackButton(track.id)
+        LikeTrackButton(
+            LikedTrackRef(
+                id = track.id,
+                title = track.title,
+                showDate = date,
+                venueName = track.venueName,
+                durationMs = track.durationMs,
+                artistName = artist.name,
+                artistSlug = artist.id,
+                recordingId = recordingId,
+                artUrl = track.artUrl,
+            )
+        )
         AddToPlaylistButton(vm) {
             LocalPlaylistTrackEntity(
                 playlistId = "", position = 0, backend = Backend.RELISTEN.id,
@@ -2337,19 +2349,19 @@ private fun RecordingTrackRow(
 }
 
 /**
- * Heart toggle for a Relisten [PlayableTrack] (#11), backed by [LikedTracks]. Deliberately
+ * Heart toggle for a Relisten [PlayableTrack] (#11, #372), backed by [LikedTracks]. Deliberately
  * separate from phish.in's [LikeButton]: no account gate, no server round-trip, no public
  * count — just a local like.
  */
 @Composable
 internal fun LikeTrackButton(
-    trackId: String,
+    ref: LikedTrackRef,
     modifier: Modifier = Modifier,
     iconSize: Dp = 18.dp,
 ) {
     val likedIds by LikedTracks.ids.collectAsState()
-    val liked = trackId in likedIds
-    IconButton(onClick = { LikedTracks.toggle(trackId) }, modifier = modifier) {
+    val liked = ref.id in likedIds
+    IconButton(onClick = { LikedTracks.toggle(ref) }, modifier = modifier) {
         Icon(
             if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
             if (liked) "Unlike" else "Like",
@@ -2357,6 +2369,15 @@ internal fun LikeTrackButton(
             modifier = Modifier.size(iconSize)
         )
     }
+}
+
+@Composable
+internal fun LikeTrackButton(
+    trackId: String,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 18.dp,
+) {
+    LikeTrackButton(LikedTrackRef(id = trackId), modifier, iconSize)
 }
 
 /**

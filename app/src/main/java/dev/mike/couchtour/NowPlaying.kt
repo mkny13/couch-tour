@@ -637,7 +637,17 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     ) {
                         if (state.backend == Backend.RELISTEN.id && state.trackId != null) {
                             LikeTrackButton(
-                                trackId = state.trackId!!,
+                                ref = LikedTrackRef(
+                                    id = state.trackId!!,
+                                    title = state.trackTitle,
+                                    showDate = state.showDate,
+                                    venueName = state.venueName,
+                                    durationMs = state.durationMs,
+                                    artistName = state.artistName,
+                                    artistSlug = state.artistId,
+                                    recordingId = deriveRecordingId(state.queueKey),
+                                    artUrl = state.artUrl,
+                                ),
                                 modifier = Modifier.size(38.dp),
                                 iconSize = 30.dp
                             )
