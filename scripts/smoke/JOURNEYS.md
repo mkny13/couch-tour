@@ -1,0 +1,182 @@
+# Smoke Test Journeys
+
+This document defines the user journey smoke specification for Couch Tour on macOS and Android.
+Every journey defines an end-to-end user flow with an explicit, deterministic pass condition
+queried against accessibility identifiers (`macos/CouchTour/AXIdentifiers.swift` on macOS and
+`app/src/main/java/dev/mike/couchtour/A11yTags.kt` on Android).
+
+## Exit Codes
+
+All smoke test scripts and runners adhere to the following exit-code convention:
+
+- `0` — **Complete**: The runner completed all tests regardless of verdict. The generated report decides pass or fail.
+- `1` — **Usage Error**: Command-line arguments or runner configuration are invalid.
+- `2` — **Preflight / Setup Failure**: Environment prerequisites are unmet (e.g. app not running, no Android device attached, missing accessibility permissions). A failing test journey is never exit 2.
+
+---
+
+## Journeys Overview
+
+| id | platforms | fixture | asserts |
+|---|---|---|---|
+| `launch-cold-start` | mac, android | none | app reaches Home; nav identifiers present |
+| `home-sections-after-relaunch` | mac, android | seeded-favorite | all three Home sections present after a force-quit + relaunch |
+| `browse-artists-to-artist` | mac, android | none | Artists section → `moe.` artist screen opens |
+| `search-artist-hit` | mac, android | none | query `moe` yields an artist hit under `search.section.artists` |
+| `favorite-persists-across-relaunch` | mac, android | signed-in | favorited artist still in `sidebar.favorites.list` / `favorites.list` after relaunch |
+| `no-unfavorited-in-favorites` | mac, android | signed-in | every row in the favorites list is a favorited artist |
+| `next-stop-chip-focus` | mac, android | none | tapping a Next Stop artist chip changes selection to the artist, not the tour picker |
+| `jam-chart-note-details` | mac, android | none | `jam_chart.note` present with details and a source link |
+| `library-phishin-playlists` | mac, android | signed-in | Library lists the phish.in account's playlists |
+| `favorite-syncs-mac-to-android` | mac→android | signed-in | the favorited artist appears on the other platform |
+| `favorite-syncs-android-to-mac` | android→mac | signed-in | the favorited artist appears on the other platform |
+| `in-progress-syncs-android-to-mac` | android→mac | signed-in | the Android In Progress queue appears on the Mac |
+| `nav-reaches-every-destination` | mac, android | none | all five `nav.*` destinations reachable and show their section identifier |
+| `search-result-sections` | mac, android | none | artists/shows/tracks sections render for a query that has all three |
+| `live-data-not-mockup` | mac, android | signed-in | a known current artist resolves to a real phish.in show — the #345 mockup-favorites regression guard |
+
+---
+
+## Journey Specifications
+
+### `launch-cold-start`
+
+- **id**: `launch-cold-start`
+- **platforms**: `mac, android`
+- **fixture**: `none`
+- **steps**: Launch the application from a cold-start state. Wait for the initial interface and navigation structure to render.
+- **pass condition**: On macOS, `sidebar.nav.home` is present. On Android, `nav.home` is present.
+
+### `home-sections-after-relaunch`
+
+- **id**: `home-sections-after-relaunch`
+- **platforms**: `mac, android`
+- **fixture**: `seeded-favorite`
+- **steps**: With an active session having at least one track in progress and at least one favorited artist, terminate (force-quit) the application and relaunch it. Inspect the Home screen.
+- **pass condition**: All three Home sections are present: on macOS, `home.in_progress`, `home.next_tour_stops`, and `home.on_this_date` are present; on Android, `home.section.in-progress`, `home.section.next-tour-stops`, and `home.section.on-this-date` are present.
+
+### `browse-artists-to-artist`
+
+- **id**: `browse-artists-to-artist`
+- **platforms**: `mac, android`
+- **fixture**: `none`
+- **steps**: Navigate to the Artists section. Scroll or search within the artists list and select artist `moe.` to open its catalog screen.
+- **pass condition**: On macOS, `sidebar.nav.artists` is selectable and navigates to the artists list, opening the artist screen; on Android, navigation from `nav.home` reaches the artist catalog screen for `moe.`.
+
+### `search-artist-hit`
+
+- **id**: `search-artist-hit`
+- **platforms**: `mac, android`
+- **fixture**: `none`
+- **steps**: Navigate to Search. Type `moe` into the search field and submit or wait for search results to settle.
+- **pass condition**: On macOS, `search.field` receives query and `search.tab.artists` is present with hits > 0; on Android, `search.results` displays `search.section.artists` containing at least one artist result row.
+
+### `favorite-persists-across-relaunch`
+
+- **id**: `favorite-persists-across-relaunch`
+- **platforms**: `mac, android`
+- **fixture**: `signed-in`
+- **steps**: In a signed-in session, favorite an artist if not already favorited. Force-quit the application and relaunch it. Inspect the favorites list.
+- **pass condition**: On macOS, `sidebar.favorites.list` is present and contains `sidebar.favorites.row` for the favorited artist; on Android, `favorites.list` is present and contains `favorites.row.<artistKey>` for the favorited artist.
+
+### `no-unfavorited-in-favorites`
+
+- **id**: `no-unfavorited-in-favorites`
+- **platforms**: `mac, android`
+- **fixture**: `signed-in`
+- **steps**: In a signed-in session, view the favorites list in the sidebar or Home screen. Compare all displayed entries with the user's actual favorited artists.
+- **pass condition**: Every row rendered in the favorites list corresponds to a confirmed favorited artist: on macOS, all children of `sidebar.favorites.list` match `sidebar.favorites.row` for favorited artists; on Android, all children of `favorites.list` match `favorites.row.<artistKey>` for favorited artists (no un-favorited or default mockup artists appear).
+
+### `next-stop-chip-focus`
+
+- **id**: `next-stop-chip-focus`
+- **platforms**: `mac, android`
+- **fixture**: `none`
+- **steps**: On the Home screen, locate the Next Tour Stops card section. Tap or click an artist chip within one of the tour stop cards.
+- **pass condition**: Clicking the artist chip changes selection to the artist screen rather than opening the tour picker: on macOS, `home.next_tour_stops` contains the artist chip and navigation focuses the artist without activating `home.track_tour`; on Android, `home.section.next-tour-stops` row item chip (`home.section.next-tour-stops.row.<showKey>`) focuses the artist screen rather than the tour picker dialog.
+
+### `jam-chart-note-details`
+
+- **id**: `jam-chart-note-details`
+- **platforms**: `mac, android`
+- **fixture**: `none`
+- **steps**: Navigate to a track known to have jam chart annotations (e.g. a Phish jam chart selection) and open the track / Now Playing view.
+- **pass condition**: `jam_chart.note` is present, displaying jam chart note text and a source link to phish.net (on macOS, queries `jam_chart.note`; on Android, `A11yTags` lacks a distinct jam chart tag at HEAD, which is noted as a platform tag gap, but the condition asserts on `jam_chart.note`).
+
+### `library-phishin-playlists`
+
+- **id**: `library-phishin-playlists`
+- **platforms**: `mac, android`
+- **fixture**: `signed-in`
+- **steps**: In a signed-in session, navigate to the Library screen.
+- **pass condition**: On macOS, selecting `sidebar.nav.library` displays the user's phish.in account playlists; on Android, selecting `nav.library` displays the user's phish.in account playlists.
+
+### `favorite-syncs-mac-to-android`
+
+- **id**: `favorite-syncs-mac-to-android`
+- **platforms**: `mac,android` (mac→android)
+- **fixture**: `signed-in`
+- **steps**: On macOS, favorite an artist from `sidebar.favorites.list`. Trigger a sync or wait for sync cycle completion. Open the Android application and view the favorites list.
+- **pass condition**: On macOS, the artist appears in `sidebar.favorites.list` (`sidebar.favorites.row`); after sync, on Android, the same artist appears in `favorites.list` under `favorites.row.<artistKey>`.
+
+### `favorite-syncs-android-to-mac`
+
+- **id**: `favorite-syncs-android-to-mac`
+- **platforms**: `mac,android` (android→mac)
+- **fixture**: `signed-in`
+- **steps**: On Android, favorite an artist in `favorites.list`. Trigger a sync or wait for sync cycle completion. Open the macOS application and view the sidebar favorites list.
+- **pass condition**: On Android, the artist appears in `favorites.list` under `favorites.row.<artistKey>`; after sync, on macOS, the same artist appears in `sidebar.favorites.list` under `sidebar.favorites.row`.
+
+### `in-progress-syncs-android-to-mac`
+
+- **id**: `in-progress-syncs-android-to-mac`
+- **platforms**: `mac,android` (android→mac)
+- **fixture**: `signed-in`
+- **steps**: On Android, start playback on a track and allow it to enter the In Progress queue. Trigger sync or wait for sync cycle completion. Launch the macOS application and inspect Home.
+- **pass condition**: On Android, `home.section.in-progress` contains `home.section.in-progress.row.<queueKey>`; after sync, on macOS, `home.in_progress` is present and contains the synced track row.
+
+### `nav-reaches-every-destination`
+
+- **id**: `nav-reaches-every-destination`
+- **platforms**: `mac, android`
+- **fixture**: `none`
+- **steps**: Tap or click each primary navigation destination in sequence.
+- **pass condition**: On macOS, all sidebar navigation items are present and selectable: `sidebar.nav.home`, `sidebar.nav.artists`, `sidebar.nav.search`, `sidebar.nav.library`, `sidebar.nav.history`, and `sidebar.nav.settings`; on Android, all bottom/drawer navigation destinations are present and selectable: `nav.home`, `nav.search`, `nav.library`, `nav.history`, and `nav.settings`.
+
+### `search-result-sections`
+
+- **id**: `search-result-sections`
+- **platforms**: `mac, android`
+- **fixture**: `none`
+- **steps**: Navigate to Search and submit a query matching artists, shows, and tracks (e.g. `ghost`).
+- **pass condition**: On macOS, search tab categories `search.tab.artists`, `search.tab.shows`, and `search.tab.tracks` render with positive result counts; on Android, `search.results` displays `search.section.artists`, `search.section.shows`, and `search.section.tracks`.
+
+### `live-data-not-mockup`
+
+- **id**: `live-data-not-mockup`
+- **platforms**: `mac, android`
+- **fixture**: `signed-in`
+- **steps**: From the favorites list, select a favorited artist (e.g. Phish) and navigate into the shows list.
+- **pass condition**: On macOS, selecting the artist from `sidebar.favorites.list` loads live show data from phish.in (not hardcoded mockup shows); on Android, selecting the artist from `favorites.list` loads live show data from the backend (regression guard for #345).
+
+---
+
+## Appendix: Report Grammar
+
+This appendix specifies the report grammar contract defined in #358 and implemented by the promotion gate:
+
+- `smoke-reports/<tag>.md` contains, anywhere, a line `Tag: <tag>` and **exactly one** line matching `^Smoke: (PASS|FAIL)$`.
+- A `PASS` report may carry any number of `Waived: <journey-id> - <reason>` lines. A journey the report lists as failed must be covered by a `Waived:` line for `PASS` to hold.
+- Any other line is ignored by the gate. Per-journey rows, screenshots, and bug links are therefore free-form — keep the grammar this small so a hand-written report and a runner-written one are both readable.
+
+### Runner Result-Line Contract
+
+The shared runner contract implemented in `scripts/smoke/lib.sh`:
+
+- One line per journey, tab-separated:
+  ```text
+  <platform>\t<journey-id>\t<status>\t<evidence>
+  ```
+- `status` is exactly one of `PASS`, `FAIL`, `SKIP`. `SKIP` carries a human-readable reason in `evidence` and means the fixture wasn't available. `SKIP` is not `PASS`.
+- The tag lives in a header comment of the results file (`# tag: <tag>`), not on every line.
+- `evidence` is a single line, identifier-level where possible, and must never contain account data (no artist names, no playlist names, no URLs with user-specific content). It is committed, in a public repo.

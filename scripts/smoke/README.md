@@ -44,3 +44,9 @@ sidebar.nav.library	AXRow	Library
 sidebar.nav.search	AXRow	Search
 sidebar.nav.settings	AXRow	Settings
 ```
+
+## Journeys
+
+Smoke user journeys and pass conditions are defined in [`JOURNEYS.md`](JOURNEYS.md).
+Runner result lines follow the tab-separated format `<platform>\t<journey-id>\t<status>\t<evidence>` with status `PASS`, `FAIL`, or `SKIP`.
+Exit codes follow the shared convention: `0` = completed run (report decides pass/fail), `1` = usage error, `2` = preflight/setup failure.
