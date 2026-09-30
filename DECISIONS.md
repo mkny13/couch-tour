@@ -4896,3 +4896,8 @@ The artist chips on the Android Home "NEXT TOUR STOP" card now filter the card t
 - A second tap on the focused chip clears focus, restoring the cross-artist default.
 - The tour picker moved to a "Change tour…" action in the card header. A labeled header action was chosen over a chip long-press because a long-press has no `contentDescription` and no visible affordance, which would have introduced the exact class of invisible-control defect the Ledger audit (#356) is filing.
 - This supersedes the part of D214 (#133) that wired the chip tap directly to the tour picker.
+
+### D285: Lowercase is the canonical wire format for ExternalReleasePlatform
+- **Context:** The curated/heuristic matches for external releases (Spotify, Tidal) are bundled as JSON assets. Android's `ExternalReleasePlatform` enum lacked `@SerialName`, causing failures to decode the lowercase `"spotify"` string in the JSON because `ignoreUnknownKeys = true` swallows the `SerializationException`.
+- **Decision:** Align Android's enum to the JSON format by adding `@SerialName("spotify")` and `@SerialName("tidal")`.
+- **Why:** Lowercase is the canonical wire format. `scripts/generate_heuristic_matches.py` emits lowercase, and the macOS client expects lowercase (its raw string enum values are lowercase). Modifying the JSON would break the generator and the macOS decoder.
