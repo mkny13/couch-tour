@@ -114,6 +114,8 @@ Long-standing items that predate this sprint.
 - [ ] `uat-041` **Dynamic Waveform Visualization** (Android & macOS) — Play a phish.in track (e.g. Bathtub Gin or Tweezer) and a Relisten track (e.g. Grateful Dead or Billy Strings). Verify the waveform scrubber displays unique, dynamic peak heights reflecting the actual track dynamics rather than the static repeating diamond wave pattern.
 - [ ] `uat-042` **Smooth Continuous Silhouette Waveform Visualization** (Android & macOS) — Play any track on phish.in or Relisten (e.g. Grateful Dead). Verify the waveform scrubber renders as a continuous, organic silhouette matching the phish.in and relisten.net web players (Option 1), with smooth top/bottom contours, unplayed opacity, spec-gradient played audio fill, continuous center hairline, and 2px playhead needle cursor.
 - [ ] `uat-076` **Now Playing scrubber zero progress on unknown duration** (Android) — Open Now Playing during initial track buffer/load when duration is unknown (e.g. first launch of a track, buffering state). Verify waveform shows no played gradient and no needle flash at 41%, and progress stays at 0% until duration resolves. Seeking should be disabled until duration is known.
+- [ ] `uat-084` **Transport Previous/Next button VoiceOver labels** (macOS) — Launch Couch Tour on macOS with VoiceOver enabled (⌘F5). Focus Previous and Next buttons in the Player Rail and in Expanded Now Playing; verify VoiceOver announces "Previous track, button" and "Next track, button" rather than the SF Symbol name ("backward.fill" / "forward.fill").
+
 
 ## Feedback Restoration, In-Progress Item Context Menu & Year-Based Tour Selection
 
