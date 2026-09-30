@@ -48,10 +48,10 @@ struct CouchTourApp: App {
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
 
-                // Focuses the toolbar's search field. With the sidebar gone the field is
-                // always on screen, so this no longer has to navigate anywhere first — it
-                // just asks for focus (ThreePaneRootView consumes the flag; `Commands` can't reach a
-                // `@FocusState` directly).
+                // Focuses the toolbar's search field. The field is always visible in the
+                // center pane toolbar, so this does not have to navigate anywhere first — it
+                // sets a flag that ThreePaneRootView consumes to focus the field (`Commands`
+                // can't reach a `@FocusState` directly).
                 Button("Find") {
                     appModel.focusSearchField = true
                 }

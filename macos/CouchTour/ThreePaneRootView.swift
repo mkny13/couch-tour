@@ -80,12 +80,11 @@ struct ThreePaneRootView: View {
         .onChange(of: appModel.favorites.keys) { _, _ in
             Task { await loadFavorites() }
         }
-        .onChange(of: appModel.searchQuery) { _, newQuery in
-            if !newQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                if appModel.path.last != .search {
-                    appModel.path.append(.search)
-                }
-            }
+        .onChange(of: appModel.searchQuery) { _, _ in syncSearchRoute() }
+        .onChange(of: appModel.focusSearchField) { _, shouldFocus in
+            guard shouldFocus else { return }
+            searchFieldFocused = true
+            appModel.focusSearchField = false
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             appModel.syncNow()
@@ -156,4 +155,19 @@ struct ThreePaneRootView: View {
         .padding(.vertical, 4)
         .background(colors.surface, in: Capsule())
     }
+
+    /// Typing opens the results screen; clearing the field closes it again. Only when `.search`
+    /// is the *top* of the path, so a search made before drilling into a hit doesn't yank the
+    /// user back out of the show they opened.
+    private func syncSearchRoute() {
+        let term = appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if term.count >= 3 {
+            if appModel.path.last != .search {
+                appModel.path.append(.search)
+            }
+        } else if term.isEmpty, appModel.path.last == .search {
+            appModel.path.removeLast()
+        }
+    }
 }
+
