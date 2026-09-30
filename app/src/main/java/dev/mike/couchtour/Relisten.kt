@@ -432,6 +432,19 @@ object RelistenApi {
 
     suspend fun venue(artistIdOrSlug: String, venueUuid: String): RelistenSliceWithShows =
         json.decodeFromString(get(path("v3", "artists", artistIdOrSlug, "venues", venueUuid).build()))
+
+    suspend fun showsOnDate(artistIdOrSlug: String, month: Int, day: Int): List<RelistenShowSummary> {
+        val url = baseUrl.newBuilder()
+            .addPathSegment("v2")
+            .addPathSegment("artists")
+            .addPathSegment(artistIdOrSlug)
+            .addPathSegment("shows")
+            .addPathSegment("on-date")
+            .addQueryParameter("month", month.toString())
+            .addQueryParameter("day", day.toString())
+            .build()
+        return json.decodeFromString(get(url))
+    }
 }
 
 /**
@@ -493,6 +506,9 @@ object RelistenCatalogSource : MusicSource {
     }
 
     override suspend fun search(term: String): SearchHits = RelistenApi.search(term).toSearchHits()
+
+    override suspend fun showsOnDate(artist: ArtistRef, month: Int, day: Int): List<ShowSummary> =
+        RelistenApi.showsOnDate(artist.id, month, day).map { it.toShowSummary(artist) }
 
     /** Test-only hook: clears every cache above in one call, the way [PhishInSource] does. */
     internal fun resetCache() {

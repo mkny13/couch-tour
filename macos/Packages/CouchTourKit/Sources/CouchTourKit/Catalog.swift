@@ -742,6 +742,15 @@ public protocol MusicSource {
     /// `term` is at least 3 characters — both APIs return nothing below that. A backend with
     /// nothing to offer returns empty hits rather than throwing.
     func search(term: String) async throws -> SearchHits
+
+    /// All shows played on `month`/`day` across all years. Currently supported only by Relisten.
+    func showsOnDate(artist: ArtistRef, month: Int, day: Int) async throws -> [ShowSummary]
+}
+
+extension MusicSource {
+    public func showsOnDate(artist: ArtistRef, month: Int, day: Int) async throws -> [ShowSummary] {
+        []
+    }
 }
 
 /// Shared by the browse UI and (eventually) any background prefetch — one seam, matching the

@@ -424,6 +424,11 @@ interface MusicSource {
      * [search], which stays about tape.
      */
     suspend fun youtubeContent(artist: ArtistRef): List<YouTubeVideo> = emptyList()
+
+    /**
+     * All shows played on [month]/[day] across all years. Currently supported only by Relisten.
+     */
+    suspend fun showsOnDate(artist: ArtistRef, month: Int, day: Int): List<ShowSummary> = emptyList()
 }
 
 /** Shared by MainActivity's screens and PlaybackService's Auto browse tree — one seam, two callers. */

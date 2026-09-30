@@ -776,6 +776,15 @@ public enum RelistenAPI {
         try decoder.decode(RelistenSliceWithShows.self, from: try await get(path("v3", "artists", artistIdOrSlug, "venues", venueUuid)))
     }
 
+    public static func showsOnDate(artistIdOrSlug: String, month: Int, day: Int) async throws -> [RelistenShowSummary] {
+        var components = URLComponents(url: path("v2", "artists", artistIdOrSlug, "shows", "on-date"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "month", value: String(month)),
+            URLQueryItem(name: "day", value: String(day)),
+        ]
+        return try decoder.decode([RelistenShowSummary].self, from: try await get(components.url!))
+    }
+
     /// `term` goes in `q`, a query parameter — unlike phish.in's `/search/{term}` path
     /// segment. `path(_:)` returns a bare `URL` here (unlike PhishInAPI's `URLComponents`),
     /// so this needs its own `URLComponents` to attach a query item.
@@ -867,5 +876,9 @@ public actor RelistenCatalogSource: MusicSource {
 
     public func search(term: String) async throws -> SearchHits {
         try await RelistenAPI.search(term).toSearchHits()
+    }
+
+    public func showsOnDate(artist: ArtistRef, month: Int, day: Int) async throws -> [ShowSummary] {
+        try await RelistenAPI.showsOnDate(artistIdOrSlug: artist.id, month: month, day: day).map { $0.toShowSummary(artist: artist) }
     }
 }
