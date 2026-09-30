@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class CouchTourApp : Application() {
@@ -46,8 +47,8 @@ class CouchTourApp : Application() {
         schedulePeriodicSync(this)
     }
 
-    internal fun detectPreviousCrash() {
-        if (CrashCapture.previousCrash() != null) {
+    internal fun detectPreviousCrash(scope: CoroutineScope = CoroutineScope(Dispatchers.IO)): Job {
+        return scope.launch(Dispatchers.IO) {
             CrashCapture.detectPreviousCrash()
         }
     }

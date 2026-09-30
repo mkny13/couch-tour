@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -25,6 +26,28 @@ object CrashCapture {
     internal var previousHandler: Thread.UncaughtExceptionHandler? = null
     internal var crashFile: File? = null
 
+    private val URL_QUERY_REGEX = Regex("""(https?://[^\s"'<>?#()]+)\?([^\s"'<>()]*)""", RegexOption.IGNORE_CASE)
+    private val PATH_QUERY_REGEX = Regex("""(/[\w\-./]+)\?([^\s"'<>()]*)""")
+    private val USER_INFO_REGEX = Regex("""(https?://)[^\s:@/]+:[^\s:@/]+@""", RegexOption.IGNORE_CASE)
+
+    internal fun sanitizeStackTrace(trace: String): String {
+        var result = trace
+        result = USER_INFO_REGEX.replace(result, "$1")
+        result = URL_QUERY_REGEX.replace(result) { match ->
+            val baseUrl = match.groupValues[1]
+            val queryPart = match.groupValues[2]
+            val trailingPunctuation = queryPart.takeLastWhile { it in ".,;:!)]\"'" }
+            baseUrl + trailingPunctuation
+        }
+        result = PATH_QUERY_REGEX.replace(result) { match ->
+            val basePath = match.groupValues[1]
+            val queryPart = match.groupValues[2]
+            val trailingPunctuation = queryPart.takeLastWhile { it in ".,;:!)]\"'" }
+            basePath + trailingPunctuation
+        }
+        return result
+    }
+
     @Synchronized
     fun install(context: Context, scope: CoroutineScope = CoroutineScope(Dispatchers.IO)): Job {
         val dir = File(context.filesDir, "diagnostics")
@@ -38,17 +61,10 @@ object CrashCapture {
             )
         }
 
-        val prev = previousCrash()
-        if (prev != null) {
-            _lastCrashNotice.value = prev
-        }
-
         return scope.launch(Dispatchers.IO) {
-            if (_lastCrashNotice.value == null) {
-                val asyncPrev = readCrashFileInternal()
-                if (asyncPrev != null) {
-                    _lastCrashNotice.value = asyncPrev
-                }
+            val prev = readCrashFileInternal()
+            if (prev != null) {
+                _lastCrashNotice.value = prev
             }
         }
     }
@@ -68,9 +84,33 @@ object CrashCapture {
         }.getOrNull()
     }
 
-    fun previousCrash(): String? = readCrashFileInternal()
+    suspend fun previousCrash(): String? = withContext(Dispatchers.IO) {
+        readCrashFileInternal()
+    }
 
-    fun consumePreviousCrash(): String? {
+    fun previousCrashBlocking(): String? = readCrashFileInternal()
+
+    suspend fun consumePreviousCrash(): String? {
+        val text = _lastCrashNotice.value
+        _lastCrashNotice.value = null
+        return withContext(Dispatchers.IO) {
+            val resolvedText = text ?: readCrashFileInternal()
+            val file = crashFile
+                ?: DiagnosticsLog.lastCrashFile
+                ?: DiagnosticsLog.diagnosticsDir?.let { File(it, "last_crash.txt") }
+
+            file?.let {
+                runCatching {
+                    if (it.exists()) {
+                        it.delete()
+                    }
+                }
+            }
+            resolvedText
+        }
+    }
+
+    fun consumePreviousCrashBlocking(): String? {
         val text = _lastCrashNotice.value ?: readCrashFileInternal()
         _lastCrashNotice.value = null
         val file = crashFile
@@ -87,10 +127,12 @@ object CrashCapture {
         return text
     }
 
-    fun consumePreviousCrashBlocking(): String? = consumePreviousCrash()
+    suspend fun detectPreviousCrash(): String? = withContext(Dispatchers.IO) {
+        detectPreviousCrashBlocking()
+    }
 
-    fun detectPreviousCrash(): String? {
-        val crash = previousCrash() ?: return null
+    fun detectPreviousCrashBlocking(): String? {
+        val crash = readCrashFileInternal() ?: return null
         _lastCrashNotice.value = crash
         val (parsedTs, parsedTrace) = parseCrashNotice(crash)
         val firstLine = if (parsedTrace.isNotEmpty()) parsedTrace else crash.lineSequence().firstOrNull()?.trim().orEmpty()
@@ -138,8 +180,16 @@ object CrashCapture {
     ) : Thread.UncaughtExceptionHandler {
         override fun uncaughtException(thread: Thread, throwable: Throwable) {
             val detail = runCatching {
-                "${thread.name} · ${throwable.stackTraceToString()}"
-            }.getOrDefault("${thread.name} · ${throwable.message}")
+                val raw = "${thread.name} · ${throwable.stackTraceToString()}"
+                sanitizeStackTrace(raw)
+            }.getOrElse {
+                runCatching {
+                    val rawFallback = "${thread.name} · ${throwable.javaClass.name}: ${throwable.message}"
+                    sanitizeStackTrace(rawFallback)
+                }.getOrElse {
+                    "unknown-thread · crash"
+                }
+            }
 
             runCatching {
                 DiagnosticsLog.init(context)

@@ -19,6 +19,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.io.IOException
 import kotlin.concurrent.thread
+import kotlinx.coroutines.runBlocking
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -214,7 +215,7 @@ class CrashCaptureTest {
     }
 
     @Test
-    fun `next-launch detection logs crash previous keeps file until consumed and second detection is no-op`() {
+    fun `next-launch detection logs crash previous keeps file until consumed and second detection is no-op`() = runBlocking {
         val diagDir = File(testFilesDir, "diagnostics")
         if (!diagDir.exists()) diagDir.mkdirs()
         val crashFile = File(diagDir, "last_crash.txt")
@@ -224,7 +225,8 @@ class CrashCaptureTest {
         val app = CouchTourApp()
 
         // 1. Run detection path
-        app.detectPreviousCrash()
+        val job = app.detectPreviousCrash(this)
+        job.join()
 
         // 2. Assert previousCrash() is non-null
         val detected = CrashCapture.previousCrash()
@@ -262,7 +264,7 @@ class CrashCaptureTest {
     }
 
     @Test
-    fun `last_crash survives relaunch until explicitly consumed`() {
+    fun `last_crash survives relaunch until explicitly consumed`() = runBlocking {
         val diagDir = File(testFilesDir, "diagnostics")
         if (!diagDir.exists()) diagDir.mkdirs()
         val crashFile = File(diagDir, "last_crash.txt")
@@ -271,16 +273,76 @@ class CrashCaptureTest {
         val app = CouchTourApp()
 
         // Launch 1
-        app.detectPreviousCrash()
+        app.detectPreviousCrash(this).join()
         assertTrue("File survives launch 1", crashFile.exists())
 
         // Launch 2 (simulated restart without consuming)
         CrashCapture.setLastCrashNoticeForTest(null)
-        app.detectPreviousCrash()
+        app.detectPreviousCrash(this).join()
         assertTrue("File survives launch 2", crashFile.exists())
 
         // Explicitly consume
         CrashCapture.consumePreviousCrash()
         assertFalse("File removed after consumption", crashFile.exists())
+    }
+
+    @Test
+    fun `uncaught exception embedding URL with query string strips query string from diagnostics log and last_crash`() {
+        val fakeHandler = RecordingExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler(fakeHandler)
+        CrashCapture.install(context)
+
+        val sensitiveToken = "super_secret_jwt_token_12345"
+        val sensitiveCode = "pairing_987654"
+        val ex = IOException("Failed connecting to https://phish.in/api/v1/user?auth_token=$sensitiveToken&code=$sensitiveCode (timeout)")
+
+        val currentHandler = Thread.getDefaultUncaughtExceptionHandler()
+        assertNotNull("Handler should be installed", currentHandler)
+        currentHandler?.uncaughtException(Thread.currentThread(), ex)
+
+        val diagDir = File(testFilesDir, "diagnostics")
+        val logFile = File(diagDir, "diagnostics.log")
+        val crashFile = File(diagDir, "last_crash.txt")
+
+        assertTrue("diagnostics.log must exist", logFile.exists())
+        assertTrue("last_crash.txt must exist", crashFile.exists())
+
+        val logContent = logFile.readText(Charsets.UTF_8)
+        val crashContent = crashFile.readText(Charsets.UTF_8)
+
+        // Secrets and query strings must be stripped
+        assertFalse("diagnostics.log must not contain auth token", logContent.contains(sensitiveToken))
+        assertFalse("diagnostics.log must not contain pairing code", logContent.contains(sensitiveCode))
+        assertFalse("diagnostics.log must not contain ?auth_token=", logContent.contains("?auth_token="))
+
+        assertFalse("last_crash.txt must not contain auth token", crashContent.contains(sensitiveToken))
+        assertFalse("last_crash.txt must not contain pairing code", crashContent.contains(sensitiveCode))
+        assertFalse("last_crash.txt must not contain ?auth_token=", crashContent.contains("?auth_token="))
+
+        // Base URL and exception details are preserved
+        assertTrue("diagnostics.log must retain base URL", logContent.contains("https://phish.in/api/v1/user"))
+        assertTrue("last_crash.txt must retain base URL", crashContent.contains("https://phish.in/api/v1/user"))
+        assertEquals(1, fakeHandler.invocations.size)
+    }
+
+    @Test
+    fun `handler survives OutOfMemoryError and delegates to previous handler`() {
+        val fakeHandler = RecordingExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler(fakeHandler)
+        CrashCapture.install(context)
+
+        val currentHandler = Thread.getDefaultUncaughtExceptionHandler()
+        assertNotNull("Handler should be installed", currentHandler)
+
+        val oom = OutOfMemoryError("Java heap space")
+        currentHandler?.uncaughtException(Thread.currentThread(), oom)
+
+        assertEquals("Previous handler must still be called under OOM", 1, fakeHandler.invocations.size)
+        assertEquals("Java heap space", fakeHandler.invocations[0].second.message)
+
+        val diagDir = File(testFilesDir, "diagnostics")
+        val crashFile = File(diagDir, "last_crash.txt")
+        assertTrue("last_crash.txt should be written", crashFile.exists())
+        assertTrue(crashFile.readText(Charsets.UTF_8).contains("OutOfMemoryError"))
     }
 }
