@@ -3,8 +3,12 @@ package dev.mike.couchtour
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import java.io.IOException
 import kotlin.random.Random
 
 /**
@@ -14,14 +18,14 @@ import kotlin.random.Random
  * Backends answer this differently:
  * - **phish.in** has no month/day endpoint; `/shows` filters by `year=` or `year_range=`.
  *   The whole archive is under 2,000 shows with audio across ~35 periods, and consecutive
- *   periods can be batched into `year_range=` requests ([phishInRanges]) capped at 900 shows.
- *   Every Phish year costs about four requests, so it gets no year bound at all.
+ *   periods can be batched into `year_range=` requests ([phishInRanges]) capped at 300 shows.
+ *   Every Phish year costs about seven requests, so it gets no year bound at all.
  * - **Relisten** provides a dedicated on-date endpoint ([RelistenApi.showsOnDate]:
  *   `GET /v2/artists/{slug}/shows/on-date?month=M&day=D`) that returns all matching shows
  *   across all years in a single request. Favorited Relisten artists are capped at
  *   [MAX_RELISTEN_ARTISTS] (10).
  *
- * Worst case is about fourteen requests, run once a day (see [OnThisDate]) and off the
+ * Worst case is about seventeen requests, run once a day (see [OnThisDate]) and off the
  * critical path of the Home screen's first paint. See D162 and D300.
  *
  * Everything here works through the [MusicSource] seam rather than the two API clients, so
@@ -32,7 +36,9 @@ import kotlin.random.Random
 /** Past this many shows in one `year_range=` request, phish.in's `per_page=1000` would
  *  truncate the page. Batches are sized against [PeriodRef.showCount] to stay under it, so
  *  the bound keeps holding as the archive grows rather than needing a hardcoded year list. */
-private const val PHISHIN_RANGE_CAP = 900
+private const val PHISHIN_RANGE_CAP = 300
+
+internal const val PHISHIN_CONCURRENCY = 4
 
 /** Relisten artists beyond this many don't participate at all. Each favorite costs one
  *  on-date request. */
@@ -86,7 +92,7 @@ private fun periodSpan(id: String): IntRange? {
 
 /**
  * Collapses phish.in's ~35 single-year periods into a handful of `year_range=` ones, so
- * covering the whole archive costs about four requests instead of thirty-five.
+ * covering the whole archive costs about seven requests instead of thirty-five.
  *
  * Greedy and order-preserving: consecutive periods accumulate until adding the next would
  * push the batch over [cap] shows, then a new batch starts. A period that already is a range
@@ -133,49 +139,45 @@ internal fun pickAnniversaryShows(
     random: Random = Random,
 ): List<ShowSummary> = matches.shuffled(random).take(limit).sortedByDescending { it.date }
 
+internal data class Fetched<T>(val value: T, val complete: Boolean)
+
 /**
  * Fetches every favorited artist's shows for [today]'s month/day, within the bounds above.
  *
- * Artists are fanned out concurrently and each period fetch is wrapped in [runCatching]: a
+ * Artists are fanned out concurrently and each period fetch is wrapped in try/catch: a
  * backend that 500s costs its own results and nothing else, because a partly-populated
  * discovery row is worth more than an error message where a row would be. That's also why
  * this returns an empty list rather than throwing when everything fails.
  *
  * [source] and [random] are injectable so the whole path runs without a network call.
  */
-suspend fun showsOnDate(
+internal suspend fun showsOnDate(
     favorites: List<ArtistRef>,
     today: String,
     random: Random = Random,
     source: (Backend) -> MusicSource = ::sourceFor,
-): List<ShowSummary> = coroutineScope {
+): Fetched<List<ShowSummary>> = coroutineScope {
     val relisten = favorites.filter { it.backend == Backend.RELISTEN }.take(MAX_RELISTEN_ARTISTS)
     val participating = favorites.filter { it.backend != Backend.RELISTEN } + relisten
 
-    if (participating.isEmpty()) return@coroutineScope emptyList()
+    if (participating.isEmpty()) return@coroutineScope Fetched(emptyList(), true)
 
     val perArtist = participating
-        .map { artist -> async { runCatching { showsFor(artist, today, source) } } }
+        .map { artist ->
+            async {
+                try {
+                    showsFor(artist, today, source)
+                } catch (e: IOException) {
+                    Fetched(emptyList(), false)
+                } catch (e: ApiException) {
+                    Fetched(emptyList(), false)
+                }
+            }
+        }
         .awaitAll()
 
-    var successCount = 0
-    var firstError: Throwable? = null
-    val allShows = mutableListOf<ShowSummary>()
-
-    for (result in perArtist) {
-        result.onSuccess { shows ->
-            allShows.addAll(shows)
-            successCount++
-        }.onFailure { error ->
-            if (firstError == null) firstError = error
-        }
-    }
-
-    if (successCount == 0 && firstError != null) {
-        throw firstError!!
-    }
-
-    pickAnniversaryShows(allShows, random = random)
+    val complete = perArtist.all { it.complete }
+    Fetched(pickAnniversaryShows(perArtist.flatMap { it.value }, random = random), complete)
 }
 
 /** One artist's anniversary matches. The fetch is where the backends differ:
@@ -185,29 +187,63 @@ private suspend fun showsFor(
     artist: ArtistRef,
     today: String,
     source: (Backend) -> MusicSource,
-): List<ShowSummary> = coroutineScope {
+): Fetched<List<ShowSummary>> = coroutineScope {
     val src = source(artist.backend)
-    val shows = when (artist.backend) {
+    when (artist.backend) {
         Backend.PHISHIN -> {
-            val all = src.periods(artist)
+            val all = try {
+                src.periods(artist)
+            } catch (e: IOException) {
+                return@coroutineScope Fetched(emptyList(), false)
+            } catch (e: ApiException) {
+                return@coroutineScope Fetched(emptyList(), false)
+            }
             val periods = phishInRanges(all)
-            periods
-                .map { period -> async { runCatching { src.shows(artist, period) }.getOrDefault(emptyList()) } }
+            val semaphore = Semaphore(PHISHIN_CONCURRENCY)
+
+            val results = periods
+                .map { period ->
+                    async {
+                        val fetch = suspend {
+                            suspend fun tryFetch(): Fetched<List<ShowSummary>>? = try {
+                                Fetched(src.shows(artist, period), true)
+                            } catch (e: IOException) {
+                                null
+                            } catch (e: ApiException) {
+                                null
+                            }
+                            
+                            tryFetch() ?: run {
+                                delay(250)
+                                tryFetch() ?: Fetched(emptyList(), false)
+                            }
+                        }
+                        semaphore.withPermit { fetch() }
+                    }
+                }
                 .awaitAll()
-                .flatten()
+
+            val complete = results.all { it.complete }
+            Fetched(showsOnAnniversary(results.flatMap { it.value }, today), complete)
         }
         Backend.RELISTEN -> {
-            val md = monthDay(today) ?: return@coroutineScope emptyList()
+            val md = monthDay(today) ?: return@coroutineScope Fetched(emptyList(), true)
             val parts = md.split("-")
-            val month = parts.getOrNull(0)?.toIntOrNull() ?: return@coroutineScope emptyList()
-            val day = parts.getOrNull(1)?.toIntOrNull() ?: return@coroutineScope emptyList()
-            src.showsOnDate(artist, month, day)
+            val month = parts.getOrNull(0)?.toIntOrNull() ?: return@coroutineScope Fetched(emptyList(), true)
+            val day = parts.getOrNull(1)?.toIntOrNull() ?: return@coroutineScope Fetched(emptyList(), true)
+            val shows = try {
+                src.showsOnDate(artist, month, day)
+            } catch (e: IOException) {
+                return@coroutineScope Fetched(emptyList(), false)
+            } catch (e: ApiException) {
+                return@coroutineScope Fetched(emptyList(), false)
+            }
+            Fetched(showsOnAnniversary(shows, today), true)
         }
         // YouTube artists have no anniversary tape; they can't be favorited anyway
         // (they never appear in any artist list), so this branch is purely exhaustive-when.
-        Backend.YOUTUBE -> emptyList()
+        Backend.YOUTUBE -> Fetched(emptyList(), true)
     }
-    showsOnAnniversary(shows, today)
 }
 
 /**
@@ -244,11 +280,15 @@ object OnThisDate {
         cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
         return mutex.withLock {
             cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
-            val shows = showsOnDate(favorites, today, random = random, source = source)
-            if (shows.isNotEmpty()) {
-                cached = key to shows
+            val fetched = showsOnDate(favorites, today, random = random, source = source)
+            if (fetched.complete && fetched.value.isNotEmpty()) {
+                cached = key to fetched.value
             }
-            shows
+            fetched.value
         }
+    }
+
+    internal fun resetCache() {
+        cached = null
     }
 }

@@ -1,14 +1,18 @@
 package dev.mike.couchtour
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlin.random.Random
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
+import java.net.SocketTimeoutException
+import kotlin.random.Random
 
 /**
  * The Home screen's "On this date" section (#13). Pure functions and a fake [MusicSource],
@@ -180,7 +184,7 @@ class OnThisDateTest {
         override suspend fun artists() = emptyList<ArtistRef>()
         override suspend fun periods(artist: ArtistRef): List<PeriodRef> {
             periodsCalled = true
-            if (artist.id in failing) error("boom")
+            if (artist.id in failing) throw IOException("boom")
             return periodsByArtist.getValue(artist.id)
         }
         override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
@@ -192,7 +196,7 @@ class OnThisDateTest {
         override suspend fun search(term: String) = SearchHits()
         override suspend fun showsOnDate(artist: ArtistRef, month: Int, day: Int): List<ShowSummary> {
             showsOnDateCalls.add(Triple(artist.id, month, day))
-            if (artist.id in failing) error("boom")
+            if (artist.id in failing) throw IOException("boom")
             return showsOnDateByArtist[artist.id].orEmpty()
         }
     }
@@ -211,7 +215,8 @@ class OnThisDateTest {
                 Backend.YOUTUBE -> error("not used")
             }
         }
-        assertEquals(listOf(show("1996-11-17")), result)
+        assertEquals(listOf(show("1996-11-17")), result.value)
+        assertTrue(result.complete)
     }
 
     @Test
@@ -231,7 +236,8 @@ class OnThisDateTest {
         )
         val result = showsOnDate(listOf(moe), today = "2026-09-29") { source }
 
-        assertEquals(listOf("2013-09-29", "2007-09-29", "2001-09-29", "1998-09-29", "1995-09-29"), result.map { it.date })
+        assertEquals(listOf("2013-09-29", "2007-09-29", "2001-09-29", "1998-09-29", "1995-09-29"), result.value.map { it.date })
+        assertTrue(result.complete)
         org.junit.Assert.assertFalse(source.periodsCalled)
         org.junit.Assert.assertFalse(source.showsCalled)
         assertEquals(listOf(Triple("moe", 9, 29)), source.showsOnDateCalls)
@@ -248,7 +254,8 @@ class OnThisDateTest {
 
         assertEquals(10, source.showsOnDateCalls.size)
         assertEquals((1..10).map { "artist-$it" }, source.showsOnDateCalls.map { it.first })
-        assertEquals(8, result.size) // Capped at MAX_ANNIVERSARY_SHOWS (8)
+        assertEquals(8, result.value.size) // Capped at MAX_ANNIVERSARY_SHOWS (8)
+        assertTrue(result.complete)
     }
 
     @Test
@@ -261,13 +268,15 @@ class OnThisDateTest {
             failing = setOf("bad"),
         )
         val result = showsOnDate(listOf(ok, bad), today = "2026-11-17") { source }
-        assertEquals(listOf(ShowSummary(artist = ok, date = "2020-11-17")), result)
+        assertEquals(listOf(ShowSummary(artist = ok, date = "2020-11-17")), result.value)
+        assertFalse(result.complete)
     }
 
     @Test
     fun `showsOnDate returns empty for no favorites`() = runBlocking {
         val result = showsOnDate(emptyList(), today = "2026-11-17") { error("not used") }
-        assertEquals(emptyList<ShowSummary>(), result)
+        assertEquals(emptyList<ShowSummary>(), result.value)
+        assertTrue(result.complete)
     }
 
     // ------------------------------------------------------------------ OnThisDate cache
@@ -287,15 +296,15 @@ class OnThisDateTest {
 
     @Test
     fun `OnThisDate load returns empty without hitting the network for no favorites`() = runBlocking {
-        OnThisDate.cached = null
+        OnThisDate.resetCache()
         val result = OnThisDate.load(emptyList(), today = "2026-11-17")
         assertEquals(emptyList<ShowSummary>(), result)
-        OnThisDate.cached = null
+        OnThisDate.resetCache()
     }
 
     @Test
     fun `concurrent OnThisDate load calls deduplicate to one fan-out`() = runBlocking {
-        OnThisDate.cached = null
+        OnThisDate.resetCache()
         var fetchCount = 0
         val fakeSource = object : MusicSource {
             override val backend = Backend.PHISHIN
@@ -303,7 +312,7 @@ class OnThisDateTest {
             override suspend fun periods(artist: ArtistRef): List<PeriodRef> {
                 fetchCount++
                 delay(50)
-                return listOf(PeriodRef("1996", "1996", showCount = 1))
+                return listOf(PeriodRef("1998", "1998", showCount = 1))
             }
             override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> =
                 listOf(ShowSummary(artist = PHISH, date = "1996-11-17"))
@@ -318,6 +327,145 @@ class OnThisDateTest {
 
         assertEquals(res1, res2)
         assertEquals(1, fetchCount)
-        OnThisDate.cached = null
+        OnThisDate.resetCache()
+    }
+
+    // ------------------------------------------------------------------ #352 New tests
+
+    @Test
+    fun `phishInRanges with cap=300 produces more batches than cap=900 for typical history`() {
+        val periods = (1983..2000).map { year ->
+            val count = if (year < 1990) 20 else 80 
+            PeriodRef(year.toString(), year.toString(), showCount = count)
+        }
+        val ranges300 = phishInRanges(periods, cap = 300)
+        val ranges900 = phishInRanges(periods, cap = 900)
+        
+        assertTrue(ranges300.size > ranges900.size)
+        assertTrue(ranges300.all { it.showCount <= 300 })
+        
+        val years300 = ranges300.flatMap { r -> 
+            val parts = r.id.split("-").map { it.toInt() }
+            (parts[0]..parts[1]).toList()
+        }
+        assertEquals((1983..2000).toList(), years300)
+    }
+
+    @Test
+    fun `showsOnDate retries a failed range once on IOException`() = runBlocking {
+        var attempts = 0
+        val source = FakeSource(
+            Backend.PHISHIN,
+            periodsByArtist = mapOf("phish" to listOf(PeriodRef("1996", "1996", showCount = 1))),
+            showsByPeriod = emptyMap()
+        )
+        val spySource = object : MusicSource by source {
+            override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+                attempts++
+                if (attempts == 1) throw SocketTimeoutException("timeout")
+                return listOf(show("1996-11-17"))
+            }
+        }
+        val result = showsOnDate(listOf(PHISH), today = "2026-11-17") { spySource }
+        assertEquals(2, attempts)
+        assertEquals(listOf(show("1996-11-17")), result.value)
+        assertTrue(result.complete)
+    }
+
+    @Test
+    fun `showsOnDate where one period always throws returns partial and complete=false`() = runBlocking {
+        var attempts = 0
+        val source = FakeSource(
+            Backend.PHISHIN,
+            periodsByArtist = mapOf("phish" to listOf(
+                PeriodRef("1995", "1995", showCount = 1),
+                PeriodRef("1998", "1998", showCount = 1)
+            )),
+            showsByPeriod = emptyMap()
+        )
+        val spySource = object : MusicSource by source {
+            override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+                if (period.id == "1998-1998") {
+                    attempts++
+                    throw SocketTimeoutException("timeout")
+                }
+                return listOf(show("1995-11-17"))
+            }
+        }
+        val result = showsOnDate(listOf(PHISH), today = "2026-11-17") { spySource }
+        assertEquals(2, attempts) // retried once
+        assertEquals(listOf(show("1995-11-17")), result.value)
+        assertFalse(result.complete)
+        
+        // And OnThisDate.load leaves cache null
+        OnThisDate.resetCache()
+        val loadResult = OnThisDate.load(listOf(PHISH), today = "2026-11-17", source = { spySource })
+        assertEquals(listOf(show("1995-11-17")), loadResult)
+        assertNull(OnThisDate.cached)
+    }
+
+    @Test
+    fun `showsOnDate where every period succeeds populates cache and doesn't refetch`() = runBlocking {
+        var fetches = 0
+        val source = FakeSource(
+            Backend.PHISHIN,
+            periodsByArtist = mapOf("phish" to listOf(PeriodRef("1996", "1996", showCount = 1))),
+            showsByPeriod = mapOf("1996-1996" to listOf(show("1996-11-17")))
+        )
+        val spySource = object : MusicSource by source {
+            override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+                fetches++
+                return source.shows(artist, period)
+            }
+        }
+        
+        OnThisDate.resetCache()
+        val load1 = OnThisDate.load(listOf(PHISH), today = "2026-11-17", source = { spySource })
+        assertEquals(1, fetches)
+        assertEquals(listOf(show("1996-11-17")), load1)
+        
+        val load2 = OnThisDate.load(listOf(PHISH), today = "2026-11-17", source = { spySource })
+        assertEquals(1, fetches) // no new fetch
+        assertEquals(listOf(show("1996-11-17")), load2)
+    }
+
+    @Test
+    fun `showsOnDate limits peak concurrency for phishin`() = runBlocking(kotlinx.coroutines.Dispatchers.Default) {
+        val inFlight = java.util.concurrent.atomic.AtomicInteger(0)
+        val peak = java.util.concurrent.atomic.AtomicInteger(0)
+        val periods = (1..10).map { PeriodRef((it*2).toString(), (it*2).toString(), showCount = 1) }
+        val source = FakeSource(
+            Backend.PHISHIN,
+            periodsByArtist = mapOf("phish" to periods),
+            showsByPeriod = emptyMap()
+        )
+        val spySource = object : MusicSource by source {
+            override suspend fun shows(artist: ArtistRef, period: PeriodRef): List<ShowSummary> {
+                val current = inFlight.incrementAndGet()
+                peak.updateAndGet { if (current > it) current else it }
+                delay(50)
+                inFlight.decrementAndGet()
+                return emptyList()
+            }
+        }
+        
+        showsOnDate(listOf(PHISH), today = "2026-11-17") { spySource }
+        assertEquals(PHISHIN_CONCURRENCY, peak.get())
+    }
+
+    @Test(expected = CancellationException::class)
+    fun `showsOnDate propagates CancellationException`() = runBlocking {
+        val source = FakeSource(
+            Backend.PHISHIN,
+            periodsByArtist = mapOf("phish" to listOf(PeriodRef("1996", "1996", showCount = 1))),
+            showsByPeriod = emptyMap()
+        )
+        val spySource = object : MusicSource by source {
+            override suspend fun periods(artist: ArtistRef): List<PeriodRef> {
+                throw CancellationException("cancelled")
+            }
+        }
+        showsOnDate(listOf(PHISH), today = "2026-11-17") { spySource }
+        Unit
     }
 }
