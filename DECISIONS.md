@@ -4901,3 +4901,12 @@ The artist chips on the Android Home "NEXT TOUR STOP" card now filter the card t
 - **Context:** The curated/heuristic matches for external releases (Spotify, Tidal) are bundled as JSON assets. Android's `ExternalReleasePlatform` enum lacked `@SerialName`, causing failures to decode the lowercase `"spotify"` string in the JSON because `ignoreUnknownKeys = true` swallows the `SerializationException`.
 - **Decision:** Align Android's enum to the JSON format by adding `@SerialName("spotify")` and `@SerialName("tidal")`.
 - **Why:** Lowercase is the canonical wire format. `scripts/generate_heuristic_matches.py` emits lowercase, and the macOS client expects lowercase (its raw string enum values are lowercase). Modifying the JSON would break the generator and the macOS decoder.
+
+## D287: Bound "On This Date" phish.in fetch fan-out and range sizes
+"On This Date" fetches the phish.in catalog using `year_range=`. Very large ranges (900 shows, ~2.7 MB) with unbounded concurrent fetches on a weak connection were timing out against the 30 s read timeout (`Api.kt`). Rather than tuning that global timeout and losing instrumentation (see D176), we've shrunk the request size and capped concurrency so the requests clear the timeout:
+- `PHISHIN_RANGE_CAP` lowered from 900 to 300. This scales the response from ~2.7 MB / 8-20 s to ~0.9 MB / ~3 s, completing well within the 30 s timeout.
+- Bounded concurrent phish.in period fetches using a `Semaphore(4)` (`PHISHIN_CONCURRENCY`).
+- Narrowed the `runCatching` fetch wrapper to `catch (IOException)` so it propagates `CancellationException` properly.
+- Added a single retry per range on `IOException` with no backoff loop to recover on marginal connections.
+- Introduced `Fetched` completeness flag: `OnThisDate.load` only populates the once-a-day cache if every period request completed successfully. A partial result is still returned to the UI rather than an error (see D162), but the next visit to Home re-fetches.
+- `Api.kt` and its 15 s/30 s timeouts remain strictly untouched.
