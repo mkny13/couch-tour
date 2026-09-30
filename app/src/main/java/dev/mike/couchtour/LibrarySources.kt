@@ -308,7 +308,7 @@ fun mergeLibraryShows(local: List<LibraryItem>, account: List<LibraryItem>): Lis
     for (item in items) {
         val key = when (val t = item.target) {
             is LibraryTarget.Show -> "show:${t.date}"
-            is LibraryTarget.Recording -> "relisten:${t.id.artistSlug}/${t.id.date}"
+            is LibraryTarget.Recording -> "relisten:${t.id.artistSlug}/${t.id.date}/${t.id.sourceId}"
             else -> item.key
         }
         groups.getOrPut(key) { mutableListOf() }.add(item)
