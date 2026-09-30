@@ -65,13 +65,17 @@ object Keys {
     const val YOUTUBE_VIDEO_URL = "youtube_video_url"
     const val YOUTUBE_MODE = "youtube_mode"
 
+    const val TRACK_SLUG = "track_slug"
+    const val JAM_CHART_NOTES = "jam_chart_notes"
+
     /** Cast has to be told what to carry across the wire; nothing else enumerates these. */
     val ALL = listOf(
         QUEUE_KEY, QUEUE_TITLE, QUEUE_SUBTITLE, QUEUE_ART, WAVEFORM, BACKEND, TRACK_ID,
         LIKED, LIKES_COUNT, FLAC_URL, MP3_URL, SHOW_DATE, VENUE_NAME, ARTIST_NAME, ARTIST_ID,
         SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION, DURATION_MS,
         LEVELING_KEY,
-        YOUTUBE_AUDIO_URL, YOUTUBE_VIDEO_URL, YOUTUBE_MODE
+        YOUTUBE_AUDIO_URL, YOUTUBE_VIDEO_URL, YOUTUBE_MODE,
+        TRACK_SLUG, JAM_CHART_NOTES
     )
 }
 

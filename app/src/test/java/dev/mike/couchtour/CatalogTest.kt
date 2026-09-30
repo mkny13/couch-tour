@@ -26,10 +26,11 @@ class CatalogTest {
         showDate: String? = "1997-11-17",
         venueName: String? = "McNichols Arena",
         showAlbumCoverUrl: String? = null,
+        slug: String? = null,
     ) = Track(
         id = id, title = title, setName = setName, duration = duration, mp3Url = mp3Url,
         audioStatus = audioStatus, waveformImageUrl = waveformImageUrl, showDate = showDate,
-        venueName = venueName, showAlbumCoverUrl = showAlbumCoverUrl,
+        venueName = venueName, showAlbumCoverUrl = showAlbumCoverUrl, slug = slug,
     )
 
     private fun show(
@@ -136,6 +137,19 @@ class CatalogTest {
         assertEquals("1997-11-17", t.showDate)
         assertEquals("McNichols Arena", t.venueName)
         assertEquals("https://phish.in/w.png", t.waveformUrl)
+    }
+
+    @Test
+    fun `a track keeps its slug`() {
+        val t = track(slug = "tweezer").toPlayableTrack(null)
+        assertEquals("tweezer", t.slug)
+    }
+
+    @Test
+    fun `trackShareUrl builds phish-in web page for Backend PHISHIN`() {
+        assertEquals("https://phish.in/1997-11-17/tweezer", trackShareUrl(PHISH, "1997-11-17", "tweezer"))
+        assertNull(trackShareUrl(PHISH, "1997-11-17", null))
+        assertNull(trackShareUrl(dead, "1977-05-08", "tweezer"))
     }
 
     @Test
@@ -506,7 +520,7 @@ class CatalogTest {
     fun `tag models round trip between Tag and TagRef`() {
         // TagRef.toTag() has no production caller since the tag-filter UI reads TagRef
         // directly (#218 dead-code pass); the inverse mapping stays pinned here.
-        fun TagRef.toTag() = Tag(name = name, description = description, color = color, priority = priority)
+        fun TagRef.toTag() = Tag(name = name, description = description, color = color, priority = priority, notes = notes)
 
         val tag = Tag(name = "Soundboard", description = "Direct SBD feed", color = "#00FF00", priority = 10, notes = "Clean")
         val ref = tag.toTagRef()
@@ -514,12 +528,33 @@ class CatalogTest {
         assertEquals("Direct SBD feed", ref.description)
         assertEquals("#00FF00", ref.color)
         assertEquals(10, ref.priority)
+        assertEquals("Clean", ref.notes)
 
         val tagBack = ref.toTag()
         assertEquals(tag.name, tagBack.name)
         assertEquals(tag.description, tagBack.description)
         assertEquals(tag.color, tagBack.color)
         assertEquals(tag.priority, tagBack.priority)
+        assertEquals(tag.notes, tagBack.notes)
+    }
+
+    @Test
+    fun `show json fixture decodes jam chart tag notes and toPlayableTrack retains them`() {
+        val fixture = javaClass.classLoader!!.getResourceAsStream("fixtures/show.json")!!
+            .bufferedReader().use { it.readText() }
+        val show = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString<Show>(fixture)
+        val tweezer = show.tracks.first { it.title == "Tweezer" }
+        assertEquals("tweezer", tweezer.slug)
+        val jamTag = tweezer.tags.first { it.name.contains("jam", ignoreCase = true) }
+        assertEquals(
+            "Very popular version, but check out the highlighted versions in this table if this version does IT for you (especially those in fall 1997).",
+            jamTag.notes
+        )
+        val playable = tweezer.toPlayableTrack(null)
+        assertEquals("tweezer", playable.slug)
+        val playableJamTag = playable.tags.first { it.name.contains("jam", ignoreCase = true) }
+        assertEquals(jamTag.notes, playableJamTag.notes)
     }
 
     // ------------------------------------------------------- search sort (#91)
