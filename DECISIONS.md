@@ -5044,3 +5044,14 @@ Audit of the Ledger redesign (#133, D214; commits 2a6b2cc / 28fa02c / c0c0912 + 
 - **Known Issues Re-verified at HEAD**: #347 fixed (macOS sidebar mock favorites replaced with honest empty/loading state in #389), #348 fixed (Artists nav row restored), #349 live (search never renders artist results; confirmed redesign regression), #354 fixed (Next Tour Stop chips focus artist in #387), #355 fixed (jam chart real notes and source link wired on Android in #378 / PR #408 and macOS in #379 / PR #407).
 - **Audit Scope & Clean Findings**: After intermediate fix rounds, the only remaining regressions at HEAD are #383, #384, #386, and #349. Decorative window traffic lights in `SidebarView` and `ExpandedNowPlayingView` logged for owner UAT. Compare Sources reachability logged in UAT. Docs-only change with no source code modifications.
 
+### D307: Bound "On This Date" phish.in fetch fan-out and range sizes (#352)
+
+"On This Date" fetches the phish.in catalog using `year_range=`. Very large ranges (up to 900 shows, ~2.7 MB) with unbounded concurrent fetches on a mobile connection were timing out against OkHttp's 30 s `readTimeout` (`Api.kt`). Rather than tuning that shared timeout and losing instrumentation (see D176), we shrunk the request payload and bounded concurrency so the requests reliably clear the timeout:
+- **Smaller Batches**: Lowered `PHISHIN_RANGE_CAP` from 900 to 300. This scales the response from ~2.7 MB / 8–20 s down to ~0.9 MB / ~3 s, finishing well within the 30 s read timeout even with multiple requests in flight. Across Phish's ~2,000 shows, this results in ~7 requests instead of ~4, still safely below phish.in's `per_page=1000` limit.
+- **Bounded Fan-out**: Bounded concurrent phish.in period fetches using `Semaphore(PHISHIN_CONCURRENCY)` with `PHISHIN_CONCURRENCY = 4`.
+- **Narrowed Exception Absorption**: Replaced broad `runCatching` with explicit `catch (e: IOException)` across period and artist fetches, allowing `CancellationException` and unexpected programming errors to propagate naturally rather than silently returning empty lists.
+- **Single Retry on Failed Ranges**: Added a single retry per range on `IOException` with a 250 ms delay to recover on transient network drops without complex backoff loops.
+- **Completeness Reporting & Cache Integrity**: Introduced `Fetched<T>(value, complete)` to distinguish complete catalog results from partial ones. `OnThisDate.load` only populates the once-a-day cache when `complete` is true and results are non-empty. Partial results are still returned to the UI per D162, but re-fetched on subsequent visits.
+- **Untouched API Client**: `Api.kt` and its shared 15 s / 30 s timeouts remain strictly untouched; this fix addresses the request size that made the timeout reachable.
+
+
