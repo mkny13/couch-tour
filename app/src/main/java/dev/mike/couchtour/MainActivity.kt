@@ -339,6 +339,13 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         val preferences by vm.artistTourPreferenceDao.getAllPreferences().collectAsState(initial = emptyList())
         val preferencesMap = remember(preferences) { preferences.associateBy { it.artistKey } }
         var tourPickerArtist by remember { mutableStateOf<ArtistRef?>(null) }
+        var focusedArtistKey by rememberSaveable { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(favoriteKeys) {
+            if (focusedArtistKey != null && focusedArtistKey !in favoriteKeys) {
+                focusedArtistKey = null
+            }
+        }
 
         // A second, independent load rather than part of loadArtistsByBackend's: it is a
         // multi-request walk of the favorited artists' catalogs (#13), far slower than the
@@ -357,8 +364,10 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
             NextStop.load(favoritedArtists, todayStr, preferencesMap)
         }
         val finishedKeys by vm.progressDao.finishedKeys().collectAsState(initial = emptyList())
-        val nextStop = remember(nextStopShows.value, finishedKeys) {
-            nextStopShows.value?.getOrNull()?.let { oldestUnplayed(it, playedShowIds(finishedKeys)) }
+        val nextStop = remember(nextStopShows.value, finishedKeys, focusedArtistKey) {
+            val loadedShows = nextStopShows.value?.getOrNull().orEmpty()
+            val candidates = focusedCandidates(loadedShows, focusedArtistKey)
+            oldestUnplayed(candidates, playedShowIds(finishedKeys))
         }
 
 
@@ -463,14 +472,32 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                         )
                                     )
                             )
-                            Text(
-                                text = "NEXT TOUR STOP",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.2.sp,
-                                color = ledger.textMuted,
-                                modifier = Modifier.padding(start = 14.dp, top = 10.dp)
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 14.dp, top = 10.dp, end = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "NEXT TOUR STOP",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                    color = ledger.textMuted
+                                )
+                                Spacer(Modifier.weight(1f))
+                                val targetPickerArtist = favoritedArtists.firstOrNull { it.key == focusedArtistKey }
+                                    ?: show?.artist
+                                    ?: favoritedArtists.firstOrNull()
+                                if (targetPickerArtist != null) {
+                                    Text(
+                                        text = "Change tour…",
+                                        fontSize = 12.sp,
+                                        color = ledger.textSubtle,
+                                        modifier = Modifier.clickable { tourPickerArtist = targetPickerArtist }
+                                    )
+                                }
+                            }
                             if (favoritedArtists.isNotEmpty()) {
                                 LazyRow(
                                     modifier = Modifier
@@ -479,7 +506,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     items(favoritedArtists, key = { it.key }) { artist ->
-                                        val selected = show?.artist?.key == artist.key
+                                        val selected = (focusedArtistKey ?: show?.artist?.key) == artist.key
                                         Box(
                                             modifier = Modifier
                                                 .height(26.dp)
@@ -492,7 +519,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                                     if (selected) ledger.accentIcon else ledger.controlOutline,
                                                     RoundedCornerShape(13.dp)
                                                 )
-                                                .clickable { tourPickerArtist = artist }
+                                                .clickable { focusedArtistKey = if (focusedArtistKey == artist.key) null else artist.key }
                                                 .padding(horizontal = 11.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -504,6 +531,15 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                         }
                                     }
                                 }
+                            }
+                            if (focusedArtistKey != null && show == null) {
+                                val artistName = favoritedArtists.firstOrNull { it.key == focusedArtistKey }?.name.orEmpty()
+                                Text(
+                                    text = "Nothing to catch up on $artistName.",
+                                    fontSize = 12.sp,
+                                    color = ledger.textSubtle,
+                                    modifier = Modifier.padding(start = 14.dp, bottom = 12.dp)
+                                )
                             }
                             if (show != null) {
                                 Row(

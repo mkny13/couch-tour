@@ -4887,3 +4887,12 @@ The Sparkle (CI) build is App Sandbox'd (D104), but `install.sh` / `install-beta
 - **Entitlement:** reading the unsandboxed files from inside the sandbox needs `com.apple.security.temporary-exception.files.home-relative-path.read-only`, scoped to exactly that bundle's plist and Application Support directory. This is a Mac App Store blocker (temporary exceptions are generally rejected there); the exception should be dropped once the migration has had time to run on the owner's Macs.
 - **Not covered:** the runtime behavior of the read exception under a real sandbox was not exercised in the unattended run (no UI automation); it is listed for UAT.
 - **Tests:** `MigrationTests` (7): unsandboxed no-op, set union, scalar fill, sync cursor rules, row merge by `updatedAt` incl. tombstones and preference tables, idempotency, no-source completion. macOS suite 448 → 455.
+
+### D283 — Next Tour Stop chips select focus, track-tour moves to header action (#354)
+
+The artist chips on the Android Home "NEXT TOUR STOP" card now filter the card to that artist's oldest unplayed show, rather than opening the tour picker.
+
+- Tapping a favorite-artist chip sets a `rememberSaveable` focus state in `HomeScreen`. The filter runs client-side against the already-fetched candidate list, so it never hits the network and `NextStop.load`'s cache key is untouched.
+- A second tap on the focused chip clears focus, restoring the cross-artist default.
+- The tour picker moved to a "Change tour…" action in the card header. A labeled header action was chosen over a chip long-press because a long-press has no `contentDescription` and no visible affordance, which would have introduced the exact class of invisible-control defect the Ledger audit (#356) is filing.
+- This supersedes the part of D214 (#133) that wired the chip tap directly to the tour picker.
