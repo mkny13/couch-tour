@@ -25,6 +25,7 @@ hosted on archive.org.
   listening"; opening one again restarts it from the top
 - A History screen lists everything you've played — in progress, completed, or removed by
   hand — with the completed ones marked
+- A Library screen lists your saved items — saved shows, playlists, and tracks — cleanly separated from listening history
 - On a "Continue listening" card: tap to open it, tap the play button to resume, long-press
   for open / mark completed / remove
 - "Shuffle all" on My tracks plays your liked tracks in random order
@@ -132,7 +133,7 @@ variant (D233).
 
 ## Tests
 
-750 Android unit tests, no device or emulator required:
+760 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
@@ -186,6 +187,8 @@ Install to a connected device or running emulator:
 | `DesignComponents.kt` | Ledger design tokens and reusable components (hairlines, badges, waveform scrubber, play buttons) |
 | `NowPlaying.kt` | Full-screen Now Playing sheet with ambient artwork glow, tape specs, waveform scrubber, and transport controls |
 | `Format.kt` | Formatting helpers for durations, progress fractions, timestamps, and show dates |
+| `LibrarySources.kt` | Pure domain models, adapters, filtering, and sorting for Library and History |
+| `LibraryScreen.kt` | Library tab UI — search, type filter chips, sorting, and honest empty states |
 | `MainActivity.kt` | Compose UI — home, search, shows, artists, recordings, mini player |
 | `TvMainActivity.kt` | Google TV entry Activity (Leanback launcher) |
 | `TvBrowse.kt` | Google TV browse UI across artists, years, shows, and tracks |
