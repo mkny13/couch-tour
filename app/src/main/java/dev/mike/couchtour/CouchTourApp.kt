@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class CouchTourApp : Application() {
@@ -11,6 +12,7 @@ class CouchTourApp : Application() {
         super.onCreate()
         CrashCapture.install(this)
         DiagnosticsLog.init(this)
+        detectPreviousCrash()
         // Restore the session before any screen or the playback service issues a request.
         Session.init(this)
         CuratedMatches.init(this)
@@ -43,5 +45,11 @@ class CouchTourApp : Application() {
             }
         }
         schedulePeriodicSync(this)
+    }
+
+    internal fun detectPreviousCrash(scope: CoroutineScope = CoroutineScope(Dispatchers.IO)): Job {
+        return scope.launch(Dispatchers.IO) {
+            CrashCapture.detectPreviousCrash()
+        }
     }
 }
