@@ -273,6 +273,13 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             showChevron = true,
             onClick = { nav.navigate("diagnostics") }
         )
+        val includeDiagnostics by FeedbackSettings.includeDiagnostics.collectAsState()
+        SettingsToggleRow(
+            label = "Include diagnostics",
+            checked = includeDiagnostics,
+            onCheckedChange = { FeedbackSettings.setIncludeDiagnostics(it) },
+            help = "Copies the recent app log to your clipboard and adds a summary to Feedback issues. Stays on this device.",
+        )
     }
 
     if (showSignOutDialog) {

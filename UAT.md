@@ -224,3 +224,12 @@ Long-standing items that predate this sprint.
 - [ ] `uat-074` **Chip double-tap clears focus** (Android) — With an artist focused, tap their highlighted chip again. Verify focus clears, the cross-artist default show returns, and the chip deselects. Check if this is discoverable enough as a way back.
 - [ ] `uat-075` **Card layout with long names** (Android) — Verify that the focused card's show row (artist, date, rating, play button) still fits the card width properly for long artist names, now that the header is a `Row` and not a lone `Text`.
 - [ ] **Sidebar Empty State (macOS)**: With no favorites, the sidebar shows a "Star artists to pin them here" hint under the "FAVORITE ARTISTS" header. Check that it doesn't flash on cold launch, and that the text visual weight matches the 236pt sidebar. Also verify that no row shows a "0" count (e.g. Phish row).
+
+## Feedback diagnostics clipboard copy & prefill (#377, Android)
+
+- [ ] `uat-076` **Feedback copies diagnostics tail to clipboard and prefills summary** (Android) — On the phone:
+  - Favorite a track, reopen Library, press the Feedback button.
+  - Confirm the Toast "Diagnostics copied to clipboard" is visible enough to notice without being annoying.
+  - When the GitHub issue page opens in browser, confirm the prefilled body carries the unchanged `## Environment` section followed by `## Diagnostics` with library counts, last sync result, and last crash (if any).
+  - Paste into the issue body under `## Log`: confirm the 200-line diagnostics tail is pasted and includes the favorite write and Library counts.
+  - In Settings → ABOUT, verify "Include diagnostics" toggle is ON by default. Turn it OFF, press Feedback again: confirm no Toast appears, clipboard is untouched, and the prefilled issue URL contains no `## Diagnostics` section.
