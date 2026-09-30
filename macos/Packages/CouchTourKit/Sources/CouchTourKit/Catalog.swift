@@ -520,6 +520,7 @@ public struct RecordingRef: Hashable, Sendable {
 
 public struct PlayableTrack: Equatable, Sendable {
     public let id: String
+    public let slug: String?
     public let title: String
     public let setName: String
     /// Milliseconds. Relisten reports seconds and is converted on the way in.
@@ -544,6 +545,7 @@ public struct PlayableTrack: Equatable, Sendable {
 
     public init(
         id: String,
+        slug: String? = nil,
         title: String,
         setName: String = "",
         position: Int = 0,
@@ -561,6 +563,7 @@ public struct PlayableTrack: Equatable, Sendable {
         recordingId: RecordingId? = nil
     ) {
         self.id = id
+        self.slug = slug
         self.title = title
         self.setName = setName
         self.position = position
@@ -577,6 +580,11 @@ public struct PlayableTrack: Equatable, Sendable {
         self.popularity = popularity
         self.recordingId = recordingId
     }
+}
+
+/// The public web page for one track on phish.in (confirmed live #19/#355).
+public func trackSourceUrl(date: String, slug: String) -> String {
+    "https://phish.in/\(date)/\(slug)"
 }
 
 public struct ShowDetail: Equatable, Sendable {
@@ -947,6 +955,7 @@ extension Track {
     public func toPlayableTrack(showArt: String?) -> PlayableTrack {
         PlayableTrack(
             id: String(id),
+            slug: slug,
             title: title,
             setName: setName,
             position: position,

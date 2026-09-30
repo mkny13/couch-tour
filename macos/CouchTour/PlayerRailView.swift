@@ -1,3 +1,4 @@
+import AppKit
 import CouchTourKit
 import SwiftUI
 
@@ -11,7 +12,7 @@ struct PlayerRailView: View {
     @Environment(\.ledgerColors) private var colors
 
     @State private var dragPositionMs: Double?
-    @State private var showJamChartNote: Bool = true
+    @State private var showJamChartNote: Bool = false
     @State private var showComparePopover = false
 
     var body: some View {
@@ -217,7 +218,9 @@ struct PlayerRailView: View {
                             .padding(.top, 4)
                             .lineLimit(1)
 
-                        let isJamChart = player.currentTrack?.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") } == true
+                        let jamChartTag = player.currentTrack?.tags.first { $0.name.localizedCaseInsensitiveContains("jam") }
+                        let isJamChart = jamChartTag != nil
+                        let jamChartNotes = jamChartTag?.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
 
                         HStack(spacing: 6) {
                             if isJamChart {
@@ -228,7 +231,7 @@ struct PlayerRailView: View {
                                         Text("JAM CHART")
                                             .font(.system(size: 10, weight: .semibold))
                                             .tracking(1.0)
-                                        Image(systemName: "chevron.down")
+                                        Image(systemName: showJamChartNote ? "chevron.up" : "chevron.down")
                                             .font(.system(size: 8))
                                     }
                                     .padding(.horizontal, 7)
@@ -257,11 +260,29 @@ struct PlayerRailView: View {
                         }
                         .padding(.top, 10)
 
-                        if isJamChart && showJamChartNote {
-                            JamChartNoteCard(
-                                note: "Jam chart entry available for this track.",
-                                onDismiss: { showJamChartNote = false }
-                            )
+                        if isJamChart && showJamChartNote, let note = jamChartNotes, !note.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                JamChartNoteCard(
+                                    note: note,
+                                    onDismiss: { showJamChartNote = false }
+                                )
+
+                                if let date = player.currentTrack?.showDate, let slug = player.currentTrack?.slug,
+                                   let url = URL(string: trackSourceUrl(date: date, slug: slug)) {
+                                    Button {
+                                        NSWorkspace.shared.open(url)
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Text("View on phish.in")
+                                            Image(systemName: "arrow.up.right")
+                                                .font(.system(size: 9, weight: .semibold))
+                                        }
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(colors.accent)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                             .padding(.top, 10)
                         }
                     }
