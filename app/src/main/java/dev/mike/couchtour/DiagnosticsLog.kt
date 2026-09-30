@@ -47,10 +47,10 @@ object DiagnosticsLog {
     private val initialized = AtomicBoolean(false)
     private val disabled = AtomicBoolean(false)
 
-    private var diagnosticsDir: File? = null
+    internal var diagnosticsDir: File? = null
     private var logFile: File? = null
     private var logFile1: File? = null
-    private var lastCrashFile: File? = null
+    internal var lastCrashFile: File? = null
 
     private sealed interface WriterMessage {
         data class Line(val text: String) : WriterMessage
@@ -301,7 +301,7 @@ object DiagnosticsLog {
     }
 
     fun exportText(context: Context): String {
-        val dir = File(context.filesDir, "diagnostics")
+        val dir = diagnosticsDir ?: File(context.filesDir, "diagnostics")
         val file1 = File(dir, "diagnostics.log.1")
         val file = File(dir, "diagnostics.log")
 

@@ -220,6 +220,7 @@ fun App(
             composable("search") { SearchScreen(vm, nav) }
             composable("library") { LibraryScreen(vm, nav) }
             composable("settings") { SettingsScreen(vm, nav) }
+            composable("diagnostics") { DiagnosticsScreen(onBack = { nav.popBackStack() }) }
             composable("player") { NowPlayingScreen(vm, nav) }
             composable("history") { HistoryScreen(vm, nav) }
             composable("login") { LoginScreen(nav) }

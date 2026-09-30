@@ -37,11 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Settings screen matching the Ledger handoff:
@@ -64,6 +67,15 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
     val skipFiller by PlaybackSettings.skipFiller.collectAsState()
     val levelVolume by PlaybackSettings.levelVolume.collectAsState()
     var showSignOutDialog by remember { mutableStateOf(false) }
+
+    var diagnosticsValue by remember { mutableStateOf("") }
+    LaunchedEffect(nav.currentBackStackEntry) {
+        withContext(Dispatchers.IO) {
+            val count = DiagnosticsLog.countEntries()
+            val bytes = DiagnosticsLog.onDiskBytes()
+            diagnosticsValue = formatDiagnosticsSummary(count, bytes)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -254,6 +266,12 @@ fun SettingsScreen(vm: PlayerViewModel, nav: NavHostController) {
             value = "phish.in · relisten.net",
             showChevron = false,
             onClick = {}
+        )
+        SettingsValueRow(
+            label = "Diagnostics",
+            value = diagnosticsValue,
+            showChevron = true,
+            onClick = { nav.navigate("diagnostics") }
         )
     }
 

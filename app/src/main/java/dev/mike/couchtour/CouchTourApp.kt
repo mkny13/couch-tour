@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 class CouchTourApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        CrashCapture.install(this)
         DiagnosticsLog.init(this)
         // Restore the session before any screen or the playback service issues a request.
         Session.init(this)
