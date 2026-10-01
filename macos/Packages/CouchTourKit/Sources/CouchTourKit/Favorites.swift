@@ -19,8 +19,8 @@ public struct FavoriteArtistSyncRow: Codable, Equatable, Sendable {
 @MainActor
 public final class Favorites: ObservableObject {
     private let defaults: UserDefaults
-    private let storageKey = "favorite_artist_keys"
-    private let rowsStorageKey = "favorite_artist_rows_json"
+    private static let storageKey = "favorite_artist_keys"
+    private static let rowsStorageKey = "favorite_artist_rows_json"
 
     /// `ArtistRef.key`s.
     @Published public private(set) var keys: Set<String>
@@ -28,9 +28,12 @@ public final class Favorites: ObservableObject {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let loadedRows = Favorites.loadRows(defaults: defaults)
+        let (loadedRows, migrated) = Favorites.loadRows(defaults: defaults)
         self.rows = Dictionary(uniqueKeysWithValues: loadedRows.map { ($0.artistKey, $0) })
         self.keys = Set(loadedRows.filter { $0.deletedAt == nil }.map(\.artistKey))
+        if migrated {
+            persist()
+        }
     }
 
     public func toggle(_ key: String) {
@@ -69,20 +72,22 @@ public final class Favorites: ObservableObject {
         let sorted = rows.values.sorted { $0.artistKey < $1.artistKey }
         if let encoded = try? JSONEncoder().encode(sorted),
            let raw = String(data: encoded, encoding: .utf8) {
-            defaults.set(raw, forKey: rowsStorageKey)
+            defaults.set(raw, forKey: Self.rowsStorageKey)
         }
-        defaults.set(Array(keys).sorted(), forKey: storageKey)
+        defaults.set(Array(keys).sorted(), forKey: Self.storageKey)
     }
 
-    private static func loadRows(defaults: UserDefaults) -> [FavoriteArtistSyncRow] {
-        if let raw = defaults.string(forKey: "favorite_artist_rows_json"),
-           let data = raw.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([FavoriteArtistSyncRow].self, from: data) {
-            return decoded
+    private static func loadRows(defaults: UserDefaults) -> (rows: [FavoriteArtistSyncRow], migrated: Bool) {
+        if let raw = defaults.string(forKey: rowsStorageKey) {
+            if let data = raw.data(using: .utf8),
+               let decoded = try? JSONDecoder().decode([FavoriteArtistSyncRow].self, from: data) {
+                return (decoded, false)
+            }
+            return ([], false)
         }
-        let legacy = defaults.stringArray(forKey: "favorite_artist_keys") ?? []
-        guard !legacy.isEmpty else { return [] }
+        let legacy = defaults.stringArray(forKey: storageKey) ?? []
+        guard !legacy.isEmpty else { return ([], false) }
         let now = Int64(Date().timeIntervalSince1970 * 1000)
-        return legacy.map { FavoriteArtistSyncRow(artistKey: $0, updatedAt: now, deletedAt: nil) }
+        return (legacy.map { FavoriteArtistSyncRow(artistKey: $0, updatedAt: now, deletedAt: nil) }, true)
     }
 }

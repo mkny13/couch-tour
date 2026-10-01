@@ -43,7 +43,11 @@ object Favorites {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         initialized = true
         synchronized(lock) {
-            rows = loadRows().associateBy { it.artistKey }.toMutableMap()
+            val (loadedRows, migrated) = loadRows()
+            rows = loadedRows.associateBy { it.artistKey }.toMutableMap()
+            if (migrated) {
+                persistLocked()
+            }
             publishLocked()
         }
     }
@@ -102,16 +106,18 @@ object Favorites {
             .apply()
     }
 
-    private fun loadRows(): List<FavoriteArtistSyncRow> {
+    private fun loadRows(): Pair<List<FavoriteArtistSyncRow>, Boolean> {
         val rawRows = prefs.getString(KEY_ARTIST_ROWS, null)
         if (rawRows != null) {
-            return runCatching { json.decodeFromString<List<FavoriteArtistSyncRow>>(rawRows) }
+            val decoded = runCatching { json.decodeFromString<List<FavoriteArtistSyncRow>>(rawRows) }
                 .getOrElse { emptyList() }
+            return Pair(decoded, false)
         }
 
         val legacyLive = prefs.getStringSet(KEY_ARTISTS, emptySet()).orEmpty()
-        if (legacyLive.isEmpty()) return emptyList()
+        if (legacyLive.isEmpty()) return Pair(emptyList(), false)
         val now = System.currentTimeMillis()
-        return legacyLive.map { FavoriteArtistSyncRow(artistKey = it, updatedAt = now, deletedAt = null) }
+        val migratedRows = legacyLive.map { FavoriteArtistSyncRow(artistKey = it, updatedAt = now, deletedAt = null) }
+        return Pair(migratedRows, true)
     }
 }
