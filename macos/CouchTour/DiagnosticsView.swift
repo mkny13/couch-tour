@@ -11,9 +11,16 @@ struct DiagnosticsView: View {
     @State private var copied = false
     @State private var confirmClear = false
 
-    // Inspection calls block on the log's serial queue and read from disk, so every use below hops
-    // off the main actor first.
-    private let log = DiagnosticsLog()
+    // DiagnosticsLog.init creates the directory and prunes/reads the files, and inspection calls block
+    // on its serial queue, so construction and every use below happen off the main actor.
+    @State private var logTask: Task<DiagnosticsLog, Never>?
+
+    private func resolveLog() -> Task<DiagnosticsLog, Never> {
+        if let logTask { return logTask }
+        let t = Task.detached(priority: .userInitiated) { DiagnosticsLog() }
+        logTask = t
+        return t
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -64,7 +71,7 @@ struct DiagnosticsView: View {
     }
 
     private func reload() async {
-        let log = log
+        let log = await resolveLog().value
         let (s, l) = await Task.detached(priority: .userInitiated) {
             (log.summaryLines(), log.tailLines(200))
         }.value
@@ -74,8 +81,9 @@ struct DiagnosticsView: View {
     }
 
     private func copy() {
-        let log = log
+        let logTask = resolveLog()
         Task {
+            let log = await logTask.value
             let text = await Task.detached(priority: .userInitiated) { log.exportText() }.value
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
@@ -84,8 +92,9 @@ struct DiagnosticsView: View {
     }
 
     private func clear() {
-        let log = log
+        let logTask = resolveLog()
         Task {
+            let log = await logTask.value
             await Task.detached(priority: .userInitiated) { log.clear() }.value
             copied = false
             await reload()
