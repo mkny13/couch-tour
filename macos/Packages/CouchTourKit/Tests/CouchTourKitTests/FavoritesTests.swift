@@ -30,4 +30,22 @@ final class FavoritesTests: XCTestCase {
         Favorites(defaults: defaults).toggle("relisten:wsp")
         XCTAssertEqual(["relisten:wsp"], Favorites(defaults: defaults).keys)
     }
+
+    func testChangedSinceIncludesTombstonesAndApplyFromSyncUsesLww() {
+        let defaults = isolatedDefaults()
+        let favorites = Favorites(defaults: defaults)
+        favorites.toggle("phish")
+        let first = favorites.changedSince(0).first!
+        XCTAssertNil(first.deletedAt)
+
+        favorites.toggle("phish")
+        let tombstone = favorites.changedSince(first.updatedAt).first!
+        XCTAssertNotNil(tombstone.deletedAt)
+
+        _ = favorites.applyFromSync([FavoriteArtistSyncRow(artistKey: "phish", updatedAt: tombstone.updatedAt - 1, deletedAt: nil)])
+        XCTAssertTrue(favorites.keys.isEmpty)
+
+        _ = favorites.applyFromSync([FavoriteArtistSyncRow(artistKey: "phish", updatedAt: tombstone.updatedAt + 1, deletedAt: nil)])
+        XCTAssertEqual(Set(["phish"]), favorites.keys)
+    }
 }

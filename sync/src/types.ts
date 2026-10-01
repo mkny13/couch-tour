@@ -37,6 +37,12 @@ export interface ProgressFields {
   deletedAt: number | null;
 }
 
+export interface FavoriteArtistFields {
+  artistKey: string;
+  updatedAt: number;
+  deletedAt: number | null;
+}
+
 /**
  * The same row as stored in D1: SQLite has no boolean type, so `finished`/`dismissed` are
  * 0/1 here — see `toWireRow` for the conversion back to `ProgressFields`'s booleans.
@@ -45,6 +51,12 @@ export interface ProgressRow extends Omit<ProgressFields, "finished" | "dismisse
   groupId: string;
   finished: number;
   dismissed: number;
+  seq: number;
+  lastWriterDeviceId: string | null;
+}
+
+export interface FavoriteArtistRow extends FavoriteArtistFields {
+  groupId: string;
   seq: number;
   lastWriterDeviceId: string | null;
 }

@@ -1,6 +1,13 @@
 import { authenticate } from "./auth";
 import { randomId, randomPairingCode, randomToken, sha256Hex } from "./crypto";
-import type { DeviceRow, Env, ProgressFields, ProgressRow } from "./types";
+import type {
+  DeviceRow,
+  Env,
+  FavoriteArtistFields,
+  FavoriteArtistRow,
+  ProgressFields,
+  ProgressRow,
+} from "./types";
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const TOKEN_ROTATION_AGE_MS = 90 * 24 * 60 * 60 * 1000;
@@ -236,6 +243,7 @@ async function handlePairClaim(request: Request, env: Env): Promise<Response> {
 interface SyncBody {
   since?: unknown;
   changes?: unknown;
+  favoriteArtistChanges?: unknown;
 }
 
 // ------------------------------------------------------- incoming change validation
@@ -323,12 +331,29 @@ function parseProgressFields(value: unknown, index: number): ProgressFields {
   };
 }
 
+function parseFavoriteArtistFields(value: unknown, index: number): FavoriteArtistFields {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new ValidationError(`favoriteArtistChanges[${index}] must be an object`);
+  }
+  const c = value as Record<string, unknown>;
+  const at = (field: string) => `favoriteArtistChanges[${index}].${field}`;
+  const artistKey = text(c.artistKey, at("artistKey"), MAX_QUEUE_KEY_CHARS);
+  if (artistKey.length === 0) throw new ValidationError(`${at("artistKey")} must not be empty`);
+  return {
+    artistKey,
+    updatedAt: int(c.updatedAt, at("updatedAt")),
+    deletedAt: optionalNonNegativeInt(c.deletedAt, at("deletedAt")),
+  };
+}
+
 /**
  * Validates the /sync request body into `{ since, incoming }`, or returns the 4xx Response to send.
  * Content-Length is only a hint (absent on chunked uploads), so `readJson` enforces the byte cap on
  * what actually arrives; MAX_CHANGES_PER_SYNC is what bounds the D1 work either way.
  */
-async function parseSyncRequest(request: Request): Promise<{ since: number; incoming: ProgressFields[] } | Response> {
+async function parseSyncRequest(
+  request: Request
+): Promise<{ since: number; incoming: ProgressFields[]; incomingFavorites: FavoriteArtistFields[] } | Response> {
   let body: SyncBody | null;
   try {
     body = await readJson<SyncBody>(request, MAX_SYNC_BODY_BYTES);
@@ -345,13 +370,25 @@ async function parseSyncRequest(request: Request): Promise<{ since: number; inco
   if (body.changes.length > MAX_CHANGES_PER_SYNC) {
     return tooLarge(`changes exceeds ${MAX_CHANGES_PER_SYNC} entries; push in smaller batches`);
   }
+  if (body.favoriteArtistChanges !== undefined && !Array.isArray(body.favoriteArtistChanges)) {
+    return badRequest("favoriteArtistChanges must be an array when present");
+  }
+  if ((body.favoriteArtistChanges?.length ?? 0) > MAX_CHANGES_PER_SYNC) {
+    return tooLarge(
+      `favoriteArtistChanges exceeds ${MAX_CHANGES_PER_SYNC} entries; push in smaller batches`
+    );
+  }
 
+  let incoming: ProgressFields[];
+  let incomingFavorites: FavoriteArtistFields[];
   try {
-    return { since, incoming: body.changes.map(parseProgressFields) };
+    incoming = body.changes.map(parseProgressFields);
+    incomingFavorites = (body.favoriteArtistChanges ?? []).map(parseFavoriteArtistFields);
   } catch (e) {
     if (e instanceof ValidationError) return badRequest(e.message);
     throw e;
   }
+  return { since, incoming, incomingFavorites };
 }
 
 /**
@@ -393,7 +430,7 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
 
   const parsed = await parseSyncRequest(request);
   if (parsed instanceof Response) return parsed;
-  const { since, incoming } = parsed;
+  const { since, incoming, incomingFavorites } = parsed;
 
   const now = Date.now();
 
@@ -424,14 +461,23 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   if (incoming.length > 0) {
     await applyIncomingChanges(env, device, incoming, now);
   }
+  if (incomingFavorites.length > 0) {
+    await applyIncomingFavoriteArtistChanges(env, device, incomingFavorites, now);
+  }
 
-  const rows = await env.DB.prepare(
+  const progressRows = await env.DB.prepare(
     "SELECT * FROM progress WHERE groupId = ? AND seq > ? ORDER BY seq ASC"
   )
     .bind(device.groupId, since)
     .all<ProgressRow>();
+  const favoriteRows = await env.DB.prepare(
+    "SELECT * FROM favorite_artists WHERE groupId = ? AND seq > ? ORDER BY seq ASC"
+  )
+    .bind(device.groupId, since)
+    .all<FavoriteArtistRow>();
 
-  const results = rows.results ?? [];
+  const progressResults = progressRows.results ?? [];
+  const favoriteResults = favoriteRows.results ?? [];
   // The reported cursor must never be lower than the seq of any row in this same response,
   // or the client stores a cursor that undercounts what it just received and re-pulls those
   // rows on every subsequent sync. Deriving it from `results` (read after `applyIncomingChanges`
@@ -445,14 +491,23 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
   // the cursor to at least retentionFloorSeq prevents its follow-up sync (since = returned seq)
   // from tripping HTTP 410 at line 331 and permanently trapping the client in an infinite 410
   // resync loop (defeating D126 full-resync recovery).
-  const lastRowSeq = results.length > 0 ? results[results.length - 1].seq : since;
+  const lastProgressSeq =
+    progressResults.length > 0 ? progressResults[progressResults.length - 1].seq : since;
+  const lastFavoriteSeq =
+    favoriteResults.length > 0 ? favoriteResults[favoriteResults.length - 1].seq : since;
+  const lastRowSeq = Math.max(lastProgressSeq, lastFavoriteSeq);
   const currentSeq = Math.max(lastRowSeq, cursor.retentionFloorSeq);
-  console.log(`handleSync elapsed: ${Date.now() - startMs}ms (in: ${incoming.length}, out: ${results.length})`);
+  console.log(
+    "handleSync elapsed: " +
+      `${Date.now() - startMs}ms (in: progress=${incoming.length}, favorites=${incomingFavorites.length}, ` +
+      `out: progress=${progressResults.length}, favorites=${favoriteResults.length})`
+  );
 
   return json(
     {
       seq: Math.max(currentSeq, since),
-      changes: results.map(toWireRow),
+      changes: progressResults.map(toWireRow),
+      favoriteArtistChanges: favoriteResults.map(toWireFavoriteRow),
     },
     200,
     responseHeaders
@@ -466,6 +521,11 @@ function toWireRow(row: ProgressRow): ProgressFields {
     finished: Boolean(fields.finished),
     dismissed: Boolean(fields.dismissed),
   };
+}
+
+function toWireFavoriteRow(row: FavoriteArtistRow): FavoriteArtistFields {
+  const { groupId: _groupId, seq: _seq, lastWriterDeviceId: _writer, ...fields } = row;
+  return fields;
 }
 
 export async function applyIncomingChanges(
@@ -576,6 +636,68 @@ export async function applyIncomingChanges(
   return accepted.length;
 }
 
+export async function applyIncomingFavoriteArtistChanges(
+  env: Env,
+  device: DeviceRow,
+  incoming: FavoriteArtistFields[],
+  now: number
+): Promise<number> {
+  const normalized = incoming.map((change) => ({
+    ...change,
+    updatedAt: change.updatedAt > now + FUTURE_CLOCK_CLAMP_MS ? now : change.updatedAt,
+    deletedAt: change.deletedAt ?? null,
+  }));
+
+  const dedupedByKey = new Map<string, FavoriteArtistFields>();
+  for (const change of normalized) {
+    const existing = dedupedByKey.get(change.artistKey);
+    if (!existing || change.updatedAt >= existing.updatedAt) {
+      dedupedByKey.set(change.artistKey, change);
+    }
+  }
+  const deduped = [...dedupedByKey.values()];
+
+  const keys = deduped.map((c) => c.artistKey);
+  const existingByKey = new Map<string, number>();
+  for (let i = 0; i < keys.length; i += KEY_LOOKUP_CHUNK) {
+    const chunk = keys.slice(i, i + KEY_LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => "?").join(",");
+    const existingRows = await env.DB.prepare(
+      `SELECT artistKey, updatedAt FROM favorite_artists WHERE groupId = ? AND artistKey IN (${placeholders})`
+    )
+      .bind(device.groupId, ...chunk)
+      .all<{ artistKey: string; updatedAt: number }>();
+    for (const r of existingRows.results ?? []) existingByKey.set(r.artistKey, r.updatedAt);
+  }
+
+  const accepted = deduped.filter((change) => {
+    const existingUpdatedAt = existingByKey.get(change.artistKey);
+    return existingUpdatedAt === undefined || change.updatedAt >= existingUpdatedAt;
+  });
+  if (accepted.length === 0) return 0;
+
+  const bumped = await env.DB.prepare(
+    "UPDATE seqs SET next = next + ? WHERE groupId = ? RETURNING next"
+  )
+    .bind(accepted.length, device.groupId)
+    .first<{ next: number }>();
+  if (!bumped) throw new Error(`no seq counter for group ${device.groupId}`);
+  const firstSeq = bumped.next - accepted.length;
+
+  const statements = accepted.map((change, i) =>
+    env.DB.prepare(
+      `INSERT INTO favorite_artists
+         (groupId, artistKey, updatedAt, deletedAt, seq, lastWriterDeviceId)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (groupId, artistKey) DO UPDATE SET
+         updatedAt = excluded.updatedAt, deletedAt = excluded.deletedAt, seq = excluded.seq,
+         lastWriterDeviceId = excluded.lastWriterDeviceId`
+    ).bind(device.groupId, change.artistKey, change.updatedAt, change.deletedAt, firstSeq + i, device.id)
+  );
+  await env.DB.batch(statements);
+  return accepted.length;
+}
+
 // ------------------------------------------------------------------ health
 
 /**
@@ -611,27 +733,39 @@ export async function purgeOldTombstones(
 ): Promise<{ groupsPurged: number; rowsPurged: number }> {
   const cutoff = now - TOMBSTONE_RETENTION_MS;
   const candidates = await env.DB.prepare(
-    `SELECT groupId, MAX(seq) as maxSeq
-     FROM progress
-     WHERE deletedAt IS NOT NULL AND deletedAt < ?
+    `SELECT groupId, MAX(maxSeq) as maxSeq
+     FROM (
+       SELECT groupId, MAX(seq) as maxSeq
+       FROM progress
+       WHERE deletedAt IS NOT NULL AND deletedAt < ?
+       GROUP BY groupId
+       UNION ALL
+       SELECT groupId, MAX(seq) as maxSeq
+       FROM favorite_artists
+       WHERE deletedAt IS NOT NULL AND deletedAt < ?
+       GROUP BY groupId
+     )
      GROUP BY groupId`
   )
-    .bind(cutoff)
+    .bind(cutoff, cutoff)
     .all<{ groupId: string; maxSeq: number }>();
 
   const groups = candidates.results ?? [];
   let rowsPurged = 0;
 
   for (const group of groups) {
-    const [, deleteResult] = await env.DB.batch([
+    const [, deleteProgressResult, deleteFavoritesResult] = await env.DB.batch([
       env.DB.prepare(
         "UPDATE seqs SET retentionFloorSeq = MAX(retentionFloorSeq, ?) WHERE groupId = ?"
       ).bind(group.maxSeq, group.groupId),
       env.DB.prepare(
         "DELETE FROM progress WHERE groupId = ? AND deletedAt IS NOT NULL AND deletedAt < ?"
       ).bind(group.groupId, cutoff),
+      env.DB.prepare(
+        "DELETE FROM favorite_artists WHERE groupId = ? AND deletedAt IS NOT NULL AND deletedAt < ?"
+      ).bind(group.groupId, cutoff),
     ]);
-    rowsPurged += deleteResult.meta.changes;
+    rowsPurged += deleteProgressResult.meta.changes + deleteFavoritesResult.meta.changes;
   }
 
   return { groupsPurged: groups.length, rowsPurged };

@@ -93,10 +93,12 @@ final class MigrationTests: XCTestCase {
 
     func testSyncCursorsTakeTheSafeSide() throws {
         try writePlist([
-            "sync.lastSeq": 50, "sync.lastPushWatermark": 900, "sync.lastSyncedAt": 5000,
+            "sync.lastSeq": 50, "sync.lastPushWatermark": 900,
+            "sync.lastFavoritesPushWatermark": 1200, "sync.lastSyncedAt": 5000,
         ])
         defaults.set(40, forKey: "sync.lastSeq")
         defaults.set(1000, forKey: "sync.lastPushWatermark")
+        defaults.set(1300, forKey: "sync.lastFavoritesPushWatermark")
         defaults.set(7000, forKey: "sync.lastSyncedAt")
         let dest = root.appendingPathComponent("dest/phishin.db")
         try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -104,6 +106,7 @@ final class MigrationTests: XCTestCase {
         migrate(dest: dest)
         XCTAssertEqual(defaults.integer(forKey: "sync.lastSeq"), 40)
         XCTAssertEqual(defaults.integer(forKey: "sync.lastPushWatermark"), 900)
+        XCTAssertEqual(defaults.integer(forKey: "sync.lastFavoritesPushWatermark"), 1200)
         XCTAssertEqual(defaults.integer(forKey: "sync.lastSyncedAt"), 7000)
     }
 

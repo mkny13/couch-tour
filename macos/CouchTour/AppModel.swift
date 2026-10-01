@@ -135,7 +135,7 @@ final class AppModel: ObservableObject {
     /// a guaranteed-background mechanism.
     func syncNow() {
         guard let progressStore else { return }
-        Task { try? await syncSession.sync(progressStore) }
+        Task { try? await syncSession.sync(progressStore, favorites: favorites) }
     }
 
     func checkForUpdates() {
@@ -179,4 +179,3 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.open(scriptURL)
     }
 }
-
