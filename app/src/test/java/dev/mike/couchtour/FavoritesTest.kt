@@ -66,4 +66,51 @@ class FavoritesTest {
         )
         assertEquals(setOf(key), Favorites.keys.value)
     }
+
+    @Test
+    fun `legacy key migration persists rows json and preserves timestamps across init`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = context.getSharedPreferences("favorites", android.content.Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("artist_keys", setOf(PHISH.key)).commit()
+
+        Favorites.init(context)
+        assertEquals(setOf(PHISH.key), Favorites.keys.value)
+        val initialRows = Favorites.changedSince(0)
+        assertEquals(1, initialRows.size)
+        val initialTimestamp = initialRows.first().updatedAt
+
+        val rawJson = prefs.getString("artist_rows_json", null)
+        org.junit.Assert.assertNotNull(rawJson)
+
+        // Subsequent init should preserve original timestamp, not re-mint fresh timestamp
+        Favorites.init(context)
+        val afterReinit = Favorites.changedSince(0)
+        assertEquals(1, afterReinit.size)
+        assertEquals(initialTimestamp, afterReinit.first().updatedAt)
+    }
+
+    @Test
+    fun `legacy key migration does not revive newer remote tombstone on subsequent init`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = context.getSharedPreferences("favorites", android.content.Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("artist_keys", setOf(PHISH.key)).commit()
+
+        Favorites.init(context)
+        val initialTimestamp = Favorites.changedSince(0).first().updatedAt
+
+        // Newer remote tombstone arrives from sync
+        val tombstoneTime = initialTimestamp + 1_000L
+        Favorites.applyFromSync(
+            listOf(FavoriteArtistSyncRow(artistKey = PHISH.key, updatedAt = tombstoneTime, deletedAt = tombstoneTime))
+        )
+        assertEquals(emptySet<String>(), Favorites.keys.value)
+
+        // Re-init must not revive PHISH from legacy keys
+        Favorites.init(context)
+        assertEquals(emptySet<String>(), Favorites.keys.value)
+        val rows = Favorites.changedSince(0)
+        assertEquals(1, rows.size)
+        assertEquals(tombstoneTime, rows.first().updatedAt)
+        org.junit.Assert.assertNotNull(rows.first().deletedAt)
+    }
 }
