@@ -632,16 +632,18 @@ final class Player: NSObject, ObservableObject {
             forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
-            guard let self, !self.isCasting, time.isValid, !time.isIndefinite else { return }
-            self.positionMs = Int64(time.seconds * 1000)
-            // AVQueuePlayer keeps firing this observer on its interval even while paused —
-            // without this guard, a show left loaded-but-paused (e.g. overnight) got its local
-            // progress row re-stamped with a fresh updatedAt every ~5s for no real change. The
-            // next sync then saw that row as "changed" and pushed the stale position, clobbering
-            // whatever a second device had actually advanced to (last-write-wins). Mirrors
-            // Android's `if (active.isPlaying) saveNow()` gate in PlaybackService.kt.
-            if self.isPlaying {
-                self.saveProgress(force: false)
+            Task { @MainActor [weak self] in
+                guard let self, !self.isCasting, time.isValid, !time.isIndefinite else { return }
+                self.positionMs = Int64(time.seconds * 1000)
+                // AVQueuePlayer keeps firing this observer on its interval even while paused —
+                // without this guard, a show left loaded-but-paused (e.g. overnight) got its local
+                // progress row re-stamped with a fresh updatedAt every ~5s for no real change. The
+                // next sync then saw that row as "changed" and pushed the stale position, clobbering
+                // whatever a second device had actually advanced to (last-write-wins). Mirrors
+                // Android's `if (active.isPlaying) saveNow()` gate in PlaybackService.kt.
+                if self.isPlaying {
+                    self.saveProgress(force: false)
+                }
             }
         }
     }
@@ -691,7 +693,7 @@ final class Player: NSObject, ObservableObject {
         guard let item = queuePlayer.currentItem else { return }
         itemStatusObservation = item.observe(\.status, options: [.new]) { [weak self] observedItem, _ in
             guard observedItem.status == .readyToPlay else { return }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self, let ms = self.pendingResumeMs else { return }
                 self.pendingResumeMs = nil
                 self.seek(toMs: ms)
@@ -929,6 +931,7 @@ final class Player: NSObject, ObservableObject {
             unprepare: nil,
             process: gainTapProcess
         )
+#if swift(>=6.0)
         var tapOut: MTAudioProcessingTap?
         let status = MTAudioProcessingTapCreate(
             kCFAllocatorDefault,
@@ -940,6 +943,19 @@ final class Player: NSObject, ObservableObject {
             storageUnmanaged.release()
             return
         }
+#else
+        var tapOut: Unmanaged<MTAudioProcessingTap>?
+        let status = MTAudioProcessingTapCreate(
+            kCFAllocatorDefault,
+            &callbacks,
+            kMTAudioProcessingTapCreationFlag_PostEffects,
+            &tapOut
+        )
+        guard status == noErr, let tap = tapOut?.takeRetainedValue() else {
+            storageUnmanaged.release()
+            return
+        }
+#endif
         let parameters = AVMutableAudioMixInputParameters(track: audioTrack)
         parameters.audioTapProcessor = tap
         // MTAudioProcessingTapCreate handed us +1; the audio mix holds its own retain.
