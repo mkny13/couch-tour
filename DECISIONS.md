@@ -5105,3 +5105,16 @@ Fixes #359. Points Android debug/beta and macOS `CouchTourBeta` at the staging s
 - **Clear Token on Host Change**: To prevent cross-environment token replay (e.g. presenting a production bearer token to staging, or vice versa), clients record the issuing host alongside the token (`SyncTokenStore.tokenHost`). When the active base URL host differs from the token's issuing host, the local token store is cleared and the client starts unpaired against the new host. Re-applying the same host preserves pairing state.
 - **Guarded Reset Script**: `scripts/smoke-sync-reset.sh` empties staging D1 tables (`progress`, `seqs`, `pairings`, `devices`, `groups`) via `wrangler d1 execute couch-tour-sync-staging --remote`. It hard-guards against running on any database other than `couch-tour-sync-staging`, specifically checking and rejecting production database names and IDs, requires an explicit `--yes` flag to write remotely, and defaults to dry-run printing. Covered by `scripts/test_smoke_sync_reset.sh`.
 
+
+### D315: macOS on-device diagnostics log in CouchTourKit (storage, rotation, retention, redaction)
+
+Part of #430 (#433). macOS counterpart of Android D292; same file format and policies so exported logs read identically.
+
+- **Storage**: `~/Library/Application Support/dev.mike.couchtour/diagnostics/` beside `phishin.db` (D171); `DiagnosticsLog(directory:)` takes an override for tests. `diagnostics.log` plus one previous generation `diagnostics.log.1`.
+- **Rotation**: 1 MiB cap per file, 2 MiB total. On append, if the current file is at or over the cap, `.1` is deleted, current is renamed to `.1`, and a fresh file starts with a `log.rotated` entry.
+- **Retention**: On `init`, both generations drop lines older than 7 days (unparseable lines are kept); a file still at or over 1 MiB is cut to its last 2000 lines.
+- **Line format**: `<ISO-8601 UTC>\t<LEVEL>\t<event>\t<key>=<value> ...`; newlines and tabs in values become spaces so one entry is one line.
+- **Redaction**: key names whose camelCase / delimiter-split words match `token`, `secret`, `password`, `passwd`, `auth`, `credential`, `cookie`, `pairing`, `code`, `key` (plural, or prefix/suffix for keywords of 4+ letters) get `***`. Bare `key` and `code` are exempt (e.g. HTTP `code=200`), but `syncKey`, `api_key`, `pairingCode` are redacted.
+- **Concurrency / failure**: a serial `DispatchQueue` owns all state; `log` and `mark` are async and non-throwing. Any write failure latches logging off for the process rather than propagating. Inspection APIs (`tailLines`, `summaryLines`, `exportText`, `clear`, `onDiskBytes`) are synchronous and meant to be called off the main thread by the viewer.
+- **Tail**: `tailLines(n)` seeks from the end and reads at most 256 KiB across both generations, dropping a leading partial line.
+- Viewer, Feedback integration and call-site instrumentation are separate sub-issues.
