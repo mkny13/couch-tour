@@ -28,6 +28,14 @@ public enum AXIdentifiers {
     public static let searchTabSongs = "search.tab.songs"
     public static let searchTabVenues = "search.tab.venues"
 
+    // Settings diagnostics viewer
+    public static let settingsDiagnosticsOpen = "settings.diagnostics.open"
+    public static let settingsDiagnosticsSummary = "settings.diagnostics.summary"
+    public static let settingsDiagnosticsLog = "settings.diagnostics.log"
+    public static let settingsDiagnosticsCopy = "settings.diagnostics.copy"
+    public static let settingsDiagnosticsClear = "settings.diagnostics.clear"
+    public static let settingsDiagnosticsDone = "settings.diagnostics.done"
+
     // Jam Chart
     public static let jamChartNote = "jam_chart.note"
 }
