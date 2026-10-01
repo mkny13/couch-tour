@@ -48,6 +48,7 @@ class SyncTokenStoreTest {
     fun `defaults the cursors to zero`() {
         assertEquals(0L, store().lastSeq)
         assertEquals(0L, store().lastPushWatermark)
+        assertEquals(0L, store().lastFavoritesPushWatermark)
         assertEquals(0L, store().lastSyncedAt)
     }
 
@@ -56,9 +57,11 @@ class SyncTokenStoreTest {
         val store = store()
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastFavoritesPushWatermark = 9
         store.lastSyncedAt = 1_700_000_000_000L
         assertEquals(42L, store.lastSeq)
         assertEquals(7L, store.lastPushWatermark)
+        assertEquals(9L, store.lastFavoritesPushWatermark)
         assertEquals(1_700_000_000_000L, store.lastSyncedAt)
     }
 
@@ -69,6 +72,7 @@ class SyncTokenStoreTest {
         store.deviceId = "device-1"
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastFavoritesPushWatermark = 9
         store.lastSyncedAt = 1_700_000_000_000L
 
         store.clear()
@@ -77,6 +81,7 @@ class SyncTokenStoreTest {
         assertNull(store.deviceId)
         assertEquals(0L, store.lastSeq)
         assertEquals(0L, store.lastPushWatermark)
+        assertEquals(0L, store.lastFavoritesPushWatermark)
         assertEquals(0L, store.lastSyncedAt)
     }
 }
@@ -348,7 +353,9 @@ class SyncSessionTest {
         SyncSession.sync(db.progressDao())
 
         val secondPush = server.takeRequest().body.readUtf8()
-        assertEquals("""{"since":1,"changes":[]}""", secondPush)
+        assertTrue(secondPush.contains(""""since":1"""))
+        assertTrue(secondPush.contains(""""changes":[]"""))
+        assertTrue(secondPush.contains(""""favoriteArtistChanges":[]"""))
     }
 
     @Test

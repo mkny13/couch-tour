@@ -85,6 +85,12 @@ public struct SyncProgressWire: Codable, Equatable {
     }
 }
 
+public struct SyncFavoriteArtistWire: Codable, Equatable {
+    public let artistKey: String
+    public let updatedAt: Int64
+    public let deletedAt: Int64?
+}
+
 private struct PairStartRequest: Encodable {
     let deviceName: String
     let platform: String
@@ -123,11 +129,22 @@ public struct PairClaimResponse: Decodable {
 private struct SyncRequest: Encodable {
     let since: Int64
     let changes: [SyncProgressWire]
+    let favoriteArtistChanges: [SyncFavoriteArtistWire]
 }
 
 public struct SyncResponse: Decodable {
     public let seq: Int64
     public let changes: [SyncProgressWire]
+    public let favoriteArtistChanges: [SyncFavoriteArtistWire]
+
+    enum CodingKeys: String, CodingKey { case seq, changes, favoriteArtistChanges }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        seq = try c.decode(Int64.self, forKey: .seq)
+        changes = try c.decode([SyncProgressWire].self, forKey: .changes)
+        favoriteArtistChanges = try c.decodeIfPresent([SyncFavoriteArtistWire].self, forKey: .favoriteArtistChanges) ?? []
+    }
 }
 
 public struct DeviceInfo: Decodable, Identifiable, Equatable {
@@ -244,8 +261,15 @@ public enum SyncAPI {
     }
 
     /// The rotated-token half is non-nil only when the server issued a fresh one.
-    public static func sync(token: String, since: Int64, changes: [SyncProgressWire]) async throws -> (SyncResponse, String?) {
-        let body = try encoder.encode(SyncRequest(since: since, changes: changes))
+    public static func sync(
+        token: String,
+        since: Int64,
+        changes: [SyncProgressWire],
+        favoriteArtistChanges: [SyncFavoriteArtistWire] = []
+    ) async throws -> (SyncResponse, String?) {
+        let body = try encoder.encode(
+            SyncRequest(since: since, changes: changes, favoriteArtistChanges: favoriteArtistChanges)
+        )
         let result = try orThrow(try await execute(request(path("sync"), method: "POST", token: token, body: body)))
         return (try decoder.decode(SyncResponse.self, from: result.data), result.rotatedToken)
     }
@@ -273,6 +297,7 @@ public final class SyncTokenStore {
         static let deviceId = "sync.deviceId"
         static let lastSeq = "sync.lastSeq"
         static let lastPushWatermark = "sync.lastPushWatermark"
+        static let lastFavoritesPushWatermark = "sync.lastFavoritesPushWatermark"
         static let lastSyncedAt = "sync.lastSyncedAt"
     }
 
@@ -303,6 +328,12 @@ public final class SyncTokenStore {
         set { defaults.set(Int(newValue), forKey: Key.lastPushWatermark) }
     }
 
+    /// The push watermark for `Favorites.changedSince`.
+    public var lastFavoritesPushWatermark: Int64 {
+        get { Int64(defaults.integer(forKey: Key.lastFavoritesPushWatermark)) }
+        set { defaults.set(Int(newValue), forKey: Key.lastFavoritesPushWatermark) }
+    }
+
     /// Wall-clock time of the last successful sync round trip, for the "Last synced" UI. 0
     /// means never.
     public var lastSyncedAt: Int64 {
@@ -315,6 +346,7 @@ public final class SyncTokenStore {
         keychain.set(nil, forKey: Key.deviceId)
         defaults.removeObject(forKey: Key.lastSeq)
         defaults.removeObject(forKey: Key.lastPushWatermark)
+        defaults.removeObject(forKey: Key.lastFavoritesPushWatermark)
         defaults.removeObject(forKey: Key.lastSyncedAt)
     }
 }
@@ -362,6 +394,7 @@ public final class SyncSession: ObservableObject {
         store.deviceId = response.deviceId
         store.lastSeq = 0
         store.lastPushWatermark = 0
+        store.lastFavoritesPushWatermark = 0
         paired = true
     }
 
@@ -396,13 +429,13 @@ public final class SyncSession: ObservableObject {
     ///
     /// Usually one round trip: only a first pair (watermark 0, so the whole progress table is
     /// "changed") has enough backlog to need more than one.
-    public func sync(_ progressStore: ProgressStore) async throws {
+    public func sync(_ progressStore: ProgressStore, favorites: Favorites? = nil) async throws {
         guard let token = store.deviceToken else { return }
 
         isSyncing = true
         defer { isSyncing = false }
         do {
-            while try await syncOnce(token: token, progressStore) {}
+            while try await syncOnce(token: token, progressStore, favorites: favorites) {}
             lastError = nil
         } catch let error as SyncException {
             if error.unauthorized {
@@ -439,25 +472,37 @@ public final class SyncSession: ObservableObject {
 
     /// One push-then-pull round trip. Returns true when the push hit `maxPushBatch` and more
     /// local rows are still waiting, so `sync` knows to come back for them.
-    private func syncOnce(token: String, _ progressStore: ProgressStore) async throws -> Bool {
+    private func syncOnce(token: String, _ progressStore: ProgressStore, favorites: Favorites?) async throws -> Bool {
         let pending = try progressStore.changedSince(store.lastPushWatermark)
         let chunk = Self.chunkToPush(pending)
         let toPush = chunk.map { $0.toWire() }
+        let pendingFavorites = await MainActor.run { favorites?.changedSince(store.lastFavoritesPushWatermark) ?? [] }
+        let chunkFavorites = Self.chunkToPushFavorites(pendingFavorites)
+        let toPushFavorites = chunkFavorites.map { $0.toWire() }
 
-        let (response, rotatedToken) = try await SyncAPI.sync(token: token, since: store.lastSeq, changes: toPush)
+        let (response, rotatedToken) = try await SyncAPI.sync(
+            token: token,
+            since: store.lastSeq,
+            changes: toPush,
+            favoriteArtistChanges: toPushFavorites
+        )
         if let rotatedToken { store.deviceToken = rotatedToken }
 
         for change in response.changes { try progressStore.put(change.toEntity()) }
+        _ = await MainActor.run { favorites?.applyFromSync(response.favoriteArtistChanges.map { $0.toEntity() }) ?? 0 }
         store.lastSeq = response.seq
         if let maxUpdatedAt = toPush.map({ $0.updatedAt }).max() {
             store.lastPushWatermark = maxUpdatedAt
+        }
+        if let maxUpdatedAt = toPushFavorites.map({ $0.updatedAt }).max() {
+            store.lastFavoritesPushWatermark = maxUpdatedAt
         }
 
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         store.lastSyncedAt = now
         lastSyncedAt = now
 
-        return pending.count > chunk.count
+        return pending.count > chunk.count || pendingFavorites.count > chunkFavorites.count
     }
 
     /// How many rows one push may carry. Deliberately under the server's own 500-entry cap
@@ -481,6 +526,15 @@ public final class SyncSession: ObservableObject {
         guard let lastAt = capped.last?.updatedAt else { return Array(capped) }
         // Only trim when the run actually continues past the cut; otherwise the boundary
         // already falls between two distinct timestamps and the full batch is safe to send.
+        guard pending[maxPushBatch].updatedAt == lastAt else { return Array(capped) }
+        let trimmed = capped.prefix { $0.updatedAt != lastAt }
+        return trimmed.isEmpty ? Array(pending.prefix { $0.updatedAt == lastAt }) : Array(trimmed)
+    }
+
+    static func chunkToPushFavorites(_ pending: [FavoriteArtistSyncRow]) -> [FavoriteArtistSyncRow] {
+        guard pending.count > maxPushBatch else { return pending }
+        let capped = pending.prefix(maxPushBatch)
+        guard let lastAt = capped.last?.updatedAt else { return Array(capped) }
         guard pending[maxPushBatch].updatedAt == lastAt else { return Array(capped) }
         let trimmed = capped.prefix { $0.updatedAt != lastAt }
         return trimmed.isEmpty ? Array(pending.prefix { $0.updatedAt == lastAt }) : Array(trimmed)
@@ -529,5 +583,17 @@ private extension PlaybackProgress {
             updatedAt: updatedAt, finished: finished, dismissed: dismissed, artist: artist,
             deletedAt: deletedAt
         )
+    }
+}
+
+private extension FavoriteArtistSyncRow {
+    func toWire() -> SyncFavoriteArtistWire {
+        SyncFavoriteArtistWire(artistKey: artistKey, updatedAt: updatedAt, deletedAt: deletedAt)
+    }
+}
+
+private extension SyncFavoriteArtistWire {
+    func toEntity() -> FavoriteArtistSyncRow {
+        FavoriteArtistSyncRow(artistKey: artistKey, updatedAt: updatedAt, deletedAt: deletedAt)
     }
 }

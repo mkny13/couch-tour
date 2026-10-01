@@ -55,6 +55,13 @@ data class SyncProgressWire(
 )
 
 @Serializable
+data class SyncFavoriteArtistWire(
+    val artistKey: String,
+    val updatedAt: Long,
+    val deletedAt: Long? = null,
+)
+
+@Serializable
 private data class PairStartRequest(val deviceName: String, val platform: String)
 
 @Serializable
@@ -80,10 +87,18 @@ private data class PairClaimRequest(
 data class PairClaimResponse(val deviceId: String, val deviceToken: String)
 
 @Serializable
-private data class SyncRequest(val since: Long, val changes: List<SyncProgressWire>)
+private data class SyncRequest(
+    val since: Long,
+    val changes: List<SyncProgressWire>,
+    val favoriteArtistChanges: List<SyncFavoriteArtistWire> = emptyList(),
+)
 
 @Serializable
-data class SyncResponse(val seq: Long, val changes: List<SyncProgressWire>)
+data class SyncResponse(
+    val seq: Long,
+    val changes: List<SyncProgressWire>,
+    val favoriteArtistChanges: List<SyncFavoriteArtistWire> = emptyList(),
+)
 
 @Serializable
 data class DeviceInfo(
@@ -181,8 +196,16 @@ object SyncApi {
     }
 
     /** The `String?` half of the pair is the rotated token header, when the server sent one. */
-    suspend fun sync(token: String, since: Long, changes: List<SyncProgressWire>): Pair<SyncResponse, String?> {
-        val payload = json.encodeToString(SyncRequest.serializer(), SyncRequest(since, changes))
+    suspend fun sync(
+        token: String,
+        since: Long,
+        changes: List<SyncProgressWire>,
+        favoriteArtistChanges: List<SyncFavoriteArtistWire> = emptyList(),
+    ): Pair<SyncResponse, String?> {
+        val payload = json.encodeToString(
+            SyncRequest.serializer(),
+            SyncRequest(since, changes, favoriteArtistChanges)
+        )
         val result = post(path("sync").build(), payload, token).orThrow()
         return json.decodeFromString<SyncResponse>(result.body) to result.rotatedToken
     }
@@ -204,6 +227,7 @@ private const val KEY_DEVICE_TOKEN = "deviceToken"
 private const val KEY_DEVICE_ID = "deviceId"
 private const val KEY_LAST_SEQ = "lastSeq"
 private const val KEY_LAST_PUSH_WATERMARK = "lastPushWatermark"
+private const val KEY_LAST_FAVORITES_PUSH_WATERMARK = "lastFavoritesPushWatermark"
 private const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
 
 /**
@@ -236,6 +260,7 @@ class SyncTokenStore(context: Context) {
     private var memoryDeviceId: String? = null
     private var memoryLastSeq: Long = 0L
     private var memoryLastPushWatermark: Long = 0L
+    private var memoryLastFavoritesPushWatermark: Long = 0L
     private var memoryLastSyncedAt: Long = 0L
 
     private fun open(context: Context): SharedPreferences? = try {
@@ -287,6 +312,14 @@ class SyncTokenStore(context: Context) {
             prefs?.edit()?.putLong(KEY_LAST_PUSH_WATERMARK, value)?.apply()
         }
 
+    /** The push watermark for [Favorites.changedSince]. */
+    var lastFavoritesPushWatermark: Long
+        get() = prefs?.getLong(KEY_LAST_FAVORITES_PUSH_WATERMARK, 0L) ?: memoryLastFavoritesPushWatermark
+        set(value) {
+            memoryLastFavoritesPushWatermark = value
+            prefs?.edit()?.putLong(KEY_LAST_FAVORITES_PUSH_WATERMARK, value)?.apply()
+        }
+
     /** Wall-clock time of the last successful sync round trip, for the "Last synced" UI. 0
      *  means never. */
     var lastSyncedAt: Long
@@ -301,6 +334,7 @@ class SyncTokenStore(context: Context) {
         memoryDeviceId = null
         memoryLastSeq = 0L
         memoryLastPushWatermark = 0L
+        memoryLastFavoritesPushWatermark = 0L
         memoryLastSyncedAt = 0L
         prefs?.edit()?.clear()?.apply()
     }
@@ -379,6 +413,7 @@ object SyncSession {
         store.deviceId = response.deviceId
         store.lastSeq = 0
         store.lastPushWatermark = 0
+        store.lastFavoritesPushWatermark = 0
         _paired.value = true
     }
 
@@ -401,7 +436,13 @@ object SyncSession {
         _lastSyncedAt.value = 0L
     }
 
-    private data class SyncOnceResult(val pushed: Int, val pulled: Int, val hasMore: Boolean)
+    private data class SyncOnceResult(
+        val pushedProgress: Int,
+        val pushedFavorites: Int,
+        val pulledProgress: Int,
+        val pulledFavorites: Int,
+        val hasMore: Boolean,
+    )
 
     /**
      * Push-then-pull until the local backlog is drained. Pushes every local row touched since
@@ -416,29 +457,42 @@ object SyncSession {
 
         DiagnosticsLog.log("sync.start")
         val startTime = System.currentTimeMillis()
-        var totalPushed = 0
-        var totalPulled = 0
+        var totalPushedProgress = 0
+        var totalPushedFavorites = 0
+        var totalPulledProgress = 0
+        var totalPulledFavorites = 0
         _syncing.value = true
         try {
             while (true) {
                 val res = syncOnce(token, progressDao)
-                totalPushed += res.pushed
-                totalPulled += res.pulled
+                totalPushedProgress += res.pushedProgress
+                totalPushedFavorites += res.pushedFavorites
+                totalPulledProgress += res.pulledProgress
+                totalPulledFavorites += res.pulledFavorites
                 if (!res.hasMore) break
             }
             _lastError.value = null
             val elapsedMs = System.currentTimeMillis() - startTime
             val watermark = store.lastPushWatermark
+            val favoritesWatermark = store.lastFavoritesPushWatermark
             val seq = store.lastSeq
             DiagnosticsLog.log(
                 "sync.end",
-                "pushed" to totalPushed,
-                "pulled" to totalPulled,
+                "pushed_progress" to totalPushedProgress,
+                "pushed_favorites" to totalPushedFavorites,
+                "pulled_progress" to totalPulledProgress,
+                "pulled_favorites" to totalPulledFavorites,
                 "ms" to elapsedMs,
                 "pushed_upto" to watermark,
+                "favorites_pushed_upto" to favoritesWatermark,
                 "pulled_seq" to seq
             )
-            DiagnosticsLog.mark("Last sync", "pushed=$totalPushed pulled=$totalPulled ms=$elapsedMs pushed_upto=$watermark pulled_seq=$seq")
+            DiagnosticsLog.mark(
+                "Last sync",
+                "pushed_progress=$totalPushedProgress pushed_favorites=$totalPushedFavorites " +
+                    "pulled_progress=$totalPulledProgress pulled_favorites=$totalPulledFavorites " +
+                    "ms=$elapsedMs pushed_upto=$watermark favorites_pushed_upto=$favoritesWatermark pulled_seq=$seq"
+            )
         } catch (e: SyncException) {
             when {
                 // Revoked from another device (or the token is simply bad): stop trying
@@ -490,19 +544,32 @@ object SyncSession {
         val pending = progressDao.changedSince(store.lastPushWatermark).sortedBy { it.updatedAt }
         val chunk = pending.chunkToPush()
         val toPush = chunk.map { it.toWire() }
+        val pendingFavorites = Favorites.changedSince(store.lastFavoritesPushWatermark)
+        val chunkFavorites = pendingFavorites.chunkToPushFavorites()
+        val toPushFavorites = chunkFavorites.map { it.toWire() }
 
-        val (response, rotatedToken) = SyncApi.sync(token, store.lastSeq, toPush)
+        val (response, rotatedToken) = SyncApi.sync(token, store.lastSeq, toPush, toPushFavorites)
         rotatedToken?.let { store.deviceToken = it }
 
         response.changes.forEach { progressDao.put(it.toEntity()) }
+        Favorites.applyFromSync(response.favoriteArtistChanges.map { it.toEntity() })
         store.lastSeq = response.seq
         if (toPush.isNotEmpty()) store.lastPushWatermark = toPush.maxOf { it.updatedAt }
+        if (toPushFavorites.isNotEmpty()) {
+            store.lastFavoritesPushWatermark = toPushFavorites.maxOf { it.updatedAt }
+        }
 
         val now = System.currentTimeMillis()
         store.lastSyncedAt = now
         _lastSyncedAt.value = now
 
-        return SyncOnceResult(pushed = toPush.size, pulled = response.changes.size, hasMore = pending.size > chunk.size)
+        return SyncOnceResult(
+            pushedProgress = toPush.size,
+            pushedFavorites = toPushFavorites.size,
+            pulledProgress = response.changes.size,
+            pulledFavorites = response.favoriteArtistChanges.size,
+            hasMore = pending.size > chunk.size || pendingFavorites.size > chunkFavorites.size,
+        )
     }
 
     private var pushJob: Job? = null
@@ -562,6 +629,15 @@ private fun List<Progress>.chunkToPush(): List<Progress> {
         .ifEmpty { takeWhile { it.updatedAt == lastAt } }
 }
 
+private fun List<FavoriteArtistSyncRow>.chunkToPushFavorites(): List<FavoriteArtistSyncRow> {
+    if (size <= MAX_PUSH_BATCH) return this
+    val capped = take(MAX_PUSH_BATCH)
+    val lastAt = capped.last().updatedAt
+    if (this[MAX_PUSH_BATCH].updatedAt != lastAt) return capped
+    return capped.dropLastWhile { it.updatedAt == lastAt }
+        .ifEmpty { takeWhile { it.updatedAt == lastAt } }
+}
+
 private fun Progress.toWire() = SyncProgressWire(
     queueKey = queueKey, title = title, subtitle = subtitle, artUrl = artUrl,
     trackIndex = trackIndex, positionMs = positionMs, trackTitle = trackTitle,
@@ -573,6 +649,18 @@ private fun SyncProgressWire.toEntity() = Progress(
     queueKey = queueKey, title = title, subtitle = subtitle, artUrl = artUrl,
     trackIndex = trackIndex, positionMs = positionMs, trackTitle = trackTitle,
     updatedAt = updatedAt, finished = finished, dismissed = dismissed, artist = artist,
+    deletedAt = deletedAt,
+)
+
+private fun FavoriteArtistSyncRow.toWire() = SyncFavoriteArtistWire(
+    artistKey = artistKey,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+)
+
+private fun SyncFavoriteArtistWire.toEntity() = FavoriteArtistSyncRow(
+    artistKey = artistKey,
+    updatedAt = updatedAt,
     deletedAt = deletedAt,
 )
 
@@ -630,4 +718,3 @@ internal fun syncErrorCode(e: Throwable): String {
         else -> "other"
     }
 }
-
