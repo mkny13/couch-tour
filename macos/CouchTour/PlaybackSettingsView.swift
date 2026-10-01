@@ -8,6 +8,7 @@ struct PlaybackSettingsView: View {
     @ObservedObject var themeSettings: ThemeSettings
     var onClearMeasuredLoudness: (() -> Void)? = nil
     @State private var loudnessCleared = false
+    @State private var showDiagnostics = false
 
     var body: some View {
         Form {
@@ -54,6 +55,8 @@ struct PlaybackSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             }
             Section {
+                Button("Diagnostics…") { showDiagnostics = true }
+                    .accessibilityIdentifier(AXIdentifiers.settingsDiagnosticsOpen)
                 Text(Bundle.main.appVersionString)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -61,5 +64,6 @@ struct PlaybackSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showDiagnostics) { DiagnosticsView() }
     }
 }

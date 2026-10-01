@@ -5118,3 +5118,13 @@ Part of #430 (#433). macOS counterpart of Android D292; same file format and pol
 - **Concurrency / failure**: a serial `DispatchQueue` owns all state; `log` and `mark` are async and non-throwing. Any write failure latches logging off for the process rather than propagating. Inspection APIs (`tailLines`, `summaryLines`, `exportText`, `clear`, `onDiskBytes`) are synchronous and meant to be called off the main thread by the viewer.
 - **Tail**: `tailLines(n)` seeks from the end and reads at most 256 KiB across both generations, dropping a leading partial line.
 - Viewer, Feedback integration and call-site instrumentation are separate sub-issues.
+
+### D316: macOS Settings diagnostics viewer (Copy / Clear)
+
+Part of #430 (#435). Counterpart of Android #376 / D293.
+
+- **Entry point**: a "Diagnostics…" button in the About section of Settings → Playback (`PlaybackSettingsView`) presents `DiagnosticsView` as a sheet.
+- **Content**: summary header (`summaryLines()`: marks, entry count, on-disk size) above a monospace, selectable view of `tailLines(200)`. No auto-refresh or filtering; it loads once per open and again after Clear.
+- **Copy** puts `exportText()` (both generations, full) on `NSPasteboard.general`. **Clear** asks for confirmation, then calls `clear()` (both files and marks) and reloads.
+- **Threading**: the log's inspection APIs block on its serial queue and hit disk, so every call runs in `Task.detached`; the main actor only assigns results.
+- The view owns its own `DiagnosticsLog()` on the default directory; the log's queue serializes it against any other instance only per-instance, which is acceptable until app-wide instrumentation (separate sub-issue) introduces a shared one.
