@@ -168,7 +168,7 @@ variant (D233).
 
 ## Tests
 
-Android unit tests (including Robolectric Compose UI suites), no device or emulator required:
+818 Android unit tests (including Robolectric Compose UI suites), no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
