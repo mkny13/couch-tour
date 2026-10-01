@@ -77,6 +77,19 @@ class A11yTagsTest {
     }
 
     @Test
+    fun `search field tag matches the macOS identifier and resolves on a text field`() {
+        assertEquals("search.field", A11yTags.SEARCH_FIELD)
+        compose.setContent {
+            androidx.compose.material3.OutlinedTextField(
+                value = "",
+                onValueChange = {},
+                modifier = Modifier.testTag(A11yTags.SEARCH_FIELD),
+            )
+        }
+        compose.onNodeWithTag(A11yTags.SEARCH_FIELD).assertExists()
+    }
+
+    @Test
     fun `parameterized helpers produce the expected prefixes and values`() {
         assertEquals("home.section.in-progress.row.test1", A11yTags.homeInProgressRow("test1"))
         assertEquals("home.section.next-tour-stops.row.test2", A11yTags.homeNextTourStopRow("test2"))

@@ -589,6 +589,9 @@ android_run_search_artist_hit() {
   sleep 0.5
   android::dump >/dev/null || true
 
+  # Focus the field first so typed text lands in it, not on whatever had focus.
+  android::tap "search.field" 2>/dev/null || true
+  sleep 0.3
   android::text "moe"
 
   if android::wait_for_tag "search.section.artists" "$TIMEOUT"; then
@@ -775,6 +778,9 @@ android_run_search_result_sections() {
   sleep 0.5
   android::dump >/dev/null || true
 
+  # Focus the field first so typed text lands in it, not on whatever had focus.
+  android::tap "search.field" 2>/dev/null || true
+  sleep 0.3
   android::text "ghost"
 
   if ! android::wait_for_tag "search.results" "$TIMEOUT"; then
