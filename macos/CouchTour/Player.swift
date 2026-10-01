@@ -929,21 +929,37 @@ final class Player: NSObject, ObservableObject {
             unprepare: nil,
             process: gainTapProcess
         )
+        let tap: MTAudioProcessingTap?
+        let status: OSStatus
+        #if compiler(>=6.1)
         var tapOut: MTAudioProcessingTap?
-        let status = MTAudioProcessingTapCreate(
+        status = MTAudioProcessingTapCreate(
             kCFAllocatorDefault,
             &callbacks,
             kMTAudioProcessingTapCreationFlag_PostEffects,
             &tapOut
         )
-        guard status == noErr, let tap = tapOut else {
+        tap = tapOut
+        #else
+        var tapOut: Unmanaged<MTAudioProcessingTap>?
+        status = MTAudioProcessingTapCreate(
+            kCFAllocatorDefault,
+            &callbacks,
+            kMTAudioProcessingTapCreationFlag_PostEffects,
+            &tapOut
+        )
+        tap = tapOut?.takeRetainedValue()
+        #endif
+        guard status == noErr, let tap else {
             storageUnmanaged.release()
             return
         }
         let parameters = AVMutableAudioMixInputParameters(track: audioTrack)
         parameters.audioTapProcessor = tap
+        #if compiler(>=6.1)
         // MTAudioProcessingTapCreate handed us +1; the audio mix holds its own retain.
         Unmanaged.passUnretained(tap).release()
+        #endif
         let mix = AVMutableAudioMix()
         mix.inputParameters = [parameters]
         item.audioMix = mix
