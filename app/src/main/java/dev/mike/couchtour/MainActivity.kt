@@ -3865,15 +3865,6 @@ private fun ShowHeader(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
-                    if (show.likesCount > 0) {
-                        Text(
-                            text = "♥ ${show.likesCount}",
-                            fontSize = 13.sp,
-                            color = Color(0xFFF06BB0),
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(text = "·", fontSize = 13.sp, color = ledger.textSubtle)
-                    }
                     Text(
                         text = "$trackCount tracks · $compactDuration",
                         fontSize = 13.sp,
@@ -4012,6 +4003,22 @@ private fun ShowHeader(
                 }.getOrNull()?.let { release ->
                     ExternalReleasePill(release)
                 }
+            }
+
+            // Show Like pill (#431) — phish.in's server-side show like, matching macOS's
+            // ShowLikeButton. Only phish.in has one, and a DTO with no id can't be liked,
+            // which is the same `id == 0` gate macOS uses.
+            if (show.id != 0L) {
+                LikeButton(
+                    type = Likable.Show,
+                    id = show.id,
+                    initiallyLiked = show.likedByUser,
+                    initialCount = show.likesCount,
+                    modifier = Modifier
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(1.dp, ledger.controlOutline, RoundedCornerShape(18.dp))
+                )
             }
 
             Spacer(Modifier.weight(1f))
