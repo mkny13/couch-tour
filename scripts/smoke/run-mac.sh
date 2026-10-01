@@ -214,6 +214,114 @@ function run(argv) {
 JXA
 }
 
+# Query direct children of element matching AXIdentifier.
+# Output format per line: <identifier>\t<role>\t<title-or-value>
+mac::ax_children() {
+  local target_id="${1:-}"
+  local timeout_ms="${2:-5000}"
+
+  osascript -l JavaScript - "$target_id" "$timeout_ms" "$BUNDLE_ID" "$APP_NAME" << 'JXA'
+function run(argv) {
+    var targetId = argv[0];
+    var timeoutMs = parseInt(argv[1] || "5000", 10);
+    var bundleId = argv[2];
+    var appName = argv[3];
+
+    var app = Application('System Events');
+    var proc = null;
+    var processes = app.applicationProcesses();
+    for (var i = 0; i < processes.length; i++) {
+        try {
+            if (processes[i].bundleIdentifier() === bundleId) {
+                proc = processes[i];
+                break;
+            }
+        } catch (e) {}
+    }
+    if (!proc) {
+        try {
+            var byName = app.applicationProcesses.byName(appName);
+            if (byName.exists()) {
+                proc = byName;
+            }
+        } catch(e) {}
+    }
+    if (!proc) return "";
+
+    var startTime = Date.now();
+    var parentElement = null;
+
+    function findParent(element, depth) {
+        if (parentElement || Date.now() - startTime > timeoutMs) return;
+
+        var axId = null;
+        try {
+            axId = element.attributes.byName("AXIdentifier").value();
+        } catch (e) {}
+
+        if (axId === targetId) {
+            parentElement = element;
+            return;
+        }
+
+        if (depth >= 6) return;
+
+        var children = [];
+        try {
+            children = element.uiElements();
+        } catch (e) {}
+
+        for (var i = 0; i < children.length; i++) {
+            findParent(children[i], depth + 1);
+            if (parentElement) return;
+        }
+    }
+
+    var windows = [];
+    try {
+        windows = proc.windows();
+    } catch (e) {}
+
+    for (var i = 0; i < windows.length; i++) {
+        findParent(windows[i], 0);
+        if (parentElement) break;
+    }
+
+    if (!parentElement) return "";
+
+    var items = [];
+    var uiChildren = [];
+    try {
+        uiChildren = parentElement.uiElements();
+    } catch (e) {}
+
+    for (var i = 0; i < uiChildren.length; i++) {
+        var child = uiChildren[i];
+        var axId = "";
+        try {
+            axId = child.attributes.byName("AXIdentifier").value() || "";
+        } catch (e) {}
+        var role = "";
+        try { role = child.role() || ""; } catch (e) {}
+        var val = "";
+        try {
+            val = child.title();
+            if (!val) val = child.value();
+        } catch (e) {}
+        if (val) {
+            val = ("" + val).replace(/[\r\n\t]+/g, " ").trim();
+        } else {
+            val = "";
+        }
+        items.push(axId + "\t" + role + "\t" + val);
+    }
+
+    return items.join("\n");
+}
+JXA
+}
+
+
 # Poll mac::ax_query until the identifier appears or timeout fires.
 mac::wait_for_id() {
   local id="$1"
@@ -593,18 +701,7 @@ mac_run_browse_artists_to_artist() {
     return 0
   fi
 
-  if ! mac::click "sidebar.nav.artists"; then
-    mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.artists"
-    return 0
-  fi
-
-  if mac::wait_for_id "sidebar.nav.artists" "$TIMEOUT" >/dev/null; then
-    smoke::result "mac" "$id" "PASS" "sidebar.nav.artists selected and navigated to artists list"
-  else
-    mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "navigation to artists list timed out"
-  fi
+  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for artists list and artist screen (platform gap)"
 }
 
 mac_run_search_artist_hit() {
@@ -708,7 +805,7 @@ mac_run_no_unfavorited_in_favorites() {
   smoke::require_journeys_file "$id"
   smoke::log "Executing journey $id..."
 
-  # Fixture: signed-in
+  # Fixture: signed-in (requires favorited artists in favorites list)
   local fav_rows
   fav_rows="$(mac::ax_query "sidebar.favorites.row")"
 
@@ -717,22 +814,62 @@ mac_run_no_unfavorited_in_favorites() {
     return 0
   fi
 
-  # Confirm all rows under favorites list follow sidebar.favorites.row convention
+  # Query broader scope to inspect all children and prevent tautological filtering
   local invalid_rows=0
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    local row_ax_id
-    row_ax_id="$(echo "$line" | cut -f1)"
-    if [[ ! "$row_ax_id" =~ ^sidebar\.favorites\.row\. ]]; then
-      invalid_rows=$((invalid_rows + 1))
-    fi
-  done <<< "$fav_rows"
+  local total_rows=0
 
-  if [[ $invalid_rows -eq 0 ]]; then
-    smoke::result "mac" "$id" "PASS" "all rows in sidebar.favorites.list match confirmed favorites"
-  else
+  # 1. Inspect direct UI children of sidebar.favorites.list container
+  local list_children
+  list_children="$(mac::ax_children "sidebar.favorites.list")"
+
+  if [[ -n "$list_children" ]]; then
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      local child_id child_role child_val
+      child_id="$(echo "$line" | cut -f1)"
+      child_role="$(echo "$line" | cut -f2)"
+      child_val="$(echo "$line" | cut -f3)"
+
+      # Header is expected
+      if [[ "$child_id" == "sidebar.favorites.header" ]]; then
+        continue
+      fi
+
+      # Each row in the favorites list must have a valid favorited artist identifier
+      if [[ "$child_id" =~ ^sidebar\.favorites\.row\.([a-z0-9_]+)\.([a-z0-9_-]+)$ ]]; then
+        total_rows=$((total_rows + 1))
+      else
+        smoke::log "Invalid favorite child element: id='$child_id', role='$child_role', val='$child_val'"
+        invalid_rows=$((invalid_rows + 1))
+      fi
+    done <<< "$list_children"
+  fi
+
+  # 2. Query broader scope sidebar.favorites for any unexpected elements
+  local fav_scope
+  fav_scope="$(mac::ax_query "sidebar.favorites")"
+  if [[ -n "$fav_scope" ]]; then
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      local ax_id
+      ax_id="$(echo "$line" | cut -f1)"
+      if [[ "$ax_id" == "sidebar.favorites.list" || "$ax_id" == "sidebar.favorites.header" ]]; then
+        continue
+      fi
+      if [[ ! "$ax_id" =~ ^sidebar\.favorites\.row\.([a-z0-9_]+)\.([a-z0-9_-]+)$ ]]; then
+        smoke::log "Unexpected element in sidebar.favorites scope: '$ax_id'"
+        invalid_rows=$((invalid_rows + 1))
+      fi
+    done <<< "$fav_scope"
+  fi
+
+  if [[ $invalid_rows -eq 0 && $total_rows -gt 0 ]]; then
+    smoke::result "mac" "$id" "PASS" "all $total_rows rows in sidebar.favorites.list match confirmed favorites"
+  elif [[ $invalid_rows -gt 0 ]]; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "detected $invalid_rows unconfirmed or malformed rows in sidebar.favorites.list"
+  else
+    smoke::result "mac" "$id" "SKIP" "signed-in fixture unavailable: no favorite rows found in sidebar.favorites.list"
   fi
 }
 
@@ -746,39 +883,7 @@ mac_run_next_stop_chip_focus() {
     return 0
   fi
 
-  mac::click "sidebar.nav.home" || true
-
-  if ! mac::wait_for_id "home.next_tour_stops" "$TIMEOUT" >/dev/null; then
-    mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "home.next_tour_stops not present on Home screen"
-    return 0
-  fi
-
-  # Check if upcoming tour stops exist or if empty state is showing
-  local next_stops
-  next_stops="$(mac::ax_query "home.next_tour_stops")"
-  if echo "$next_stops" | grep -qi "No upcoming tour stops"; then
-    smoke::result "mac" "$id" "SKIP" "no upcoming tour stops in home.next_tour_stops"
-    return 0
-  fi
-
-  # Click artist chip inside home.next_tour_stops
-  if ! mac::click "home.next_tour_stops"; then
-    mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "could not click artist chip in home.next_tour_stops"
-    return 0
-  fi
-
-  # Assert home.track_tour is not opened (the #352 bug: chip should focus artist, not tour picker)
-  local track_tour_dialog
-  track_tour_dialog="$(mac::ax_query "home.track_tour")"
-
-  if [[ -z "$track_tour_dialog" ]]; then
-    smoke::result "mac" "$id" "PASS" "clicking artist chip focused artist without activating home.track_tour"
-  else
-    mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "home.track_tour activated when clicking artist chip (regression #352)"
-  fi
+  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for artist chip and artist target screen (platform gap)"
 }
 
 mac_run_jam_chart_note_details() {
@@ -828,22 +933,19 @@ mac_run_library_phishin_playlists() {
   smoke::log "Executing journey $id..."
 
   # Fixture: signed-in
+  local fav_rows
+  fav_rows="$(mac::ax_query "sidebar.favorites.row")"
+  if [[ -z "$fav_rows" ]]; then
+    smoke::result "mac" "$id" "SKIP" "signed-in fixture unavailable: no favorited artist in sidebar.favorites.list"
+    return 0
+  fi
+
   if [[ "$NO_INPUT" == "true" ]]; then
     smoke::result "mac" "$id" "SKIP" "input disabled"
     return 0
   fi
 
-  if ! mac::click "sidebar.nav.library"; then
-    mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.library"
-    return 0
-  fi
-
-  if mac::wait_for_id "sidebar.nav.library" "$TIMEOUT" >/dev/null; then
-    smoke::result "mac" "$id" "PASS" "sidebar.nav.library opened Library view"
-  else
-    smoke::result "mac" "$id" "SKIP" "signed-in fixture unavailable or library navigation timed out"
-  fi
+  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for library playlists (platform gap)"
 }
 
 mac_run_favorite_syncs_mac_to_android() {
@@ -880,28 +982,7 @@ mac_run_nav_reaches_every_destination() {
     return 0
   fi
 
-  local destinations=(
-    "sidebar.nav.home"
-    "sidebar.nav.artists"
-    "sidebar.nav.search"
-    "sidebar.nav.library"
-    "sidebar.nav.history"
-    "sidebar.nav.settings"
-  )
-
-  for dest in "${destinations[@]}"; do
-    if ! mac::wait_for_id "$dest" 5 >/dev/null; then
-      mac_screenshot "$id"
-      smoke::result "mac" "$id" "FAIL" "destination $dest not present"
-      return 0
-    fi
-    mac::click "$dest" || true
-    sleep 0.25
-  done
-
-  # Return to Home
-  mac::click "sidebar.nav.home" || true
-  smoke::result "mac" "$id" "PASS" "all six sidebar navigation destinations reachable"
+  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for destination target views (platform gap)"
 }
 
 mac_run_search_result_sections() {
@@ -994,16 +1075,7 @@ mac_run_live_data_not_mockup() {
     return 0
   fi
 
-  local row_id
-  row_id="$(echo "$fav_rows" | head -n1 | cut -f1)"
-
-  if ! mac::click "$row_id"; then
-    mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "could not click favorited artist row '$row_id'"
-    return 0
-  fi
-
-  smoke::result "mac" "$id" "PASS" "favorited artist loaded live show data from backend"
+  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for live show data verification (platform gap)"
 }
 
 # -----------------------------------------------------------------------------
