@@ -84,6 +84,7 @@ final class AppModel: ObservableObject {
         SyncAPI.baseURL = SyncConfig.resolveBaseURL(defaultBase: SyncConfig.stagingBaseURL)
         syncSession = SyncSession(store: SyncTokenStore(keychain: SystemKeychain(service: "dev.mike.couchtour.beta.sync")))
         #else
+        SyncAPI.baseURL = SyncConfig.resolveBaseURL(defaultBase: SyncConfig.prodBaseURL)
         syncSession = SyncSession()
         #endif
 

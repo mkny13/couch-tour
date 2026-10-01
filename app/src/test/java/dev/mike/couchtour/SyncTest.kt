@@ -137,6 +137,22 @@ class SyncConfigTest {
 
 
     @Test
+    fun `a legacy token without a host is not stamped with a staging override`() {
+        val store = store()
+        store.deviceToken = "legacy-prod-token"
+        store.tokenHost = null
+
+        SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://couch-tour-sync.mkastellec.workers.dev",
+            override = "https://staging.example.com",
+            store = store,
+        )
+
+        // Stamping would make the production token look staging-issued and get replayed there.
+        assertNull(store.tokenHost)
+    }
+
+    @Test
     fun `re-applying the same host does not clear it`() {
         val store = store()
         store.tokenHost = "same-host.example.com"

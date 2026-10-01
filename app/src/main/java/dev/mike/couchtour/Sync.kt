@@ -145,14 +145,9 @@ object SyncApi {
         val targetHost = target.host
         baseUrl = target
 
-        // If this is the first token, record its host so we can check for mismatches later.
-        // We do NOT wipe the token here; doing so on launch races with MainActivity receiving
-        // the override intent. The actual mismatch check happens in SyncSession.sync().
-        tokenStore?.let { s ->
-            if (s.deviceToken != null && s.tokenHost == null) {
-                s.tokenHost = targetHost
-            }
-        }
+        // A token with no recorded host predates host tracking, so it was issued by production.
+        // Leave it unstamped: SyncSession.sync() compares it against DEFAULT_BASE and clears it
+        // before any cross-host request, rather than replaying it at a staging override.
 
         return target
     }

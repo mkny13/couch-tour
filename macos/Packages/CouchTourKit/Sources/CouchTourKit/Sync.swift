@@ -417,8 +417,6 @@ public final class SyncSession: ObservableObject {
             let issuingHost = store.tokenHost ?? SyncAPI.defaultBase.host ?? ""
             if !targetHost.isEmpty && issuingHost != targetHost {
                 store.clear()
-            } else if store.tokenHost == nil && !targetHost.isEmpty {
-                store.tokenHost = targetHost
             }
         }
         self.paired = store.deviceToken != nil
