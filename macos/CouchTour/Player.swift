@@ -956,10 +956,6 @@ final class Player: NSObject, ObservableObject {
         }
         let parameters = AVMutableAudioMixInputParameters(track: audioTrack)
         parameters.audioTapProcessor = tap
-        #if compiler(>=6.1)
-        // MTAudioProcessingTapCreate handed us +1; the audio mix holds its own retain.
-        Unmanaged.passUnretained(tap).release()
-        #endif
         let mix = AVMutableAudioMix()
         mix.inputParameters = [parameters]
         item.audioMix = mix
