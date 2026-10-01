@@ -66,4 +66,34 @@ class LedgerLayoutTest {
         assertEquals(30, playButtonSize)
         assertEquals(2, rowProgressBarHeight)
     }
+
+    @Test
+    fun `audio format badge labels FLAC and MP3`() {
+        assertEquals("FLAC", audioFormatLabel("flac"))
+        assertEquals("MP3", audioFormatLabel("MP3"))
+        assertTrue(audioFormatIsFlac("FLAC"))
+        assertTrue(!audioFormatIsFlac("MP3"))
+    }
+
+    @Test
+    fun `audio format badge stays hidden when the item has no MP3 or FLAC stream`() {
+        // A YouTube item reports no format: it is neither, so no badge may be drawn.
+        assertEquals("", audioFormatLabel(" "))
+        assertTrue(!audioFormatIsFlac(""))
+    }
+
+    @Test
+    fun `audio format reports MP3 and FLAC for tape items and nothing for YouTube`() {
+        assertEquals("MP3", playerAudioFormat(isFlac = false, youTubeMode = null))
+        assertEquals("FLAC", playerAudioFormat(isFlac = true, youTubeMode = null))
+        assertEquals("", playerAudioFormat(isFlac = false, youTubeMode = YouTubePlaybackMode.AUDIO))
+        assertEquals("", playerAudioFormat(isFlac = false, youTubeMode = YouTubePlaybackMode.VIDEO))
+    }
+
+    @Test
+    fun `cast header shows device only while casting`() {
+        assertEquals("Casting to Living Room TV", castHeaderTitle("Living Room TV"))
+        assertEquals(null, castHeaderTitle(null))
+        assertEquals(null, castHeaderTitle(""))
+    }
 }

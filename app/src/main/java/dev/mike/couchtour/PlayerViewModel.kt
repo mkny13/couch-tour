@@ -60,6 +60,19 @@ data class PlayerState(
     val queue: List<QueueTrackItem> = emptyList(),
 )
 
+/**
+ * The audio format to report for the current item, or empty when the item has no MP3/FLAC
+ * pair to describe. A YouTube video (#234) resolves to YouTube's own codecs and carries no
+ * `FLAC_URL`, so deriving "MP3" from its missing key made the restored Now Playing badge
+ * assert a format the stream never had. Blank means "show no format", and every surface
+ * that displays one already hides itself on blank.
+ */
+internal fun playerAudioFormat(isFlac: Boolean, youTubeMode: YouTubePlaybackMode?): String = when {
+    youTubeMode != null -> ""
+    isFlac -> "FLAC"
+    else -> "MP3"
+}
+
 data class QueueTrackItem(
     val index: Int,
     val mediaId: String,
@@ -131,10 +144,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val extras = meta?.extras
         val flacUrl = extras?.getString(Keys.FLAC_URL)
         val isFlac = !flacUrl.isNullOrBlank()
-        val audioFormat = if (isFlac) "FLAC" else "MP3"
         val queueKey = extras?.getString(Keys.QUEUE_KEY)
         val backend = extras?.getString(Keys.BACKEND)
         val youTubeMode = extras?.getString(Keys.YOUTUBE_MODE)?.let { YouTubePlaybackMode.fromId(it) }
+        val audioFormat = playerAudioFormat(isFlac, youTubeMode)
 
         var showDate = extras?.getString(Keys.SHOW_DATE).orEmpty()
         var venueName = extras?.getString(Keys.VENUE_NAME).orEmpty()
