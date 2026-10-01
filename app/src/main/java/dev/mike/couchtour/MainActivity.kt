@@ -186,7 +186,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CouchTourTheme {
-                Surface(modifier = Modifier.fillMaxSize()) { App(openNowPlaying = openNowPlaying) }
+                Surface(modifier = Modifier.fillMaxSize().testTagsAsResourceIds()) { App(openNowPlaying = openNowPlaying) }
             }
         }
     }

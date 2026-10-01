@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import org.junit.Assert.assertEquals
@@ -52,6 +53,27 @@ class A11yTagsTest {
         compose.onNodeWithTag(A11yTags.HOME_SECTION_IN_PROGRESS, useUnmergedTree = true).assertExists()
         compose.onNodeWithTag(A11yTags.HOME_SECTION_NEXT_TOUR_STOPS, useUnmergedTree = true).assertExists()
         compose.onNodeWithTag(A11yTags.HOME_SECTION_ON_THIS_DATE, useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun `root modifier exposes test tags as resource ids`() {
+        compose.setContent {
+            Column(Modifier.testTagsAsResourceIds()) {
+                Text("x", Modifier.testTag(A11yTags.HOME_SECTION_IN_PROGRESS))
+            }
+        }
+
+        val root = compose.onNodeWithTag(A11yTags.HOME_SECTION_IN_PROGRESS, useUnmergedTree = true)
+            .fetchSemanticsNode()
+        var parent = root.parent
+        var found = false
+        while (parent != null) {
+            if (parent.config.contains(androidx.compose.ui.semantics.SemanticsProperties.TestTag).not() &&
+                parent.config.getOrNull(androidx.compose.ui.semantics.SemanticsPropertiesAndroid.TestTagsAsResourceId) == true
+            ) found = true
+            parent = parent.parent
+        }
+        assertTrue("testTagsAsResourceId not set on an ancestor", found)
     }
 
     @Test
