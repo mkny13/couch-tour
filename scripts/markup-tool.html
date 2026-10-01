@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Couch Tour — Mac Screen Markup Tool</title>
+<style>
+:root {
+  --bg: #0f111a; --sidebar: #161826; --card: #1c1e2c; --line: #272a3c;
+  --fg: #e2e8f0; --muted: #94a3b8; --accent: #9184d9; --accent-light: #b5abfc;
+  --warn: #f59e0b; --danger: #ef4444; --success: #10b981;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  height: 58px; background: var(--sidebar); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem;
+  flex-shrink: 0; gap: 1rem;
+}
+h1 { font-size: 1.1rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.6rem; letter-spacing: -0.01em; }
+.badge { font-size: 0.75rem; background: rgba(145,132,217,0.18); color: var(--accent-light); padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid rgba(145,132,217,0.3); }
+.actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+button {
+  background: var(--card); border: 1px solid var(--line); color: var(--fg);
+  padding: 0.45rem 0.85rem; border-radius: 7px; font: inherit; font-size: 0.825rem;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.15s;
+}
+button:hover { border-color: var(--accent); color: #fff; }
+button.active { background: rgba(145,132,217,0.22); border-color: var(--accent); color: var(--accent-light); font-weight: 600; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.primary:hover { background: var(--accent-light); }
+
+.workspace {
+  flex: 1; display: flex; overflow: hidden; position: relative;
+}
+.canvas-container {
+  flex: 1; overflow: auto; background: #08090f; padding: 2rem;
+  display: flex; justify-content: center; align-items: flex-start;
+  position: relative; cursor: crosshair;
+}
+.image-wrapper {
+  position: relative; box-shadow: 0 16px 50px rgba(0,0,0,0.75);
+  border-radius: 10px; overflow: hidden; border: 1px solid var(--line);
+  user-select: none; line-height: 0; background: #12141f;
+}
+.image-wrapper img {
+  display: block; max-width: 100%; height: auto;
+}
+
+.pin {
+  position: absolute; width: 28px; height: 28px; border-radius: 50%;
+  background: #f43f5e; color: #ffffff; font-weight: 700; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transform: translate(-50%, -50%); cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  border: 2px solid #ffffff; transition: transform 0.15s, background 0.15s;
+  z-index: 10; line-height: 1;
+}
+.pin:hover { transform: translate(-50%, -50%) scale(1.2); background: #e11d48; }
+.pin.active { background: #8b5cf6; border-color: #fef08a; transform: translate(-50%, -50%) scale(1.25); }
+
+.sidebar {
+  width: 420px; background: var(--sidebar); border-left: 1px solid var(--line);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.sidebar-header {
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.comment-list {
+  flex: 1; overflow-y: auto; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.85rem;
+}
+.comment-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.85rem; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.comment-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.card-top {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;
+}
+.pin-label {
+  display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.85rem; color: var(--accent-light);
+}
+.pin-num {
+  width: 22px; height: 22px; border-radius: 50%; background: #f43f5e; color: #fff;
+  font-size: 11px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700;
+}
+.del-btn {
+  background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 2px 6px; font-size: 1.1rem; line-height: 1; border-radius: 4px;
+}
+.del-btn:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--fg); font: inherit; font-size: 0.85rem; padding: 0.6rem; resize: vertical; min-height: 64px;
+}
+textarea:focus { border-color: var(--accent); outline: none; }
+
+.footer {
+  padding: 0.85rem 1.25rem; border-top: 1px solid var(--line); display: flex; gap: 0.6rem;
+}
+.toast {
+  position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%) translateY(-20px);
+  background: var(--success); color: #fff; font-weight: 600; padding: 0.6rem 1.4rem;
+  border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); opacity: 0; pointer-events: none;
+  transition: all 0.2s ease; z-index: 999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Couch Tour <span class="badge">Screen Markup Tool</span></h1>
+  <div class="actions">
+    <button id="btn-rail" class="active" onclick="switchScreen('rail')">Player Rail (Right Side)</button>
+    <button id="btn-np-dark" onclick="switchScreen('np-dark')">Now Playing Expanded (Dark)</button>
+    <button id="btn-np-light" onclick="switchScreen('np-light')">Now Playing Expanded (Light)</button>
+    <button id="btn-home-full" onclick="switchScreen('home-full')">Home (Full 1440×900)</button>
+    <button onclick="document.getElementById('file-input').click()">📁 Load Screengrab</button>
+    <input type="file" id="file-input" accept="image/*" style="display:none" onchange="uploadImage(event)" />
+    <button class="primary" onclick="copyFeedback()">📋 Copy Feedback Markdown</button>
+  </div>
+</header>
+<div class="workspace">
+  <div class="canvas-container" id="canvas-container" onclick="onCanvasClick(event)">
+    <div class="image-wrapper" id="img-wrapper">
+      <img id="target-img" src="../design/handoff/screenshots/macos-2a-player-rail-dark.png" alt="Player Rail" />
+    </div>
+  </div>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span>Feedback Notes (<span id="count">0</span>)</span>
+      <span style="font-size:0.8rem; color:var(--muted)">Click screen to drop pin</span>
+    </div>
+    <div class="comment-list" id="comment-list">
+      <div id="empty-hint" style="color:var(--muted); text-align:center; margin-top:3rem; line-height:1.6">
+        <div style="font-size:2rem; margin-bottom:0.5rem">📍</div>
+        Click anywhere on the screen to add a numbered comment pin.<br><br>
+        Press <strong>⌘V</strong> anytime to paste a fresh screengrab from your clipboard.
+      </div>
+    </div>
+    <div class="footer">
+      <button style="flex:1" onclick="clearAll()">Clear</button>
+      <button class="primary" style="flex:2" onclick="copyFeedback()">📋 Copy for Agent</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast">✓ Feedback markdown copied to clipboard!</div>
+
+<script>
+const screens = {
+  'rail': {
+    name: 'Home Screen — Player Rail (Right Side)',
+    src: '../design/handoff/screenshots/macos-2a-player-rail-dark.png'
+  },
+  'np-dark': {
+    name: 'Now Playing Expanded — Dark (Screen 2D)',
+    src: '../design/handoff/screenshots/macos-2d-nowplaying-dark.png'
+  },
+  'np-light': {
+    name: 'Now Playing Expanded — Light (Screen 2D-L)',
+    src: '../design/handoff/screenshots/macos-2d-nowplaying-light.png'
+  },
+  'home-full': {
+    name: 'Home Screen — Full (1440×900)',
+    src: '../design/handoff/screenshots/macos-2a-home-dark.png'
+  }
+};
+
+let currentScreenKey = 'rail';
+let pins = [];
+let nextId = 1;
+
+function switchScreen(key) {
+  currentScreenKey = key;
+  document.querySelectorAll('.actions button').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`btn-${key}`);
+  if (btn) btn.classList.add('active');
+  const img = document.getElementById('target-img');
+  img.src = screens[key].src;
+  img.alt = screens[key].name;
+}
+
+function onCanvasClick(e) {
+  const wrapper = document.getElementById('img-wrapper');
+  const img = document.getElementById('target-img');
+  if (e.target.closest('.pin')) return;
+  const rect = wrapper.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+
+  const pctX = (x / rect.width) * 100;
+  const pctY = (y / rect.height) * 100;
+
+  const pin = {
+    id: nextId++,
+    pctX,
+    pctY,
+    text: '',
+    screen: screens[currentScreenKey].name
+  };
+  pins.push(pin);
+  renderPins();
+  renderComments();
+  setTimeout(() => {
+    const ta = document.getElementById(`text-${pin.id}`);
+    if (ta) ta.focus();
+  }, 50);
+}
+
+function renderPins() {
+  const wrapper = document.getElementById('img-wrapper');
+  wrapper.querySelectorAll('.pin').forEach(p => p.remove());
+  pins.forEach((pin, idx) => {
+    const el = document.createElement('div');
+    el.className = 'pin';
+    el.innerText = idx + 1;
+    el.style.left = `${pin.pctX}%`;
+    el.style.top = `${pin.pctY}%`;
+    el.onclick = (e) => {
+      e.stopPropagation();
+      highlightPin(pin.id);
+    };
+    wrapper.appendChild(el);
+  });
+  document.getElementById('count').innerText = pins.length;
+}
+
+function renderComments() {
+  const list = document.getElementById('comment-list');
+  if (pins.length === 0) {
+    list.innerHTML = `
+      <div id="empty-hint" style="color:var(--muted); text-align:center; margin-top:3rem; line-height:1.6">
+        <div style="font-size:2rem; margin-bottom:0.5rem">📍</div>
+        Click anywhere on the screen to add a numbered comment pin.<br><br>
+        Press <strong>⌘V</strong> anytime to paste a fresh screengrab from your clipboard.
+      </div>`;
+    return;
+  }
+  list.innerHTML = '';
+  pins.forEach((pin, idx) => {
+    const card = document.createElement('div');
+    card.className = 'comment-card';
+    card.id = `card-${pin.id}`;
+    card.innerHTML = `
+      <div class="card-top">
+        <span class="pin-label">
+          <span class="pin-num">${idx + 1}</span>
+          <span>Point #${idx + 1} (~${Math.round(pin.pctX)}% x, ~${Math.round(pin.pctY)}% y)</span>
+        </span>
+        <button class="del-btn" onclick="deletePin(${pin.id})" title="Delete note">×</button>
+      </div>
+      <textarea id="text-${pin.id}" placeholder="Type what looks wrong, needs adjustment, or should be changed..." oninput="updateText(${pin.id}, this.value)">${pin.text || ''}</textarea>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function highlightPin(id) {
+  document.querySelectorAll('.pin').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.comment-card').forEach(c => c.classList.remove('active'));
+  const idx = pins.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    const pinEls = document.querySelectorAll('.pin');
+    if (pinEls[idx]) pinEls[idx].classList.add('active');
+    const card = document.getElementById(`card-${id}`);
+    if (card) {
+      card.classList.add('active');
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const ta = document.getElementById(`text-${id}`);
+      if (ta) ta.focus();
+    }
+  }
+}
+
+function updateText(id, text) {
+  const pin = pins.find(p => p.id === id);
+  if (pin) pin.text = text;
+}
+
+function deletePin(id) {
+  pins = pins.filter(p => p.id !== id);
+  renderPins();
+  renderComments();
+}
+
+function clearAll() {
+  if (pins.length === 0) return;
+  if (confirm('Clear all markup pins?')) {
+    pins = [];
+    renderPins();
+    renderComments();
+  }
+}
+
+function uploadImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = document.getElementById('target-img');
+    img.src = event.target.result;
+    document.querySelectorAll('.actions button').forEach(b => b.classList.remove('active'));
+    screens['custom'] = { name: file.name, src: event.target.result };
+    currentScreenKey = 'custom';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Support Cmd+V to paste screenshot
+window.addEventListener('paste', (e) => {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (let index in items) {
+    const item = items[index];
+    if (item.kind === 'file' && item.type.includes('image')) {
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = document.getElementById('target-img');
+        img.src = event.target.result;
+        document.querySelectorAll('.actions button').forEach(b => b.classList.remove('active'));
+        screens['pasted'] = { name: 'Pasted Screengrab', src: event.target.result };
+        currentScreenKey = 'pasted';
+        showToast('Pasted screenshot loaded!');
+      };
+      reader.readAsDataURL(blob);
+    }
+  }
+});
+
+function copyFeedback() {
+  if (pins.length === 0) {
+    alert('Click on the screen to drop at least one pin first.');
+    return;
+  }
+  const screenTitle = screens[currentScreenKey] ? screens[currentScreenKey].name : 'Mac Screen';
+  let md = `### Mac Screen Markup Feedback: ${screenTitle}\n\n`;
+  pins.forEach((pin, idx) => {
+    md += `${idx + 1}. **Point #${idx + 1}** (~${Math.round(pin.pctX)}% x, ~${Math.round(pin.pctY)}% y):\n   ${pin.text.trim() || '(no comment written)'}\n\n`;
+  });
+  navigator.clipboard.writeText(md).then(() => {
+    showToast('✓ Feedback markdown copied to clipboard!');
+  }).catch(() => {
+    alert('Failed to write to clipboard, but here is the text:\n\n' + md);
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
