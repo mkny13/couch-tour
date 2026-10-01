@@ -27,6 +27,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -115,10 +116,54 @@ class SyncException(message: String, val code: Int = 0) : Exception(message) {
  * an unrelated service with an unrelated identity.
  */
 object SyncApi {
-    private val DEFAULT_BASE = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
+    internal val DEFAULT_BASE = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
 
     /** Overridden by tests to point at a local mock server. */
     internal var baseUrl: HttpUrl = DEFAULT_BASE
+
+    /**
+     * Resolves and sets the base URL for sync traffic.
+     * If an override is provided and valid, it takes precedence. Otherwise falls back to [defaultUrl].
+     * If the resolved host differs from the issuing host of any currently stored token,
+     * the token store is cleared to prevent cross-environment token replay.
+     */
+    fun applyConfiguredBaseUrl(
+        defaultUrl: String = BuildConfig.SYNC_BASE_URL,
+        override: String? = null,
+        store: SyncTokenStore? = null,
+    ): HttpUrl {
+        val tokenStore = store ?: if (SyncSession.isStoreInitialized()) SyncSession.currentStore() else null
+        if (override != null && override.isNotBlank()) {
+            tokenStore?.baseUrlOverride = override
+        }
+
+        val activeOverride = tokenStore?.baseUrlOverride ?: override
+        val parsedOverride = activeOverride?.takeIf { it.isNotBlank() }?.let { raw ->
+            raw.toHttpUrlOrNull()
+        }
+        val target = parsedOverride ?: defaultUrl.toHttpUrl()
+        val targetHost = target.host
+        baseUrl = target
+
+        // A token with no recorded host predates host tracking, so it was issued by production.
+        // Leave it unstamped: SyncSession.sync() compares it against DEFAULT_BASE and clears it
+        // before any cross-host request, rather than replaying it at a staging override.
+
+        return target
+    }
+
+    fun applyConfiguredBaseUrl(
+        context: Context,
+        defaultUrl: String = BuildConfig.SYNC_BASE_URL,
+        override: String? = null,
+    ): HttpUrl {
+        val tokenStore = if (SyncSession.isStoreInitialized()) {
+            SyncSession.currentStore()
+        } else {
+            SyncTokenStore(context.applicationContext)
+        }
+        return applyConfiguredBaseUrl(defaultUrl, override, tokenStore)
+    }
 
     private val JSON_MEDIA = "application/json".toMediaType()
     private val http = OkHttpClient.Builder()
@@ -202,9 +247,11 @@ object SyncApi {
 private const val SYNC_PREFS = "couchtour_sync"
 private const val KEY_DEVICE_TOKEN = "deviceToken"
 private const val KEY_DEVICE_ID = "deviceId"
+private const val KEY_TOKEN_HOST = "tokenHost"
 private const val KEY_LAST_SEQ = "lastSeq"
 private const val KEY_LAST_PUSH_WATERMARK = "lastPushWatermark"
 private const val KEY_LAST_SYNCED_AT = "lastSyncedAt"
+private const val KEY_BASE_URL_OVERRIDE = "baseUrlOverride"
 
 /**
  * Encrypted-at-rest storage for the sync device token — its own prefs file, deliberately NOT
@@ -234,6 +281,7 @@ class SyncTokenStore(context: Context) {
 
     private var memoryToken: String? = null
     private var memoryDeviceId: String? = null
+    private var memoryTokenHost: String? = null
     private var memoryLastSeq: Long = 0L
     private var memoryLastPushWatermark: Long = 0L
     private var memoryLastSyncedAt: Long = 0L
@@ -257,7 +305,24 @@ class SyncTokenStore(context: Context) {
         set(value) {
             memoryToken = value
             prefs?.edit()?.apply { if (value == null) remove(KEY_DEVICE_TOKEN) else putString(KEY_DEVICE_TOKEN, value) }?.apply()
+            if (value != null && tokenHost == null) {
+                tokenHost = SyncApi.baseUrl.host
+            }
         }
+
+    var tokenHost: String?
+        get() = prefs?.getString(KEY_TOKEN_HOST, null) ?: memoryTokenHost
+        set(value) {
+            memoryTokenHost = value
+            prefs?.edit()?.apply { if (value == null) remove(KEY_TOKEN_HOST) else putString(KEY_TOKEN_HOST, value) }?.apply()
+        }
+
+    var baseUrlOverride: String?
+        get() = prefs?.getString(KEY_BASE_URL_OVERRIDE, null)
+        set(value) {
+            prefs?.edit()?.apply { if (value == null) remove(KEY_BASE_URL_OVERRIDE) else putString(KEY_BASE_URL_OVERRIDE, value) }?.apply()
+        }
+
 
     var deviceId: String?
         get() = prefs?.getString(KEY_DEVICE_ID, null) ?: memoryDeviceId
@@ -299,6 +364,7 @@ class SyncTokenStore(context: Context) {
     fun clear() {
         memoryToken = null
         memoryDeviceId = null
+        memoryTokenHost = null
         memoryLastSeq = 0L
         memoryLastPushWatermark = 0L
         memoryLastSyncedAt = 0L
@@ -343,6 +409,15 @@ object SyncSession {
         _lastError.value = null
     }
 
+    internal fun isStoreInitialized(): Boolean = this::store.isInitialized
+    internal fun currentStore(): SyncTokenStore = store
+    internal fun updatePairedFromStore() {
+        if (this::store.isInitialized) {
+            _paired.value = store.deviceToken != null
+            _lastSyncedAt.value = store.lastSyncedAt
+        }
+    }
+
     fun init(context: Context) {
         store = SyncTokenStore(context.applicationContext)
         _paired.value = store.deviceToken != null
@@ -361,6 +436,7 @@ object SyncSession {
     suspend fun startPairing(): PairStartResponse {
         val response = SyncApi.pairStart(Build.MODEL, "android", store.deviceToken)
         if (response.deviceToken != null && response.deviceId != null) {
+            store.tokenHost = SyncApi.baseUrl.host
             store.deviceToken = response.deviceToken
             store.deviceId = response.deviceId
             _paired.value = true
@@ -375,6 +451,7 @@ object SyncSession {
      */
     suspend fun claimPairing(code: String) {
         val response = SyncApi.pairClaim(code, Build.MODEL, "android")
+        store.tokenHost = SyncApi.baseUrl.host
         store.deviceToken = response.deviceToken
         store.deviceId = response.deviceId
         store.lastSeq = 0
@@ -413,6 +490,14 @@ object SyncSession {
      */
     suspend fun sync(progressDao: ProgressDao) {
         val token = store.deviceToken ?: return
+
+        // Prevent cross-environment token replay if the base URL changed.
+        val issuingHost = store.tokenHost ?: SyncApi.DEFAULT_BASE.host
+        if (issuingHost != SyncApi.baseUrl.host) {
+            store.clear()
+            updatePairedFromStore()
+            return
+        }
 
         DiagnosticsLog.log("sync.start")
         val startTime = System.currentTimeMillis()
@@ -492,7 +577,10 @@ object SyncSession {
         val toPush = chunk.map { it.toWire() }
 
         val (response, rotatedToken) = SyncApi.sync(token, store.lastSeq, toPush)
-        rotatedToken?.let { store.deviceToken = it }
+        rotatedToken?.let {
+            store.tokenHost = SyncApi.baseUrl.host
+            store.deviceToken = it
+        }
 
         response.changes.forEach { progressDao.put(it.toEntity()) }
         store.lastSeq = response.seq

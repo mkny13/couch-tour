@@ -75,9 +75,119 @@ class SyncTokenStoreTest {
 
         assertNull(store.deviceToken)
         assertNull(store.deviceId)
+        assertNull(store.tokenHost)
         assertEquals(0L, store.lastSeq)
         assertEquals(0L, store.lastPushWatermark)
         assertEquals(0L, store.lastSyncedAt)
+    }
+
+    @Test
+    fun `round-trips the token host`() {
+        val store = store()
+        store.tokenHost = "example.com"
+        assertEquals("example.com", store.tokenHost)
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class SyncConfigTest {
+
+    private fun store() = SyncTokenStore(ApplicationProvider.getApplicationContext<Context>())
+
+    @After
+    fun tearDown() {
+        SyncApi.baseUrl = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
+    }
+
+    @Test
+    fun `buildConfig sync base url for debug is the staging host`() {
+        assertEquals("https://couch-tour-sync-staging.mkastellec.workers.dev", BuildConfig.SYNC_BASE_URL)
+    }
+
+    @Test
+    fun `applyConfiguredBaseUrl honours an override`() {
+        val resolved = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://default.example.com",
+            override = "https://custom.example.com",
+            store = store(),
+        )
+        assertEquals("https://custom.example.com".toHttpUrl(), resolved)
+        assertEquals("https://custom.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+    @Test
+    fun `switching hosts defers token clearing to the sync phase`() {
+        val store = store()
+        store.tokenHost = "old-host.example.com"
+        store.deviceToken = "token-123"
+        store.deviceId = "device-123"
+
+        SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://new-host.example.com",
+            override = null,
+            store = store,
+        )
+
+        // Token must survive here so we don't wipe it before MainActivity processes an override intent.
+        assertNotNull(store.deviceToken)
+        assertEquals("old-host.example.com", store.tokenHost)
+        assertEquals("https://new-host.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+
+    @Test
+    fun `a legacy token without a host is not stamped with a staging override`() {
+        val store = store()
+        store.deviceToken = "legacy-prod-token"
+        store.tokenHost = null
+
+        SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://couch-tour-sync.mkastellec.workers.dev",
+            override = "https://staging.example.com",
+            store = store,
+        )
+
+        // Stamping would make the production token look staging-issued and get replayed there.
+        assertNull(store.tokenHost)
+    }
+
+    @Test
+    fun `re-applying the same host does not clear it`() {
+        val store = store()
+        store.tokenHost = "same-host.example.com"
+        store.deviceToken = "token-123"
+        store.deviceId = "device-123"
+
+        SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://same-host.example.com",
+            override = null,
+            store = store,
+        )
+
+        assertEquals("token-123", store.deviceToken)
+        assertEquals("device-123", store.deviceId)
+        assertEquals("same-host.example.com", store.tokenHost)
+        assertEquals("https://same-host.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+    @Test
+    fun `a malformed override URL is ignored and falls back to configured default`() {
+        val resolved = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://default.example.com",
+            override = "not a valid url",
+            store = store(),
+        )
+        assertEquals("https://default.example.com".toHttpUrl(), resolved)
+        assertEquals("https://default.example.com".toHttpUrl(), SyncApi.baseUrl)
+
+        val resolvedBlank = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = "https://default.example.com",
+            override = "   ",
+            store = store(),
+        )
+        assertEquals("https://default.example.com".toHttpUrl(), resolvedBlank)
+        assertEquals("https://default.example.com".toHttpUrl(), SyncApi.baseUrl)
     }
 }
 
@@ -291,6 +401,20 @@ class SyncSessionTest {
         SyncSession.sync(db.progressDao())
 
         assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `sync clears the token store if the host changed`() = runBlocking {
+        claim()
+        
+        // Change the API base URL so it mismatches the stored tokenHost
+        SyncApi.baseUrl = "https://different-host.example.com".toHttpUrl()
+        
+        SyncSession.sync(db.progressDao())
+        
+        // Assert token is cleared
+        assertFalse(SyncSession.paired.value)
+        assertEquals(1, server.requestCount)
     }
 
     @Test

@@ -152,12 +152,31 @@ class MainActivity : ComponentActivity() {
         // launchMode is singleTask, so a second tap re-enters through here, not onCreate.
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false)) openNowPlaying.value = true
+        intent.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
+            SyncApi.applyConfiguredBaseUrl(this, override = override)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         openNowPlaying.value = intent?.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false) == true
+        intent?.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
+            SyncApi.applyConfiguredBaseUrl(this, override = override)
+        }
+
+        if (savedInstanceState == null) {
+            // An immediate catch-up on launch, on top of the periodic background job.
+            // Fire-and-forget: sync() is a no-op if unpaired.
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                try {
+                    SyncSession.sync(PhishInDb.get(this@MainActivity).progressDao())
+                } catch (e: Exception) {
+                    android.util.Log.w("Sync", "Launch sync failed; the periodic job will retry", e)
+                    DiagnosticsLog.log("sync.error", DiagnosticsLog.Level.WARN, "code" to syncErrorCode(e))
+                }
+            }
+        }
 
         // Without this the media notification (and therefore the lockscreen controls)
         // is silently suppressed on Android 13+.
@@ -174,6 +193,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_NOW_PLAYING = "open_now_playing"
+        const val EXTRA_SYNC_BASE_URL = "syncBaseUrl"
     }
 }
 

@@ -131,9 +131,43 @@ variant (D233).
 - **Typecheck:** `cd sync && npm run typecheck`.
 - **Deployments:** Never deploy by hand. `.github/workflows/sync-deploy.yml` deploys to staging, runs smoke tests, applies migrations, and promotes to prod on push to `main` for `sync/**`. Dispatch on demand with `gh workflow run sync-deploy.yml`.
 
+#### Environments, overrides, and smoke reset
+
+- **Defaults**:
+  - Production builds (Android `release`, macOS `CouchTour`) point to `https://couch-tour-sync.mkastellec.workers.dev`.
+  - Debug & beta builds (Android `debug`/`-PsideInstall=true`, macOS `CouchTourBeta`) point to `https://couch-tour-sync-staging.mkastellec.workers.dev`.
+- **Host Overrides**: Switching the sync host automatically clears the local token store so the client starts unpaired against the new host.
+  - **macOS** (`--sync-base-url=<url>` or `COUCHTOUR_SYNC_BASE_URL` env var):
+    ```bash
+    # Point Mac beta back at production
+    /Applications/Couch\ Tour\ Beta.app/Contents/MacOS/Couch\ Tour\ Beta --sync-base-url=https://couch-tour-sync.mkastellec.workers.dev
+
+    # Point Mac production app at staging
+    /Applications/Couch\ Tour.app/Contents/MacOS/Couch\ Tour --sync-base-url=https://couch-tour-sync-staging.mkastellec.workers.dev
+    ```
+  - **Android** (`syncBaseUrl` intent extra):
+    ```bash
+    # Point Android beta back at production
+    adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
+
+    # Point regular debug build at production
+    adb shell am start -n dev.mike.couchtour/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
+
+    # Point beta back to staging
+    adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync-staging.mkastellec.workers.dev
+    ```
+- **Staging Reset**: `scripts/smoke-sync-reset.sh` empties staging tables (`progress`, `seqs`, `pairings`, `devices`, `groups`) via `wrangler d1 execute couch-tour-sync-staging --remote`. Hard-guarded against running on prod.
+  ```bash
+  # Dry run (prints command)
+  scripts/smoke-sync-reset.sh
+
+  # Execute reset
+  scripts/smoke-sync-reset.sh --yes
+  ```
+
 ## Tests
 
-785 Android unit tests, no device or emulator required:
+793 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
@@ -142,7 +176,7 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML report lands in
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-473 macOS package tests under `macos/Packages/CouchTourKit`:
+483 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test
