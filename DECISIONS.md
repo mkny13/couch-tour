@@ -5081,4 +5081,13 @@ Baseline feature parity audit across macOS and Android clients, establishing the
 - **Findings Filed**: #427 (macOS search does not return or display phish.in playlists), #428 (macOS browse public phish.in playlists), #429 (macOS PlaybackSettings lacks Audio Quality and Gapless playback preferences), #430 (macOS on-device diagnostics log and viewer), #431 (Android Show Detail header lacks phish.in server-side Show Like button).
 - **Existing Parity Issues Re-verified at HEAD**: #351 (favorite artists cross-device sync), #382 (macOS Library shows playback history rather than saved shows, and misses account content), #423 (Android search field testTag), #386 (Android Now Playing dropped artwork and indicators), #362 (macOS On This Date range timeout and cache bug).
 
+### D312: CI verifies macOS app target compilation on pull requests (#402)
+
+Broadens PR CI coverage to verify full macOS application target compilation alongside existing package unit tests:
+- **Coverage Gap Closed**: Prior CI gates ran CouchTourKit unit tests only (`swift test`), allowing compilation failures in the macOS app layer (e.g. view layer typing, AVFoundation integration, Swift version mismatches) to pass CI unnoticed and escape to release cuts (#345–#356).
+- **PR Trigger Broadened**: Updated `.github/workflows/macos-tests.yml` to trigger on changes matching `macos/**` rather than just `macos/Packages/CouchTourKit/**`.
+- **Concurrent Build Job**: Added `macos-build` job running on `macos-14` concurrently with `macos-test`. The job checks out the repository, installs XcodeGen via `brew install xcodegen`, selects Xcode 16.2 to match XcodeGen's project file format, generates the Xcode project via `xcodegen generate`, and compiles the Debug scheme unsigned via `xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO`.
+- **Local Runtime Overhead Benchmark**: Clean project generation and build runs in ~29s on local hardware (incremental compilation ~14s; initial build with uncached SPM resolution ~55s). Recommended for CI; owner decision whether to incorporate into Mahler local verify.
+
+
 
