@@ -606,7 +606,7 @@ SWIFTEOF
 
 mac_screenshot() {
   local journey_id="$1"
-  local screenshot_path="smoke-reports/${TAG}/mac-${journey_id}.png"
+  local screenshot_path="scripts/smoke/artifacts/${TAG}/mac-${journey_id}-failure.png"
   mac::screenshot "$screenshot_path"
 }
 
@@ -625,7 +625,11 @@ mac::relaunch() {
     elapsed=$((elapsed + 1))
   done
 
-  open -b "$BUNDLE_ID"
+  if [[ "$ALLOW_FOCUS" == "true" ]]; then
+    open -b "$BUNDLE_ID"
+  else
+    open -g -b "$BUNDLE_ID"
+  fi
 
   if ! mac::wait_for_id "sidebar.nav.home" "$TIMEOUT" >/dev/null; then
     smoke::die 2 "Failed to reach launch identifier (sidebar.nav.home) after relaunching $APP_NAME"
