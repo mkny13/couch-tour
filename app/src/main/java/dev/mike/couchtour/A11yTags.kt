@@ -1,5 +1,8 @@
 package dev.mike.couchtour
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+
 object A11yTags {
     const val NAV_HOME = "nav.home"
     const val NAV_SEARCH = "nav.search"
@@ -24,3 +27,11 @@ object A11yTags {
     const val SEARCH_SECTION_TRACKS = "search.section.tracks"
     const val SEARCH_RESULTS = "search.results"
 }
+
+/**
+ * Without this on the root, Compose keeps testTag internal and `uiautomator dump` shows an empty
+ * resource-id for every node, so the A11yTags can't be used to locate anything from adb.
+ */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+fun androidx.compose.ui.Modifier.testTagsAsResourceIds(): androidx.compose.ui.Modifier =
+    this.semantics { testTagsAsResourceId = true }
