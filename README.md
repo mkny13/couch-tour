@@ -133,7 +133,7 @@ variant (D233).
 
 ## Tests
 
-781 Android unit tests, no device or emulator required:
+814 Android unit tests (including Robolectric Compose UI suites), no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
@@ -146,6 +146,12 @@ Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML r
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test
+```
+
+And a deterministic macOS app-target XCUITest suite (4 tests):
+
+```bash
+cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -destination 'platform=macOS' test -only-testing:CouchTourUITests
 ```
 
 14 sync backend tests, run against real Miniflare D1 rather than a mock:

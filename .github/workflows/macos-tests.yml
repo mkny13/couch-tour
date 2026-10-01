@@ -1,14 +1,14 @@
-name: macOS unit tests
+name: macOS tests
 
-# Runs CouchTourKit's plain SwiftPM test suite — no Xcode project needed, see CLAUDE.md's
-# "Building (macOS)" section — on a GitHub-hosted macOS runner, so a change to the API clients,
-# catalog model, queue-key grammar, or progress storage can't silently break the desktop client.
-# The full app target (macos/CouchTour) still needs local ad-hoc signing to build/install and
-# isn't covered here; that stays a manual check (CLAUDE.md, macos/scripts/install.sh).
+# Runs both the shared package suite and a small deterministic XCUITest suite for the
+# macOS app target, so UI regressions in sort/tag/context-menu/artwork chrome are caught on PRs.
 on:
   pull_request:
     paths:
+      - "macos/CouchTour/**"
+      - "macos/CouchTourUITests/**"
       - "macos/Packages/CouchTourKit/**"
+      - "macos/project.yml"
       - ".github/workflows/macos-tests.yml"
   workflow_dispatch:
 
@@ -22,3 +22,14 @@ jobs:
       - name: Run CouchTourKit tests
         working-directory: macos/Packages/CouchTourKit
         run: swift test
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: macos
+        run: xcodegen generate
+
+      - name: Run macOS XCUITests
+        working-directory: macos
+        run: xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -destination 'platform=macOS' test -only-testing:CouchTourUITests

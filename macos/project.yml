@@ -40,6 +40,9 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme:
+      testTargets:
+        - CouchTourUITests
     info:
       path: Generated/Info.plist
       properties:
@@ -109,3 +112,17 @@ targets:
         com.apple.security.temporary-exception.files.home-relative-path.read-only:
           - /Library/Preferences/dev.mike.couchtour.mac.beta.plist
           - /Library/Application Support/dev.mike.couchtour.beta/
+
+  CouchTourUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: CouchTourUITests
+    dependencies:
+      - target: CouchTour
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.mike.couchtour.mac.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"

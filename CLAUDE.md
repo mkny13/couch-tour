@@ -32,6 +32,12 @@ Tests are local (Robolectric + MockWebServer); run after any change.
 ### Accessibility checks (macOS)
 Dump the running beta's accessibility tree (bounded, identifier-scoped): `scripts/smoke/ax-tree.sh`
 
+### macOS UI tests (XCUITest)
+Regenerate the Xcode project, then run the deterministic app-target UI suite:
+```bash
+cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -destination 'platform=macOS' test -only-testing:CouchTourUITests
+```
+
 ## Building (sync backend)
 
 `sync/` is a Cloudflare Worker + D1 service (`https://couch-tour-sync.mkastellec.workers.dev`).
@@ -81,7 +87,7 @@ They are declared in `macos/CouchTour/AXIdentifiers.swift` and verified by `maco
 - **macOS Build Hazards:**
   - `macos/CouchTour.xcodeproj` may be a symlink to the main checkout. Remove symlink before running `xcodegen generate`.
   - Ensure `xcodebuild` resolves local `CouchTourKit` from the worktree, not the main checkout.
-  - `swift test` covers `CouchTourKit` package only, not the app UI (track UI checks in `UAT.md`).
+  - `swift test` covers `CouchTourKit` package only; app UI coverage lives in `CouchTourUITests` (`xcodebuild ... -only-testing:CouchTourUITests`).
 
 ## Session continuity (primary checkout only)
 
