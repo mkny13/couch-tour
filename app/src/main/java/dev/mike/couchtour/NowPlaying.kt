@@ -75,6 +75,7 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
     val state by vm.state.collectAsState()
     val compareState by vm.compareState.collectAsState()
     val isComparing = compareState?.isComparing == true
+    val castDevice by Casting.deviceName.collectAsState()
     val ledger = LocalLedgerColors.current
     var menuOpen by remember { mutableStateOf(false) }
     var showJamChartNote by remember { mutableStateOf(false) }
@@ -183,6 +184,17 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
+                castHeaderTitle(castDevice)?.let { title ->
+                    Text(
+                        text = title,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ledger.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(2f, fill = false)
+                    )
+                }
                 FeedbackButton(nav, modifier = Modifier.size(44.dp), iconSize = 22.dp, tint = ledger.textHeadline)
                 CastButton(modifier = Modifier.size(44.dp), iconSize = 22.dp, tint = ledger.textHeadline)
                 Box {
@@ -230,12 +242,29 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
             }
 
             // Show & Tape Info Header
-            val topHeaderPadding = if (ledger.isDark) 150.dp else 24.dp
+            // Artwork tile sits over the dark hero gradient (or the plain light background);
+            // ShowArtwork supplies the procedural cassette fallback for missing/failed art.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                ShowArtwork(
+                    artUrl = state.artUrl,
+                    artistName = state.artistName,
+                    date = state.showDate,
+                    venue = state.venueName,
+                    size = 180.dp,
+                    modifier = Modifier.clip(RoundedCornerShape(16.dp)),
+                    contentDescription = state.trackTitle
+                )
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
-                    .padding(top = topHeaderPadding)
+                    .padding(top = 16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -304,24 +333,22 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 tint = ledger.textSubtle,
                                 modifier = Modifier.size(14.dp)
                             )
-                            if (state.isFlac) {
-                                Box(
-                                    modifier = Modifier
-                                        .border(
-                                            1.dp,
-                                            if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615),
-                                            RoundedCornerShape(4.dp)
-                                        )
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "FLAC",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        letterSpacing = 1.sp,
-                                        color = ledger.ratingAmber
-                                    )
-                                }
+                            val isFlacFormat = audioFormatIsFlac(state.audioFormat)
+                            val badgeBorder = if (isFlacFormat) {
+                                if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615)
+                            } else ledger.controlOutline
+                            Box(
+                                modifier = Modifier
+                                    .border(1.dp, badgeBorder, RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = audioFormatLabel(state.audioFormat),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.sp,
+                                    color = if (isFlacFormat) ledger.ratingAmber else ledger.textSecondary
+                                )
                             }
                         }
                     }
@@ -735,4 +762,11 @@ internal fun PostShowTourPromptBanner(
     }
 }
 
+/** Top-bar title while a Google Cast session is live; null when playing locally. */
+internal fun castHeaderTitle(castDevice: String?): String? =
+    castDevice?.takeIf { it.isNotBlank() }?.let { "Casting to $it" }
 
+internal fun audioFormatIsFlac(format: String): Boolean = format.trim().equals("FLAC", ignoreCase = true)
+
+/** Badge text for the tape row; blank formats fall back to the app-wide MP3 default. */
+internal fun audioFormatLabel(format: String): String = format.trim().uppercase().ifEmpty { "MP3" }

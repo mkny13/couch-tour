@@ -66,4 +66,20 @@ class LedgerLayoutTest {
         assertEquals(30, playButtonSize)
         assertEquals(2, rowProgressBarHeight)
     }
+
+    @Test
+    fun `audio format badge labels FLAC and MP3`() {
+        assertEquals("FLAC", audioFormatLabel("flac"))
+        assertEquals("MP3", audioFormatLabel("MP3"))
+        assertEquals("MP3", audioFormatLabel(" "))
+        assertTrue(audioFormatIsFlac("FLAC"))
+        assertTrue(!audioFormatIsFlac("MP3"))
+    }
+
+    @Test
+    fun `cast header shows device only while casting`() {
+        assertEquals("Casting to Living Room TV", castHeaderTitle("Living Room TV"))
+        assertEquals(null, castHeaderTitle(null))
+        assertEquals(null, castHeaderTitle(""))
+    }
 }

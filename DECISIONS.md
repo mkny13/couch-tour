@@ -5089,5 +5089,5 @@ Broadens PR CI coverage to verify full macOS application target compilation alon
 - **Concurrent Build Job**: Added `macos-build` job running on `macos-14` concurrently with `macos-test`. The job checks out the repository, installs XcodeGen via `brew install xcodegen`, selects Xcode 16.2 to match XcodeGen's project file format, generates the Xcode project via `xcodegen generate`, and compiles the Debug scheme unsigned via `xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO`.
 - **Local Runtime Overhead Benchmark**: Clean project generation and build runs in ~29s on local hardware (incremental compilation ~14s; initial build with uncached SPM resolution ~55s). Recommended for CI; owner decision whether to incorporate into Mahler local verify.
 
-
-
+### D313: Android Now Playing restores artwork, audio format badge, and cast indicator within Ledger (#386)
+Owner chose "Restore artwork & indicators" over keeping the artwork-free Ledger layout. `NowPlaying.kt` now renders a 180dp rounded `ShowArtwork` tile (procedural cassette fallback) over the hero gradient (dark) / plain background (light), shows an FLAC (amber) or MP3 (outline/muted) badge in the TAPE row from `state.audioFormat`, and shows "Casting to <device>" in the top bar from `Casting.deviceName`. This supersedes the artwork/indicator omissions in D214/D215; the rest of the Ledger layout stands. Android now matches macOS (`ConicGlowArtwork`) and Google TV (`ShowArtwork`).
