@@ -333,22 +333,25 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 tint = ledger.textSubtle,
                                 modifier = Modifier.size(14.dp)
                             )
-                            val isFlacFormat = audioFormatIsFlac(state.audioFormat)
-                            val badgeBorder = if (isFlacFormat) {
-                                if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615)
-                            } else ledger.controlOutline
-                            Box(
-                                modifier = Modifier
-                                    .border(1.dp, badgeBorder, RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = audioFormatLabel(state.audioFormat),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.sp,
-                                    color = if (isFlacFormat) ledger.ratingAmber else ledger.textSecondary
-                                )
+                            val formatLabel = audioFormatLabel(state.audioFormat)
+                            if (formatLabel.isNotEmpty()) {
+                                val isFlacFormat = audioFormatIsFlac(formatLabel)
+                                val badgeBorder = if (isFlacFormat) {
+                                    if (ledger.isDark) Color(0x80F2A93B) else Color(0x66A06615)
+                                } else ledger.controlOutline
+                                Box(
+                                    modifier = Modifier
+                                        .border(1.dp, badgeBorder, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = formatLabel,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 1.sp,
+                                        color = if (isFlacFormat) ledger.ratingAmber else ledger.textSecondary
+                                    )
+                                }
                             }
                         }
                     }
@@ -768,5 +771,9 @@ internal fun castHeaderTitle(castDevice: String?): String? =
 
 internal fun audioFormatIsFlac(format: String): Boolean = format.trim().equals("FLAC", ignoreCase = true)
 
-/** Badge text for the tape row; blank formats fall back to the app-wide MP3 default. */
-internal fun audioFormatLabel(format: String): String = format.trim().uppercase().ifEmpty { "MP3" }
+/**
+ * Badge text for the tape row. Empty stays empty: [playerAudioFormat] hands out an empty
+ * format for items with no MP3/FLAC pair (YouTube), and a badge is better than a claim the
+ * stream can't back up.
+ */
+internal fun audioFormatLabel(format: String): String = format.trim().uppercase()
