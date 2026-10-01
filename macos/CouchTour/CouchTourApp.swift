@@ -24,15 +24,21 @@ struct CouchTourApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ThreePaneRootView()
-                .environmentObject(appModel)
-                .environmentObject(player)
-                .environmentObject(appModel.favorites)
-                .environmentObject(appModel.likedTracks)
-                .environmentObject(appModel.playbackSettings)
-                .environmentObject(appModel.themeSettings)
-                .environmentObject(appModel.phishInSession)
-                .preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)
+            Group {
+                if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_MODE"] == "1" {
+                    UITestHarnessView()
+                } else {
+                    ThreePaneRootView()
+                }
+            }
+            .environmentObject(appModel)
+            .environmentObject(player)
+            .environmentObject(appModel.favorites)
+            .environmentObject(appModel.likedTracks)
+            .environmentObject(appModel.playbackSettings)
+            .environmentObject(appModel.themeSettings)
+            .environmentObject(appModel.phishInSession)
+            .preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)
         }
         .commands {
             CommandGroup(after: .appInfo) {

@@ -1,8 +1,8 @@
 # UAT — manual verification owed
 
-Things that can only be confirmed by a human using the app. Automated suites cannot reach any of
-this: Android's tests are Robolectric/MockWebServer, and `swift test` covers `CouchTourKit` only —
-never the macOS app target (D208). A green build is not a verified feature.
+Things that can only be confirmed by a human using the app. Automated suites now cover Android
+Robolectric/Compose flows and a deterministic macOS XCUITest surface, but many real-device and
+real-network behaviors below are still human-only. A green build is not a verified feature.
 
 **Check items off in the local board** rather than editing this file by hand:
 
@@ -268,7 +268,6 @@ Long-standing items that predate this sprint.
   - **Auto-push on query (≥3 chars):** Type a search term (≥3 chars). Verify app automatically pushes the `.search` route and displays search results without requiring Enter.
   - **Route pop on clear:** Click the "x" clear button or delete/backspace the query until empty. Verify the Search route closes and returns to the preceding screen.
   - **Drill-down preservation:** From search results, click into a show detail screen. Clear the search query (click "x" or backspace) and verify the show detail screen remains active and is not popped.
-
 ## Android Now Playing restorations (#386)
 
 - [ ] `uat-084` **Now Playing artwork, format badge, cast indicator** (Android) — Open Now Playing in dark and light mode on a phone. Verify the artwork tile (or cassette fallback when art is missing) is balanced with the title/tape rows and nothing is clipped on a small screen. Verify the TAPE row shows an amber FLAC badge for FLAC sources and a muted MP3 badge otherwise. Start a Cast session and verify the top bar reads "Casting to <device name>", and disappears when casting stops.
