@@ -139,14 +139,19 @@ final class Player: NSObject, ObservableObject {
     /// `queuePlayer` (playback starts mid-show when a track other than the first is tapped) —
     /// this is what lets `currentItemDidChange` map an `AVPlayerItem` back to a `tracks` index.
     private var items: [AVPlayerItem] = []
-    /// A stored position to seek to once the first item of a resumed queue is actually ready
-    /// to play — seeking before that is silently ignored by AVFoundation.
+    /// A stored position to seek to once the current item is ready to play. Playlist
+    /// excerpts use the same path even when playback starts at their beginning.
     private var pendingResumeMs: Int64?
+    private var pendingReadyPlayback: AVPlayerItem?
+    private var playWhenReady = true
+    private var preparedItems: Set<ObjectIdentifier> = []
+    private var preparingItems: Set<ObjectIdentifier> = []
+    private var itemStatusObservations: [NSKeyValueObservation] = []
+    private var queueGeneration = 0
 
     private var timeObserverToken: Any?
     private var currentItemObservation: NSKeyValueObservation?
     private var rateObservation: NSKeyValueObservation?
-    private var itemStatusObservation: NSKeyValueObservation?
 
     // MARK: - Volume leveling (#268)
 
@@ -490,6 +495,12 @@ final class Player: NSObject, ObservableObject {
     /// Tears the local queue down without the show-finished side effects of a drained
     /// queue — used when leaving show playback for a different media kind.
     private func stopAudio() {
+        queueGeneration += 1
+        itemStatusObservations.removeAll()
+        preparedItems.removeAll()
+        preparingItems.removeAll()
+        pendingReadyPlayback = nil
+        pendingResumeMs = nil
         queuePlayer.pause()
         queuePlayer.removeAllItems()
         gainStorageByItem.removeAll()
@@ -529,6 +540,13 @@ final class Player: NSObject, ObservableObject {
                 castClient.play()
             }
         } else {
+            if pendingReadyPlayback != nil {
+                playWhenReady.toggle()
+                isPlaying = playWhenReady
+                updateNowPlayingElapsedTime()
+                saveProgress(force: true)
+                return
+            }
             if queuePlayer.rate == 0 {
                 queuePlayer.play()
             } else {
@@ -579,6 +597,10 @@ final class Player: NSObject, ObservableObject {
         positionMs = ms
         if isCasting {
             castClient.seek(toMs: ms)
+        } else if pendingReadyPlayback != nil {
+            // A seek before AVPlayerItem is ready would be dropped. The ready callback
+            // uses the latest requested position, including a scrub during loading.
+            pendingResumeMs = ms
         } else {
             queuePlayer.seek(to: CMTime(value: ms + clipStartMs, timescale: 1000))
         }
@@ -598,6 +620,12 @@ final class Player: NSObject, ObservableObject {
         )
         self.tracks = filtered.tracks
         postShowPrompt = nil
+        queueGeneration += 1
+        itemStatusObservations.removeAll()
+        preparedItems.removeAll()
+        preparingItems.removeAll()
+        pendingReadyPlayback = nil
+        queuePlayer.pause()
         queuePlayer.removeAllItems()
         // New queue → new items → new taps. Drop the old per-item gain state first.
         gainStorageByItem.removeAll()
@@ -608,23 +636,27 @@ final class Player: NSObject, ObservableObject {
             let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
             let item = AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
             // Playlist excerpts (D30): start inside the file and end early.
-            if track.clipStartMs > 0 { item.seek(to: CMTime(value: track.clipStartMs, timescale: 1000), completionHandler: nil) }
             if let end = track.clipEndMs { item.forwardPlaybackEndTime = CMTime(value: end, timescale: 1000) }
             return item
         }
+        currentIndex = filtered.startIndex
+        positionMs = resumePositionMs
+        pendingResumeMs = resumePositionMs
+        let firstItem = items[filtered.startIndex]
+        if filtered.tracks[filtered.startIndex].clipStartMs > 0 || resumePositionMs > 0 {
+            pendingReadyPlayback = firstItem
+            playWhenReady = true
+        }
+        observeItemsReadyForClipStart(startIndex: filtered.startIndex)
         // Gapless off: queue only the current item; currentItemDidChange loads the next one
         // once this drains, so nothing is preloaded ahead of track end.
         let preloaded = (playbackSettings?.gapless ?? true) ? items[filtered.startIndex...] : items[filtered.startIndex...].prefix(1)
         for item in preloaded {
             queuePlayer.insert(item, after: nil)
         }
-        currentIndex = filtered.startIndex
-        positionMs = 0
-        pendingResumeMs = resumePositionMs > 0 ? resumePositionMs : nil
-        observeCurrentItemReadyForResume()
         scheduleGainTaps()
         scheduleLeveling()
-        queuePlayer.play()
+        if pendingReadyPlayback == nil { queuePlayer.play() }
         updateNowPlayingInfo()
         claimNowPlaying(playing: true)
         saveProgress(force: true)
@@ -652,7 +684,8 @@ final class Player: NSObject, ObservableObject {
             forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
-            guard let self, !self.isCasting, time.isValid, !time.isIndefinite else { return }
+            guard let self, !self.isCasting, self.pendingReadyPlayback == nil,
+                  time.isValid, !time.isIndefinite else { return }
             self.positionMs = max(Int64(time.seconds * 1000) - self.clipStartMs, 0)
             // AVQueuePlayer keeps firing this observer on its interval even while paused —
             // without this guard, a show left loaded-but-paused (e.g. overnight) got its local
@@ -672,8 +705,14 @@ final class Player: NSObject, ObservableObject {
               let index = items.firstIndex(where: { $0 === item }) else {
             if playbackSettings?.gapless == false, queuePlayer.currentItem == nil,
                let last = currentIndex, items.indices.contains(last + 1) {
-                queuePlayer.insert(items[last + 1], after: nil)
-                queuePlayer.play()
+                let nextItem = items[last + 1]
+                if tracks[last + 1].clipStartMs > 0 && !preparedItems.contains(ObjectIdentifier(nextItem)) {
+                    pendingReadyPlayback = nextItem
+                    pendingResumeMs = 0
+                    playWhenReady = true
+                }
+                queuePlayer.insert(nextItem, after: nil)
+                if pendingReadyPlayback == nil { queuePlayer.play() }
                 return
             }
             recorder.markFinished(queueKey: queueKey)
@@ -695,20 +734,65 @@ final class Player: NSObject, ObservableObject {
             }
             return
         }
+        if let pendingReadyPlayback, pendingReadyPlayback !== item {
+            self.pendingReadyPlayback = nil
+        }
+        if tracks[index].clipStartMs > 0 && !preparedItems.contains(ObjectIdentifier(item)) {
+            queuePlayer.pause()
+            if pendingReadyPlayback !== item {
+                pendingReadyPlayback = item
+                pendingResumeMs = 0
+                playWhenReady = true
+            }
+        }
         currentIndex = index
-        positionMs = 0
+        positionMs = pendingReadyPlayback === item ? (pendingResumeMs ?? 0) : 0
         updateNowPlayingInfo()
         saveProgress(force: true)
     }
 
-    private func observeCurrentItemReadyForResume() {
-        guard let item = queuePlayer.currentItem else { return }
-        itemStatusObservation = item.observe(\.status, options: [.new]) { [weak self] observedItem, _ in
-            guard observedItem.status == .readyToPlay else { return }
-            Task { @MainActor in
-                guard let self, let ms = self.pendingResumeMs else { return }
-                self.pendingResumeMs = nil
-                self.seek(toMs: ms)
+    private func observeItemsReadyForClipStart(startIndex: Int) {
+        let generation = queueGeneration
+        for (index, item) in items.enumerated() where tracks[index].clipStartMs > 0 ||
+            (index == startIndex && (pendingResumeMs ?? 0) > 0) {
+            let observation = item.observe(\.status, options: [.initial, .new]) { [weak self] observedItem, _ in
+                guard observedItem.status == .readyToPlay else { return }
+                Task { @MainActor [weak self] in
+                    guard let self, self.queueGeneration == generation else { return }
+                    self.prepareItemAtClipStart(observedItem, index: index, generation: generation)
+                }
+            }
+            itemStatusObservations.append(observation)
+        }
+    }
+
+    private func prepareItemAtClipStart(_ item: AVPlayerItem, index: Int, generation: Int) {
+        guard queueGeneration == generation, items.indices.contains(index), items[index] === item else { return }
+        let id = ObjectIdentifier(item)
+        guard !preparedItems.contains(id), !preparingItems.contains(id) else { return }
+
+        let resumeMs = pendingReadyPlayback === item ? (pendingResumeMs ?? 0) : 0
+        let targetMs = tracks[index].clipStartMs + resumeMs
+        preparingItems.insert(id)
+        item.seek(to: CMTime(value: targetMs, timescale: 1000)) { [weak self, weak item] finished in
+            Task { @MainActor [weak self, weak item] in
+                guard let self, let item, self.queueGeneration == generation else { return }
+                self.preparingItems.remove(id)
+                guard finished else { return }
+                // A scrub while the first seek was pending must win before playback starts.
+                if self.pendingReadyPlayback === item, self.pendingResumeMs != resumeMs {
+                    self.prepareItemAtClipStart(item, index: index, generation: generation)
+                    return
+                }
+                self.preparedItems.insert(id)
+                if self.pendingReadyPlayback === item {
+                    self.pendingReadyPlayback = nil
+                    self.pendingResumeMs = nil
+                    self.positionMs = resumeMs
+                    self.updateNowPlayingElapsedTime()
+                    self.saveProgress(force: true)
+                    if self.playWhenReady && !self.isCasting { self.queuePlayer.play() }
+                }
             }
         }
     }
@@ -761,20 +845,30 @@ final class Player: NSObject, ObservableObject {
 
         center.playCommand.addTarget { [weak self] _ in
             Task { @MainActor in
-                if self?.isCasting == true {
-                    self?.castClient.play()
+                guard let self else { return }
+                if self.isCasting {
+                    self.castClient.play()
+                } else if self.pendingReadyPlayback != nil {
+                    self.playWhenReady = true
+                    self.isPlaying = true
+                    self.updateNowPlayingElapsedTime()
                 } else {
-                    self?.queuePlayer.play()
+                    self.queuePlayer.play()
                 }
             }
             return .success
         }
         center.pauseCommand.addTarget { [weak self] _ in
             Task { @MainActor in
-                if self?.isCasting == true {
-                    self?.castClient.pause()
+                guard let self else { return }
+                if self.isCasting {
+                    self.castClient.pause()
+                } else if self.pendingReadyPlayback != nil {
+                    self.playWhenReady = false
+                    self.isPlaying = false
+                    self.updateNowPlayingElapsedTime()
                 } else {
-                    self?.queuePlayer.pause()
+                    self.queuePlayer.pause()
                 }
             }
             return .success
