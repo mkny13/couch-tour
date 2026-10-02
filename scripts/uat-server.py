@@ -21,6 +21,7 @@ issue — closing it stays a human/Mahler decision through the normal pipeline.
 import argparse
 import json
 import re
+import secrets
 import subprocess
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -513,7 +514,7 @@ let savedTimer;
 async function save(it) {
   const r = await fetch('/api/item', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: {'Content-Type': 'application/json', 'X-UAT-Token': '__UAT_TOKEN__'},
     body: JSON.stringify({id: it.id, status: it.status, note: it.note || ''})
   });
   const j = await r.json();
@@ -546,7 +547,21 @@ load();
 </script></body></html>"""
 
 
+# Per-run secret embedded in the served page and required on every POST. The server binds
+# 127.0.0.1, but any web page in the owner's browser can still send a POST there (simple
+# cross-origin request) and trigger `gh issue create/comment`. A custom header forces a CORS
+# preflight, which this server never approves, and a foreign page can't read the token.
+TOKEN = secrets.token_urlsafe(32)
+ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
+
+
 class Handler(BaseHTTPRequestHandler):
+    def _host_ok(self):
+        # Rejects DNS-rebinding: an attacker's hostname resolving to 127.0.0.1 would
+        # otherwise be same-origin to the page and could read the token.
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+        return host in ALLOWED_HOSTS
+
     def _send(self, code, body, ctype):
         payload = body.encode()
         self.send_response(code)
@@ -556,14 +571,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self):
+        if not self._host_ok():
+            return self._send(403, "forbidden", "text/plain")
         if self.path == "/":
-            self._send(200, PAGE, "text/html; charset=utf-8")
+            self._send(200, PAGE.replace("__UAT_TOKEN__", TOKEN), "text/html; charset=utf-8")
         elif self.path == "/api/items":
             self._send(200, json.dumps(parse(UAT_PATH.read_text())), "application/json")
         else:
             self._send(404, "not found", "text/plain")
 
     def do_POST(self):
+        if not self._host_ok() or not secrets.compare_digest(
+                self.headers.get("X-UAT-Token") or "", TOKEN):
+            return self._send(403, json.dumps({"error": "forbidden"}), "application/json")
         if self.path != "/api/item":
             return self._send(404, "not found", "text/plain")
         try:
@@ -593,7 +613,7 @@ def main():
         if not out_path.is_absolute():
             out_path = REPO_ROOT / out_path
         items_json = json.dumps(parse(UAT_PATH.read_text()))
-        standalone = PAGE.replace("data = await (await fetch('/api/items')).json();", f"data = {items_json};")
+        standalone = PAGE.replace("data = await (await fetch('/api/items')).json();", f"data = {items_json};").replace("__UAT_TOKEN__", "")
         out_path.write_text(standalone)
         print(f"Exported standalone UAT board to {out_path}")
         return

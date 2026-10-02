@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   mockup-data:
     runs-on: ubuntu-latest
@@ -15,3 +18,12 @@ jobs:
         run: scripts/checks/test_check_mockup_data.sh
       - name: Check shipping code for mockup/placeholder data
         run: scripts/checks/check-mockup-data.sh
+  workflow-permissions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Self-test the workflow-permissions check
+        run: scripts/checks/test_check_workflow_permissions.sh
+      - name: Check every workflow declares top-level permissions
+        run: scripts/checks/check-workflow-permissions.sh

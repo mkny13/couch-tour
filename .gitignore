@@ -34,3 +34,9 @@ sync/.dev.vars
 # Python bytecode (scripts/uat-server.py)
 __pycache__/
 *.pyc
+
+# Scratch build/test output and patches that kept getting committed from the repo root (#476)
+/*.log
+/stdout.txt
+/stderr.txt
+/*.patch
