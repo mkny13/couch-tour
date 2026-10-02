@@ -234,7 +234,8 @@ class CrashCaptureTest {
         assertEquals(crashTrace, detected)
         assertEquals(crashTrace, CrashCapture.lastCrashNotice.value)
 
-        // 3. Assert crash.previous line is logged
+        // 3. Assert crash.previous line is logged (the writer is async, so drain it first)
+        DiagnosticsLog.flush()
         val logLines = DiagnosticsLog.tailLines(10)
         val crashPrevLine = logLines.find { it.contains("crash.previous") }
         assertNotNull("crash.previous event must be logged", crashPrevLine)
@@ -256,9 +257,11 @@ class CrashCaptureTest {
         assertNull("lastCrashNotice must be null after consume", CrashCapture.lastCrashNotice.value)
 
         // 7. Second detection is a no-op
+        DiagnosticsLog.flush()
         val linesCountBefore = DiagnosticsLog.tailLines(100).size
         val secondDetect = CrashCapture.detectPreviousCrash()
         assertNull("Second detection must return null", secondDetect)
+        DiagnosticsLog.flush()
         val linesCountAfter = DiagnosticsLog.tailLines(100).size
         assertEquals("Second detection must not add any new log lines", linesCountBefore, linesCountAfter)
     }
