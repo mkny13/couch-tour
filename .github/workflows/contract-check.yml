@@ -1,0 +1,36 @@
+name: Contract drift check
+# Weekly: re-record the live phish.in and Relisten responses to a temp dir and compare their
+# shape (keys and types, not values) with the committed fixtures (D320). Never runs on PRs.
+on:
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # --skip-failed: a phish.in/Relisten outage skips that endpoint instead of failing.
+      - name: Record live responses
+        run: python3 scripts/contracts/record.py --skip-failed --out-dir "$RUNNER_TEMP/fresh"
+
+      # Exit 1 is drift, already reported as an issue; the issue is the signal, not a red job.
+      - name: Compare shapes and file or update drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rc=0
+          python3 scripts/contracts/shape_check.py --committed app/src/test/resources/fixtures \
+            --fresh "$RUNNER_TEMP/fresh" --report-issue || rc=$?
+          [ "$rc" -le 1 ] || exit "$rc"

@@ -5145,8 +5145,9 @@ Part of #405. The hand-shaped fixtures let upstream drift pass CI and break on d
 
 ## D320 — Weekly contract drift check (#443)
 
-Part of #405. `.github/workflows/contract-drift.yml` runs Mondays (and on dispatch): it re-records the live phish.in/Relisten responses with `scripts/contracts/record.sh` over the checked-in fixtures in the CI workspace (never committed), then runs `ContractFixturesTest`. Values change with the catalog, so nothing is diffed; the decode tests are the shape check.
+Part of #405. `.github/workflows/contract-check.yml` runs Mondays (and on dispatch, never on PRs): `scripts/contracts/record.py --skip-failed` re-records the live phish.in/Relisten responses to a temp dir, then `scripts/contracts/shape_check.py` compares their shape (keys and JSON types, never values) with the committed `contract_*.json` fixtures.
 
-- **Failure means drift**: either the recorder fails (an endpoint disappeared or a field it indexes was renamed) or a production DTO no longer decodes the fresh response.
-- **Issue filing**: on failure it files one open "Upstream API contract drift detected" issue (`type:bug`, `p2`, `mahler`); if one is already open it comments instead of filing a duplicate. Fixes land as a normal re-record plus DTO change.
-- Android only for now; CouchTourKit decode tests are #442 and can join this job once they land.
+- **Why shape, not decode**: the DTOs use `ignoreUnknownKeys`, so a decode test can't see an added upstream key. The diff names each endpoint and path (`+` added, `-` removed, `~` retyped). Null and array length/emptiness are ignored: they are sample values, not shape.
+- **Outages are not drift**: with `--skip-failed` a failed request (timeout, HTTP error) skips that endpoint, logged in the job; only drift files an issue.
+- **Issue filing**: one open "Contract drift: upstream API shape changed" issue (`mahler`, `type:bug`); if open, the report is added as a comment. The job stays green on drift; the issue is the signal. Fixes land as a normal re-record plus DTO change.
+- Unit tests: `python3 -m unittest scripts/contracts/test_shape_check.py`.
