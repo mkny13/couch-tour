@@ -5212,3 +5212,14 @@ all future sync traffic (pairing, progress, token rotation) to a host it control
 Supersedes the Android portion of D314 ("`syncBaseUrl` intent extra overrides the base URL on
 launch or `onNewIntent`") while preserving D314's staging defaults, token-host protection, and
 macOS override behavior.
+
+## D324: Pin undici and sharp via npm `overrides` in `sync/` (#483)
+
+`@cloudflare/vitest-pool-workers@0.22.0` (latest) nests a miniflare/wrangler that pulls
+undici 7.29.0 and sharp 0.35.2, giving 5 high dev-only advisories in `npm audit` (production
+bundle unaffected; `npm audit --omit=dev` is 0). No upstream fix exists, and the suggested
+downgrade to 0.8.30 is unacceptable. `sync/package.json` now overrides `undici` to `^7.29.1`
+and `sharp` to `^0.35.4`; audit is clean and all 18 tests plus typecheck pass.
+Remove the overrides once vitest-pool-workers ships a release whose nested miniflare no longer
+needs them (re-check at the next security audit); if they ever break the test pool, revert and
+record the advisories as accepted instead.
