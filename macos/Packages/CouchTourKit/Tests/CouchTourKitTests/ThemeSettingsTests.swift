@@ -5,15 +5,18 @@ import XCTest
 final class ThemeSettingsTests: XCTestCase {
 
     private var defaults: UserDefaults!
+    /// Unique per test: `swift test --parallel` runs tests concurrently, and a fixed suite
+    /// name made them clobber each other's stored values.
+    private var suiteName: String!
 
     override func setUp() {
         super.setUp()
-        defaults = UserDefaults(suiteName: "dev.mike.couchtour.ThemeSettingsTests")!
-        defaults.removePersistentDomain(forName: "dev.mike.couchtour.ThemeSettingsTests")
+        suiteName = "dev.mike.couchtour.ThemeSettingsTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
     }
 
     override func tearDown() {
-        defaults.removePersistentDomain(forName: "dev.mike.couchtour.ThemeSettingsTests")
+        defaults.removePersistentDomain(forName: suiteName)
         defaults = nil
         super.tearDown()
     }
