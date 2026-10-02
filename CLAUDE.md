@@ -62,6 +62,11 @@ The `progress` table stores listening history. Destructive migrations are never 
 - **README.md:** Update test counts when adding or removing tests.
 - **UAT.md:** Record items requiring human verification (`scripts/uat-server.py`). Items marked "needs work" are active bug reports.
 
+## Escaped bugs
+
+A bug fix isn't done until the issue's *Check that now catches it* names a check that exists in the repo (a test, CI step, lint, or smoke journey under `scripts/smoke/`), or states why none is feasible.
+The fix's PR adds that check or points to it. Fill in *Escape cause* too, so the same class stops recurring.
+
 ## Accessibility identifiers
 
 macOS identifiers follow the naming convention `<surface>.<element>[.<variant>]` (lower-case, dot-separated).

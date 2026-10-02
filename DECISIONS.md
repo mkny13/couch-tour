@@ -5170,3 +5170,15 @@ Kotlin one file-for-file, or the two clients would silently test different recor
 - The curated/heuristic match tests read through `CuratedMatches.shared`/`HeuristicMatches.shared`
   rather than by file path, so they cover the resource actually shipping in the bundle.
 - Tests: `cd macos/Packages/CouchTourKit && swift test` (515).
+
+## D322 — Escaped-bug loop: Escape cause + Check that now catches it (#446)
+
+Bugs that reached beta/prod were fixed without asking what check would have caught them, so
+the same class recurred (#345–#356). The bug issue template now ends with *Escape cause* and
+*Check that now catches it* sections, and `CLAUDE.md` gains an `## Escaped bugs` rule: a bug
+fix isn't done until the second section names a check that exists in the repo (test, CI step,
+lint, or smoke journey) or says why none is feasible.
+
+- **Guidance, not a gate**: nothing enforces the sections mechanically yet. That generalization
+  belongs to mkny13/mahler#611 (gates, not guidance).
+- Part of #403.

@@ -24,3 +24,9 @@ What you expected to happen instead.
 
 **Additional context**
 Anything else — the screen you were on, screenshots, logs.
+
+**Escape cause**
+<!-- Filled in by whoever fixes it: why did this reach a beta/prod build? (no test for this path, mockup data, error cached as empty, decoding drift vs. real API, platform parity gap, …) -->
+
+**Check that now catches it**
+<!-- A test, CI step, lint or smoke journey that fails if this regresses (file path or workflow name), or why none is feasible. -->
