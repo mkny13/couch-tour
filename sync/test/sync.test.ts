@@ -153,9 +153,11 @@ describe("happy paths", () => {
 
     const stale = await sync(tokenA, 5, []);
     expect(stale.status).toBe(410);
+    expect(((await stale.json()) as { error: string }).error).toContain("full resync required");
 
     const fresh = await sync(tokenA, 0, []);
     expect(fresh.status).toBe(200);
+    expect(((await fresh.json()) as { seq: number }).seq).toBe(10);
   });
 
   test("full resync (since = 0) with active rows below retentionFloorSeq advances cursor to at least retentionFloorSeq", async () => {
@@ -184,7 +186,7 @@ describe("happy paths", () => {
     expect(body.changes).toHaveLength(1);
     expect(body.changes[0].queueKey).toBe("active-1");
     // Returned seq must be bounded by retentionFloorSeq (5), not the active row's seq (1)
-    expect(body.seq).toBeGreaterThanOrEqual(5);
+    expect(body.seq).toBe(5);
 
     // Follow-up sync with the returned seq must succeed (200), not trigger a 410 resync loop
     const followUp = await sync(tokenA, body.seq, []);
@@ -245,6 +247,7 @@ describe("F1: duplicate queueKey within one push", () => {
     const second = change({ queueKey: "dup-key", trackTitle: "Second", updatedAt: 5000 });
 
     const response = await sync(tokenA, 0, [first, second]);
+    expect(response.status).toBe(200);
     const body = (await response.json()) as { changes: { trackTitle: string }[] };
     expect(body.changes).toHaveLength(1);
     expect(body.changes[0].trackTitle).toBe("Second");
@@ -318,6 +321,8 @@ describe("F2: cursor arithmetic under a concurrent push", () => {
       const followUpBody = (await followUp.json()) as { changes: unknown[] };
       expect(followUpBody.changes).toHaveLength(0);
     } finally {
+      // Also release the gate so a failed assertion above can't leave request A parked.
+      releaseGate!();
       env.DB.prepare = originalPrepare;
     }
   });
@@ -424,5 +429,10 @@ describe("applyIncomingChanges", () => {
       Date.now()
     );
     expect(accepted).toBe(1);
+    const stored = await env.DB.prepare("SELECT trackTitle, seq FROM progress WHERE groupId = ? AND queueKey = ?")
+      .bind(device.groupId, "direct-key")
+      .first<{ trackTitle: string; seq: number }>();
+    expect(stored?.trackTitle).toBe("Track One");
+    expect(stored?.seq).toBe(1);
   });
 });
