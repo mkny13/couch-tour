@@ -275,4 +275,67 @@ final class OnThisDateTests: XCTestCase {
         XCTAssertEqual(0, res2.count)
         XCTAssertEqual(2, phishFetchCount)
     }
+
+    func testOnThisDatePartialArtistFailureReturnedButNotCached() async throws {
+        OnThisDate.resetCache()
+        let ok = ArtistRef(backend: .relisten, id: "ok", name: "Ok")
+        let bad = ArtistRef(backend: .relisten, id: "bad", name: "Bad")
+        var badFails = true
+        var calls = 0
+        let mock = MockMusicSource(backend: .relisten)
+        mock.showsOnDateHandler = { artist, _, _ in
+            calls += 1
+            if artist.id == "bad" && badFails { throw APIException("500", code: 500) }
+            return [ShowSummary(artist: artist, date: "1999-09-29")]
+        }
+        let favs = [ok, bad]
+
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", source: { _ in mock })
+        XCTAssertEqual(["ok"], res1.map { $0.artist.id })
+        XCTAssertEqual(2, calls)
+
+        // Not cached: the failed artist is retried.
+        badFails = false
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", source: { _ in mock })
+        XCTAssertEqual(2, res2.count)
+        XCTAssertEqual(4, calls)
+
+        // Complete result is cached.
+        let res3 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", source: { _ in mock })
+        XCTAssertEqual(2, res3.count)
+        XCTAssertEqual(4, calls)
+    }
+
+    func testOnThisDatePartialPeriodFailureReturnedButNotCached() async throws {
+        OnThisDate.resetCache()
+        var failLater = true
+        var periodsCalls = 0
+        let mock = MockMusicSource(backend: .phishin)
+        mock.periodsHandler = { _ in
+            periodsCalls += 1
+            // Two ranges: the cap forces separate requests.
+            return [
+                PeriodRef(id: "1990", label: "1990", showCount: 800),
+                PeriodRef(id: "1997", label: "1997", showCount: 800),
+            ]
+        }
+        mock.showsHandler = { artist, period in
+            if period.id == "1997-1997" && failLater { throw APIException("500", code: 500) }
+            let year = period.id.prefix(4)
+            return [ShowSummary(artist: artist, date: "\(year)-11-17")]
+        }
+        let favs = [PHISH]
+
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        XCTAssertEqual(["1990-11-17"], res1.map { $0.date })
+        XCTAssertEqual(1, periodsCalls)
+
+        failLater = false
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        XCTAssertEqual(["1997-11-17", "1990-11-17"], res2.map { $0.date })
+        XCTAssertEqual(2, periodsCalls)
+
+        _ = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        XCTAssertEqual(2, periodsCalls)
+    }
 }

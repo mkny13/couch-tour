@@ -88,13 +88,23 @@ public func showsOnDate(
     today: String,
     source: @escaping (Backend) -> MusicSource = sourceFor
 ) async throws -> [ShowSummary] {
+    try await showsOnDateChecked(favorites: favorites, today: today, source: source).shows
+}
+
+/// Like `showsOnDate`, but also reports whether every artist and period request succeeded.
+/// A partial list is still worth showing, but not worth caching for the day.
+public func showsOnDateChecked(
+    favorites: [ArtistRef],
+    today: String,
+    source: @escaping (Backend) -> MusicSource = sourceFor
+) async throws -> (shows: [ShowSummary], complete: Bool) {
     let relisten = Array(favorites.filter { $0.backend == .relisten }.prefix(maxRelistenArtists))
     let participating = favorites.filter { $0.backend != .relisten } + relisten
 
-    if participating.isEmpty { return [] }
+    if participating.isEmpty { return ([], true) }
 
     enum ArtistResult {
-        case success([ShowSummary])
+        case success([ShowSummary], complete: Bool)
         case failure(Error)
     }
 
@@ -103,6 +113,7 @@ public func showsOnDate(
             group.addTask {
                 do {
                     let src = source(artist.backend)
+                    var complete = true
                     let artistShows: [ShowSummary]
                     switch artist.backend {
                     case .phishin:
@@ -110,18 +121,20 @@ public func showsOnDate(
                         let periods = phishInRanges(periods: allPeriods)
                         var shows: [ShowSummary] = []
                         for period in periods {
-                            if let s = try? await src.shows(artist: artist, period: period) {
-                                shows.append(contentsOf: s)
+                            do {
+                                shows.append(contentsOf: try await src.shows(artist: artist, period: period))
+                            } catch {
+                                complete = false
                             }
                         }
                         artistShows = shows
                     case .relisten:
-                        guard let md = monthDay(today) else { return .success([]) }
+                        guard let md = monthDay(today) else { return .success([], complete: true) }
                         let parts = md.split(separator: "-").compactMap { Int($0) }
-                        guard parts.count == 2 else { return .success([]) }
+                        guard parts.count == 2 else { return .success([], complete: true) }
                         artistShows = try await src.showsOnDate(artist: artist, month: parts[0], day: parts[1])
                     }
-                    return .success(showsOnAnniversary(shows: artistShows, today: today))
+                    return .success(showsOnAnniversary(shows: artistShows, today: today), complete: complete)
                 } catch {
                     return .failure(error)
                 }
@@ -130,14 +143,17 @@ public func showsOnDate(
 
         var allMatches: [ShowSummary] = []
         var successCount = 0
+        var allComplete = true
         var firstError: Error?
 
         for try await result in group {
             switch result {
-            case .success(let shows):
+            case .success(let shows, let complete):
                 allMatches.append(contentsOf: shows)
                 successCount += 1
+                if !complete { allComplete = false }
             case .failure(let error):
+                allComplete = false
                 if firstError == nil { firstError = error }
             }
         }
@@ -146,10 +162,10 @@ public func showsOnDate(
             throw error
         }
         
-        return allMatches
+        return (allMatches, allComplete)
     }
 
-    return pickAnniversaryShows(matches: perArtist)
+    return (pickAnniversaryShows(matches: perArtist.0), perArtist.1)
 }
 
 /// The Home screen's entry point: `showsOnDate` behind a one-entry in-memory cache.
@@ -171,8 +187,9 @@ public enum OnThisDate {
         if let cached = cached, cached.key == key {
             return cached.shows
         }
-        let shows = try await showsOnDate(favorites: favorites, today: today, source: source)
-        if !shows.isEmpty {
+        let (shows, complete) = try await showsOnDateChecked(favorites: favorites, today: today, source: source)
+        // A partial list cached here would hide the failed artists/periods until tomorrow.
+        if complete && !shows.isEmpty {
             cached = (key, shows)
         }
         return shows
