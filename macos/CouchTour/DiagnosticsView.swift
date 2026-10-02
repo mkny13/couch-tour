@@ -17,7 +17,7 @@ struct DiagnosticsView: View {
 
     private func resolveLog() -> Task<DiagnosticsLog, Never> {
         if let logTask { return logTask }
-        let t = Task.detached(priority: .userInitiated) { DiagnosticsLog() }
+        let t = Task.detached(priority: .userInitiated) { Diagnostics.log ?? DiagnosticsLog() }
         logTask = t
         return t
     }
