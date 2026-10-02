@@ -70,6 +70,8 @@ AND deletedAt IS NULL`, `(artist, updatedAt DESC) WHERE deletedAt IS NULL`, `upd
 | `source_loudness` by `leveling_key` | `ProgressStore.swift` | primary key autoindex | index |
 | `progress` write `put` (`save`: insert or update by key) | `ProgressStore.swift` | no read; primary-key lookup, then maintains the 4 partial/secondary indexes | index (see write note) |
 | `source_loudness` write `saveSourceLoudness` (`save`) | `ProgressStore.swift` | no read; primary-key upsert, no secondary indexes | index |
+| `source_loudness` write `clearAllSourceLoudness` (`SourceLoudness.deleteAll`) | `ProgressStore.swift`; called from `Player.swift` and `LoudnessMeasurer.swift` when the leveling algorithm changes | no read; full-table delete | acceptable: full delete by design, same as Android `clearAll` |
+| `mergeDatabase` full reads `PlaybackProgress.fetchAll`, `ArtistTourPreference.fetchAll`, `TaperPreference.fetchAll` on the source copy | `Migration.swift` | `SCAN` of each table | acceptable: unfiltered read of every row is the point of a merge; runs once per user-initiated import, on a scratch copy |
 | `Migration.swift` `mergeDatabase` `save` per merged row | `Migration.swift` | primary key; one-off import | acceptable |
 | `local_playlists` list `ORDER BY updatedAt DESC` | `LocalPlaylist.swift` | `SCAN` + temp sort | acceptable: a handful of playlists |
 | playlist by id, rename, touch | `LocalPlaylist.swift` | primary key autoindex | index |
@@ -106,6 +108,8 @@ must use `CREATE INDEX IF NOT EXISTS`; none was added.
 | existing-key lookup `groupId = ? AND queueKey IN (...)` | `applyIncomingChanges` | primary key `(groupId, queueKey)` | index |
 | upsert `INSERT ... ON CONFLICT (groupId, queueKey)` | `applyIncomingChanges` | primary key | index |
 | purge candidates `deletedAt IS NOT NULL AND deletedAt < ? GROUP BY groupId` | `purgeOldTombstones` | `progress_deletedAt_seq` range scan, temp B-tree for `GROUP BY` only | acceptable: the sort covers only tombstones older than 180 days, once a day |
+| `UPDATE seqs SET retentionFloorSeq = MAX(retentionFloorSeq, ?) WHERE groupId = ?` | `purgeOldTombstones` | primary key (`seqs.groupId`) | index |
+| `SELECT retentionFloorSeq FROM seqs WHERE groupId = ?` | `src/index.ts` sync handler | primary key | index |
 | purge `DELETE ... WHERE groupId = ? AND deletedAt ...` | `purgeOldTombstones` | `COVERING INDEX progress_deletedAt_seq` | index |
 
 Loops: the existing-key lookup is chunked `IN (...)` (not one query per row) and the upserts go
