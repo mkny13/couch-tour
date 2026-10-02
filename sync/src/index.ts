@@ -324,24 +324,11 @@ function parseProgressFields(value: unknown, index: number): ProgressFields {
 }
 
 /**
- * Push-then-pull in one round trip. Incoming changes are merged with row-level
- * last-write-wins on `updatedAt` (ties go to whichever arrives at the server later, i.e. gets
- * the higher `seq` — see DECISIONS.md); everything the caller hasn't seen yet, including its
- * own just-applied pushes, comes back in `changes`.
+ * Validates the /sync request body into `{ since, incoming }`, or returns the 4xx Response to send.
+ * Content-Length is only a hint (absent on chunked uploads), so `readJson` enforces the byte cap on
+ * what actually arrives; MAX_CHANGES_PER_SYNC is what bounds the D1 work either way.
  */
-async function handleSync(request: Request, env: Env): Promise<Response> {
-  const startMs = Date.now();
-  const device = await authenticate(request, env);
-  if (!device) return json({ error: "unauthorized" }, 401);
-
-  // Cheap pre-read rejection: a declared oversize body never gets parsed, let alone reaches
-  // D1. Content-Length is absent on a chunked upload, so it's a fast path rather than the
-  // actual guarantee — MAX_CHANGES_PER_SYNC below is what bounds the work either way.
-  const declaredLength = Number(request.headers.get("content-length") ?? "");
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_SYNC_BODY_BYTES) {
-    return tooLarge(`request body exceeds ${MAX_SYNC_BODY_BYTES} bytes`);
-  }
-
+async function parseSyncRequest(request: Request): Promise<{ since: number; incoming: ProgressFields[] } | Response> {
   let body: SyncBody | null;
   try {
     body = await readJson<SyncBody>(request, MAX_SYNC_BODY_BYTES);
@@ -359,21 +346,60 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     return tooLarge(`changes exceeds ${MAX_CHANGES_PER_SYNC} entries; push in smaller batches`);
   }
 
-  let incoming: ProgressFields[];
   try {
-    incoming = body.changes.map(parseProgressFields);
+    return { since, incoming: body.changes.map(parseProgressFields) };
   } catch (e) {
     if (e instanceof ValidationError) return badRequest(e.message);
     throw e;
   }
+}
+
+/**
+ * Issues a fresh token when the current one is old, or when the client is still using the previous
+ * token (it missed the response containing the new one). Returns the headers to send back.
+ */
+async function rotateTokenIfDue(
+  env: Env,
+  device: DeviceRow,
+  requestTokenHash: string,
+  now: number
+): Promise<Record<string, string>> {
+  const usingPreviousToken = device.previousTokenHash === requestTokenHash;
+  if (now - device.tokenIssuedAt <= TOKEN_ROTATION_AGE_MS && !usingPreviousToken) return {};
+
+  const newToken = randomToken();
+  const newHash = await sha256Hex(newToken);
+  await env.DB.prepare(
+    `UPDATE devices
+     SET previousTokenHash = ?, previousTokenExpiresAt = ?,
+         tokenHash = ?, tokenIssuedAt = ?
+     WHERE id = ?`
+  )
+    .bind(requestTokenHash, now + TOKEN_GRACE_MS, newHash, now, device.id)
+    .run();
+  return { "X-Sync-Token-Rotated": newToken };
+}
+
+/**
+ * Push-then-pull in one round trip. Incoming changes are merged with row-level
+ * last-write-wins on `updatedAt` (ties go to whichever arrives at the server later, i.e. gets
+ * the higher `seq` — see DECISIONS.md); everything the caller hasn't seen yet, including its
+ * own just-applied pushes, comes back in `changes`.
+ */
+async function handleSync(request: Request, env: Env): Promise<Response> {
+  const startMs = Date.now();
+  const device = await authenticate(request, env);
+  if (!device) return json({ error: "unauthorized" }, 401);
+
+  const parsed = await parseSyncRequest(request);
+  if (parsed instanceof Response) return parsed;
+  const { since, incoming } = parsed;
 
   const now = Date.now();
 
-  // If the client is using the previous token, they missed the response containing the new one.
   const authHeader = request.headers.get("Authorization");
   const requestToken = authHeader ? authHeader.slice("Bearer ".length).trim() : "";
   const requestTokenHash = await sha256Hex(requestToken);
-  const usingPreviousToken = device.previousTokenHash === requestTokenHash;
 
   const cursor = await env.DB.prepare("SELECT retentionFloorSeq FROM seqs WHERE groupId = ?")
     .bind(device.groupId)
@@ -393,20 +419,7 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     return json({ error: "cursor too old; full resync required" }, 410);
   }
 
-  const responseHeaders: Record<string, string> = {};
-  if (now - device.tokenIssuedAt > TOKEN_ROTATION_AGE_MS || usingPreviousToken) {
-    const newToken = randomToken();
-    const newHash = await sha256Hex(newToken);
-    await env.DB.prepare(
-      `UPDATE devices
-       SET previousTokenHash = ?, previousTokenExpiresAt = ?,
-           tokenHash = ?, tokenIssuedAt = ?
-       WHERE id = ?`
-    )
-      .bind(requestTokenHash, now + TOKEN_GRACE_MS, newHash, now, device.id)
-      .run();
-    responseHeaders["X-Sync-Token-Rotated"] = newToken;
-  }
+  const responseHeaders = await rotateTokenIfDue(env, device, requestTokenHash, now);
 
   if (incoming.length > 0) {
     await applyIncomingChanges(env, device, incoming, now);

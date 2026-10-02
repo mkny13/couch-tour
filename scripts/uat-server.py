@@ -188,53 +188,22 @@ def parse(text):
     return [s for s in sections if s["items"]]
 
 
-def update(item_id, status, note):
-    """Rewrite one item's status (and note) in UAT.md, leaving everything else byte-identical.
-
-    A [!] with a note also files a GitHub bug (see file_bug_report) and pins its number
-    onto the note line as a trailing '(→ #N)'. The marker survives a later pass as a
-    marker-only note line, so a fresh [!] still finds its old issue; a [!] re-mark with
-    an unchanged note files nothing (every textarea blur would otherwise spam the issue
-    with duplicate comments).
-
-    Returns a result dict for the API response. A gh failure degrades to a warning —
-    the UAT.md write is the source of truth and must succeed regardless.
-    """
-    lines = UAT_PATH.read_text().splitlines()
-    text, existing_note, section, located = "", "", "", False
+def locate_item(lines, item_id):
+    """Return (item text, its note-line text, its section title); KeyError if absent."""
+    section = ""
     for idx, line in enumerate(lines):
         if m := SECTION_RE.match(line):
             section = m.group(1)
         elif (m := ITEM_RE.match(line)) and m.group(2) == item_id:
-            text = m.group(3)
+            note = ""
             if idx + 1 < len(lines) and (n := NOTE_RE.match(lines[idx + 1])):
-                existing_note = n.group(1)
-            located = True
-            break
-    if not located:
-        raise KeyError(item_id)
-    _, existing_issue = split_marker(existing_note)
+                note = n.group(1)
+            return m.group(3), note, section
+    raise KeyError(item_id)
 
-    note = note.strip()
-    clean, incoming_issue = split_marker(note)
-    existing_clean = split_marker(existing_note)[0]
-    issue_no, warning = existing_issue, None
 
-    if status == "needs-work" and clean:
-        if incoming_issue is not None:
-            # The payload itself carries the marker: already on record.
-            issue_no = incoming_issue
-        elif clean == existing_clean and existing_issue is not None:
-            # Same note as already on disk: nothing new to report.
-            pass
-        else:
-            try:
-                issue_no = file_bug_report(
-                    item_id, item_title(text), area(text, section), clean, existing_issue
-                )
-            except (GhError, OSError) as e:
-                warning = f"saved to UAT.md, but filing the GitHub bug failed: {e}"
-
+def rewrite_item(lines, item_id, status, clean, issue_no):
+    """Return `lines` with only item_id's status line and note line replaced."""
     out, i, found = [], 0, False
     while i < len(lines):
         line = lines[i]
@@ -258,6 +227,46 @@ def update(item_id, status, note):
         i += 1
     if not found:
         raise KeyError(item_id)
+    return out
+
+
+def update(item_id, status, note):
+    """Rewrite one item's status (and note) in UAT.md, leaving everything else byte-identical.
+
+    A [!] with a note also files a GitHub bug (see file_bug_report) and pins its number
+    onto the note line as a trailing '(→ #N)'. The marker survives a later pass as a
+    marker-only note line, so a fresh [!] still finds its old issue; a [!] re-mark with
+    an unchanged note files nothing (every textarea blur would otherwise spam the issue
+    with duplicate comments).
+
+    Returns a result dict for the API response. A gh failure degrades to a warning —
+    the UAT.md write is the source of truth and must succeed regardless.
+    """
+    lines = UAT_PATH.read_text().splitlines()
+    text, existing_note, section = locate_item(lines, item_id)
+    _, existing_issue = split_marker(existing_note)
+
+    note = note.strip()
+    clean, incoming_issue = split_marker(note)
+    existing_clean = split_marker(existing_note)[0]
+    issue_no, warning = existing_issue, None
+
+    if status == "needs-work" and clean:
+        if incoming_issue is not None:
+            # The payload itself carries the marker: already on record.
+            issue_no = incoming_issue
+        elif clean == existing_clean and existing_issue is not None:
+            # Same note as already on disk: nothing new to report.
+            pass
+        else:
+            try:
+                issue_no = file_bug_report(
+                    item_id, item_title(text), area(text, section), clean, existing_issue
+                )
+            except (GhError, OSError) as e:
+                warning = f"saved to UAT.md, but filing the GitHub bug failed: {e}"
+
+    out = rewrite_item(lines, item_id, status, clean, issue_no)
     UAT_PATH.write_text("\n".join(out) + "\n")
     return {"ok": True, "issue": issue_no, "warning": warning}
 
