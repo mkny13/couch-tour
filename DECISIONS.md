@@ -5132,3 +5132,13 @@ Part of #430 (#435). Counterpart of Android #376 / D293.
 ## D318 — macOS audio quality and gapless preferences (#429)
 
 `PlaybackSettings` gains `audioQuality` (`lossless`/`compressed`, key `audio_quality`, default lossless) and `gapless` (key `gapless`, default on), matching Android's stored values (D228). `AudioQuality.resolveURL` picks FLAC vs MP3 and always falls back to the other format so a tape never becomes unplayable; the FLAC badge follows what actually plays. With gapless off, `Player` queues only the current item and inserts the next one when the queue drains (`currentItemDidChange`), so nothing is preloaded. Both settings apply from the next queue start, not mid-track.
+
+## D319 — Recorded contract fixtures (#441)
+
+Part of #405. The hand-shaped fixtures let upstream drift pass CI and break on devices (#353, #388), so `scripts/contracts/record.sh` captures real responses from the endpoints the clients actually call (11 requests: phish.in years/shows-by-year/show/search/playlists; Relisten artists/years/year/show/on-date/search). It sends a `CouchTour-contract-recorder` User-Agent, runs sequentially with a ~1 s pause, and resolves the Relisten Phish and 1997 uuids from the live responses instead of hard-coding them.
+
+- **Naming**: `contract_*.json`, written byte-identically into both the Android and CouchTourKit fixture dirs, so `macos/scripts/check-fixtures.sh` (D35) keeps passing.
+- **Trimming**: every JSON array is cut to its first 3 elements, recursively. Values and shape stay real; output is pretty-printed with sorted keys so re-records diff cleanly.
+- **Re-record**: `scripts/contracts/record.sh` from the repo root (`--out-dir DIR` writes elsewhere, for a scheduled drift check, #443), then run the Android and CouchTourKit tests. A decode failure on a fresh recording is a real DTO bug, not a fixture problem.
+- **Android**: `ContractFixturesTest` decodes each file with the production DTO and `Json` config, runs the phish.in and Relisten show through the real API clients over `MockWebServer`, and checks that the bundled curated/heuristic match assets load. `ShowsPage` and `PlaylistsPage` became `internal` for this. CouchTourKit decode tests are #442.
+- The curated-match JSON is a bundled asset, not fetched, so it is tested where it ships rather than recorded.

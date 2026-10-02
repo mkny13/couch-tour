@@ -1,0 +1,237 @@
+[
+  {
+    "created_at": "2017-05-19T09:02:11Z",
+    "featured": 1,
+    "features": {
+      "can_have_flac": true,
+      "descriptions": true,
+      "eras": false,
+      "jam_charts": false,
+      "multiple_sources": true,
+      "per_show_venues": true,
+      "per_source_venues": true,
+      "ratings": true,
+      "review_titles": true,
+      "reviews": true,
+      "reviews_have_ratings": true,
+      "setlist_data_incomplete": false,
+      "sets": false,
+      "songs": true,
+      "source_information": true,
+      "taper_notes": true,
+      "tours": true,
+      "track_durations": true,
+      "track_md5s": true,
+      "track_names": true,
+      "venue_coords": false,
+      "venue_past_names": false,
+      "years": true
+    },
+    "musicbrainz_id": "6faa7ca7-0d99-4a5e-bfa6-1fd5037520c6",
+    "name": "Grateful Dead",
+    "popularity": {
+      "momentum_score": 0.9205,
+      "trend_ratio": 1.0455,
+      "windows": {
+        "30d": {
+          "hot_score": 1083.4579,
+          "hours": 146373.9169,
+          "plays": 1173881
+        },
+        "48h": {
+          "hot_score": 295.8057,
+          "hours": 10452.5644,
+          "plays": 87501
+        },
+        "7d": {
+          "hot_score": 432.3945,
+          "hours": 21643.3008,
+          "plays": 186965
+        }
+      }
+    },
+    "show_count": 2082,
+    "slug": "grateful-dead",
+    "sort_name": "Grateful Dead",
+    "source_count": 18200,
+    "updated_at": "2019-07-03T18:54:14Z",
+    "upstream_sources": [
+      {
+        "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+        "upstream_identifier": "GratefulDead",
+        "upstream_source": {
+          "credit_line": "blah blah blah",
+          "description": "The Live Music Archive, part of the Internet Archive, is a collection of over 170,000 concert recordings in lossless audio formats. The songs are also downloadable or playable in lossy formats such as Ogg Vorbis or MP3. Archive.org is the one hosting the music you are listening to. Reviews and ratings also come from archive.org.",
+          "name": "archive.org",
+          "url": "https://archive.org"
+        },
+        "upstream_source_id": 1
+      },
+      {
+        "artist_uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72",
+        "upstream_identifier": "grateful_dead",
+        "upstream_source": {
+          "credit_line": "fix",
+          "description": " jerrygarcia.com has detailed setlist information for all the bands that he was a part. Relisten uses this information to match venues and songs to recordings.",
+          "name": "jerrygarcia.com",
+          "url": "https://jerrygarcia.com"
+        },
+        "upstream_source_id": 7
+      }
+    ],
+    "uuid": "77a58ff9-2e01-c59c-b8eb-cff106049b72"
+  },
+  {
+    "created_at": "2017-02-12T21:11:14Z",
+    "featured": 1,
+    "features": {
+      "can_have_flac": false,
+      "descriptions": true,
+      "eras": true,
+      "jam_charts": true,
+      "multiple_sources": false,
+      "per_show_venues": true,
+      "per_source_venues": true,
+      "ratings": true,
+      "review_titles": false,
+      "reviews": true,
+      "reviews_have_ratings": false,
+      "setlist_data_incomplete": false,
+      "sets": true,
+      "songs": true,
+      "source_information": false,
+      "taper_notes": true,
+      "tours": true,
+      "track_durations": true,
+      "track_md5s": false,
+      "track_names": true,
+      "venue_coords": true,
+      "venue_past_names": true,
+      "years": true
+    },
+    "musicbrainz_id": "e01646f2-2a04-450d-8bf2-0d993082e058",
+    "name": "Phish",
+    "popularity": {
+      "momentum_score": 0.9017,
+      "trend_ratio": 0.7255,
+      "windows": {
+        "30d": {
+          "hot_score": 503.4928,
+          "hours": 42865.7206,
+          "plays": 253505
+        },
+        "48h": {
+          "hot_score": 135.4363,
+          "hours": 2928.2264,
+          "plays": 18343
+        },
+        "7d": {
+          "hot_score": 174.2642,
+          "hours": 4803.5561,
+          "plays": 30368
+        }
+      }
+    },
+    "show_count": 1885,
+    "slug": "phish",
+    "sort_name": "Phish",
+    "source_count": 1885,
+    "updated_at": "2019-07-03T18:54:18Z",
+    "upstream_sources": [
+      {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "upstream_identifier": "",
+        "upstream_source": {
+          "credit_line": "beep boop",
+          "description": "Phish.in provides a JSON API for programmatic access to content. It is a fan run site to host Phish audience recordings alongside detailed setlist information in compliance with Phish's official taping policy.\n\nRelisten uses this information for everything about Phish aside from reviews and ratings.",
+          "name": "phish.in",
+          "url": "https://phish.in"
+        },
+        "upstream_source_id": 3
+      },
+      {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "upstream_identifier": "",
+        "upstream_source": {
+          "credit_line": "blop blorp",
+          "description": "Phish.net is a non-commercial project run by Phish fans and for Phish fans under the auspices of the all-volunteer, non-profit Mockingbird Foundation.\n\nThis project serves to compile, preserve, and protect encyclopedic information about Phish and their music.\n\nRelisten uses information from phish.net to show Show ratings and reviews.",
+          "name": "phish.net",
+          "url": "https://phish.net"
+        },
+        "upstream_source_id": 4
+      }
+    ],
+    "uuid": "ca53d281-0041-ae33-a050-c87702d93b0c"
+  },
+  {
+    "created_at": "2024-04-14T06:38:16Z",
+    "featured": 0,
+    "features": {
+      "can_have_flac": true,
+      "descriptions": true,
+      "eras": false,
+      "jam_charts": false,
+      "multiple_sources": true,
+      "per_show_venues": false,
+      "per_source_venues": true,
+      "ratings": true,
+      "review_titles": true,
+      "reviews": true,
+      "reviews_have_ratings": true,
+      "setlist_data_incomplete": false,
+      "sets": false,
+      "songs": false,
+      "source_information": true,
+      "taper_notes": true,
+      "tours": false,
+      "track_durations": true,
+      "track_md5s": true,
+      "track_names": true,
+      "venue_coords": false,
+      "venue_past_names": false,
+      "years": true
+    },
+    "musicbrainz_id": "",
+    "name": "311",
+    "popularity": {
+      "momentum_score": 0.909,
+      "trend_ratio": 0.9388,
+      "windows": {
+        "30d": {
+          "hot_score": 30.8221,
+          "hours": 62.5842,
+          "plays": 950
+        },
+        "48h": {
+          "hot_score": 8.6603,
+          "hours": 4.6322,
+          "plays": 75
+        },
+        "7d": {
+          "hot_score": 8.6023,
+          "hours": 4.6975,
+          "plays": 74
+        }
+      }
+    },
+    "show_count": 259,
+    "slug": "three-one-one",
+    "sort_name": "311",
+    "source_count": 295,
+    "updated_at": "2025-03-31T20:21:08Z",
+    "upstream_sources": [
+      {
+        "artist_uuid": "c5a6da29-a60a-1ec9-e26f-6ca4024310c2",
+        "upstream_identifier": "311",
+        "upstream_source": {
+          "credit_line": "blah blah blah",
+          "description": "The Live Music Archive, part of the Internet Archive, is a collection of over 170,000 concert recordings in lossless audio formats. The songs are also downloadable or playable in lossy formats such as Ogg Vorbis or MP3. Archive.org is the one hosting the music you are listening to. Reviews and ratings also come from archive.org.",
+          "name": "archive.org",
+          "url": "https://archive.org"
+        },
+        "upstream_source_id": 1
+      }
+    ],
+    "uuid": "c5a6da29-a60a-1ec9-e26f-6ca4024310c2"
+  }
+]

@@ -1,0 +1,852 @@
+{
+  "exact_show": null,
+  "other_shows": [
+    {
+      "admin_notes": null,
+      "album_cover_url": "https://phish.in/blob/ia7q0qr9ygqs4g1nqmq9qbzo6lok.jpg",
+      "album_zip_url": null,
+      "audio_status": "complete",
+      "cover_art_model": "openai/gpt-image-2.5-sunburst",
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+        "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+        "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+      },
+      "created_at": "2024-04-19T15:09:25-04:00",
+      "date": "2024-04-18",
+      "duration": 12776786,
+      "id": 2173,
+      "liked_by_user": false,
+      "likes_count": 22,
+      "next_show_date": null,
+      "next_show_date_with_audio": null,
+      "performance_gap_value": 1,
+      "previous_show_date": null,
+      "previous_show_date_with_audio": null,
+      "tags": [
+        {
+          "color": "#808080",
+          "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+          "name": "Lore",
+          "notes": "The band took the stage while the pre-show electronic music continued. During Back on the Train, psychedelic images of passing countryside were displayed behind and above the band, rotating in opposite directions in different sections of the dome. During Maze, psychedelic live images of each band member appeared, stacked on top of each other. These images then fragmented and spread out, dancing and turning throughout the jam. During Leaves, several giant paper lanterns appeared, flanking the stage, while the dome showed a multitude of paper lanterns floating over water, with the moon shining above. During Life Saving Gun, the dome displayed stacks of old-style televisions with rabbit ears, with each television showing a live shot of one of the band members. These TVs moved and rotated as the jam progressed. During Dirt, the dome showed a forest view, looking upwards through trees at a purple-hued sky. During Tweezer, a field of multi-colored cars appeared behind the band, changing in size and shape and with their headlights blinking on and off in patterns, while other cars drove past overhead. My Friend, My Friend included live spotlight silhouettes of the band members projected across the entire dome. The projections during Mike's Song made it seem as if the venue was outdoors, with the band playing in front of a body of water with a rotating sculpture on the far shore. During Lifeboy, the sun went down and a number of other rotating sculptures lit up in the sky, creating a golden star-scape. The sun then rose again during Weekapaug. Farmhouse included images of a farmhouse in a field under a night sky filled with stars and aurorae. This show was connected to the other three with each night's setlist tied into a state of matter. This performance's matter type was solid.",
+          "priority": 22
+        }
+      ],
+      "taper_notes": "Phish\n4/18/2024\nSphere - Las Vegas, NV\n\nSource: 3xDPA 4006c(ROC/OTS, Decca tree[0.5m spacing]@8'->Sonosax M2D2->SD744T(24bit/96kHz)->FLAC\n\nRecorded and transferred by Scott Schneider\n\nSet One (91:17):\n01. Crowd/Intro\n02. Everything's Right\n03. Back on the Train\n04. Wolfman's Brother\n05. Maze\n06. Leaves\n07. Life Saving Gun\n08. Dirt\n09. Carini\n\nSet Two (126:51):\n10. Crowd\n11. Sand \n12. Tweezer\n13. My Friend, My Friend\n14. Mike's Song\n15. Lifeboy\n16. Weekapaug Groove\n17. Blaze On\n18. Fluffhead\n19. Encore break\n20. Farmhouse(1)\n21. Run Like an Antelope\n\n(1) Trey on acoustic",
+      "tour_name": "Sphere 2024",
+      "tracks": [
+        {
+          "audio_status": "complete",
+          "created_at": "2024-04-19T15:10:05-04:00",
+          "duration": 121248,
+          "exclude_from_stats": false,
+          "id": 37084,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 2,
+          "mp3_url": "https://phish.in/blob/v4wjm3bxxd7mntc7ccs4f9gh8ymg.mp3",
+          "position": 1,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/ia7q0qr9ygqs4g1nqmq9qbzo6lok.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+            "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+            "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+          },
+          "show_date": "2024-04-18",
+          "slug": "intro",
+          "songs": [
+            {
+              "alias": null,
+              "artist": null,
+              "created_at": "2012-10-23T22:44:07-04:00",
+              "id": 887,
+              "original": false,
+              "slug": "intro",
+              "title": "Intro",
+              "tracks_count": 17,
+              "tracks_with_audio_count": 17,
+              "updated_at": "2025-04-07T04:18:57-04:00"
+            }
+          ],
+          "tags": [],
+          "title": "Intro",
+          "updated_at": "2025-10-01T23:25:57-04:00",
+          "venue_location": "Las Vegas, NV",
+          "venue_name": "Sphere",
+          "venue_slug": "sphere",
+          "waveform_image_url": "https://phish.in/blob/ncfoqyq0zo7yi5yx0bu51jk70gbi.png"
+        },
+        {
+          "audio_status": "complete",
+          "created_at": "2024-04-19T15:09:25-04:00",
+          "duration": 856656,
+          "exclude_from_stats": false,
+          "id": 37083,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 8,
+          "mp3_url": "https://phish.in/blob/a98gm88t8z2aedoazw7rrqsu4ieh.mp3",
+          "position": 2,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/ia7q0qr9ygqs4g1nqmq9qbzo6lok.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+            "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+            "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+          },
+          "show_date": "2024-04-18",
+          "slug": "everythings-right",
+          "songs": [
+            {
+              "alias": null,
+              "artist": null,
+              "created_at": "2017-07-16T01:51:43-04:00",
+              "id": 982,
+              "original": true,
+              "slug": "everything-s-right",
+              "title": "Everything's Right",
+              "tracks_count": 78,
+              "tracks_with_audio_count": 71,
+              "updated_at": "2021-05-04T09:35:43-04:00"
+            }
+          ],
+          "tags": [
+            {
+              "color": "#888888",
+              "description": "Spoken interaction between band members or audience",
+              "ends_at_second": null,
+              "name": "Banter",
+              "notes": "Trey welcomes the crowd",
+              "priority": 17,
+              "starts_at_second": 835,
+              "transcript": "TREY: Welcome, everybody, welcome! Thank you for being here."
+            }
+          ],
+          "title": "Everything's Right",
+          "updated_at": "2025-10-01T23:25:57-04:00",
+          "venue_location": "Las Vegas, NV",
+          "venue_name": "Sphere",
+          "venue_slug": "sphere",
+          "waveform_image_url": "https://phish.in/blob/32mmzjavggjkasoda3k1l1eig3db.png"
+        },
+        {
+          "audio_status": "complete",
+          "created_at": "2024-04-19T15:10:10-04:00",
+          "duration": 478104,
+          "exclude_from_stats": false,
+          "id": 37085,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 2,
+          "mp3_url": "https://phish.in/blob/vltuawva993oftnpqqg929t3w2qv.mp3",
+          "position": 3,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/ia7q0qr9ygqs4g1nqmq9qbzo6lok.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+            "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+            "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+          },
+          "show_date": "2024-04-18",
+          "slug": "back-on-the-train",
+          "songs": [
+            {
+              "alias": "BOTT",
+              "artist": null,
+              "created_at": "2012-08-25T11:01:05-04:00",
+              "id": 61,
+              "original": true,
+              "slug": "back-on-the-train",
+              "title": "Back on the Train",
+              "tracks_count": 177,
+              "tracks_with_audio_count": 174,
+              "updated_at": "2021-05-09T01:13:22-04:00"
+            }
+          ],
+          "tags": [
+            {
+              "color": "#808080",
+              "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+              "ends_at_second": null,
+              "name": "Lore",
+              "notes": "Psychedelic images of passing countryside were displayed behind and above the band, rotating in opposite directions in different sections of the dome.",
+              "priority": 22,
+              "starts_at_second": null,
+              "transcript": null
+            }
+          ],
+          "title": "Back on the Train",
+          "updated_at": "2026-01-06T02:03:05-05:00",
+          "venue_location": "Las Vegas, NV",
+          "venue_name": "Sphere",
+          "venue_slug": "sphere",
+          "waveform_image_url": "https://phish.in/blob/ftgdf28h47u9z9i4pja2nmkcnkur.png"
+        }
+      ],
+      "updated_at": "2026-09-19T14:49:24-04:00",
+      "venue": {
+        "city": "Las Vegas",
+        "country": "USA",
+        "created_at": "2024-04-19T14:38:12-04:00",
+        "id": 838,
+        "latitude": 36.120556,
+        "location": "Las Vegas, NV",
+        "longitude": -115.161389,
+        "map_snapshot_url": "https://phish.in/blob/s49hwnencrjpgzr1plqkp3xrh02x.png",
+        "name": "Sphere",
+        "other_names": [],
+        "shows_count": 13,
+        "shows_with_audio_count": 13,
+        "slug": "sphere",
+        "state": "NV",
+        "updated_at": "2026-01-01T21:23:12-05:00"
+      },
+      "venue_name": "Sphere"
+    },
+    {
+      "admin_notes": null,
+      "album_cover_url": "https://phish.in/blob/w5hjl72r34nlmp6iahrsspur1l6k.jpg",
+      "album_zip_url": "https://phish.in/blob/au6rusw1fgghnhdjmgmqqtdopfjj.zip",
+      "audio_status": "complete",
+      "cover_art_model": "openai/gpt-image-2.5-sunburst",
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/rgh680vf6n1fu1r61ewffpns95mh.jpg",
+        "medium": "https://phish.in/blob/tt6vszn8yfx1klak40cda4pw1wmk.jpg",
+        "small": "https://phish.in/blob/gqdyox07wf6f1nb9c4oap6oct64f.jpg"
+      },
+      "created_at": "2025-01-01T18:02:46-05:00",
+      "date": "2024-12-31",
+      "duration": 14619467,
+      "id": 2224,
+      "liked_by_user": false,
+      "likes_count": 12,
+      "next_show_date": null,
+      "next_show_date_with_audio": null,
+      "performance_gap_value": 1,
+      "previous_show_date": null,
+      "previous_show_date_with_audio": null,
+      "tags": [
+        {
+          "color": "#808080",
+          "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+          "name": "Lore",
+          "notes": "Throughout the show, a series of white coils turned while suspended over the stage. The band came out for the third set in three matching blue jumpsuits and a blue donut muumuu. During Pillow Jets, the coils started to descend and screens lit up behind them and throughout MSG. A fractured face came down and dancers (conjurors of thunder) came out with yellow fabric. The face came together as the countdown to midnight ended, after which the dancers removed their robes and took up glowing accessories. The dancers sang during Pillow Jets and What's Going Through Your Mind. The dancers returned during Tweezer Reprise to throw beach balls into the crowd.",
+          "priority": 22
+        }
+      ],
+      "taper_notes": "Phish\nMadison Square Gardens\nHappy New Years!\nNew York City, NY\nDecember 31, 2024 (Tuesday)\n\nTaper - Jon Pasternak\n\n**24 Bit Recording**\n\nSET 1: (80 Minutes)\n\n01. Mike's Song >\n02. Bouncing Around the Room >\n03. Weekapaug Groove\n04. Stash\n05. Evolve\n06. Llama\n07. Split Open and Melt\n08. Backwards Down the Number Line >\n09. Carini\n10. The Squirming Coil\n\nSET 2: (80 Minutes)\n\n11. Sigma Oasis >\n12. My Friend, My Friend[1] >\n13. Sand\n14. Golden Age >\n15. What's the Use? >\n16. Taste\n17. Golgi Apparatus\n18. First Tube\n\nSET 3: (90 Minutes)\n\n19. Character Zero\n20. Pillow Jets[2] >\n21. Auld Lang Syne >\n22. What's Going Through Your Mind[2] ->\n23. Chalk Dust Torture >\n24. Slave to the Traffic Light\n25. Life Saving Gun[3] >\n26. Say It To Me S.A.N.T.O.S.\n\nENCORE:\n\n27. Grind\n28. Icculus\n29. Tweezer Reprise\n\n[1] No \"Myfe\" ending.\n[2] With additional vocals from dancers.\n[3] Mike on mini-keyboard.\n\nTrey teased In Memory of Elizabeth Reed during Stash. Throughout the show, a series of white coils turned while suspeneded over the stage. Trey teased Sigma Oasis during My Friend, My Friend, which did not contain the \"Myfe\" ending. The band came out for the third set in three matching blue jumpsuits and a blue donut mumu. During Pillow Jets, the coils started to descend and screens lit up behind them and throughout MSG. A fractured face came down and dancers (conjurors of thunder) came out with yellow fabric. The face came together as the countdown to midnight ended, after which the dancers removed their robes and took up glowing accessories. The dancers sang during Pillow Jets and What's Going Through Your Mind, which contained Blaze On, Bouncing Around The Room, Martian Monster, Wolfman's Brother, The Lizards, and Halley's Comet quotes. Life Saving Gun briefly featured Mike on a mini-keyboard. The narration in Icculus centered on Trey explaining that the omission of the song the previous year was a test. The dancers returned during Tweezer Reprise to throw beach balls into the crowd.\n\nTapers Notes:\n\nOTS Front Row DFC\nSec 2 Row 6 Seat 12\n\nSource: Neumann KMR 82i/Oade M248/SD 722/24/48\n\nLineage: SD Card > Audacity (Amplify Slightly, Normalize) > CDWAV (Tracking) > FLAC > Foobar2000 (tagging)\n\nRecorded by: Jon Pasternak\nProcessed by: Rich Stoler\n\nhttps://www.facebook.com/SEPALiveMusicCollective\n\n*Support Taper Friendly Bands and Venues*\n",
+      "tour_name": "New Years Run 2024",
+      "tracks": [
+        {
+          "audio_status": "complete",
+          "created_at": "2025-01-01T18:02:46-05:00",
+          "duration": 418922,
+          "exclude_from_stats": false,
+          "id": 38130,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 0,
+          "mp3_url": "https://phish.in/blob/lcsvof8wz6nl9nodznicbch83y9e.mp3",
+          "position": 1,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/w5hjl72r34nlmp6iahrsspur1l6k.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/rgh680vf6n1fu1r61ewffpns95mh.jpg",
+            "medium": "https://phish.in/blob/tt6vszn8yfx1klak40cda4pw1wmk.jpg",
+            "small": "https://phish.in/blob/gqdyox07wf6f1nb9c4oap6oct64f.jpg"
+          },
+          "show_date": "2024-12-31",
+          "slug": "mikes-song",
+          "songs": [
+            {
+              "alias": null,
+              "artist": null,
+              "created_at": "2012-08-25T11:01:06-04:00",
+              "id": 505,
+              "original": true,
+              "slug": "mike-s-song",
+              "title": "Mike's Song",
+              "tracks_count": 568,
+              "tracks_with_audio_count": 540,
+              "updated_at": "2021-05-09T01:13:23-04:00"
+            }
+          ],
+          "tags": [],
+          "title": "Mike's Song",
+          "updated_at": "2026-08-24T02:32:44-04:00",
+          "venue_location": "New York, NY",
+          "venue_name": "Madison Square Garden",
+          "venue_slug": "madison-square-garden",
+          "waveform_image_url": "https://phish.in/blob/igs9o27on0if50pt5n8pynwqc6jq.png"
+        },
+        {
+          "audio_status": "complete",
+          "created_at": "2025-01-01T18:02:55-05:00",
+          "duration": 221376,
+          "exclude_from_stats": false,
+          "id": 38131,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 0,
+          "mp3_url": "https://phish.in/blob/zymic1udkt36y34qzcwihq1okvb0.mp3",
+          "position": 2,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/w5hjl72r34nlmp6iahrsspur1l6k.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/rgh680vf6n1fu1r61ewffpns95mh.jpg",
+            "medium": "https://phish.in/blob/tt6vszn8yfx1klak40cda4pw1wmk.jpg",
+            "small": "https://phish.in/blob/gqdyox07wf6f1nb9c4oap6oct64f.jpg"
+          },
+          "show_date": "2024-12-31",
+          "slug": "bouncing-around-the-room",
+          "songs": [
+            {
+              "alias": null,
+              "artist": null,
+              "created_at": "2012-08-25T11:01:05-04:00",
+              "id": 111,
+              "original": true,
+              "slug": "bouncing-around-the-room",
+              "title": "Bouncing Around the Room",
+              "tracks_count": 499,
+              "tracks_with_audio_count": 463,
+              "updated_at": "2021-05-04T09:35:38-04:00"
+            }
+          ],
+          "tags": [],
+          "title": "Bouncing Around the Room",
+          "updated_at": "2025-10-01T23:26:00-04:00",
+          "venue_location": "New York, NY",
+          "venue_name": "Madison Square Garden",
+          "venue_slug": "madison-square-garden",
+          "waveform_image_url": "https://phish.in/blob/ckjveg7nw2kndw12rzs7p2jabtem.png"
+        },
+        {
+          "audio_status": "complete",
+          "created_at": "2025-01-01T18:03:00-05:00",
+          "duration": 504096,
+          "exclude_from_stats": false,
+          "id": 38132,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 2,
+          "mp3_url": "https://phish.in/blob/ppxhbswu1pjxrrhdjz48ciuyu52j.mp3",
+          "position": 3,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/w5hjl72r34nlmp6iahrsspur1l6k.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/rgh680vf6n1fu1r61ewffpns95mh.jpg",
+            "medium": "https://phish.in/blob/tt6vszn8yfx1klak40cda4pw1wmk.jpg",
+            "small": "https://phish.in/blob/gqdyox07wf6f1nb9c4oap6oct64f.jpg"
+          },
+          "show_date": "2024-12-31",
+          "slug": "weekapaug-groove",
+          "songs": [
+            {
+              "alias": null,
+              "artist": null,
+              "created_at": "2012-08-25T11:01:07-04:00",
+              "id": 836,
+              "original": true,
+              "slug": "weekapaug-groove",
+              "title": "Weekapaug Groove",
+              "tracks_count": 538,
+              "tracks_with_audio_count": 519,
+              "updated_at": "2021-05-04T09:35:42-04:00"
+            }
+          ],
+          "tags": [],
+          "title": "Weekapaug Groove",
+          "updated_at": "2025-10-01T23:26:00-04:00",
+          "venue_location": "New York, NY",
+          "venue_name": "Madison Square Garden",
+          "venue_slug": "madison-square-garden",
+          "waveform_image_url": "https://phish.in/blob/mvmk6mhc60jppsdbbiamzjqd2k0l.png"
+        }
+      ],
+      "updated_at": "2026-09-19T16:17:38-04:00",
+      "venue": {
+        "city": "New York",
+        "country": "USA",
+        "created_at": "2013-02-09T22:10:39-05:00",
+        "id": 408,
+        "latitude": 40.7505045,
+        "location": "New York, NY",
+        "longitude": -73.9934387,
+        "map_snapshot_url": "https://phish.in/blob/grp12ixz2qouwkqyrtonfixp5ad0.png",
+        "name": "Madison Square Garden",
+        "other_names": [],
+        "shows_count": 96,
+        "shows_with_audio_count": 96,
+        "slug": "madison-square-garden",
+        "state": "NY",
+        "updated_at": "2026-01-01T21:21:53-05:00"
+      },
+      "venue_name": "Madison Square Garden"
+    },
+    {
+      "admin_notes": null,
+      "album_cover_url": "https://phish.in/blob/3ipmqs3fhkwar3j4zqc7vf7ii2kv.jpg",
+      "album_zip_url": null,
+      "audio_status": "complete",
+      "cover_art_model": "openai/gpt-image-2.5-sunburst",
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+        "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+        "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+      },
+      "created_at": "2024-04-21T13:54:58-04:00",
+      "date": "2024-04-20",
+      "duration": 11330936,
+      "id": 2175,
+      "liked_by_user": false,
+      "likes_count": 15,
+      "next_show_date": null,
+      "next_show_date_with_audio": null,
+      "performance_gap_value": 1,
+      "previous_show_date": null,
+      "previous_show_date_with_audio": null,
+      "tags": [
+        {
+          "color": "#808080",
+          "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+          "name": "Lore",
+          "notes": "During Tube, the dome seemed to fill with soap bubbles which reflected the venue and drifted in front of a nebula of changing colors. During Pillow Jets, the view became that of a grassy path through a grove of trees under a starlit sky. Travelling down the path as the jam progressed, the grass and trees became tinged with glowing, multi-colored light, which periodically intensified and erupted from the ground through the branches, creating a firework effect. During Mountains in the Mist, the dome made it appear as if the venue was nestled in an evergreen-covered mountain range, with mist shrouding the sky from view. During Taste, the entire dome appeared to become covered in turning rings of Jim Pollock illustrations from the covers of the Live Phish CD releases, rendered in gold and black. During Sigma Oasis, the dome became a cloudscape, with trees, birds and sea creatures made out of bubbling clouds. During Fuego, a spotlight was used to create a silhouette of the band, with the image then recreated across the dome with effects added to make the band appear as flaming shadow people. During Twist, the dome became filled with multicolored letters tumbling before a backdrop of pulsing red circles. During Tweezer Reprise, the dome again displayed images of cars, this time tumbling into the distance. This show was connected to the other three with each night's setlist tied into a state of matter. This performance's matter type was gas.",
+          "priority": 22
+        }
+      ],
+      "taper_notes": "Phish\n4/20/2024\nSphere - Las Vegas, NV\n\nSource: 3xDPA 4006c w/30cm APE spheres(ROC/OTS, Decca[0.5m spacing]@7')->Sonosax M2D2(analog)->SD788T(24bit/96kHz)->FLAC\n\nRecorded and transferred by Scott Schneider\n\nSet One (93:08):\n01. Crowd/Intro\n02. Set Your Soul Free\n03. Tube\n04. Stash\n05. Pillow Jets\n06. Steam\n07. Mountains in the Mist\n08. Taste\n09. 46 Days\n\n\nSet Two (99:51):\n10. Crowd\n11. Sigma Oasis\n12. Fuego\n13. Golden Age\n14. Twist\n15. I Am Hydrogen\n16. Chalk Dust Torture\n17. Say it to Me S.A.N.T.O.S.\n18. Encore break\n19. A Life Beyond a Dream\n20. Tweezer Reprise\n\n",
+      "tour_name": "Sphere 2024",
+      "tracks": [
+        {
+          "audio_status": "complete",
+          "created_at": "2024-04-21T13:55:35-04:00",
+          "duration": 128136,
+          "exclude_from_stats": false,
+          "id": 37120,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 0,
+          "mp3_url": "https://phish.in/blob/l174qg6whw3fsrppig5in4ykjuit.mp3",
+          "position": 1,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/3ipmqs3fhkwar3j4zqc7vf7ii2kv.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+            "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+            "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+          },
+          "show_date": "2024-04-20",
+          "slug": "intro",
+          "songs": [
+            {
+              "alias": null,
+              "artist": null,
+              "created_at": "2012-10-23T22:44:07-04:00",
+              "id": 887,
+              "original": false,
+              "slug": "intro",
+              "title": "Intro",
+              "tracks_count": 17,
+              "tracks_with_audio_count": 17,
+              "updated_at": "2025-04-07T04:18:57-04:00"
+            }
+          ],
+          "tags": [],
+          "title": "Intro",
+          "updated_at": "2025-10-01T23:25:57-04:00",
+          "venue_location": "Las Vegas, NV",
+          "venue_name": "Sphere",
+          "venue_slug": "sphere",
+          "waveform_image_url": "https://phish.in/blob/0h8va9bkg0z0ibf9uegqzfyzb3q4.png"
+        },
+        {
+          "audio_status": "complete",
+          "created_at": "2024-04-21T13:54:58-04:00",
+          "duration": 805872,
+          "exclude_from_stats": false,
+          "id": 37119,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 3,
+          "mp3_url": "https://phish.in/blob/xf1i0ky8qijb35ae6yfin8dydtnh.mp3",
+          "position": 2,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/3ipmqs3fhkwar3j4zqc7vf7ii2kv.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+            "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+            "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+          },
+          "show_date": "2024-04-20",
+          "slug": "set-your-soul-free",
+          "songs": [
+            {
+              "alias": null,
+              "artist": "Psycho Realm",
+              "created_at": "2018-07-25T13:27:11-04:00",
+              "id": 1011,
+              "original": false,
+              "slug": "set-your-soul-free",
+              "title": "Set Your Soul Free",
+              "tracks_count": 48,
+              "tracks_with_audio_count": 45,
+              "updated_at": "2021-05-04T01:57:36-04:00"
+            }
+          ],
+          "tags": [],
+          "title": "Set Your Soul Free",
+          "updated_at": "2025-10-01T23:25:57-04:00",
+          "venue_location": "Las Vegas, NV",
+          "venue_name": "Sphere",
+          "venue_slug": "sphere",
+          "waveform_image_url": "https://phish.in/blob/f5dqw1m1lhhwi028a1sm0z74g7c5.png"
+        },
+        {
+          "audio_status": "complete",
+          "created_at": "2024-04-21T13:55:41-04:00",
+          "duration": 619920,
+          "exclude_from_stats": false,
+          "id": 37121,
+          "jam_starts_at_second": null,
+          "liked_by_user": false,
+          "likes_count": 4,
+          "mp3_url": "https://phish.in/blob/jb597jtf4c8a1i8m6fjt7ia0adc7.mp3",
+          "position": 3,
+          "set_name": "Set 1",
+          "show_album_cover_url": "https://phish.in/blob/3ipmqs3fhkwar3j4zqc7vf7ii2kv.jpg",
+          "show_cover_art_urls": {
+            "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+            "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+            "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+          },
+          "show_date": "2024-04-20",
+          "slug": "tube",
+          "songs": [
+            {
+              "alias": null,
+              "artist": null,
+              "created_at": "2012-08-25T11:01:07-04:00",
+              "id": 797,
+              "original": true,
+              "slug": "tube",
+              "title": "Tube",
+              "tracks_count": 209,
+              "tracks_with_audio_count": 198,
+              "updated_at": "2018-12-26T22:40:53-05:00"
+            }
+          ],
+          "tags": [
+            {
+              "color": "#888888",
+              "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+              "ends_at_second": null,
+              "name": "Jamcharts",
+              "notes": "A subtler and more introspective take on improvisation than the consistently exciting  groove fest \"Tube\" tends to bring, the band here sonically 'dims the lights' briefly before building melodically to the more familiar peak and return",
+              "priority": 4,
+              "starts_at_second": null,
+              "transcript": null
+            },
+            {
+              "color": "#808080",
+              "description": "Physical/theatrical elements, props, costumes, skits, or special stage productions",
+              "ends_at_second": null,
+              "name": "Lore",
+              "notes": "The dome seemed to fill with soap bubbles which reflected the venue and drifted in front of a nebula of changing colors.",
+              "priority": 22,
+              "starts_at_second": null,
+              "transcript": null
+            }
+          ],
+          "title": "Tube",
+          "updated_at": "2026-08-03T07:03:26-04:00",
+          "venue_location": "Las Vegas, NV",
+          "venue_name": "Sphere",
+          "venue_slug": "sphere",
+          "waveform_image_url": "https://phish.in/blob/s3vdy03u8g58gvndyfg97jxmvtht.png"
+        }
+      ],
+      "updated_at": "2026-09-19T14:48:35-04:00",
+      "venue": {
+        "city": "Las Vegas",
+        "country": "USA",
+        "created_at": "2024-04-19T14:38:12-04:00",
+        "id": 838,
+        "latitude": 36.120556,
+        "location": "Las Vegas, NV",
+        "longitude": -115.161389,
+        "map_snapshot_url": "https://phish.in/blob/s49hwnencrjpgzr1plqkp3xrh02x.png",
+        "name": "Sphere",
+        "other_names": [],
+        "shows_count": 13,
+        "shows_with_audio_count": 13,
+        "slug": "sphere",
+        "state": "NV",
+        "updated_at": "2026-01-01T21:23:12-05:00"
+      },
+      "venue_name": "Sphere"
+    }
+  ],
+  "playlists": [
+    {
+      "cover_art_track_id": 37086,
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/xeqkm00fafth32ytmawaqfgww840.jpg",
+        "medium": "https://phish.in/blob/qnv03a9chqtg5scvathgzg38i1qa.jpg",
+        "small": "https://phish.in/blob/cuxz4svz834nhzq3s2vm8p99cy0h.jpg"
+      },
+      "created_at": "2024-10-05T10:58:34-04:00",
+      "description": "Everything but the brightest highlights of 2024.\n\nIf possible, also check out:\n2/21 DWD;\n2/22 Axilla 2, ASIHTOS, Tweezer;\n2/23 KDF, Blaze On, Harry Hood;\n2/24 Wolfmans, Gin",
+      "duration": 72365407,
+      "id": 3258,
+      "liked_by_user": false,
+      "likes_count": 0,
+      "name": "2024's Middle Class",
+      "published": true,
+      "slug": "2024s-middle-class",
+      "tracks_count": 78,
+      "updated_at": "2024-10-05T11:00:53-04:00",
+      "username": "maxhog"
+    },
+    {
+      "cover_art_track_id": 4225,
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/shmhiyfryvi0c907fg6c3m10s6tr.jpg",
+        "medium": "https://phish.in/blob/kt4wp7548im7zw3yteb8jup8swix.jpg",
+        "small": "https://phish.in/blob/iwlmhtqfb3ierst6rbv5vppdqmn8.jpg"
+      },
+      "created_at": "2025-08-05T15:17:32-04:00",
+      "description": "Discography - Released 1995-06-27\n\nDisc 1\n1\tBouncing Around the Room\n2\tStash\n3\tGumbo\n4\tMontana (min 16:07-18:12 in Tweezer)\n5\tYou Enjoy Myself\n6\tChalk Dust Torture\n7\tSlave to the Traffic Light\n\nDisc 2\n8\tWilson\n9\tTweezer\n10\tSimple\n11\tHarry Hood\n12\tThe Squirming Coil",
+      "duration": 10222408,
+      "id": 3474,
+      "liked_by_user": false,
+      "likes_count": 0,
+      "name": "PHISH - A Live One",
+      "published": true,
+      "slug": "phish-a-live-one",
+      "tracks_count": 12,
+      "updated_at": "2025-08-06T10:53:18-04:00",
+      "username": "MrPalmerLH"
+    }
+  ],
+  "songs": [
+    {
+      "alias": null,
+      "artist": null,
+      "created_at": "2012-08-25T11:01:07-04:00",
+      "id": 803,
+      "original": true,
+      "slug": "tweezer",
+      "title": "Tweezer",
+      "tracks_count": 475,
+      "tracks_with_audio_count": 468,
+      "updated_at": "2021-05-04T09:35:42-04:00"
+    },
+    {
+      "alias": null,
+      "artist": null,
+      "created_at": "2012-08-25T11:01:07-04:00",
+      "id": 804,
+      "original": true,
+      "slug": "tweezer-reprise",
+      "title": "Tweezer Reprise",
+      "tracks_count": 344,
+      "tracks_with_audio_count": 338,
+      "updated_at": "2021-05-04T09:35:42-04:00"
+    }
+  ],
+  "tags": [],
+  "tracks": [
+    {
+      "audio_status": "complete",
+      "created_at": "2012-10-08T19:17:46-04:00",
+      "duration": 140617,
+      "exclude_from_stats": false,
+      "id": 2045,
+      "jam_starts_at_second": null,
+      "liked_by_user": false,
+      "likes_count": 4,
+      "mp3_url": "https://phish.in/blob/e22cfou3ks3qxygmo32j4c11z8qq.mp3",
+      "position": 18,
+      "set_name": "Set 2",
+      "show_album_cover_url": "https://phish.in/blob/jdlge1z9dkhyrjvk1fpz4inpkgrs.jpg",
+      "show_cover_art_urls": {
+        "large": "https://phish.in/blob/34139go0801c4lm3epsu2adhvvfj.jpg",
+        "medium": "https://phish.in/blob/13x0t5okfxla0wmwwlhzadesf6k9.jpg",
+        "small": "https://phish.in/blob/xkytuxofmaum9d5cionm04x8wdhn.jpg"
+      },
+      "show_date": "1992-11-22",
+      "slug": "big-ball-jam",
+      "songs": [
+        {
+          "alias": null,
+          "artist": null,
+          "created_at": "2024-07-04T15:58:55-04:00",
+          "id": 1100,
+          "original": true,
+          "slug": "big-ball-jam",
+          "title": "Big Ball Jam",
+          "tracks_count": 103,
+          "tracks_with_audio_count": 108,
+          "updated_at": "2024-07-04T15:58:55-04:00"
+        }
+      ],
+      "tags": [
+        {
+          "color": "#888888",
+          "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+          "ends_at_second": null,
+          "name": "Jamcharts",
+          "notes": "-> in from \"Tweezer.\" \"BBJ\" is sandwiched in the \"Tweezer\" jam",
+          "priority": 4,
+          "starts_at_second": null,
+          "transcript": null
+        }
+      ],
+      "title": "Big Ball Jam",
+      "updated_at": "2026-08-03T07:00:24-04:00",
+      "venue_location": "Ithaca, NY",
+      "venue_name": "Bailey Hall, Cornell University",
+      "venue_slug": "bailey-hall-cornell-university",
+      "waveform_image_url": "https://phish.in/blob/ehz00gxveedt8m1htguvrik7wrle.png"
+    },
+    {
+      "audio_status": "complete",
+      "created_at": "2012-10-15T16:29:32-04:00",
+      "duration": 207334,
+      "exclude_from_stats": false,
+      "id": 5041,
+      "jam_starts_at_second": null,
+      "liked_by_user": false,
+      "likes_count": 6,
+      "mp3_url": "https://phish.in/blob/0oxpzqa4rxsdfdug8t45jh22cldj.mp3",
+      "position": 12,
+      "set_name": "Set 2",
+      "show_album_cover_url": "https://phish.in/blob/oqa55bvfjwmekkd4t6er9szhzikx.jpg",
+      "show_cover_art_urls": {
+        "large": "https://phish.in/blob/4423l56zkg5lfsepngj4d0j0cbj8.jpg",
+        "medium": "https://phish.in/blob/yi88s30i9bsskt5p1mmwtwevm9ue.jpg",
+        "small": "https://phish.in/blob/8026xf9nhtmt06cudejbt3i0y46v.jpg"
+      },
+      "show_date": "1994-12-01",
+      "slug": "bbfcfm",
+      "songs": [
+        {
+          "alias": "BBFCFM",
+          "artist": null,
+          "created_at": "2012-08-25T11:01:05-04:00",
+          "id": 78,
+          "original": true,
+          "slug": "big-black-furry-creature-from-mars",
+          "title": "Big Black Furry Creature From Mars",
+          "tracks_count": 142,
+          "tracks_with_audio_count": 138,
+          "updated_at": "2026-07-22T17:40:36-04:00"
+        }
+      ],
+      "tags": [
+        {
+          "color": "#888888",
+          "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+          "ends_at_second": null,
+          "name": "Jamcharts",
+          "notes": "-> in from \"Tweezer.\" First in a medley of songs which ultimately -> back to \"Tweezer.\"",
+          "priority": 4,
+          "starts_at_second": null,
+          "transcript": null
+        },
+        {
+          "color": "#888888",
+          "description": "Incomplete performance of a composition",
+          "ends_at_second": null,
+          "name": "Unfinished",
+          "notes": "Shorter version without all verses",
+          "priority": 16,
+          "starts_at_second": null,
+          "transcript": null
+        }
+      ],
+      "title": "Big Black Furry Creature From Mars",
+      "updated_at": "2026-07-29T07:00:03-04:00",
+      "venue_location": "Salem, OR",
+      "venue_name": "Salem Armory",
+      "venue_slug": "salem-armory",
+      "waveform_image_url": "https://phish.in/blob/ueb1fzxp15msuvubo1shgvhpkpq3.png"
+    },
+    {
+      "audio_status": "complete",
+      "created_at": "2012-10-09T20:59:57-04:00",
+      "duration": 308219,
+      "exclude_from_stats": false,
+      "id": 4083,
+      "jam_starts_at_second": null,
+      "liked_by_user": false,
+      "likes_count": 9,
+      "mp3_url": "https://phish.in/blob/smlxav8oqivpenmhkh70dyzjrfvi.mp3",
+      "position": 20,
+      "set_name": "Set 2",
+      "show_album_cover_url": "https://phish.in/blob/2lv13maq83wq104h3s1up6rk0dg4.jpg",
+      "show_cover_art_urls": {
+        "large": "https://phish.in/blob/d1eqrrg99vfkevyzxkmn377rlj1s.jpg",
+        "medium": "https://phish.in/blob/bmo1eylxxz6l59b36zzqvyuqz70k.jpg",
+        "small": "https://phish.in/blob/pbre6dm5swj60fx771i4zry3j4jf.jpg"
+      },
+      "show_date": "1994-07-13",
+      "slug": "bbfcfm",
+      "songs": [
+        {
+          "alias": "BBFCFM",
+          "artist": null,
+          "created_at": "2012-08-25T11:01:05-04:00",
+          "id": 78,
+          "original": true,
+          "slug": "big-black-furry-creature-from-mars",
+          "title": "Big Black Furry Creature From Mars",
+          "tracks_count": 142,
+          "tracks_with_audio_count": 138,
+          "updated_at": "2026-07-22T17:40:36-04:00"
+        }
+      ],
+      "tags": [
+        {
+          "color": "#888888",
+          "description": "Phish.net Jam Charts selections (phish.net/jamcharts)",
+          "ends_at_second": null,
+          "name": "Jamcharts",
+          "notes": "-> in from \"Tweezer.\" \"BBFCFM\" is sandwiched in this \"Tweezer\" jam",
+          "priority": 4,
+          "starts_at_second": null,
+          "transcript": null
+        },
+        {
+          "color": "#888888",
+          "description": "Transient musical reference",
+          "ends_at_second": null,
+          "name": "Tease",
+          "notes": "Scent of a Mule",
+          "priority": 15,
+          "starts_at_second": null,
+          "transcript": null
+        },
+        {
+          "color": "#888888",
+          "description": "Incomplete performance of a composition",
+          "ends_at_second": null,
+          "name": "Unfinished",
+          "notes": null,
+          "priority": 16,
+          "starts_at_second": null,
+          "transcript": null
+        }
+      ],
+      "title": "Big Black Furry Creature From Mars",
+      "updated_at": "2026-08-23T02:34:48-04:00",
+      "venue_location": "Patterson, NY",
+      "venue_name": "Big Birch Concert Pavilion",
+      "venue_slug": "big-birch-concert-pavilion",
+      "waveform_image_url": "https://phish.in/blob/pitsqvl9nv3spuj97upblerk3ag7.png"
+    }
+  ],
+  "venues": []
+}

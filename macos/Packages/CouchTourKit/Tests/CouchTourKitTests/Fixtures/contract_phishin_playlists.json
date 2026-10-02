@@ -1,0 +1,67 @@
+{
+  "current_page": 1,
+  "playlists": [
+    {
+      "cover_art_track_id": 8380,
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/43w865118qg48xeav1z59912siri.jpg",
+        "medium": "https://phish.in/blob/8ijsgk0nsw5cvhhxb84qe49aloft.jpg",
+        "small": "https://phish.in/blob/3zrcskv8ypvxuo7zmjg4n9arm10u.jpg"
+      },
+      "created_at": "2014-07-25T14:32:32-04:00",
+      "description": null,
+      "duration": 92895294,
+      "id": 131,
+      "liked_by_user": false,
+      "likes_count": 41,
+      "name": "Phish.net Key Jams Pt 1",
+      "published": true,
+      "slug": "phishnet-key-jams-pt-1",
+      "tracks_count": 106,
+      "updated_at": "2014-07-25T14:32:34-04:00",
+      "username": "mfhgreyboy"
+    },
+    {
+      "cover_art_track_id": 21659,
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/8lo1dtmvvcrgdc2jjxqjakf99rg5.jpg",
+        "medium": "https://phish.in/blob/iwh60j4azioa8hqsbn8a5pjfbpx7.jpg",
+        "small": "https://phish.in/blob/b4mgujhpf8jgvoy94wew0mllf5sk.jpg"
+      },
+      "created_at": "2014-07-25T14:43:10-04:00",
+      "description": null,
+      "duration": 30305781,
+      "id": 132,
+      "liked_by_user": false,
+      "likes_count": 32,
+      "name": "Phish.net Key Jams Pt. 2",
+      "published": true,
+      "slug": "phishnet-key-jams-pt-2",
+      "tracks_count": 26,
+      "updated_at": "2014-07-25T14:43:10-04:00",
+      "username": "mfhgreyboy"
+    },
+    {
+      "cover_art_track_id": 28485,
+      "cover_art_urls": {
+        "large": "https://phish.in/blob/8mrl0cozj3ldv0up654w5pkxhues.jpg",
+        "medium": "https://phish.in/blob/mphyzhukw38whj8qldr1sm79fypj.jpg",
+        "small": "https://phish.in/blob/as73j9cf4wd2aaz2xel1l30e0lct.jpg"
+      },
+      "created_at": "2014-07-28T16:35:01-04:00",
+      "description": null,
+      "duration": 91245629,
+      "id": 139,
+      "liked_by_user": false,
+      "likes_count": 20,
+      "name": "Phish.net Recommended Jams Pt. 4",
+      "published": true,
+      "slug": "phishnet-recommended-jams-pt-4",
+      "tracks_count": 101,
+      "updated_at": "2014-07-28T16:35:03-04:00",
+      "username": "srndsnd1"
+    }
+  ],
+  "total_entries": 137,
+  "total_pages": 2
+}

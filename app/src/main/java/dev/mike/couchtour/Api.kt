@@ -151,7 +151,7 @@ data class SearchResults(
 }
 
 @Serializable
-private data class ShowsPage(
+internal data class ShowsPage(
     val shows: List<Show> = emptyList(),
     @SerialName("total_entries") val totalEntries: Int = 0,
 )
@@ -163,7 +163,7 @@ private data class TracksPage(
 )
 
 @Serializable
-private data class PlaylistsPage(
+internal data class PlaylistsPage(
     val playlists: List<Playlist> = emptyList(),
     @SerialName("total_entries") val totalEntries: Int = 0,
 )
