@@ -5142,3 +5142,11 @@ Part of #405. The hand-shaped fixtures let upstream drift pass CI and break on d
 - **Re-record**: `scripts/contracts/record.sh` from the repo root (`--out-dir DIR` writes elsewhere, for a scheduled drift check, #443), then run the Android and CouchTourKit tests. A decode failure on a fresh recording is a real DTO bug, not a fixture problem.
 - **Android**: `ContractFixturesTest` decodes each file with the production DTO and `Json` config, runs the phish.in and Relisten show through the real API clients over `MockWebServer`, and checks that the bundled curated/heuristic match assets load. `ShowsPage` and `PlaylistsPage` became `internal` for this. CouchTourKit decode tests are #442.
 - The curated-match JSON is a bundled asset, not fetched, so it is tested where it ships rather than recorded.
+
+## D320 — Weekly contract drift check (#443)
+
+Part of #405. `.github/workflows/contract-drift.yml` runs Mondays (and on dispatch): it re-records the live phish.in/Relisten responses with `scripts/contracts/record.sh` over the checked-in fixtures in the CI workspace (never committed), then runs `ContractFixturesTest`. Values change with the catalog, so nothing is diffed; the decode tests are the shape check.
+
+- **Failure means drift**: either the recorder fails (an endpoint disappeared or a field it indexes was renamed) or a production DTO no longer decodes the fresh response.
+- **Issue filing**: on failure it files one open "Upstream API contract drift detected" issue (`type:bug`, `p2`, `mahler`); if one is already open it comments instead of filing a duplicate. Fixes land as a normal re-record plus DTO change.
+- Android only for now; CouchTourKit decode tests are #442 and can join this job once they land.
