@@ -183,8 +183,8 @@ private val WAVEFORM_BOTTOM = floatArrayOf(
 fun WaveformScrubber(
     progress: Float,
     onSeek: (Float) -> Unit,
+    modifier: Modifier = Modifier,
     waveformUrl: String? = null,
-    modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var dynamicHeights by remember(waveformUrl) {

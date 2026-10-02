@@ -24,7 +24,8 @@
 
     <application
         android:name=".CouchTourApp"
-        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/${appIcon}"
         android:label="${appLabel}"
         android:supportsRtl="true"
@@ -84,6 +85,8 @@
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
 

@@ -1,6 +1,8 @@
 package dev.mike.couchtour
 
 import android.content.ClipData
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -55,7 +57,7 @@ object FeedbackSettings {
 
     fun setIncludeDiagnostics(enabled: Boolean) {
         _includeDiagnostics.value = enabled
-        prefs?.edit()?.putBoolean(KEY_INCLUDE_DIAGNOSTICS, enabled)?.apply()
+        prefs?.edit { putBoolean(KEY_INCLUDE_DIAGNOSTICS, enabled) }
     }
 
     internal fun resetForTest() {
@@ -148,7 +150,7 @@ fun launchFeedback(
         val title = "Feedback (Couch Tour ${BuildConfig.VERSION_NAME})"
         val body = buildFeedbackBody(routeName, includeDiagnostics = false)
         val url = buildFeedbackUrl(title, body)
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
@@ -167,7 +169,7 @@ fun launchFeedback(
         val title = "Feedback (Couch Tour ${BuildConfig.VERSION_NAME})"
         val body = buildFeedbackBody(routeName, includeDiagnostics = true, summary = summary)
         val url = buildFeedbackUrl(title, body)
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         runCatching {

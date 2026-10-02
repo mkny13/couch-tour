@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -319,7 +320,7 @@ private fun mediaMetadata(
     // Queue identity lives here instead, so the mini player still shows the
     // playlist you started from rather than the underlying show.
     .setSubtitle("${info.title} · ${info.subtitle}")
-    .setArtworkUri(art?.let { Uri.parse(it.requireHttps()) })
+    .setArtworkUri(art?.let { it.requireHttps().toUri() })
     .setIsBrowsable(false)
     .setIsPlayable(true)
     .setExtras(extras)

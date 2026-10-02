@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.graphics.drawable.BitmapDrawable
+import androidx.core.graphics.get
 import coil.imageLoader
 import coil.request.ImageRequest
 
@@ -24,7 +25,7 @@ object WaveformExtractor {
         if (width <= 0 || height <= 0 || sampleCount <= 0) return null
 
         // Auto-detect polarity: if corner pixel is opaque, signal is transparent cutout (archive.org)
-        val cornerColor = bitmap.getPixel(0, 0)
+        val cornerColor = bitmap[0, 0]
         val isInverted = android.graphics.Color.alpha(cornerColor) > 128
 
         val topHeights = FloatArray(sampleCount)
@@ -41,7 +42,7 @@ object WaveformExtractor {
             for (x in startX until maxOf(startX + 1, endX)) {
                 // Find topmost signal pixel
                 for (y in 0 until centerY) {
-                    val pixel = bitmap.getPixel(x, y)
+                    val pixel = bitmap[x, y]
                     val alpha = android.graphics.Color.alpha(pixel)
                     val isSignal = if (isInverted) alpha < 128 else alpha > 128
                     if (isSignal) {
@@ -52,7 +53,7 @@ object WaveformExtractor {
                 }
                 // Find bottommost signal pixel
                 for (y in height - 1 downTo centerY) {
-                    val pixel = bitmap.getPixel(x, y)
+                    val pixel = bitmap[x, y]
                     val alpha = android.graphics.Color.alpha(pixel)
                     val isSignal = if (isInverted) alpha < 128 else alpha > 128
                     if (isSignal) {

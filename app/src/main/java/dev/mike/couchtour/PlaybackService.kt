@@ -1,6 +1,9 @@
 package dev.mike.couchtour
 
 import android.app.PendingIntent
+import androidx.media3.common.util.UnstableApi
+import androidx.annotation.OptIn
+import androidx.core.net.toUri
 import android.content.Intent
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -110,6 +113,7 @@ private const val GAPLESS_PRELOAD_US = 10_000_000L
  * — and hands the session whichever one is live. Everything above it (the UI's
  * MediaController, the progress writer) is deliberately unaware of which.
  */
+@OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
 
     private var session: MediaLibrarySession? = null
@@ -567,7 +571,7 @@ class PlaybackService : MediaLibraryService() {
         val meta = MediaMetadata.Builder()
             .setTitle(title)
             .apply { subtitle?.let { setSubtitle(it) } }
-            .apply { artUri?.let { setArtworkUri(Uri.parse(it.requireHttps())) } }
+            .apply { artUri?.let { setArtworkUri(it.requireHttps().toUri()) } }
             .setIsBrowsable(true)
             .setIsPlayable(false)
             .build()

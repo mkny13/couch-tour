@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import androidx.core.content.edit
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,7 +43,7 @@ object ThemeSettings {
     fun setThemeMode(mode: ThemeMode) {
         _themeMode.value = mode
         if (::prefs.isInitialized) {
-            prefs.edit().putString(KEY_THEME_MODE, mode.storageValue).apply()
+            prefs.edit { putString(KEY_THEME_MODE, mode.storageValue) }
         }
     }
 }
