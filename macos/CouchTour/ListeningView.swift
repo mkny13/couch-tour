@@ -172,6 +172,7 @@ struct ListeningView: View {
             switch try await resolveNavigationTarget(for: row, localPlaylistStore: appModel.localPlaylistStore) {
             case .show(let show): appModel.path.append(.show(show))
             case .localPlaylist(let playlist): appModel.path.append(.localPlaylist(playlist))
+            case .publicPlaylist(let playlist): appModel.path.append(.publicPlaylist(playlist))
             }
         } catch {
             resumeError = "Couldn't open \(row.title): \(error.localizedDescription)"

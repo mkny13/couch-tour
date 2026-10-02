@@ -49,6 +49,7 @@ struct PublicPlaylistsView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                .accessibilityIdentifier(AXIdentifiers.publicPlaylistsList)
             }
         }
         .searchable(text: $query, prompt: "Search public playlists…")
@@ -74,15 +75,29 @@ struct PublicPlaylistsView: View {
     }
 }
 
-/// One public playlist's tracks. Tapping a row plays the playlist from there.
+/// One public playlist: header (name, author, counts, description, like), a track filter,
+/// and the tracks. Tapping a row plays the playlist from there.
 struct PublicPlaylistView: View {
     let summary: PublicPlaylistSummary
 
     @EnvironmentObject private var player: Player
+    @Environment(\.ledgerColors) private var colors
 
     @State private var playlist: PublicPlaylist?
     @State private var isLoading = true
     @State private var error: String?
+    @State private var query = ""
+
+    private func visibleEntries(_ playlist: PublicPlaylist) -> [PublicPlaylistEntry] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        let playable = playlist.playableEntries
+        guard !q.isEmpty else { return playable }
+        return playable.filter {
+            $0.track.title.localizedCaseInsensitiveContains(q)
+                || ($0.track.showDate ?? "").localizedCaseInsensitiveContains(q)
+                || ($0.track.venueName ?? "").localizedCaseInsensitiveContains(q)
+        }
+    }
 
     var body: some View {
         Group {
@@ -98,28 +113,30 @@ struct PublicPlaylistView: View {
                 }
             } else if let playlist {
                 List {
-                    if let description = playlist.description, !description.isEmpty {
-                        Text(description).font(.callout).foregroundStyle(.secondary)
-                    }
-                    ForEach(playlist.tracks.filter(\.playable), id: \.position) { track in
+                    header(playlist)
+                    ForEach(visibleEntries(playlist), id: \.position) { entry in
                         Button {
-                            play(playlist, startingAt: track)
+                            play(playlist, startingAt: entry)
                         } label: {
                             HStack {
                                 VStack(alignment: .leading) {
-                                    Text(track.title)
-                                    Text([track.date, track.venue].compactMap { $0 }.joined(separator: " · "))
+                                    Text(entry.track.title)
+                                    Text([entry.track.showDate, entry.track.venueName].compactMap { $0 }.joined(separator: " · "))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(fmt(track.durationMs)).font(.caption).foregroundStyle(.secondary)
+                                Text(fmt(entry.duration > 0 ? entry.duration : entry.track.duration))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
                 }
+                .searchable(text: $query, prompt: "Search this playlist…")
+                .accessibilityIdentifier(AXIdentifiers.publicPlaylistTracks)
             }
         }
         .toolbar {
@@ -129,15 +146,34 @@ struct PublicPlaylistView: View {
                 } label: {
                     Label("Play", systemImage: "play.fill")
                 }
-                .disabled(playlist?.tracks.contains(where: \.playable) != true)
+                .disabled(playlist?.playableEntries.isEmpty != false)
             }
         }
         .task { await load() }
     }
 
-    private func play(_ playlist: PublicPlaylist, startingAt track: PublicPlaylistTrack?) {
+    private func header(_ playlist: PublicPlaylist) -> some View {
+        let s = playlist.summary
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(s.name).font(.title2.weight(.semibold))
+            Text(headerSubtitle(s)).font(.callout).foregroundStyle(.secondary)
+            if let description = s.description, !description.isEmpty {
+                Text(description).font(.callout).foregroundStyle(.secondary)
+            }
+            ShowLikeButton(showID: s.id, likable: .playlist, likesCount: s.likesCount, likedByUser: s.likedByUser)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func headerSubtitle(_ s: PublicPlaylistSummary) -> String {
+        var parts = ["\(s.tracksCount) \(plural(s.tracksCount, "track"))", formatCompactDuration(ms: s.durationMs)]
+        if let author = s.author, !author.isEmpty { parts.append("by \(author)") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func play(_ playlist: PublicPlaylist, startingAt entry: PublicPlaylistEntry?) {
         let detail = playlist.toShowDetail()
-        let startIndex = track.flatMap { t in detail.tracks.firstIndex { $0.position == t.position } } ?? 0
+        let startIndex = entry.flatMap { e in detail.tracks.firstIndex { $0.position == e.position } } ?? 0
         player.play(detail: detail, startIndex: startIndex)
     }
 

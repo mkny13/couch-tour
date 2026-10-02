@@ -67,20 +67,15 @@ final class RequestTests: XCTestCase {
     }
 
     func testPublicPlaylistsListAndDetail() async throws {
-        server.enqueue(#"{"playlists":[{"name":"Top","slug":"top","duration_ms":1000,"tracks_count":2,"likes_count":5,"author":"a"}]}"#)
+        server.enqueue(#"{"playlists":[{"id":7,"name":"Top","slug":"top","duration":1000,"tracks_count":2,"likes_count":5,"username":"a"}]}"#)
         let list = try await PhishInAPI.publicPlaylists()
         XCTAssertEqual(["api", "v2", "playlists"], server.takeRequest()!.pathSegments)
-        XCTAssertEqual(list, [PublicPlaylistSummary(name: "Top", slug: "top", durationMs: 1000, tracksCount: 2, likesCount: 5, author: "a")])
+        XCTAssertEqual(list, [PublicPlaylistSummary(id: 7, name: "Top", slug: "top", durationMs: 1000, tracksCount: 2, likesCount: 5, author: "a")])
 
-        server.enqueue(
-            #"{"name":"Top","slug":"top","cover_art_url":"https://x/c.jpg","tracks":[{"position":1,"title":"Foam","date":"1994-11-16","venue":"Hill","duration_ms":5,"url":"https://phish.in/1994-11-16/foam","mp3_url":"https://x/a.mp3"},{"position":2,"title":"Gone","mp3_url":null}]}"#)
-        let playlist = try await PhishInAPI.publicPlaylist("top")
-        XCTAssertEqual(["api", "v2", "playlists", "top"], server.takeRequest()!.pathSegments)
-        let detail = playlist.toShowDetail()
-        XCTAssertEqual(detail.queueKey, "playlist:top")
-        XCTAssertEqual(detail.tracks.map(\.title), ["Foam"])
-        XCTAssertEqual(detail.tracks[0].slug, "foam")
-        XCTAssertEqual(detail.tracks[0].showDate, "1994-11-16")
+        server.enqueue(String(decoding: try fixtureData("playlist.json"), as: UTF8.self))
+        let playlist = try await PhishInAPI.publicPlaylist("phishnet-key-jams-pt-1")
+        XCTAssertEqual(["api", "v2", "playlists", "phishnet-key-jams-pt-1"], server.takeRequest()!.pathSegments)
+        XCTAssertEqual(playlist.entries.count, 2)
     }
 
     func testPutsTheShowDateInThePath() async throws {

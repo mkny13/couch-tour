@@ -138,4 +138,34 @@ final class PhishInParsingTests: XCTestCase {
         XCTAssertTrue(empty.tracks.isEmpty)
         XCTAssertTrue(empty.toSearchHits().isEmpty)
     }
+
+    // -------------------------------------------------------------- playlists
+
+    func testDecodesPublicPlaylistWithNestedTrackEntries() throws {
+        let playlist = try decoder.decode(PublicPlaylist.self, from: try fixture("playlist.json"))
+
+        XCTAssertEqual(playlist.name, "Phish.net Key Jams Pt 1")
+        XCTAssertEqual(playlist.summary.author, "mfhgreyboy")
+        XCTAssertEqual(playlist.summary.durationMs, 93_221_960)
+        XCTAssertEqual(playlist.summary.tracksCount, 99)
+        XCTAssertEqual(playlist.summary.likesCount, 41)
+        XCTAssertFalse(playlist.summary.likedByUser)
+        XCTAssertEqual(playlist.entries.map(\.track.title), ["The Curtain With", "Jesus Just Left Chicago"])
+        XCTAssertEqual(playlist.entries[0].duration, 865_097)
+        XCTAssertNil(playlist.entries[0].startsAtSecond)
+
+        let detail = playlist.toShowDetail()
+        XCTAssertEqual(detail.queueKey, "playlist:phishnet-key-jams-pt-1")
+        XCTAssertEqual(detail.tracks.count, 2)
+        XCTAssertEqual(detail.tracks[0].showDate, "1988-05-24")
+        XCTAssertEqual(detail.tracks[0].durationMs, 865_097)
+    }
+
+    func testDecodesPublicPlaylistListRowAuthorAndDuration() throws {
+        let page = try decoder.decode(
+            PublicPlaylistsPage.self,
+            from: Data(#"{"playlists":[{"id":1,"name":"N","slug":"n","username":"bob","duration":4200,"tracks_count":3}]}"#.utf8))
+        XCTAssertEqual(page.playlists[0].author, "bob")
+        XCTAssertEqual(page.playlists[0].durationMs, 4200)
+    }
 }

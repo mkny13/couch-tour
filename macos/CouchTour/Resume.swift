@@ -4,8 +4,8 @@ import Foundation
 /// Turns a stored `PlaybackProgress` row back into a fetchable `ShowDetail`, mirroring
 /// Android's `PlayerViewModel.resume` — parse the queue key, dispatch on its kind, re-fetch
 /// from the network rather than trusting anything stale in the row beyond display fields.
-/// Server-side (phish.in) playlists are still out of scope (D5-equivalent), so a `.playlist`
-/// key resolves to nothing; local playlists (#59) are handled below.
+/// A `.playlist` key is a public phish.in playlist (#428), re-fetched by slug; local playlists
+/// (#59) are handled below.
 enum ResumeError: Error {
     case unresumable
 }
@@ -26,7 +26,7 @@ func resolveShowDetail(for progress: PlaybackProgress, localPlaylistStore: Local
         )
 
     case .playlist:
-        throw ResumeError.unresumable
+        return try await PhishInAPI.publicPlaylist(ref.id).toShowDetail()
 
     // YouTube resume isn't implemented yet — a `youtube:` row (D253) can't be
     // re-fetched into a ShowDetail, so it can't be resumed from history.
@@ -48,6 +48,7 @@ func resolveShowDetail(for progress: PlaybackProgress, localPlaylistStore: Local
 enum ResumeNavigationTarget: Hashable {
     case show(ShowSummary)
     case localPlaylist(LocalPlaylist)
+    case publicPlaylist(PublicPlaylistSummary)
 }
 
 /// Resolves a stored `PlaybackProgress` row to where tapping it should navigate. Checks for a
@@ -63,6 +64,9 @@ func resolveNavigationTarget(
             throw ResumeError.unresumable
         }
         return .localPlaylist(playlist)
+    }
+    if ref.kind == .playlist {
+        return .publicPlaylist(try await PhishInAPI.publicPlaylist(ref.id).summary)
     }
     let detail = try await resolveShowDetail(for: progress, localPlaylistStore: localPlaylistStore)
     return .show(detail.summary)

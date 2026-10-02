@@ -8,6 +8,7 @@ import SwiftUI
 /// `ShowSummary.id` stays at its 0 default there, which is what this keys off.
 struct ShowLikeButton: View {
     let showID: Int64
+    var likable: Likable = .show
     let likesCount: Int
     let likedByUser: Bool
 
@@ -17,8 +18,9 @@ struct ShowLikeButton: View {
     @State private var liked: Bool
     @State private var count: Int
 
-    init(showID: Int64, likesCount: Int, likedByUser: Bool) {
+    init(showID: Int64, likable: Likable = .show, likesCount: Int, likedByUser: Bool) {
         self.showID = showID
+        self.likable = likable
         self.likesCount = likesCount
         self.likedByUser = likedByUser
         _liked = State(initialValue: likedByUser)
@@ -64,9 +66,9 @@ struct ShowLikeButton: View {
         Task {
             do {
                 if wasLiked {
-                    try await PhishInAPI.unlike(.show, showID)
+                    try await PhishInAPI.unlike(likable, showID)
                 } else {
-                    try await PhishInAPI.like(.show, showID)
+                    try await PhishInAPI.like(likable, showID)
                 }
             } catch {
                 liked = wasLiked
