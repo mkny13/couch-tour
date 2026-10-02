@@ -149,7 +149,7 @@ interaction fixes first; the broad design restructure last, because it rewrites 
 others touch. Batches A and B are independent and can run in parallel worktrees; Batch C is
 gated on both landing.
 
-Working prompts for each batch: [prompts/macos-ux-polish-batches.md](prompts/macos-ux-polish-batches.md).
+Working prompts for each batch: [docs/plans/macos-ux-polish-batches.md](docs/plans/macos-ux-polish-batches.md).
 
 **Status:** Batches A (#107, D200; #110, D201), B (#112, D202), and C (#114, D203, D204) have
 all merged and shipped. The macOS sidebar has been replaced with the hub model and shared components.
@@ -168,7 +168,7 @@ all merged and shipped. The macOS sidebar has been replaced with the hub model a
 ### Phase 2: Audio Fidelity, Discovery & Media Power Features
 
 Focus on advanced audio streaming, caching infrastructure, and richer catalog exploration.
-Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md).
+Working prompts for this phase's batches: [docs/plans/phase-2-batch-prompts.md](docs/plans/phase-2-batch-prompts.md).
 
 | Issue | Feature | Description | Platforms | Status |
 |---|---|---|---|---|
