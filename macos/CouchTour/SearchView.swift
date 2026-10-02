@@ -580,10 +580,27 @@ struct SearchView: View {
                     .lineLimit(1)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundStyle(colors.textMuted)
-                .frame(width: 34, alignment: .trailing)
+            Button {
+                Task {
+                    do {
+                        let full = try await PhishInAPI.publicPlaylist(playlist.slug)
+                        guard !full.playableEntries.isEmpty else { return }
+                        player.play(detail: full.toShowDetail(), startIndex: 0)
+                        appModel.showNowPlaying = true
+                    } catch {}
+                }
+            } label: {
+                Circle()
+                    .stroke(colors.accentIcon, lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colors.accentTintText)
+                    )
+            }
+            .buttonStyle(.plain)
+            .frame(width: 34, alignment: .trailing)
         }
         .contentShape(Rectangle())
         .onTapGesture {
