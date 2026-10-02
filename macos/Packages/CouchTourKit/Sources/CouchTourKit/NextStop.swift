@@ -73,32 +73,52 @@ public func tourFor(
     preference: ArtistTourPreference? = nil,
     source: (Backend) -> MusicSource = sourceFor
 ) async throws -> [ShowSummary] {
+    try await tourForChecked(artist: artist, preference: preference, source: source).shows
+}
+
+/// Like `tourFor`, but also reports whether every period request it needed succeeded.
+/// A failed period is skipped so the rest still shows, but the result must not be cached (#466).
+public func tourForChecked(
+    artist: ArtistRef,
+    preference: ArtistTourPreference? = nil,
+    source: (Backend) -> MusicSource = sourceFor
+) async throws -> (shows: [ShowSummary], complete: Bool) {
     let src = source(artist.backend)
     let periods = try await src.periods(artist: artist)
+    var complete = true
+
+    func fetch(_ period: PeriodRef) async -> [ShowSummary]? {
+        do {
+            return try await src.shows(artist: artist, period: period)
+        } catch {
+            complete = false
+            return nil
+        }
+    }
 
     if let pref = preference {
         if let year = pref.year, !year.isEmpty {
             if let period = periods.first(where: { $0.label == year || $0.id == year }) {
-                guard let shows = try? await src.shows(artist: artist, period: period) else { return [] }
+                guard let shows = await fetch(period) else { return ([], false) }
                 if let tourName = pref.tourName, !tourName.isEmpty {
-                    return shows.filter { $0.tourName == tourName }
+                    return (shows.filter { $0.tourName == tourName }, true)
                 }
-                return shows
+                return (shows, true)
             }
         }
         if let tourName = pref.tourName, !tourName.isEmpty {
             // First check period matching a 4-digit year in the tourName if present
             if let yearMatch = periods.first(where: { tourName.contains($0.label) }) {
-                if let shows = try? await src.shows(artist: artist, period: yearMatch) {
+                if let shows = await fetch(yearMatch) {
                     let matching = shows.filter { $0.tourName == tourName }
-                    if !matching.isEmpty { return matching }
+                    if !matching.isEmpty { return (matching, complete) }
                 }
             }
             for period in periods {
-                if let shows = try? await src.shows(artist: artist, period: period) {
+                if let shows = await fetch(period) {
                     let matching = shows.filter { $0.tourName == tourName }
                     if !matching.isEmpty {
-                        return matching
+                        return (matching, complete)
                     }
                 }
             }
@@ -108,11 +128,11 @@ public func tourFor(
     let recPeriods = recentPeriods(periods)
     var allShows: [ShowSummary] = []
     for period in recPeriods {
-        if let shows = try? await src.shows(artist: artist, period: period) {
+        if let shows = await fetch(period) {
             allShows.append(contentsOf: shows)
         }
     }
-    return currentTourShows(allShows)
+    return (currentTourShows(allShows), complete)
 }
 
 /// Fetches every favorited artist's tour shows, fanned out concurrently and capped at `maxTourArtists` per backend.
@@ -121,8 +141,7 @@ public func currentTours(
     preferences: [ArtistTourPreference] = [],
     source: @escaping (Backend) -> MusicSource = sourceFor
 ) async throws -> [ShowSummary] {
-    let prefMap = Dictionary(uniqueKeysWithValues: preferences.map { ($0.artistKey, $0) })
-    return try await currentTours(favorites: favorites, preferenceLookup: { prefMap[$0.key] }, source: source)
+    try await currentToursChecked(favorites: favorites, preferences: preferences, source: source).shows
 }
 
 public func currentTours(
@@ -130,6 +149,24 @@ public func currentTours(
     preferenceLookup: @escaping (ArtistRef) -> ArtistTourPreference?,
     source: @escaping (Backend) -> MusicSource = sourceFor
 ) async throws -> [ShowSummary] {
+    try await currentToursChecked(favorites: favorites, preferenceLookup: preferenceLookup, source: source).shows
+}
+
+public func currentToursChecked(
+    favorites: [ArtistRef],
+    preferences: [ArtistTourPreference] = [],
+    source: @escaping (Backend) -> MusicSource = sourceFor
+) async throws -> (shows: [ShowSummary], complete: Bool) {
+    let prefMap = Dictionary(uniqueKeysWithValues: preferences.map { ($0.artistKey, $0) })
+    return try await currentToursChecked(favorites: favorites, preferenceLookup: { prefMap[$0.key] }, source: source)
+}
+
+/// Like `currentTours`, but `complete` is false if any artist or period request failed.
+public func currentToursChecked(
+    favorites: [ArtistRef],
+    preferenceLookup: @escaping (ArtistRef) -> ArtistTourPreference?,
+    source: @escaping (Backend) -> MusicSource = sourceFor
+) async throws -> (shows: [ShowSummary], complete: Bool) {
     var participating: [ArtistRef] = []
     let grouped = Dictionary(grouping: favorites, by: \.backend)
     for backend in Backend.allCases {
@@ -138,10 +175,10 @@ public func currentTours(
         }
     }
 
-    if participating.isEmpty { return [] }
+    if participating.isEmpty { return ([], true) }
 
     enum ArtistResult {
-        case success([ShowSummary])
+        case success([ShowSummary], complete: Bool)
         case failure(Error)
     }
 
@@ -150,33 +187,36 @@ public func currentTours(
             let pref = preferenceLookup(artist)
             group.addTask {
                 do {
-                    let shows = try await tourFor(artist: artist, preference: pref, source: source)
-                    return .success(shows)
+                    let (shows, complete) = try await tourForChecked(artist: artist, preference: pref, source: source)
+                    return .success(shows, complete: complete)
                 } catch {
                     return .failure(error)
                 }
             }
         }
-        
+
         var allShows: [ShowSummary] = []
         var successCount = 0
+        var allComplete = true
         var firstError: Error?
-        
+
         for try await result in group {
             switch result {
-            case .success(let shows):
+            case .success(let shows, let complete):
                 allShows.append(contentsOf: shows)
                 successCount += 1
+                if !complete { allComplete = false }
             case .failure(let error):
+                allComplete = false
                 if firstError == nil { firstError = error }
             }
         }
-        
+
         if successCount == 0, let error = firstError {
             throw error
         }
-        
-        return allShows
+
+        return (allShows, allComplete)
     }
 }
 
@@ -208,8 +248,9 @@ public enum NextStop {
         if let cached = cached, cached.key == key {
             return cached.shows
         }
-        let shows = try await currentTours(favorites: favorites, preferences: preferences, source: source)
-        if !shows.isEmpty {
+        let (shows, complete) = try await currentToursChecked(favorites: favorites, preferences: preferences, source: source)
+        // A partial list cached here would hide the failed artists/periods until tomorrow (#466).
+        if complete && !shows.isEmpty {
             cached = (key, shows)
         }
         return shows

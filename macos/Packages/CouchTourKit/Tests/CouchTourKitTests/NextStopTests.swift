@@ -114,8 +114,8 @@ final class NextStopTests: XCTestCase {
 
     private final class MockMusicSource: MusicSource {
         let backend: Backend
-        var periodsHandler: ((ArtistRef) -> [PeriodRef])?
-        var showsHandler: ((ArtistRef, PeriodRef) -> [ShowSummary])?
+        var periodsHandler: ((ArtistRef) throws -> [PeriodRef])?
+        var showsHandler: ((ArtistRef, PeriodRef) throws -> [ShowSummary])?
 
         init(backend: Backend) {
             self.backend = backend
@@ -123,10 +123,10 @@ final class NextStopTests: XCTestCase {
 
         func artists() async throws -> [ArtistRef] { [] }
         func periods(artist: ArtistRef) async throws -> [PeriodRef] {
-            periodsHandler?(artist) ?? []
+            try periodsHandler?(artist) ?? []
         }
         func shows(artist: ArtistRef, period: PeriodRef) async throws -> [ShowSummary] {
-            showsHandler?(artist, period) ?? []
+            try showsHandler?(artist, period) ?? []
         }
         func show(artist: ArtistRef, date: String, recordingId: String?) async throws -> ShowDetail {
             throw TestError()
@@ -283,5 +283,65 @@ final class NextStopTests: XCTestCase {
         let res2 = try await NextStop.load(favorites: favs, today: "2026-08-26", source: { _ in mock })
         XCTAssertEqual(0, res2.count)
         XCTAssertEqual(2, phishFetchCount)
+    }
+
+    func testNextStopFailedPeriodNotCached() async throws {
+        NextStop.resetCache()
+
+        var showsFetchCount = 0
+        var failing = true
+        let mock = MockMusicSource(backend: .phishin)
+        mock.periodsHandler = { _ in [PeriodRef(id: "2026", label: "2026"), PeriodRef(id: "2025", label: "2025")] }
+        mock.showsHandler = { artist, period in
+            showsFetchCount += 1
+            if period.label == "2025" && failing { throw TestError() }
+            return [ShowSummary(artist: artist, date: "\(period.label)-07-01", tourName: "Summer Tour")]
+        }
+
+        let first = try await NextStop.load(favorites: [PHISH], today: "2026-08-26", source: { _ in mock })
+        XCTAssertEqual(["2026-07-01"], first.map { $0.date })
+        XCTAssertEqual(2, showsFetchCount)
+
+        // Same key: the partial load must not have been cached, so the failed period is retried.
+        failing = false
+        let second = try await NextStop.load(favorites: [PHISH], today: "2026-08-26", source: { _ in mock })
+        XCTAssertEqual(Set(["2025-07-01", "2026-07-01"]), Set(second.map { $0.date }))
+        XCTAssertEqual(4, showsFetchCount)
+
+        // Now complete, so it caches.
+        _ = try await NextStop.load(favorites: [PHISH], today: "2026-08-26", source: { _ in mock })
+        XCTAssertEqual(4, showsFetchCount)
+    }
+
+    func testNextStopFailedArtistNotCached() async throws {
+        NextStop.resetCache()
+
+        var deadFetchCount = 0
+        var deadFailing = true
+        let phishMock = MockMusicSource(backend: .phishin)
+        phishMock.periodsHandler = { _ in [PeriodRef(id: "1997", label: "1997")] }
+        phishMock.showsHandler = { artist, _ in
+            [ShowSummary(artist: artist, date: "1997-11-17", tourName: "1997 Fall Tour")]
+        }
+        let deadMock = MockMusicSource(backend: .relisten)
+        deadMock.periodsHandler = { _ in
+            deadFetchCount += 1
+            if deadFailing { throw TestError() }
+            return [PeriodRef(id: "1977", label: "1977")]
+        }
+        deadMock.showsHandler = { artist, _ in
+            [ShowSummary(artist: artist, date: "1977-05-08", tourName: "Spring 1977")]
+        }
+        let source: (Backend) -> MusicSource = { $0 == .phishin ? phishMock : deadMock }
+        let favs = [PHISH, GRATEFUL_DEAD]
+
+        let first = try await NextStop.load(favorites: favs, today: "2026-08-26", source: source)
+        XCTAssertEqual(["1997-11-17"], first.map { $0.date })
+        XCTAssertEqual(1, deadFetchCount)
+
+        deadFailing = false
+        let second = try await NextStop.load(favorites: favs, today: "2026-08-26", source: source)
+        XCTAssertEqual(Set(["1977-05-08", "1997-11-17"]), Set(second.map { $0.date }))
+        XCTAssertEqual(2, deadFetchCount)
     }
 }
