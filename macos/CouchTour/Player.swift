@@ -234,9 +234,17 @@ final class Player: NSObject, ObservableObject {
     }
 
     public func connectCast(to device: CastDevice) {
+        let wasPlaying = isPlaying
         isCasting = true
         castDeviceName = device.name
         queuePlayer.pause()
+        if wasPlaying {
+            // The rate observer is gated off once casting starts. Clear the local
+            // state here so the receiver's first playing callback is not mistaken
+            // for a duplicate transition and its playback.start event is recorded.
+            Diagnostics.playbackStop(show: show?.date, trackIndex: currentIndex, positionMs: positionMs)
+            isPlaying = false
+        }
         // Gain decisions are meaningless while the receiver decodes — don't let a
         // in-flight measurement land into the taps mid-cast (#268).
         levelingTask?.cancel()
