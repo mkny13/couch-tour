@@ -152,18 +152,14 @@ class MainActivity : ComponentActivity() {
         // launchMode is singleTask, so a second tap re-enters through here, not onCreate.
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false)) openNowPlaying.value = true
-        intent.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
-            SyncApi.applyConfiguredBaseUrl(this, override = override)
-        }
+        SyncApi.maybeApplyBaseUrlOverride(this, intent.getStringExtra(EXTRA_SYNC_BASE_URL))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         openNowPlaying.value = intent?.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false) == true
-        intent?.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
-            SyncApi.applyConfiguredBaseUrl(this, override = override)
-        }
+        SyncApi.maybeApplyBaseUrlOverride(this, intent?.getStringExtra(EXTRA_SYNC_BASE_URL))
 
         if (savedInstanceState == null) {
             // An immediate catch-up on launch, on top of the periodic background job.

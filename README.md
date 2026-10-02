@@ -145,17 +145,18 @@ variant (D233).
     # Point Mac production app at staging
     /Applications/Couch\ Tour.app/Contents/MacOS/Couch\ Tour --sync-base-url=https://couch-tour-sync-staging.mkastellec.workers.dev
     ```
-  - **Android** (`syncBaseUrl` intent extra):
-    ```bash
-    # Point Android beta back at production
-    adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
+   - **Android** (`syncBaseUrl` intent extra, debug/beta builds only — see D323):
+     ```bash
+     # Point Android beta back at production
+     adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
 
-    # Point regular debug build at production
-    adb shell am start -n dev.mike.couchtour/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
+     # Point regular debug build at production
+     adb shell am start -n dev.mike.couchtour/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
 
-    # Point beta back to staging
-    adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync-staging.mkastellec.workers.dev
-    ```
+     # Point beta back to staging
+     adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync-staging.mkastellec.workers.dev
+     ```
+     Release builds ignore `syncBaseUrl` entirely so an installed app cannot redirect sync traffic.
 - **Staging Reset**: `scripts/smoke-sync-reset.sh` empties staging tables (`progress`, `seqs`, `pairings`, `devices`, `groups`) via `wrangler d1 execute couch-tour-sync-staging --remote`. Hard-guarded against running on prod.
   ```bash
   # Dry run (prints command)
@@ -167,7 +168,7 @@ variant (D233).
 
 ## Tests
 
-813 Android unit tests, no device or emulator required:
+818 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
