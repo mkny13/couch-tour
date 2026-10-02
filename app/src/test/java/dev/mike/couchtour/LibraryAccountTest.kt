@@ -57,7 +57,12 @@ class LibraryAccountTest {
 
     @Test
     fun `loadLibraryAccount on network failure returns error without throwing`() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(500))
+        // loadLibraryAccount fans out four parallel requests; a single enqueued 500 leaves the
+        // other three unanswered until the client read timeout (~30s), so answer all of them.
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest) =
+                MockResponse().setResponseCode(500)
+        }
         val result = loadLibraryAccount(api = PhishInApi, username = "mike")
         assertTrue(result.loaded)
         assertTrue(result.error)

@@ -347,16 +347,22 @@ class DiagnosticsLogTest {
             override fun getFilesDir(): File = readOnlyDir
         }
 
-        DiagnosticsLog.resetForTest()
-        DiagnosticsLog.init(unwritableContext)
+        try {
+            DiagnosticsLog.resetForTest()
+            DiagnosticsLog.init(unwritableContext)
 
-        // log() on caller thread does not throw
-        DiagnosticsLog.log("test.unwritable", DiagnosticsLog.Level.INFO, "key" to "value")
+            // log() on caller thread does not throw
+            DiagnosticsLog.log("test.unwritable", DiagnosticsLog.Level.INFO, "key" to "value")
 
-        // recordCrash() executes synchronously and swallows any I/O error
-        DiagnosticsLog.recordCrash("crash.unwritable", "simulated crash on read-only disk")
+            // recordCrash() executes synchronously and swallows any I/O error
+            DiagnosticsLog.recordCrash("crash.unwritable", "simulated crash on read-only disk")
 
-        // No exception escaped!
+            // No exception escaped! (the assertion is that none of the calls above threw)
+        } finally {
+            // A mode-000 dir can't be deleted by TemporaryFolder, which would leak it per run.
+            readOnlyDir.setReadable(true)
+            readOnlyDir.setWritable(true)
+        }
     }
 
     @Test
