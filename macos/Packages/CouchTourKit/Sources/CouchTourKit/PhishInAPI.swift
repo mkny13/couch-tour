@@ -418,6 +418,20 @@ public enum PhishInAPI {
         return try decoder.decode(SearchResults.self, from: try await get(components.url!))
     }
 
+    /// Public community playlists (#428), most-liked first — phish.in's own ordering.
+    public static func publicPlaylists() async throws -> [PublicPlaylistSummary] {
+        var components = path("playlists")
+        components.queryItems = [
+            URLQueryItem(name: "sort", value: "likes_count:desc"),
+            URLQueryItem(name: "per_page", value: "100"),
+        ]
+        return try decoder.decode(PublicPlaylistsPage.self, from: try await get(components.url!)).playlists
+    }
+
+    public static func publicPlaylist(_ slug: String) async throws -> PublicPlaylist {
+        try decoder.decode(PublicPlaylist.self, from: try await get(path("playlists", slug).url!))
+    }
+
     public static func login(email: String, password: String) async throws -> LoginResponse {
         let url = path("auth", "login").url!
         let data = try await post(url, body: LoginRequest(email: email, password: password), authenticated: false)

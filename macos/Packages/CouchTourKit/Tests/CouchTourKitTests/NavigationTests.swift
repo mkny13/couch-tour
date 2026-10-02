@@ -19,6 +19,8 @@ final class NavigationTests: XCTestCase {
 
         XCTAssertEqual(Route.artists.crumbTitle, "Artists")
         XCTAssertEqual(Route.listening.crumbTitle, "Listening")
+        XCTAssertEqual(Route.publicPlaylists.crumbTitle, "Public Playlists")
+        XCTAssertEqual(Route.publicPlaylist(PublicPlaylistSummary(name: "Top Jams", slug: "top")).crumbTitle, "Top Jams")
         XCTAssertEqual(Route.artist(dead).crumbTitle, "Grateful Dead")
         XCTAssertEqual(Route.period(artist: dead, period: period).crumbTitle, "1977")
         XCTAssertEqual(Route.show(show).crumbTitle, "1977-05-08")

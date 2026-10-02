@@ -19,6 +19,9 @@ public enum Route: Hashable {
     /// Continue Listening and History merged into one screen (D203, superseding D171).
     case listening
     case playlists
+    /// phish.in's public community playlists (#428), and one of them.
+    case publicPlaylists
+    case publicPlaylist(PublicPlaylistSummary)
     case search
     case artist(ArtistRef)
     case period(artist: ArtistRef, period: PeriodRef)
@@ -38,6 +41,8 @@ public enum Route: Hashable {
         case .artists: return "Artists"
         case .listening: return "Listening"
         case .playlists: return "Playlists"
+        case .publicPlaylists: return "Public Playlists"
+        case .publicPlaylist(let playlist): return playlist.name
         case .search: return "Search"
         case .artist(let artist): return artist.name
         case .period(_, let period): return period.label
