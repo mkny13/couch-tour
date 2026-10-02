@@ -36,13 +36,13 @@ Indexes on `progress`: `deletedAt`, `updatedAt`, `finished`, `artist`. `local_pl
 | tracks of a playlist `ORDER BY position` | `tracks`, `tracksOnce` | `(playlistId, position)` index, no sort | index |
 | `MAX(position)` per playlist | `maxPosition` | covering `(playlistId, position)` index | index |
 | all tracks `ORDER BY rowId DESC` | `LocalPlaylistDao.allTracks` | rowid walk, no sort | acceptable: unfiltered read of every playlist track by design (Library screen) |
-| track by `rowId`, delete/reposition by `rowId` | `trackIdOf`, `deleteTrack`, `setPosition` | integer primary key | index |
+| track by `rowId`, delete/reposition by `rowId` | `trackIdByRow`, `deleteTrackRow`, `updateTrackPosition` | integer primary key | index |
 | `source_loudness` by `leveling_key` (+ `algorithm_version`) | `SourceLoudness.kt` | primary key | index |
-| `DELETE FROM source_loudness` | `SourceLoudnessDao.clear` | full delete by design | acceptable |
+| `DELETE FROM source_loudness` | `SourceLoudnessDao.clearAll` | full delete by design | acceptable |
 | `artist_tour_preferences`, `taper_preferences` | `Progress.kt` | primary key lookups; unfiltered lists of tiny tables | acceptable: one row per artist/taper the user customised |
 | `external_releases` by `(artist_key, date)` | `ExternalReleaseDao.get` | composite primary key | index |
 
-Loops: `reorder` runs one `UPDATE` per track by integer primary key inside one transaction.
+Loops: `reorderTracks` runs one `UPDATE` per track by integer primary key inside one transaction.
 That is a per-row write loop, not a read N+1, and a playlist is small. Left as is.
 
 ## macOS (GRDB)
