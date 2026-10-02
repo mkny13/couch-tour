@@ -793,10 +793,10 @@ mac_run_favorite_persists_across_relaunch() {
   fi
 
   if mac::wait_for_id "$row_id" "$TIMEOUT" >/dev/null; then
-    smoke::result "mac" "$id" "PASS" "favorited artist row '$row_id' persisted across relaunch"
+    smoke::result "mac" "$id" "PASS" "a favorited artist row persisted across relaunch"
   else
     mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "favorited artist row '$row_id' missing from sidebar.favorites.list after relaunch"
+    smoke::result "mac" "$id" "FAIL" "no favorited artist row found in sidebar.favorites.list after relaunch"
   fi
 }
 
