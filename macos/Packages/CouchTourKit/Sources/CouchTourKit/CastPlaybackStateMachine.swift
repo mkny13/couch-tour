@@ -154,17 +154,6 @@ public final class CastPlaybackStateMachine {
         )
     }
 
-    public func createStopPacket() -> CastCodec.Packet? {
-        guard let sessionId = receiverSessionId else { return nil }
-        let reqId = getNextRequestId()
-        return CastCodec.Packet(
-            sourceId: senderId,
-            destinationId: "receiver-0",
-            namespace: CastNamespace.receiver,
-            payloadUtf8: CastCodec.stopAppMessage(requestId: reqId, sessionId: sessionId)
-        )
-    }
-
     public func createDisconnectPacket() -> CastCodec.Packet {
         let packet = CastCodec.Packet(
             sourceId: senderId,

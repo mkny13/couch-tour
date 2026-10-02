@@ -8,7 +8,6 @@ import ImageIO
 public actor WaveformLoader {
     public static let shared = WaveformLoader()
 
-    private var cache: [URL: [CGFloat]] = [:]
     private var envelopeCache: [URL: WaveformEnvelope] = [:]
 
     public init() {}
@@ -37,26 +36,6 @@ public actor WaveformLoader {
             }
             envelopeCache[url] = env
             return env
-        } catch {
-            return nil
-        }
-    }
-
-    /// Loads and parses waveform peaks from a URL. Results are cached in memory.
-    public func loadWaveform(from url: URL, barCount: Int = 95) async -> [CGFloat]? {
-        if let cached = cache[url] {
-            return cached
-        }
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                return nil
-            }
-            guard let heights = Self.extractHeights(from: data, sampleCount: barCount) else {
-                return nil
-            }
-            cache[url] = heights
-            return heights
         } catch {
             return nil
         }
