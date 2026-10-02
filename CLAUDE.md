@@ -37,7 +37,7 @@ Dump the running beta's accessibility tree (bounded, identifier-scoped): `script
 `sync/` is a Cloudflare Worker + D1 service (`https://couch-tour-sync.mkastellec.workers.dev`).
 - **Local dev:** `cd sync && npm install && npm run db:migrate:local && npm run dev` (runs local D1 at `http://localhost:8787`).
 - **Typecheck:** `cd sync && npm run typecheck`.
-- **Tests:** `cd sync && npm test` (14 tests, real Miniflare D1, not a mock). CI runs typecheck and tests before any deploy.
+- **Tests:** `cd sync && npm test` (18 tests, real Miniflare D1, not a mock). CI runs typecheck and tests before any deploy.
 - **Deployments:** Never deploy by hand. `.github/workflows/sync-deploy.yml` deploys to staging, runs smoke tests, applies migrations, and promotes to prod on push to `main` for `sync/**`. Dispatch on demand with `gh workflow run sync-deploy.yml`.
 
 ## Names that look wrong and are not

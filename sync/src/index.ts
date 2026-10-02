@@ -44,12 +44,55 @@ function tooLarge(message: string): Response {
   return json({ error: message }, 413);
 }
 
-async function readJson<T>(request: Request): Promise<T | null> {
+/** The pairing routes take two short strings; nothing legitimate comes near this. */
+const MAX_PAIR_BODY_BYTES = 4 * 1024;
+const MAX_DEVICE_NAME_CHARS = 128;
+const MAX_PLATFORM_CHARS = 32;
+
+class BodyTooLargeError extends Error {}
+
+/**
+ * Reads at most `maxBytes` of body, counting as it streams. Content-Length is only a hint (absent
+ * on chunked uploads), so the cap has to be enforced on the bytes actually received — otherwise a
+ * chunked request, including an unauthenticated /pair/* one, is bounded only by the platform limit.
+ * Throws BodyTooLargeError past the cap; returns null for an unparseable body.
+ */
+async function readJson<T>(request: Request, maxBytes: number): Promise<T | null> {
+  const declared = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > maxBytes) throw new BodyTooLargeError();
+  if (!request.body) return null;
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > maxBytes) {
+      await reader.cancel();
+      throw new BodyTooLargeError();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   try {
-    return (await request.json()) as T;
+    return JSON.parse(new TextDecoder().decode(bytes)) as T;
   } catch {
     return null;
   }
+}
+
+/** Device name + platform, length-capped: they're stored as-is and /pair/start is unauthenticated. */
+function deviceLabels(body: { deviceName?: unknown; platform?: unknown } | null): { deviceName: string; platform: string } | null {
+  if (typeof body?.deviceName !== "string" || typeof body?.platform !== "string") return null;
+  if (body.deviceName.length > MAX_DEVICE_NAME_CHARS || body.platform.length > MAX_PLATFORM_CHARS) return null;
+  return { deviceName: body.deviceName, platform: body.platform };
 }
 
 // -------------------------------------------------------------- pairing
@@ -65,7 +108,13 @@ interface PairStartBody {
  * further device). Either way it returns a short-lived code for the other device to claim.
  */
 async function handlePairStart(request: Request, env: Env): Promise<Response> {
-  const body = await readJson<PairStartBody>(request);
+  let body: PairStartBody | null;
+  try {
+    body = await readJson<PairStartBody>(request, MAX_PAIR_BODY_BYTES);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) return tooLarge(`request body exceeds ${MAX_PAIR_BODY_BYTES} bytes`);
+    throw e;
+  }
   const caller = await authenticate(request, env);
 
   let groupId: string;
@@ -81,8 +130,11 @@ async function handlePairStart(request: Request, env: Env): Promise<Response> {
     const { success } = await env.PAIR_START_LIMITER.limit({ key: `pair-start:${ip}` });
     if (!success) return json({ error: "too many pairing attempts; try again shortly" }, 429);
 
-    if (typeof body?.deviceName !== "string" || typeof body?.platform !== "string") {
-      return badRequest("deviceName and platform are required to start a new group");
+    const labels = deviceLabels(body);
+    if (!labels) {
+      return badRequest(
+        `deviceName (max ${MAX_DEVICE_NAME_CHARS} chars) and platform (max ${MAX_PLATFORM_CHARS}) are required to start a new group`
+      );
     }
     const now = Date.now();
     groupId = randomId();
@@ -96,7 +148,7 @@ async function handlePairStart(request: Request, env: Env): Promise<Response> {
       env.DB.prepare(
         `INSERT INTO devices (id, groupId, name, platform, tokenHash, tokenIssuedAt, createdAt)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(deviceId, groupId, body.deviceName, body.platform, tokenHash, now, now),
+      ).bind(deviceId, groupId, labels.deviceName, labels.platform, tokenHash, now, now),
     ]);
 
     bootstrapped = { deviceId, deviceToken: token };
@@ -138,13 +190,16 @@ interface PairingRow {
  * a 10-minute window, so no separate attempt-counting is needed on top of that.
  */
 async function handlePairClaim(request: Request, env: Env): Promise<Response> {
-  const body = await readJson<PairClaimBody>(request);
-  if (
-    typeof body?.code !== "string" ||
-    typeof body?.deviceName !== "string" ||
-    typeof body?.platform !== "string"
-  ) {
-    return badRequest("code, deviceName, and platform are required");
+  let body: PairClaimBody | null;
+  try {
+    body = await readJson<PairClaimBody>(request, MAX_PAIR_BODY_BYTES);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) return tooLarge(`request body exceeds ${MAX_PAIR_BODY_BYTES} bytes`);
+    throw e;
+  }
+  const labels = deviceLabels(body);
+  if (typeof body?.code !== "string" || body.code.length > 64 || !labels) {
+    return badRequest("code, deviceName (max 128 chars), and platform (max 32) are required");
   }
 
   const codeHash = await sha256Hex(body.code);
@@ -171,7 +226,7 @@ async function handlePairClaim(request: Request, env: Env): Promise<Response> {
   await env.DB.prepare(
     `INSERT INTO devices (id, groupId, name, platform, tokenHash, tokenIssuedAt, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(deviceId, pairing.groupId, body.deviceName, body.platform, tokenHash, now, now).run();
+  ).bind(deviceId, pairing.groupId, labels.deviceName, labels.platform, tokenHash, now, now).run();
 
   return json({ deviceId, deviceToken: token });
 }
@@ -287,7 +342,13 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     return tooLarge(`request body exceeds ${MAX_SYNC_BODY_BYTES} bytes`);
   }
 
-  const body = await readJson<SyncBody>(request);
+  let body: SyncBody | null;
+  try {
+    body = await readJson<SyncBody>(request, MAX_SYNC_BODY_BYTES);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) return tooLarge(`request body exceeds ${MAX_SYNC_BODY_BYTES} bytes`);
+    throw e;
+  }
   if (!isSafeInt(body?.since) || !Array.isArray(body?.changes)) {
     return badRequest("since (integer) and changes (array) are required");
   }
