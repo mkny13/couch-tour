@@ -116,7 +116,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import kotlinx.coroutines.Dispatchers
@@ -222,22 +225,23 @@ fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
     }
 
     // Live refresh the device list while this screen is open, with exponential backoff (#209).
+    // Only while the app is on screen (#505): repeatOnLifecycle cancels the loop on stop and
+    // restarts it, with an immediate refresh, on resume.
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(paired, refreshKey) {
         if (!paired) return@LaunchedEffect
         devicesState = null
-        var intervalMs = 5_000L
-        val maxIntervalMs = 60_000L
-        while (true) {
-            val res = runCatching { SyncSession.devices() }
-            val newList = res.getOrNull()
-            
-            if (devicesState?.isSuccess == true && res.isSuccess && devicesState?.getOrNull() == newList) {
-                intervalMs = (intervalMs * 1.5).toLong().coerceAtMost(maxIntervalMs)
-            } else {
-                devicesState = res
-                intervalMs = 5_000L
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var intervalMs = DeviceListBackoff.INITIAL_MS
+            while (true) {
+                val res = runCatching { SyncSession.devices() }
+                val newList = res.getOrNull()
+                val unchanged = devicesState?.isSuccess == true && res.isSuccess &&
+                    devicesState?.getOrNull() == newList
+                if (!unchanged) devicesState = res
+                intervalMs = DeviceListBackoff.next(intervalMs, changed = !unchanged)
+                delay(intervalMs)
             }
-            delay(intervalMs)
         }
     }
 

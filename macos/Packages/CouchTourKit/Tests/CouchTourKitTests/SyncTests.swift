@@ -709,3 +709,10 @@ final class SyncSessionTests: XCTestCase {
         XCTAssertNil(server.takeRequest())
     }
 }
+
+final class PeriodicSyncPolicyTests: XCTestCase {
+    func testSyncsOnlyWhileTheAppIsActive() {
+        XCTAssertTrue(PeriodicSyncPolicy.shouldSync(appIsActive: true))
+        XCTAssertFalse(PeriodicSyncPolicy.shouldSync(appIsActive: false))
+    }
+}
