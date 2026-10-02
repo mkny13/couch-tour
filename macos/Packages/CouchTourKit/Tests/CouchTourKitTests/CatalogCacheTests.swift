@@ -113,6 +113,26 @@ final class CatalogCacheHitTests: XCTestCase {
         XCTAssertEqual(1, server.requestCount)
     }
 
+    func testPhishInSourcePeriodsDoesNotCacheAFailedLoadAsEmpty() async {
+        let source = PhishInSource()
+        let periods = await assertErrorNotCachedAsEmpty(
+            server: server,
+            successBody: #"[{"period":"1997","shows_with_audio_count":81}]"#
+        ) { try await source.periods(artist: PHISH) }
+
+        XCTAssertEqual(["1997"], periods?.map { $0.id })
+    }
+
+    func testPhishInSourceShowsDoesNotCacheAFailedLoadAsEmpty() async {
+        let source = PhishInSource()
+        let shows = await assertErrorNotCachedAsEmpty(
+            server: server,
+            successBody: #"{"shows":[{"date":"1997-11-17"}]}"#
+        ) { try await source.shows(artist: PHISH, period: PeriodRef(id: "1997", label: "1997")) }
+
+        XCTAssertEqual("1997-11-17", shows?.first?.date)
+    }
+
     func testPhishInSourceResetCacheForcesARealRefetch() async throws {
         let source = PhishInSource()
         server.enqueue(#"[{"period":"1997","shows_with_audio_count":81}]"#)
