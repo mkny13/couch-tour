@@ -41,6 +41,11 @@ Indexes on `progress`: `deletedAt`, `updatedAt`, `finished`, `artist`. `local_pl
 | `DELETE FROM source_loudness` | `SourceLoudnessDao.clearAll` | full delete by design | acceptable |
 | `artist_tour_preferences`, `taper_preferences` | `Progress.kt` | primary key lookups; unfiltered lists of tiny tables | acceptable: one row per artist/taper the user customised |
 | `external_releases` by `(artist_key, date)` | `ExternalReleaseDao.get` | composite primary key | index |
+| `progress` write `INSERT OR REPLACE` | `ProgressDao.put` | no read; conflict check by primary key, then maintains the 4 secondary indexes | index (see write note) |
+| `source_loudness` write `INSERT OR REPLACE` | `SourceLoudnessDao.upsert` | no read; primary-key conflict check, no secondary indexes | index |
+| `local_playlists` / `local_playlist_tracks` `INSERT` | `LocalPlaylistDao.insertPlaylist`, `insertTrack` | no read; maintains `(playlistId, position)` index on tracks | index |
+| `UPDATE local_playlists` track count and `updatedAt` | `incrementTrackCount`, `decrementTrackCount`, `touchPlaylist`, `renamePlaylist` | primary key | index |
+| preference and release upserts | `upsertPreference` (tour, taper), `ExternalReleaseDao.put`, `deletePreference` | primary key | index |
 
 Loops: `reorderTracks` runs one `UPDATE` per track by integer primary key inside one transaction.
 That is a per-row write loop, not a read N+1, and a playlist is small. Left as is.
@@ -63,11 +68,15 @@ AND deletedAt IS NULL`, `(artist, updatedAt DESC) WHERE deletedAt IS NULL`, `upd
 | `changedSince(_:)` | `ProgressStore.swift` | `SEARCH ... idx_progress_changed_since_updated_at (updatedAt>?)` | index |
 | tour/taper preference reads, saves, deletes | `ProgressStore.swift` | primary key; unfiltered lists of tiny tables | acceptable |
 | `source_loudness` by `leveling_key` | `ProgressStore.swift` | primary key autoindex | index |
+| `progress` write `put` (`save`: insert or update by key) | `ProgressStore.swift` | no read; primary-key lookup, then maintains the 4 partial/secondary indexes | index (see write note) |
+| `source_loudness` write `saveSourceLoudness` (`save`) | `ProgressStore.swift` | no read; primary-key upsert, no secondary indexes | index |
+| `Migration.swift` `mergeDatabase` `save` per merged row | `Migration.swift` | primary key; one-off import | acceptable |
 | `local_playlists` list `ORDER BY updatedAt DESC` | `LocalPlaylist.swift` | `SCAN` + temp sort | acceptable: a handful of playlists |
 | playlist by id, rename, touch | `LocalPlaylist.swift` | primary key autoindex | index |
 | tracks of a playlist `ORDER BY position` | `LocalPlaylist.swift` | `idx_local_playlist_tracks_playlist_position`, no sort | index |
 | `MAX(position)` | `LocalPlaylist.swift` | `COVERING INDEX idx_local_playlist_tracks_playlist_position` | index |
 | delete/reposition track by `rowId` | `LocalPlaylist.swift` | integer primary key | index |
+| playlist and track `insert`, track-count `UPDATE`s by playlist id | `LocalPlaylist.swift` `createPlaylist`, `addTrack`, `addTracks`, `removeTrack` | primary key; tracks insert maintains the `(playlistId, position)` index | index |
 
 Loops: `reorderTracks` (one `UPDATE` per row by primary key, one transaction) and `addTracks`
 (one `INSERT` per row, one transaction) are write loops over a small playlist. `Migration.swift`
@@ -108,6 +117,12 @@ Notes, not changed (no scan involved, so out of this issue's fix scope):
   `devices_previousTokenHash` index. They duplicate each other. The cost is one extra index
   write on a tiny table, and dropping it needs a D1 migration for no read gain.
 - Every authenticated request writes `devices.lastSeenAt`. This is a write, not a scan.
+
+Write note: `progress` is written on every playback tick via `put`, and each write updates the
+four secondary indexes on Android (partial indexes on macOS, where a row that no longer matches
+a `WHERE` clause skips that index). That is the cost of the read plans above; it touches one row
+and no scan is involved. Not changed. `source_loudness` writes happen once per measured source
+and only touch the primary key.
 
 ## Changes made
 
