@@ -13,6 +13,7 @@ public enum AXIdentifiers {
 
     // Home
     public static let homeInProgress = "home.in_progress"
+    public static let homeInProgressCard = "home.in_progress.card"
     public static let homeNextTourStops = "home.next_tour_stops"
     public static let homeOnThisDate = "home.on_this_date"
     public static let homeTrackTour = "home.track_tour"
@@ -44,4 +45,5 @@ public enum AXIdentifiers {
 
     // Jam Chart
     public static let jamChartNote = "jam_chart.note"
+    public static let jamChartSourceLink = "jam_chart.source_link"
 }
