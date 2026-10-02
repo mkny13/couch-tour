@@ -606,12 +606,16 @@ SWIFTEOF
 
 mac_screenshot() {
   local journey_id="$1"
-  local screenshot_path="scripts/smoke/artifacts/${TAG}/mac-${journey_id}-failure.png"
+  local screenshot_path="smoke-reports/${TAG}/mac-${journey_id}.png"
   mac::screenshot "$screenshot_path"
 }
 
 # Quits and reopens Couch Tour Beta by bundle id, then waits for sidebar.nav.home.
 mac::relaunch() {
+  # Quitting Beta interrupts the owner's live session, so only do it when
+  # Beta is frontmost (or --allow-focus lets us take focus). Dies otherwise.
+  mac::focus
+
   smoke::log "Relaunching $APP_NAME ($BUNDLE_ID)..."
 
   osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
@@ -625,14 +629,13 @@ mac::relaunch() {
     elapsed=$((elapsed + 1))
   done
 
-  if [[ "$ALLOW_FOCUS" == "true" ]]; then
-    open -b "$BUNDLE_ID"
-  else
-    open -g -b "$BUNDLE_ID"
-  fi
+  # Beta was frontmost before the quit, so reopening it in front is not a steal.
+  open -b "$BUNDLE_ID"
 
   if ! mac::wait_for_id "sidebar.nav.home" "$TIMEOUT" >/dev/null; then
-    smoke::die 2 "Failed to reach launch identifier (sidebar.nav.home) after relaunching $APP_NAME"
+    # Don't abort: a broken cold start must surface as a journey FAIL.
+    smoke::log "Failed to reach launch identifier (sidebar.nav.home) after relaunching $APP_NAME"
+    return 1
   fi
 }
 
@@ -645,8 +648,16 @@ mac_run_launch_cold_start() {
   smoke::require_journeys_file "$id"
   smoke::log "Executing journey $id..."
 
+  if [[ "$NO_INPUT" == "true" ]]; then
+    smoke::result "mac" "$id" "SKIP" "input disabled: cold launch requires quitting and reopening Beta"
+    return 0
+  fi
+
+  # Preflight needs Beta already running, so a real cold start means quitting it.
+  mac::relaunch
+
   if mac::wait_for_id "sidebar.nav.home" "$TIMEOUT" >/dev/null; then
-    smoke::result "mac" "$id" "PASS" "sidebar.nav.home is present"
+    smoke::result "mac" "$id" "PASS" "sidebar.nav.home present after cold relaunch"
   else
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "sidebar.nav.home not present within ${TIMEOUT}s"
