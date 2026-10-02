@@ -351,6 +351,59 @@ final class CastTests: XCTestCase {
         XCTAssertNil(sm.mediaSessionId)
     }
 
+    func testCastPlaylistExcerptUsesFileTimeAndFinishesAtClipEnd() throws {
+        let sm = CastPlaybackStateMachine(senderId: "test-sender")
+        let receiver = CastCodec.Packet(
+            sourceId: "receiver-0", destinationId: "test-sender", namespace: CastNamespace.receiver,
+            payloadUtf8: #"{"status":{"applications":[{"appId":"CC1AD845","sessionId":"receiver-session","transportId":"transport-1"}]}}"#
+        )
+        XCTAssertEqual(sm.handleIncomingPacket(receiver), .needTransportConnection)
+
+        let excerpt = PlayableTrack(
+            id: "1", title: "Jam excerpt", durationMs: 60_000,
+            url: "https://phish.in/jam.mp3", clipStartMs: 30_000, clipEndMs: 90_000
+        )
+        let media = CastItemConverter.toMediaInfo(track: excerpt, show: nil, queueKey: "playlist:jams")
+        XCTAssertNil(media["duration"], "The 60s excerpt is not the full MP3 duration")
+
+        let load = try XCTUnwrap(sm.createLoadMediaPacket(
+            track: excerpt, show: nil, queueKey: "playlist:jams", currentTimeSeconds: 10
+        ))
+        let loadJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(load.payloadUtf8.utf8)) as? [String: Any])
+        XCTAssertEqual(loadJSON["currentTime"] as? Double, 40)
+        XCTAssertEqual(sm.positionMs, 10_000)
+        XCTAssertEqual(sm.durationMs, 60_000)
+
+        func status(_ seconds: Double, session: Int = 7) -> CastCodec.Packet {
+            CastCodec.Packet(
+                sourceId: "transport-1", destinationId: "test-sender", namespace: CastNamespace.media,
+                payloadUtf8: #"{"status":[{"mediaSessionId":\#(session),"playerState":"PLAYING","currentTime":\#(seconds)}]}"#
+            )
+        }
+
+        XCTAssertEqual(sm.handleIncomingPacket(status(45)), .mediaStatusUpdated)
+        XCTAssertEqual(sm.positionMs, 15_000)
+        let seek = try XCTUnwrap(sm.createSeekPacket(positionMs: 20_000))
+        XCTAssertTrue(seek.payloadUtf8.contains(#""currentTime":50"#))
+        let poll = try XCTUnwrap(sm.createGetMediaStatusPacket())
+        XCTAssertEqual(poll.namespace, CastNamespace.media)
+        XCTAssertTrue(poll.payloadUtf8.contains(#""type":"GET_STATUS""#))
+
+        XCTAssertEqual(sm.handleIncomingPacket(status(90)), .clipFinished)
+        XCTAssertEqual(sm.positionMs, 60_000)
+        XCTAssertFalse(sm.isPlaying)
+        XCTAssertNil(sm.handleIncomingPacket(status(90.5)), "Late status must not restart the completed excerpt")
+
+        // Loading the next entry starts a new Cast media session. Late status from the
+        // excerpt must not overwrite the next track's position or playback state.
+        let whole = PlayableTrack(id: "2", title: "Next song", durationMs: 120_000, url: "https://phish.in/next.mp3")
+        XCTAssertNotNil(sm.createLoadMediaPacket(track: whole, show: nil, queueKey: "playlist:jams"))
+        XCTAssertNil(sm.handleIncomingPacket(status(91)))
+        XCTAssertEqual(sm.positionMs, 0)
+        XCTAssertEqual(sm.handleIncomingPacket(status(5, session: 8)), .mediaStatusUpdated)
+        XCTAssertEqual(sm.positionMs, 5_000)
+    }
+
     func testHeartbeatPingGeneratesPongEvent() {
         let sm = CastPlaybackStateMachine(senderId: "test-sender")
         let pingPacket = CastCodec.Packet(

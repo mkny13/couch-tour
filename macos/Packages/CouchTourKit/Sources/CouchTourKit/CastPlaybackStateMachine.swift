@@ -27,6 +27,9 @@ public final class CastPlaybackStateMachine {
 
     private var nextRequestId: Int = 1
     private let senderId: String
+    private var loadedTrack: PlayableTrack?
+    private var previousMediaSessionId: Int?
+    private var clipCompletionSent = false
 
     public init(senderId: String = "sender-0") {
         self.senderId = senderId
@@ -98,8 +101,18 @@ public final class CastPlaybackStateMachine {
             requestId: reqId,
             mediaInfo: mediaInfo,
             autoplay: true,
-            currentTime: currentTimeSeconds
+            currentTime: Double(min(track.clipStartMs + Int64(max(currentTimeSeconds, 0) * 1000),
+                                    track.clipEndMs ?? Int64.max)) / 1000.0
         ) else { return nil }
+
+        previousMediaSessionId = mediaSessionId
+        mediaSessionId = nil
+        loadedTrack = track
+        clipCompletionSent = false
+        isPlaying = false
+        positionMs = min(Int64(max(currentTimeSeconds, 0) * 1000),
+                         track.clipEndMs.map { $0 - track.clipStartMs } ?? Int64.max)
+        durationMs = track.durationMs
 
         return CastCodec.Packet(
             sourceId: senderId,
@@ -134,12 +147,26 @@ public final class CastPlaybackStateMachine {
     public func createSeekPacket(positionMs: Int64) -> CastCodec.Packet? {
         guard let transportId, let mediaSessionId else { return nil }
         let reqId = getNextRequestId()
-        let seconds = Double(positionMs) / 1000.0
+        let start = loadedTrack?.clipStartMs ?? 0
+        let filePositionMs = min(start + max(positionMs, 0), loadedTrack?.clipEndMs ?? Int64.max)
+        let seconds = Double(filePositionMs) / 1000.0
         return CastCodec.Packet(
             sourceId: senderId,
             destinationId: transportId,
             namespace: CastNamespace.media,
             payloadUtf8: CastCodec.seekMessage(requestId: reqId, mediaSessionId: mediaSessionId, positionSeconds: seconds)
+        )
+    }
+
+    /// The receiver does not enforce a playlist entry's end time, so clipped tracks need
+    /// position updates even when the receiver has no state change to broadcast.
+    public func createGetMediaStatusPacket() -> CastCodec.Packet? {
+        guard let transportId else { return nil }
+        return CastCodec.Packet(
+            sourceId: senderId,
+            destinationId: transportId,
+            namespace: CastNamespace.media,
+            payloadUtf8: CastCodec.getStatusMessage(requestId: getNextRequestId())
         )
     }
 
@@ -182,6 +209,7 @@ public final class CastPlaybackStateMachine {
         case needTransportConnection
         case mediaStatusUpdated
         case mediaFinished
+        case clipFinished
         case receiverDisconnected
         case heartbeatPong
     }
@@ -230,10 +258,18 @@ public final class CastPlaybackStateMachine {
 
     private func handleMediaStatus(_ packet: CastCodec.Packet) -> Event? {
         guard let mediaStatus = CastCodec.parseMediaStatus(json: packet.payloadUtf8) else { return nil }
+        // A LOAD creates a fresh media session. Ignore late status from the previous item,
+        // especially when two playlist entries refer to the same underlying audio file.
+        if let previousMediaSessionId, mediaStatus.mediaSessionId == previousMediaSessionId {
+            return nil
+        }
+        if mediaSessionId == nil, mediaStatus.mediaSessionId == nil { return nil }
+        if clipCompletionSent { return nil }
         if let session = mediaStatus.mediaSessionId {
             self.mediaSessionId = session
+            previousMediaSessionId = nil
         }
-        if let dur = mediaStatus.duration {
+        if let dur = mediaStatus.duration, loadedTrack == nil {
             self.durationMs = Int64(dur * 1000)
         }
         if let vol = mediaStatus.volumeLevel {
@@ -242,8 +278,18 @@ public final class CastPlaybackStateMachine {
         if let muted = mediaStatus.isMuted {
             self.isMuted = muted
         }
-        self.positionMs = Int64(mediaStatus.currentTime * 1000)
+        let filePositionMs = Int64(mediaStatus.currentTime * 1000)
+        let clipStartMs = loadedTrack?.clipStartMs ?? 0
+        let clipLengthMs = loadedTrack?.clipEndMs.map { max($0 - clipStartMs, 0) } ?? Int64.max
+        self.positionMs = min(max(filePositionMs - clipStartMs, 0), clipLengthMs)
         self.lastIdleReason = mediaStatus.idleReason
+
+        if let end = loadedTrack?.clipEndMs, filePositionMs >= end,
+           mediaStatus.playerState == .playing, !clipCompletionSent {
+            clipCompletionSent = true
+            isPlaying = false
+            return .clipFinished
+        }
 
         switch mediaStatus.playerState {
         case .playing, .buffering:
@@ -268,6 +314,9 @@ public final class CastPlaybackStateMachine {
         receiverSessionId = nil
         transportId = nil
         mediaSessionId = nil
+        previousMediaSessionId = nil
+        loadedTrack = nil
+        clipCompletionSent = false
         isPlaying = false
         positionMs = 0
         durationMs = 0

@@ -272,3 +272,7 @@ Long-standing items that predate this sprint.
 ## Android Now Playing restorations (#386)
 
 - [ ] `uat-084` **Now Playing artwork, format badge, cast indicator** (Android) — Open Now Playing in dark and light mode on a phone. Verify the artwork tile (or cassette fallback when art is missing) is balanced with the title/tape rows and nothing is clipped on a small screen. Verify the TAPE row shows an amber FLAC badge for FLAC sources and a muted MP3 badge otherwise. Start a Cast session and verify the top bar reads "Casting to <device name>", and disappears when casting stops.
+
+## Public phish.in playlists on macOS (#428)
+
+- [ ] `uat-085` **Browse, play, resume, and cast a public playlist** (macOS) — From Home, open "Browse playlists", select "Phish.net Key Jams Pt 1", and confirm the author, duration, track list, search filter, and like control render. Play a track and verify audio and the playlist title in Now Playing; leave and resume it from Continue Listening. For an entry with `starts_at_second=30` and `ends_at_second=90`, verify local playback begins at 30 seconds and advances at 90 seconds. Connect to a Cast receiver before selecting that entry, then repeat; also seek within the excerpt, pause/resume, and switch playback from Mac to Cast and back. Confirm the displayed progress stays within the 60-second excerpt and the receiver advances at its end.

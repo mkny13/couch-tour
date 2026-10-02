@@ -607,7 +607,7 @@ final class Player: NSObject, ObservableObject {
             let playURL = audioQuality.resolveURL(flac: track.flacUrl, mp3: track.url)
             let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
             let item = AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
-            // Playlist excerpts (D30): start inside the file and end early. Casting still plays whole files.
+            // Playlist excerpts (D30): start inside the file and end early.
             if track.clipStartMs > 0 { item.seek(to: CMTime(value: track.clipStartMs, timescale: 1000), completionHandler: nil) }
             if let end = track.clipEndMs { item.forwardPlaybackEndTime = CMTime(value: end, timescale: 1000) }
             return item
