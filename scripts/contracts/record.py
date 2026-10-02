@@ -6,7 +6,7 @@ its first 3 elements so fixtures stay small while values and shape stay real, an
 same bytes to both the Android and CouchTourKit fixture dirs (macos/scripts/check-fixtures.sh
 requires them to match). Polite by design: ~11 sequential requests with a pause between.
 
-    scripts/contracts/record.sh [--out-dir DIR]
+    scripts/contracts/record.sh [--out-dir DIR] [--skip-failed]
 """
 import argparse
 import json
@@ -33,6 +33,10 @@ DEFAULT_OUT_DIRS = [
 _last_request = 0.0
 
 
+class FetchError(Exception):
+    """An upstream request failed (timeout, network, HTTP error, non-JSON body)."""
+
+
 def fetch(url):
     """GET [url] and parse it as JSON, pausing so requests stay sequential and spaced out."""
     global _last_request
@@ -44,6 +48,8 @@ def fetch(url):
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.load(resp)
+    except (OSError, ValueError) as e:  # URLError/HTTPError/timeouts are OSError; bad JSON is ValueError
+        raise FetchError(f"{url}: {e}") from e
     finally:
         _last_request = time.monotonic()
 
@@ -61,37 +67,68 @@ def q(params):
     return urllib.parse.urlencode(params)
 
 
-def endpoints():
-    """Yields (output name, response) in request order; Relisten uuids are resolved live."""
-    yield "contract_phishin_years.json", fetch(f"{PHISHIN}/years")
-    yield "contract_phishin_shows_year.json", fetch(
-        f"{PHISHIN}/shows?" + q({"year": FIXTURE_YEAR, "audio_status": "complete_or_partial",
-                                 "sort": "date:asc", "per_page": 1000}))
-    yield "contract_phishin_show.json", fetch(f"{PHISHIN}/shows/{FIXTURE_DATE}")
-    yield "contract_phishin_search.json", fetch(
-        f"{PHISHIN}/search/tweezer?" + q({"audio_status": "complete_or_partial"}))
-    yield "contract_phishin_playlists.json", fetch(
-        f"{PHISHIN}/playlists?" + q({"sort": "likes_count:desc", "per_page": 100}))
+def endpoints(skip_failed=False):
+    """Yields (output name, response) in request order; Relisten uuids are resolved live.
 
-    artists = fetch(f"{RELISTEN}/v3/artists")
-    yield "contract_relisten_artists.json", artists
-    phish = next(a for a in artists if a["slug"] == "phish")["uuid"]
+    With [skip_failed], an endpoint whose request fails is logged and left out (along with any
+    that depend on it) instead of aborting, so an upstream outage isn't mistaken for drift.
+    """
+    def get(name, url):
+        try:
+            return name, fetch(url)
+        except FetchError as e:
+            if not skip_failed:
+                raise
+            print(f"SKIPPED {name}: {e}", file=sys.stderr)
+            return name, None
 
-    years = fetch(f"{RELISTEN}/v3/artists/{phish}/years")
-    yield "contract_relisten_years.json", years
-    year = next(y for y in years if y["year"] == FIXTURE_YEAR)["uuid"]
+    steps = [
+        ("contract_phishin_years.json", f"{PHISHIN}/years"),
+        ("contract_phishin_shows_year.json", f"{PHISHIN}/shows?" + q(
+            {"year": FIXTURE_YEAR, "audio_status": "complete_or_partial", "sort": "date:asc", "per_page": 1000})),
+        ("contract_phishin_show.json", f"{PHISHIN}/shows/{FIXTURE_DATE}"),
+        ("contract_phishin_search.json", f"{PHISHIN}/search/tweezer?" + q({"audio_status": "complete_or_partial"})),
+        ("contract_phishin_playlists.json", f"{PHISHIN}/playlists?" + q({"sort": "likes_count:desc", "per_page": 100})),
+    ]
+    for name, url in steps:
+        name, body = get(name, url)
+        if body is not None:
+            yield name, body
 
-    yield "contract_relisten_year.json", fetch(f"{RELISTEN}/v3/artists/{phish}/years/{year}")
-    yield "contract_relisten_show.json", fetch(f"{RELISTEN}/v2/artists/phish/shows/{FIXTURE_DATE}")
-    yield "contract_relisten_on_date.json", fetch(
-        f"{RELISTEN}/v2/artists/phish/shows/on-date?" + q({"month": 11, "day": 22}))
-    yield "contract_relisten_search.json", fetch(f"{RELISTEN}/v3/search?" + q({"q": "tweezer"}))
+    name, artists = get("contract_relisten_artists.json", f"{RELISTEN}/v3/artists")
+    phish = None
+    if artists is not None:
+        yield name, artists
+        phish = next(a for a in artists if a["slug"] == "phish")["uuid"]
+
+    year = None
+    if phish is not None:
+        name, years = get("contract_relisten_years.json", f"{RELISTEN}/v3/artists/{phish}/years")
+        if years is not None:
+            yield name, years
+            year = next(y for y in years if y["year"] == FIXTURE_YEAR)["uuid"]
+    if year is not None:
+        name, body = get("contract_relisten_year.json", f"{RELISTEN}/v3/artists/{phish}/years/{year}")
+        if body is not None:
+            yield name, body
+
+    # These use the artist slug, so they don't depend on the uuid lookups above.
+    for name, url in [
+        ("contract_relisten_show.json", f"{RELISTEN}/v2/artists/phish/shows/{FIXTURE_DATE}"),
+        ("contract_relisten_on_date.json", f"{RELISTEN}/v2/artists/phish/shows/on-date?" + q({"month": 11, "day": 22})),
+        ("contract_relisten_search.json", f"{RELISTEN}/v3/search?" + q({"q": "tweezer"})),
+    ]:
+        name, body = get(name, url)
+        if body is not None:
+            yield name, body
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--out-dir", type=Path, action="append",
                         help="write here instead of both repo fixture dirs (repeatable)")
+    parser.add_argument("--skip-failed", action="store_true",
+                        help="log and skip endpoints whose request fails instead of aborting")
     args = parser.parse_args()
     out_dirs = args.out_dir or DEFAULT_OUT_DIRS
     for d in out_dirs:
@@ -100,7 +137,7 @@ def main():
     # Fetch everything before writing anything, so a mid-run failure can't leave the two
     # fixture dirs half re-recorded.
     recorded = [(name, json.dumps(trim(body), indent=2, sort_keys=True, ensure_ascii=False) + "\n")
-                for name, body in endpoints()]
+                for name, body in endpoints(args.skip_failed)]
     for name, text in recorded:
         for d in out_dirs:
             (d / name).write_text(text, encoding="utf-8")
