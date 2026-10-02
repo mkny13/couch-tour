@@ -32,6 +32,7 @@ public enum AXIdentifiers {
     public static let searchTabShows = "search.tab.shows"
     public static let searchTabSongs = "search.tab.songs"
     public static let searchTabVenues = "search.tab.venues"
+    public static let searchTabPlaylists = "search.tab.playlists"
 
     // Settings diagnostics viewer
     public static let settingsDiagnosticsOpen = "settings.diagnostics.open"
