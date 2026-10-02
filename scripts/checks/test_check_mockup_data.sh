@@ -34,6 +34,16 @@ expect 0 "Goose inside #Preview / PreviewProvider passes"
 fresh; printf '@Preview\nfun P() {\n}\nval a = "Goose"\n' >"$tmp/r/app/src/main/A.kt"
 expect 1 "hit after a preview ends still fails"
 
+fresh; printf '@Preview\n@Composable\nfun SamplePreview() =\n    Text("Goose")\n\nval ok = 1\n' >"$tmp/r/app/src/main/A.kt"
+expect 0 "Goose in multiline expression-body @Preview passes"
+
+fresh; printf '@Preview\n@Composable\nfun SamplePreview() =\n    Foo(\n        listOf("Goose"),\n    )\n\nval a = "Goose"\n' >"$tmp/r/app/src/main/A.kt"
+expect 1 "hit after an expression-body preview still fails"
+grep -q 'A.kt:8:' "$tmp/out" || { echo "FAIL: wrong line after expression preview"; fails=1; }
+
+fresh; printf '@Preview\n@Composable\nfun P() = Text("Goose")\nval a = "Goose"\n' >"$tmp/r/app/src/main/A.kt"
+expect 1 "hit after a one-line expression-body preview still fails"
+
 fresh; mkdir -p "$tmp/r/app/src/test" "$tmp/r/macos/Packages/CouchTourKit/Tests"
 printf 'val a = "Goose"\n' >"$tmp/r/app/src/test/A.kt"
 printf 'let a = "Goose"\n' >"$tmp/r/macos/Packages/CouchTourKit/Tests/A.swift"

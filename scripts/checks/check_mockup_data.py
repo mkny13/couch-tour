@@ -53,6 +53,49 @@ def load_allowlist():
     return entries
 
 
+def _kt_preview_end(lines, i):
+    """Index of the last line of the Kotlin preview function starting at annotation line i.
+
+    Handles block bodies and expression bodies (`fun X() =` with the body on later lines)
+    without swallowing the declarations that follow.
+    """
+    depth, seen_fun, eq_seen, block, j = 0, False, False, False, i
+    while j < len(lines):
+        line = re.sub(r'"(\\.|[^"\\])*"', '""', lines[j])
+        m = re.search(r"\bfun\b", line)
+        if m and not seen_fun:
+            seen_fun = True
+            tail = line[m.end():]
+        else:
+            tail = line if seen_fun else ""
+        if seen_fun and not eq_seen:
+            d = depth
+            for ch in tail:
+                if ch == "{" and d == 0:
+                    block = True
+                    break  # block body; brace counting below finds its end
+                if ch in "([{":
+                    d += 1
+                elif ch in ")]}":
+                    d -= 1
+                elif ch == "=" and d == 0:
+                    eq_seen = True
+                    break
+        depth += sum(line.count(c) for c in "([{") - sum(line.count(c) for c in ")]}")
+        if seen_fun and depth <= 0:
+            if not eq_seen:
+                if block:
+                    return j
+            else:
+                nxt = next((l.strip() for l in lines[j + 1:] if l.strip()), "")
+                cont = re.search(r"(=|[-+*/%&|,.]|\?:)\s*$", line.rstrip()) or \
+                    re.match(r"(\?\.|\.|\?:|&&|\|\||[-+*/%]\s)", nxt)
+                if not cont:
+                    return j
+        j += 1
+    return len(lines) - 1
+
+
 def preview_lines(lines, ext):
     """Return indexes of lines inside preview code."""
     skip = set()
@@ -62,18 +105,18 @@ def preview_lines(lines, ext):
         if not start.search(lines[i]):
             i += 1
             continue
+        if ext == ".kt":
+            j = _kt_preview_end(lines, i)
+            skip.update(range(i, j + 1))
+            i = j + 1
+            continue
         depth, opened, j = 0, False, i
         while j < len(lines):
             skip.add(j)
             depth += lines[j].count("{") - lines[j].count("}")
             if "{" in lines[j]:
                 opened = True
-            # A Kotlin expression-body preview has no brace; stop after its first
-            # non-annotation line rather than swallowing the rest of the file.
             if opened and depth <= 0:
-                break
-            if not opened and ext == ".kt" and "fun " in lines[j] and "=" in lines[j] \
-                    and "{" not in lines[j]:
                 break
             j += 1
         i = j + 1
