@@ -228,6 +228,20 @@ class SyncBaseUrlOverrideTest {
     }
 
     @Test
+    fun `a release build ignores and clears an override persisted by an earlier release`() {
+        val store = store()
+        store.baseUrlOverride = "https://evil.example.com"
+
+        val target = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = defaultUrl.toString(), store = store, allowOverride = false,
+        )
+
+        assertEquals(defaultUrl, target)
+        assertEquals(defaultUrl, SyncApi.baseUrl)
+        assertNull("stale override must be wiped", store.baseUrlOverride)
+    }
+
+    @Test
     fun `a debug override is accepted and applied through the shared policy`() {
         val store = store()
         SyncApi.baseUrl = "https://original.example.com".toHttpUrl()

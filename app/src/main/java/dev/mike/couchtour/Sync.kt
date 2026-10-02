@@ -131,13 +131,18 @@ object SyncApi {
         defaultUrl: String = BuildConfig.SYNC_BASE_URL,
         override: String? = null,
         store: SyncTokenStore? = null,
+        allowOverride: Boolean = BuildConfig.DEBUG,
     ): HttpUrl {
         val tokenStore = store ?: if (SyncSession.isStoreInitialized()) SyncSession.currentStore() else null
-        if (override != null && override.isNotBlank()) {
+        // Release builds never honor an override, including one persisted by an earlier
+        // vulnerable release (prefs survive an in-place update), so drop it.
+        if (!allowOverride) {
+            tokenStore?.baseUrlOverride = null
+        } else if (override != null && override.isNotBlank()) {
             tokenStore?.baseUrlOverride = override
         }
 
-        val activeOverride = tokenStore?.baseUrlOverride ?: override
+        val activeOverride = if (allowOverride) tokenStore?.baseUrlOverride ?: override else null
         val parsedOverride = activeOverride?.takeIf { it.isNotBlank() }?.let { raw ->
             raw.toHttpUrlOrNull()
         }
@@ -156,13 +161,14 @@ object SyncApi {
         context: Context,
         defaultUrl: String = BuildConfig.SYNC_BASE_URL,
         override: String? = null,
+        allowOverride: Boolean = BuildConfig.DEBUG,
     ): HttpUrl {
         val tokenStore = if (SyncSession.isStoreInitialized()) {
             SyncSession.currentStore()
         } else {
             SyncTokenStore(context.applicationContext)
         }
-        return applyConfiguredBaseUrl(defaultUrl, override, tokenStore)
+        return applyConfiguredBaseUrl(defaultUrl, override, tokenStore, allowOverride)
     }
 
     /**
