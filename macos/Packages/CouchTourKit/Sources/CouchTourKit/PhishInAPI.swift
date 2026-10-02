@@ -256,7 +256,9 @@ extension SearchResults {
     }
 }
 
-private struct ShowsPage: Decodable {
+/// Not `private` — `ContractFixturesTests` decodes a recorded /shows page straight into this,
+/// the same way Android's `ContractFixturesTest` decodes `ShowsPage` (D319).
+struct ShowsPage: Decodable {
     let shows: [Show]
 
     enum CodingKeys: String, CodingKey {

@@ -5151,3 +5151,22 @@ Part of #405. `.github/workflows/contract-check.yml` runs Mondays (and on dispat
 - **Outages are not drift**: with `--skip-failed` a failed request (timeout, HTTP error) skips that endpoint, logged in the job; only drift files an issue.
 - **Issue filing**: one open "Contract drift: upstream API shape changed" issue (`mahler`, `type:bug`); if open, the report is added as a comment. The job stays green on drift; the issue is the signal. Fixes land as a normal re-record plus DTO change.
 - Unit tests: `python3 -m unittest scripts/contracts/test_shape_check.py`.
+
+## D321 — CouchTourKit contract decode tests (#442)
+
+Part of #405. The other half of D319: the `contract_*.json` recordings are decoded by
+`ContractFixturesTests` here as well as by `ContractFixturesTest` on Android, so drift that
+only breaks the Swift DTOs fails CI rather than a user's Mac. The endpoint list mirrors the
+Kotlin one file-for-file, or the two clients would silently test different recordings again.
+
+- **Through the real clients**: the phish.in and Relisten shows are served by `MockServer`
+  and fetched via `PhishInAPI.show`/`RelistenAPI.show`, so the request path is exercised too,
+  not just the decode.
+- **`ShowsPage` is internal**: it was `private`, which `@testable` can't reach. Android did the
+  same for `ShowsPage`/`PlaylistsPage` in #461.
+- **Playlists has no Swift DTO and gets no new one**: the desktop MVP has no playlists screen
+  (D5), so there is no model here to drift. `contract_phishin_playlists.json` is parsed
+  generically to keep it loadable; D320's weekly shape check is what guards that endpoint.
+- The curated/heuristic match tests read through `CuratedMatches.shared`/`HeuristicMatches.shared`
+  rather than by file path, so they cover the resource actually shipping in the bundle.
+- Tests: `cd macos/Packages/CouchTourKit && swift test` (515).
