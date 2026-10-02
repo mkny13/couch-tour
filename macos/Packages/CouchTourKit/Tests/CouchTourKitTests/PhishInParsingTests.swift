@@ -161,6 +161,20 @@ final class PhishInParsingTests: XCTestCase {
         XCTAssertEqual(detail.tracks[0].durationMs, 865_097)
     }
 
+    func testPublicPlaylistExcerptCarriesClipBoundsToPlayableTrack() throws {
+        let base = try decoder.decode(PublicPlaylist.self, from: try fixture("playlist.json"))
+        let t = base.entries[0].track
+        let excerpt = PublicPlaylistEntry(track: t, position: 1, duration: 60_000, startsAtSecond: 30, endsAtSecond: 90)
+        let whole = PublicPlaylistEntry(track: t, position: 2, duration: 0)
+        let detail = PublicPlaylist(summary: base.summary, entries: [excerpt, whole]).toShowDetail()
+
+        XCTAssertEqual(detail.tracks[0].clipStartMs, 30_000)
+        XCTAssertEqual(detail.tracks[0].clipEndMs, 90_000)
+        XCTAssertEqual(detail.tracks[0].durationMs, 60_000)
+        XCTAssertEqual(detail.tracks[1].clipStartMs, 0)
+        XCTAssertNil(detail.tracks[1].clipEndMs)
+    }
+
     func testDecodesPublicPlaylistListRowAuthorAndDuration() throws {
         let page = try decoder.decode(
             PublicPlaylistsPage.self,

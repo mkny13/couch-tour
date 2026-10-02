@@ -70,8 +70,7 @@ struct PublicPlaylistsPage: Decodable {
 
 /// One element of `entries` in `GET /playlists/<slug>`: a full `Track` plus the entry's own
 /// position and effective length. An entry can be an excerpt of its track —
-/// `startsAtSecond`/`endsAtSecond` are decoded but the player doesn't clip yet, so an excerpt
-/// plays the whole track (its `duration` is still the clipped span).
+/// `startsAtSecond`/`endsAtSecond` become the queued track's clip bounds (D30).
 public struct PublicPlaylistEntry: Codable, Equatable, Sendable {
     public let track: Track
     public let position: Int
@@ -144,7 +143,10 @@ public struct PublicPlaylist: Decodable, Equatable, Sendable {
                 setName: t.setName, audioStatus: t.audioStatus, mp3Url: t.mp3Url,
                 waveformImageUrl: t.waveformImageUrl, showDate: t.showDate, venueName: t.venueName,
                 venueLocation: t.venueLocation, showAlbumCoverUrl: t.showAlbumCoverUrl, tags: t.tags)
-            return sized.toPlayableTrack(showArt: nil)
+            let base = sized.toPlayableTrack(showArt: nil)
+            let start = Int64(max(entry.startsAtSecond ?? 0, 0)) * 1000
+            let end = entry.endsAtSecond.map { Int64($0) * 1000 }.flatMap { $0 > start ? $0 : nil }
+            return base.clipped(startMs: start, endMs: end)
         }
         let artist = ArtistRef(backend: .phishin, id: "playlist:\(slug)", name: name)
         let label = "\(playable.count) \(playable.count == 1 ? "track" : "tracks")"

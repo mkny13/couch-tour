@@ -580,11 +580,14 @@ final class Player: NSObject, ObservableObject {
         if isCasting {
             castClient.seek(toMs: ms)
         } else {
-            queuePlayer.seek(to: CMTime(value: ms, timescale: 1000))
+            queuePlayer.seek(to: CMTime(value: ms + clipStartMs, timescale: 1000))
         }
         updateNowPlayingElapsedTime()
         saveProgress(force: true)
     }
+
+    /// Offset of the current track's excerpt inside its file; 0 for whole tracks.
+    private var clipStartMs: Int64 { currentTrack?.clipStartMs ?? 0 }
 
     private func startQueue(tracks: [PlayableTrack], startIndex: Int, resumePositionMs: Int64 = 0) {
         guard tracks.indices.contains(startIndex) else { return }
@@ -603,7 +606,11 @@ final class Player: NSObject, ObservableObject {
         items = filtered.tracks.map { track in
             let playURL = audioQuality.resolveURL(flac: track.flacUrl, mp3: track.url)
             let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
-            return AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
+            let item = AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
+            // Playlist excerpts (D30): start inside the file and end early. Casting still plays whole files.
+            if track.clipStartMs > 0 { item.seek(to: CMTime(value: track.clipStartMs, timescale: 1000), completionHandler: nil) }
+            if let end = track.clipEndMs { item.forwardPlaybackEndTime = CMTime(value: end, timescale: 1000) }
+            return item
         }
         // Gapless off: queue only the current item; currentItemDidChange loads the next one
         // once this drains, so nothing is preloaded ahead of track end.
@@ -646,7 +653,7 @@ final class Player: NSObject, ObservableObject {
             queue: .main
         ) { [weak self] time in
             guard let self, !self.isCasting, time.isValid, !time.isIndefinite else { return }
-            self.positionMs = Int64(time.seconds * 1000)
+            self.positionMs = max(Int64(time.seconds * 1000) - self.clipStartMs, 0)
             // AVQueuePlayer keeps firing this observer on its interval even while paused —
             // without this guard, a show left loaded-but-paused (e.g. overnight) got its local
             // progress row re-stamped with a fresh updatedAt every ~5s for no real change. The
