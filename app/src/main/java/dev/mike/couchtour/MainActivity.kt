@@ -126,8 +126,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import kotlinx.coroutines.Dispatchers
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -163,8 +165,10 @@ class MainActivity : ComponentActivity() {
 
         if (savedInstanceState == null) {
             // An immediate catch-up on launch, on top of the periodic background job.
-            // Fire-and-forget: sync() is a no-op if unpaired.
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            // Fire-and-forget: sync() is a no-op if unpaired. lifecycleScope ties this launch
+            // to the Activity lifecycle so the coroutine (and the Activity reference it
+            // captures) is cancelled if the Activity is destroyed before sync completes.
+            lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     SyncSession.sync(PhishInDb.get(this@MainActivity).progressDao())
                 } catch (e: Exception) {
