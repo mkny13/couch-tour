@@ -36,7 +36,7 @@ Carried over from the old `macos_dead_code_audit.md` (now deleted):
 - No obsolete network adapters (`PhishInAPI`, `RelistenAPI`, `Sync` all live).
 - Deprecated APIs (`NSApp.keyWindow` at `Player.swift`, `.foregroundColor` in `SearchView`, `HomeView`, `PlayerRailView`) are still present, but upgrades are out of scope for #489 and remain open.
 
-`PlayerController.postShowPrompt` is still published and set (`Player.swift:283`, `:685`) but nothing in the views reads it now. Left alone as bigger than a local fix; see follow-up below.
+`PlayerController.postShowPrompt` is still published and set (`Player.swift:283`, `:685`) but nothing in the views reads it now. Left alone as bigger than a local fix; see #492.
 
 ## Complexity
 
@@ -63,3 +63,5 @@ Top 10 longest functions / view bodies across `macos/` after this change:
 | 10 | 101 | `CouchTourKit/Artwork.swift:68` | `func curatedPalette` (data table) / `LocalPlaylistsView.swift:281` `tableRow` |
 
 Items 1-9 are outside the issue's named files and are candidates for the next pass (the first two are the best targets).
+
+Follow-up issue: #492.
