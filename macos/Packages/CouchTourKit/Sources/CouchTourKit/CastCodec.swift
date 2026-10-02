@@ -177,7 +177,10 @@ public enum CastCodec {
         return #"{"type":"STOP","requestId":\#(requestId),"sessionId":"\#(sessionId)"}"#
     }
 
-    public static func getStatusMessage(requestId: Int) -> String {
+    public static func getStatusMessage(requestId: Int, mediaSessionId: Int? = nil) -> String {
+        if let mediaSessionId {
+            return #"{"type":"GET_STATUS","requestId":\#(requestId),"mediaSessionId":\#(mediaSessionId)}"#
+        }
         return #"{"type":"GET_STATUS","requestId":\#(requestId)}"#
     }
 

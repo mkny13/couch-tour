@@ -388,6 +388,7 @@ final class CastTests: XCTestCase {
         let poll = try XCTUnwrap(sm.createGetMediaStatusPacket())
         XCTAssertEqual(poll.namespace, CastNamespace.media)
         XCTAssertTrue(poll.payloadUtf8.contains(#""type":"GET_STATUS""#))
+        XCTAssertTrue(poll.payloadUtf8.contains(#""mediaSessionId":7"#))
 
         XCTAssertEqual(sm.handleIncomingPacket(status(90)), .clipFinished)
         XCTAssertEqual(sm.positionMs, 60_000)

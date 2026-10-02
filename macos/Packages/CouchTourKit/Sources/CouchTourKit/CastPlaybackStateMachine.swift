@@ -161,12 +161,12 @@ public final class CastPlaybackStateMachine {
     /// The receiver does not enforce a playlist entry's end time, so clipped tracks need
     /// position updates even when the receiver has no state change to broadcast.
     public func createGetMediaStatusPacket() -> CastCodec.Packet? {
-        guard let transportId else { return nil }
+        guard let transportId, let mediaSessionId else { return nil }
         return CastCodec.Packet(
             sourceId: senderId,
             destinationId: transportId,
             namespace: CastNamespace.media,
-            payloadUtf8: CastCodec.getStatusMessage(requestId: getNextRequestId())
+            payloadUtf8: CastCodec.getStatusMessage(requestId: getNextRequestId(), mediaSessionId: mediaSessionId)
         )
     }
 
