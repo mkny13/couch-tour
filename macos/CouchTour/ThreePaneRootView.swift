@@ -74,7 +74,10 @@ struct ThreePaneRootView: View {
             await loadFavorites()
             while !Task.isCancelled {
                 try? await Task.sleep(for: periodicSyncInterval)
-                appModel.syncNow()
+                // Inactive apps resync on activation instead (#505).
+                if PeriodicSyncPolicy.shouldSync(appIsActive: NSApp.isActive) {
+                    appModel.syncNow()
+                }
             }
         }
         .onChange(of: appModel.favorites.keys) { _, _ in

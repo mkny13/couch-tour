@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -295,16 +296,17 @@ class PlaybackService : MediaLibraryService() {
             .build()
     }
 
+    // Fed from the listener and from player swaps, so the saver below can sleep while paused.
+    private val playingFlag = MutableStateFlow(false)
+
+    private fun updatePlayingFlag() {
+        playingFlag.value = session?.player?.isPlaying == true
+    }
+
     private fun startProgressSaver() {
         // ...and on a slow tick while playing, so a crash or swipe-away loses at most 5s.
         scope.launch {
-            while (true) {
-                delay(5_000)
-                val active = session?.player ?: continue
-                if (active.isPlaying) {
-                    saveNow()
-                }
-            }
+            runWhilePlaying(playingFlag, 5_000) { saveNow() }
         }
     }
 
@@ -315,6 +317,7 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             saveNow()
+            updatePlayingFlag()
             SyncSession.requestDebouncedPush(progressDao())
             if (wasPlaying && !isPlaying) {
                 DiagnosticsLog.log("playback.stop")
@@ -455,6 +458,7 @@ class PlaybackService : MediaLibraryService() {
             next.playWhenReady = from.playWhenReady && next !== localPlayer
         }
         session.setPlayer(next)
+        updatePlayingFlag()
         // Kept, not replaced: a cast player reports an empty queue until the receiver has
         // loaded it, and overwriting the fallback with that would lose the queue outright
         // if the session then failed.

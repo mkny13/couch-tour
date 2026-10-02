@@ -616,3 +616,9 @@ private extension PlaybackProgress {
         )
     }
 }
+
+/// Gate for the macOS 15-minute sync timer (#505). A hidden or backgrounded app skips the tick
+/// because `didBecomeActiveNotification` already syncs the moment the user comes back.
+public enum PeriodicSyncPolicy {
+    public static func shouldSync(appIsActive: Bool) -> Bool { appIsActive }
+}

@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -847,5 +849,33 @@ class SyncSessionTest {
 
         assertEquals(1, server.requestCount - requestsBeforeSync)
         assertEquals(450, pushedKeyCount(server.takeRequest()))
+    }
+}
+
+class PollingTest {
+    @Test
+    fun `device list backoff grows 1_5x, caps at 60s, and resets on change`() {
+        assertEquals(7_500L, DeviceListBackoff.next(5_000, changed = false))
+        assertEquals(60_000L, DeviceListBackoff.next(50_000, changed = false))
+        assertEquals(5_000L, DeviceListBackoff.next(60_000, changed = true))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `progress ticker saves every tick while playing and is idle while paused`() = runTest {
+        val playing = MutableStateFlow(false)
+        var saves = 0
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            runWhilePlaying(playing, 5_000) { saves++ }
+        }
+        advanceTimeBy(20_000)
+        assertEquals(0, saves)
+        playing.value = true
+        advanceTimeBy(11_000)
+        assertEquals(2, saves)
+        playing.value = false
+        advanceTimeBy(30_000)
+        assertEquals(2, saves)
+        job.cancel()
     }
 }
