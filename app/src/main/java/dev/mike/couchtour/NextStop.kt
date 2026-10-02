@@ -131,11 +131,21 @@ suspend fun currentTours(
     favorites: List<ArtistRef>,
     preferences: Map<String, ArtistTourPreferenceEntity> = emptyMap(),
     source: (Backend) -> MusicSource = ::sourceFor,
-): List<ShowSummary> = coroutineScope {
+): List<ShowSummary> = currentToursChecked(favorites, preferences, source).first
+
+/**
+ * Like [currentTours], but also reports whether every artist's fetch succeeded. A failed artist
+ * is skipped so the rest still show, but the list must not be cached as the day's answer (#465).
+ */
+suspend fun currentToursChecked(
+    favorites: List<ArtistRef>,
+    preferences: Map<String, ArtistTourPreferenceEntity> = emptyMap(),
+    source: (Backend) -> MusicSource = ::sourceFor,
+): Pair<List<ShowSummary>, Boolean> = coroutineScope {
     val participating = favorites.groupBy { it.backend }
         .flatMap { (_, artists) -> artists.take(MAX_TOUR_ARTISTS) }
 
-    if (participating.isEmpty()) return@coroutineScope emptyList()
+    if (participating.isEmpty()) return@coroutineScope emptyList<ShowSummary>() to true
 
     val perArtist = participating
         .map { artist ->
@@ -161,7 +171,7 @@ suspend fun currentTours(
         throw firstError!!
     }
 
-    allShows
+    allShows.toList() to (successCount == perArtist.size)
 }
 
 /**
@@ -248,8 +258,9 @@ object NextStop {
         if (favorites.isEmpty()) return emptyList()
         val key = cacheKey(favorites, today, preferences)
         cached?.let { (cachedKey, shows) -> if (cachedKey == key) return shows }
-        val shows = currentTours(favorites, preferences, source)
-        if (shows.isNotEmpty()) {
+        val (shows, complete) = currentToursChecked(favorites, preferences, source)
+        // A partial list cached here would hide the failed artists until tomorrow (#465).
+        if (complete && shows.isNotEmpty()) {
             cached = key to shows
         }
         return shows
