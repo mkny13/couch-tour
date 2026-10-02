@@ -19,11 +19,28 @@ struct ExpandedNowPlayingView: View {
 
     var body: some View {
         ZStack {
-            // Background & Ambient Wash
             colors.background
                 .ignoresSafeArea()
 
             if colors.isDark {
+                ambientWash
+            }
+
+            VStack(spacing: 0) {
+                chromeBar
+                Spacer()
+                heroSection
+                Spacer()
+                scrubberSection
+                timestampsRow
+                transportRow
+                volumeRow
+            }
+        }
+        .frame(minWidth: 1000, minHeight: 700)
+    }
+
+    private var ambientWash: some View {
                 ZStack {
                     RadialGradient(
                         colors: [Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0).opacity(0.50), Color.clear],
@@ -46,10 +63,9 @@ struct ExpandedNowPlayingView: View {
                 }
                 .blur(radius: 40)
                 .ignoresSafeArea()
-            }
+    }
 
-            VStack(spacing: 0) {
-                // Window Chrome Bar / Collapse Button
+    private var chromeBar: some View {
                 HStack {
                     TrafficLights()
 
@@ -81,19 +97,17 @@ struct ExpandedNowPlayingView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Collapse Now Playing")
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 12)
+    }
 
-                let artistName = player.show?.artist.name ?? ""
-                let showDate = player.show?.date ?? ""
-                let venueName = player.show?.where_.isEmpty == false ? player.show!.where_ : ""
-                let trackTitle = player.currentTrack?.title ?? "No track playing"
-                let duration = Double(player.currentTrack?.durationMs ?? 0)
-                let currentPos = dragPositionMs ?? Double(player.positionMs)
-                let progressFrac = duration > 0 ? (currentPos / duration) : 0.0
+    private var artistName: String { player.show?.artist.name ?? "" }
+    private var showDate: String { player.show?.date ?? "" }
+    private var venueName: String { player.show?.where_.isEmpty == false ? player.show!.where_ : "" }
+    private var trackTitle: String { player.currentTrack?.title ?? "No track playing" }
+    private var duration: Double { Double(player.currentTrack?.durationMs ?? 0) }
+    private var currentPos: Double { dragPositionMs ?? Double(player.positionMs) }
+    private var progressFrac: Double { duration > 0 ? (currentPos / duration) : 0.0 }
 
-                let tapeLabel: String = {
+    private var tapeLabel: String {
                     if let rec = player.recording {
                         var parts: [String] = []
                         parts.append(rec.isSoundboard ? "SBD" : "AUD")
@@ -114,11 +128,9 @@ struct ExpandedNowPlayingView: View {
                         return parts.joined(separator: " · ")
                     }
                     return "SBD"
-                }()
+    }
 
-                Spacer()
-
-                // Hero section: 2 columns
+    private var heroSection: some View {
                 HStack(alignment: .center, spacing: 56) {
                     // Left: 440x440 artwork with conic glow
                     ConicGlowArtwork(
@@ -133,6 +145,17 @@ struct ExpandedNowPlayingView: View {
 
                     // Right: Metadata + Title + Tape + Jam Chart Note
                     VStack(alignment: .leading, spacing: 0) {
+                        headerText
+                        tapeRatingSetRow
+                        trackTitleBlock
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 72)
+    }
+
+    private var headerText: some View {
+        VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 14) {
                             Text(artistName)
                                 .font(.system(size: 34, weight: .medium))
@@ -146,8 +169,10 @@ struct ExpandedNowPlayingView: View {
                             .font(.system(size: 17))
                             .foregroundStyle(colors.textSecondary)
                             .padding(.top, 7)
+        }
+    }
 
-                        // Tape / Show Rating / Set Row
+    private var tapeRatingSetRow: some View {
                         HStack(alignment: .center, spacing: 26) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("TAPE")
@@ -224,8 +249,9 @@ struct ExpandedNowPlayingView: View {
                                 .frame(height: 1),
                             alignment: .top
                         )
+    }
 
-                        // Track Title & Badges
+    private var trackTitleBlock: some View {
                         VStack(alignment: .leading, spacing: 0) {
                             let currentIdx = (player.currentIndex ?? 0) + 1
                             let eyebrow = formatSetAndTrackEyebrow(
@@ -329,15 +355,10 @@ struct ExpandedNowPlayingView: View {
                             }
                         }
                         .padding(.top, 34)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.horizontal, 72)
+    }
 
-                Spacer()
-
-                // Waveform Scrubber (110px tall)
-                WaveformScrubber(
+    private var scrubberSection: some View {
+        WaveformScrubber(
                     progressFraction: progressFrac,
                     waveformURL: player.currentTrack?.waveformURL
                 ) { seekFrac in
@@ -347,8 +368,9 @@ struct ExpandedNowPlayingView: View {
                 }
                 .frame(height: 110)
                 .padding(.horizontal, 72)
+    }
 
-                // Timestamps
+    private var timestampsRow: some View {
                 HStack {
                     Text(fmt(Int64(currentPos)))
                         .font(.system(size: 13))
@@ -361,8 +383,9 @@ struct ExpandedNowPlayingView: View {
                 }
                 .padding(.horizontal, 72)
                 .padding(.top, 8)
+    }
 
-                // Transport Row (82x82 filled play button)
+    private var transportRow: some View {
                 HStack(spacing: 14) {
                     if let show = player.show, let currentTrack = player.currentTrack {
                         TrackLikeButton(
@@ -434,17 +457,17 @@ struct ExpandedNowPlayingView: View {
                     }
                 }
                 .padding(.top, 20)
-                
+    }
+
+    private var volumeRow: some View {
                 HStack(spacing: 20) {
                     volumeControl
                     CastRoutePickerButton()
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 34)
-            }
-        }
-        .frame(minWidth: 1000, minHeight: 700)
     }
+
     
     private var volumeControl: some View {
         HStack(spacing: 6) {

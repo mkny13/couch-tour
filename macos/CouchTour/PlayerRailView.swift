@@ -17,8 +17,51 @@ struct PlayerRailView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Ambient Radial Blur Wash (Dark Mode)
             if colors.isDark {
+                ambientWash
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                headerBar
+
+                if let show = player.show {
+                    ConicGlowArtwork(
+                        url: player.artURL,
+                        artist: show.artist.name,
+                        date: show.date,
+                        size: 344,
+                        cornerRadius: 14,
+                        glowPadding: 14,
+                        blurRadius: 24
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.top, 22)
+                    showMetadata(show)
+
+                    Spacer(minLength: 16)
+
+                    trackBlock
+
+                    scrubberSection
+                    timestampsRow
+                    transportRow(show)
+
+                    volumeControl
+                        .padding(.top, 12)
+                        .padding(.bottom, 26)
+
+                } else {
+                    // Empty state fallback when no show is loaded
+                    fallbackRailContent
+                }
+            }
+        }
+        .frame(width: 392)
+        .background(colors.elevated)
+        .border(width: 1, edges: [.leading], color: colors.panelBorder)
+    }
+
+    private var ambientWash: some View {
                 ZStack {
                     RadialGradient(
                         colors: [Color(red: 0x5B / 255.0, green: 0x8C / 255.0, blue: 1.0).opacity(0.45), Color.clear],
@@ -43,10 +86,9 @@ struct PlayerRailView: View {
                 .blur(radius: 30)
                 .offset(y: -40)
                 .allowsHitTesting(false)
-            }
+    }
 
-            VStack(alignment: .leading, spacing: 0) {
-                // Header: NOW PLAYING + Expand Button
+    private var headerBar: some View {
                 HStack {
                     Text("NOW PLAYING")
                         .font(.system(size: 11, weight: .semibold))
@@ -76,22 +118,9 @@ struct PlayerRailView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
+    }
 
-                if let show = player.show {
-                    // Artwork (344x344 with Conic Glow)
-                    ConicGlowArtwork(
-                        url: player.artURL,
-                        artist: show.artist.name,
-                        date: show.date,
-                        size: 344,
-                        cornerRadius: 14,
-                        glowPadding: 14,
-                        blurRadius: 24
-                    )
-                    .padding(.horizontal, 24)
-                    .padding(.top, 22)
-
-                    // Show Metadata Block
+    private func showMetadata(_ show: ShowSummary) -> some View {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 10) {
                             Text(show.artist.name)
@@ -194,12 +223,11 @@ struct PlayerRailView: View {
                             alignment: .top
                         )
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 22)
+        .padding(.horizontal, 24)
+        .padding(.top, 22)
+    }
 
-                    Spacer(minLength: 16)
-
-                    // Track Block (Eyebrow, Title, Jam Chart Pill, Note Card)
+    private var trackBlock: some View {
                     VStack(alignment: .leading, spacing: 0) {
                         let currentIdx = (player.currentIndex ?? 0) + 1
                         let eyebrow = formatSetAndTrackEyebrow(
@@ -289,12 +317,13 @@ struct PlayerRailView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 16)
+    }
 
-                    // Waveform Scrubber
-                    let duration = Double(player.currentTrack?.durationMs ?? 0)
-                    let currentPos = dragPositionMs ?? Double(player.positionMs)
-                    let progressFrac = duration > 0 ? (currentPos / duration) : 0.0
+    private var duration: Double { Double(player.currentTrack?.durationMs ?? 0) }
+    private var currentPos: Double { dragPositionMs ?? Double(player.positionMs) }
+    private var progressFrac: Double { duration > 0 ? (currentPos / duration) : 0.0 }
 
+    private var scrubberSection: some View {
                     WaveformScrubber(
                         progressFraction: progressFrac,
                         waveformURL: player.currentTrack?.waveformURL
@@ -305,8 +334,9 @@ struct PlayerRailView: View {
                     }
                     .frame(height: 64)
                     .padding(.horizontal, 24)
+    }
 
-                    // Timestamps
+    private var timestampsRow: some View {
                     HStack {
                         Text(fmt(Int64(currentPos)))
                             .font(.system(size: 12))
@@ -319,8 +349,9 @@ struct PlayerRailView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 6)
+    }
 
-                    // 5-Item Transport Controls
+    private func transportRow(_ show: ShowSummary) -> some View {
                     HStack(spacing: 10) {
                         if let currentTrack = player.currentTrack {
                             TrackLikeButton(
@@ -397,22 +428,8 @@ struct PlayerRailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 16)
-                    
-                    volumeControl
-                        .padding(.top, 12)
-                        .padding(.bottom, 26)
-
-                } else {
-                    // Empty state fallback when no show is loaded
-                    fallbackRailContent
-                }
-            }
-        }
-        .frame(width: 392)
-        .background(colors.elevated)
-        .border(width: 1, edges: [.leading], color: colors.panelBorder)
     }
-    
+
     private var volumeControl: some View {
         HStack(spacing: 6) {
             Button {
