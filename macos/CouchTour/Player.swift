@@ -314,6 +314,7 @@ final class Player: NSObject, ObservableObject {
         comparisonSources = sources
         isComparingSources = true
         let currentVolume = volume
+        let quality = audioQuality
 
         Task {
             var players: [String: AVPlayer] = [:]
@@ -330,7 +331,7 @@ final class Player: NSObject, ObservableObject {
                         }
                         guard let match = match else { return (source.id, nil) }
 
-                        let playURL = (match.flacUrl?.isEmpty == false) ? match.flacUrl! : match.url
+                        let playURL = quality.resolveURL(flac: match.flacUrl, mp3: match.url)
                         let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
                         let item = AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
                         let player = AVPlayer(playerItem: item)
@@ -536,6 +537,15 @@ final class Player: NSObject, ObservableObject {
         }
     }
 
+    /// Stream preference, defaulting to lossless when no settings are attached.
+    var audioQuality: AudioQuality { playbackSettings?.audioQuality ?? .lossless }
+
+    /// Whether `track` plays as FLAC under the current preference (drives the FLAC badge).
+    func playsFlac(_ track: PlayableTrack?) -> Bool {
+        guard let track else { return false }
+        return audioQuality.playsFlac(flac: track.flacUrl, mp3: track.url)
+    }
+
     func skipToNext() {
         if isCasting {
             guard let currentIndex, currentIndex < tracks.count - 1 else { return }
@@ -591,11 +601,14 @@ final class Player: NSObject, ObservableObject {
         levelingTask?.cancel()
         levelingTask = nil
         items = filtered.tracks.map { track in
-            let playURL = (track.flacUrl?.isEmpty == false) ? track.flacUrl! : track.url
+            let playURL = audioQuality.resolveURL(flac: track.flacUrl, mp3: track.url)
             let validURL = playURL.lowercased().hasPrefix("https://") ? playURL : "https://invalid.local/blocked"
             return AVPlayerItem(url: URL(string: validURL) ?? URL(string: "https://invalid.local/blocked")!)
         }
-        for item in items[filtered.startIndex...] {
+        // Gapless off: queue only the current item; currentItemDidChange loads the next one
+        // once this drains, so nothing is preloaded ahead of track end.
+        let preloaded = (playbackSettings?.gapless ?? true) ? items[filtered.startIndex...] : items[filtered.startIndex...].prefix(1)
+        for item in preloaded {
             queuePlayer.insert(item, after: nil)
         }
         currentIndex = filtered.startIndex
@@ -650,6 +663,12 @@ final class Player: NSObject, ObservableObject {
         guard !isCasting else { return }
         guard let item = queuePlayer.currentItem,
               let index = items.firstIndex(where: { $0 === item }) else {
+            if playbackSettings?.gapless == false, queuePlayer.currentItem == nil,
+               let last = currentIndex, items.indices.contains(last + 1) {
+                queuePlayer.insert(items[last + 1], after: nil)
+                queuePlayer.play()
+                return
+            }
             recorder.markFinished(queueKey: queueKey)
             currentIndex = nil
             isPlaying = false

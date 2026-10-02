@@ -100,14 +100,14 @@ struct ExpandedNowPlayingView: View {
                         if let taper = rec.taper, !taper.isEmpty {
                             parts.append(taper)
                         }
-                        if rec.hasFlac {
+                        if rec.hasFlac && player.audioQuality == .lossless {
                             parts.append("FLAC")
                         }
                         return parts.joined(separator: " · ")
                     }
                     if let show = player.show {
                         let isSbd = show.tags.contains { $0.name.localizedCaseInsensitiveContains("sbd") }
-                        let hasFlac = player.currentTrack?.flacUrl?.isEmpty == false
+                        let hasFlac = player.playsFlac(player.currentTrack)
                         var parts: [String] = []
                         parts.append(isSbd ? "SBD" : "AUD")
                         if hasFlac { parts.append("FLAC") }
@@ -244,7 +244,7 @@ struct ExpandedNowPlayingView: View {
                                     .font(.system(size: 44, weight: .medium))
                                     .foregroundStyle(colors.textPrimary)
 
-                                if player.currentTrack?.flacUrl?.isEmpty == false {
+                                if player.playsFlac(player.currentTrack) {
                                     Text("FLAC")
                                         .font(.system(size: 11, weight: .semibold))
                                         .tracking(1.0)
