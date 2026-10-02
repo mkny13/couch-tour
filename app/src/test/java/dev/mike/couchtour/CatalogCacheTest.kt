@@ -126,6 +126,26 @@ class CatalogCacheHitTest {
     }
 
     @Test
+    fun `PhishInSource periods does not cache a failed load as empty`() = runBlocking {
+        val periods = assertErrorNotCachedAsEmpty(
+            phishInServer,
+            """[{"period":"1997","shows_with_audio_count":81}]""",
+        ) { PhishInSource.periods(PHISH) }
+
+        assertEquals(listOf(POPULAR_PERIOD_ID, "1997"), periods.map { it.id })
+    }
+
+    @Test
+    fun `PhishInSource shows does not cache a failed load as empty`() = runBlocking {
+        val shows = assertErrorNotCachedAsEmpty(
+            phishInServer,
+            """{"shows":[{"date":"1997-11-17"}]}""",
+        ) { PhishInSource.shows(PHISH, PeriodRef("1997", "1997")) }
+
+        assertEquals("1997-11-17", shows.first().date)
+    }
+
+    @Test
     fun `PhishInSource resetCache forces a real re-fetch`() = runBlocking {
         phishInServer.enqueue(MockResponse().setBody("""[{"period":"1997","shows_with_audio_count":81}]"""))
         PhishInSource.periods(PHISH)

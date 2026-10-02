@@ -21,6 +21,7 @@ issue — closing it stays a human/Mahler decision through the normal pipeline.
 import argparse
 import json
 import re
+import secrets
 import subprocess
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -187,53 +188,22 @@ def parse(text):
     return [s for s in sections if s["items"]]
 
 
-def update(item_id, status, note):
-    """Rewrite one item's status (and note) in UAT.md, leaving everything else byte-identical.
-
-    A [!] with a note also files a GitHub bug (see file_bug_report) and pins its number
-    onto the note line as a trailing '(→ #N)'. The marker survives a later pass as a
-    marker-only note line, so a fresh [!] still finds its old issue; a [!] re-mark with
-    an unchanged note files nothing (every textarea blur would otherwise spam the issue
-    with duplicate comments).
-
-    Returns a result dict for the API response. A gh failure degrades to a warning —
-    the UAT.md write is the source of truth and must succeed regardless.
-    """
-    lines = UAT_PATH.read_text().splitlines()
-    text, existing_note, section, located = "", "", "", False
+def locate_item(lines, item_id):
+    """Return (item text, its note-line text, its section title); KeyError if absent."""
+    section = ""
     for idx, line in enumerate(lines):
         if m := SECTION_RE.match(line):
             section = m.group(1)
         elif (m := ITEM_RE.match(line)) and m.group(2) == item_id:
-            text = m.group(3)
+            note = ""
             if idx + 1 < len(lines) and (n := NOTE_RE.match(lines[idx + 1])):
-                existing_note = n.group(1)
-            located = True
-            break
-    if not located:
-        raise KeyError(item_id)
-    _, existing_issue = split_marker(existing_note)
+                note = n.group(1)
+            return m.group(3), note, section
+    raise KeyError(item_id)
 
-    note = note.strip()
-    clean, incoming_issue = split_marker(note)
-    existing_clean = split_marker(existing_note)[0]
-    issue_no, warning = existing_issue, None
 
-    if status == "needs-work" and clean:
-        if incoming_issue is not None:
-            # The payload itself carries the marker: already on record.
-            issue_no = incoming_issue
-        elif clean == existing_clean and existing_issue is not None:
-            # Same note as already on disk: nothing new to report.
-            pass
-        else:
-            try:
-                issue_no = file_bug_report(
-                    item_id, item_title(text), area(text, section), clean, existing_issue
-                )
-            except (GhError, OSError) as e:
-                warning = f"saved to UAT.md, but filing the GitHub bug failed: {e}"
-
+def rewrite_item(lines, item_id, status, clean, issue_no):
+    """Return `lines` with only item_id's status line and note line replaced."""
     out, i, found = [], 0, False
     while i < len(lines):
         line = lines[i]
@@ -257,6 +227,46 @@ def update(item_id, status, note):
         i += 1
     if not found:
         raise KeyError(item_id)
+    return out
+
+
+def update(item_id, status, note):
+    """Rewrite one item's status (and note) in UAT.md, leaving everything else byte-identical.
+
+    A [!] with a note also files a GitHub bug (see file_bug_report) and pins its number
+    onto the note line as a trailing '(→ #N)'. The marker survives a later pass as a
+    marker-only note line, so a fresh [!] still finds its old issue; a [!] re-mark with
+    an unchanged note files nothing (every textarea blur would otherwise spam the issue
+    with duplicate comments).
+
+    Returns a result dict for the API response. A gh failure degrades to a warning —
+    the UAT.md write is the source of truth and must succeed regardless.
+    """
+    lines = UAT_PATH.read_text().splitlines()
+    text, existing_note, section = locate_item(lines, item_id)
+    _, existing_issue = split_marker(existing_note)
+
+    note = note.strip()
+    clean, incoming_issue = split_marker(note)
+    existing_clean = split_marker(existing_note)[0]
+    issue_no, warning = existing_issue, None
+
+    if status == "needs-work" and clean:
+        if incoming_issue is not None:
+            # The payload itself carries the marker: already on record.
+            issue_no = incoming_issue
+        elif clean == existing_clean and existing_issue is not None:
+            # Same note as already on disk: nothing new to report.
+            pass
+        else:
+            try:
+                issue_no = file_bug_report(
+                    item_id, item_title(text), area(text, section), clean, existing_issue
+                )
+            except (GhError, OSError) as e:
+                warning = f"saved to UAT.md, but filing the GitHub bug failed: {e}"
+
+    out = rewrite_item(lines, item_id, status, clean, issue_no)
     UAT_PATH.write_text("\n".join(out) + "\n")
     return {"ok": True, "issue": issue_no, "warning": warning}
 
@@ -513,7 +523,7 @@ let savedTimer;
 async function save(it) {
   const r = await fetch('/api/item', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: {'Content-Type': 'application/json', 'X-UAT-Token': '__UAT_TOKEN__'},
     body: JSON.stringify({id: it.id, status: it.status, note: it.note || ''})
   });
   const j = await r.json();
@@ -546,7 +556,21 @@ load();
 </script></body></html>"""
 
 
+# Per-run secret embedded in the served page and required on every POST. The server binds
+# 127.0.0.1, but any web page in the owner's browser can still send a POST there (simple
+# cross-origin request) and trigger `gh issue create/comment`. A custom header forces a CORS
+# preflight, which this server never approves, and a foreign page can't read the token.
+TOKEN = secrets.token_urlsafe(32)
+ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
+
+
 class Handler(BaseHTTPRequestHandler):
+    def _host_ok(self):
+        # Rejects DNS-rebinding: an attacker's hostname resolving to 127.0.0.1 would
+        # otherwise be same-origin to the page and could read the token.
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+        return host in ALLOWED_HOSTS
+
     def _send(self, code, body, ctype):
         payload = body.encode()
         self.send_response(code)
@@ -556,14 +580,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self):
+        if not self._host_ok():
+            return self._send(403, "forbidden", "text/plain")
         if self.path == "/":
-            self._send(200, PAGE, "text/html; charset=utf-8")
+            self._send(200, PAGE.replace("__UAT_TOKEN__", TOKEN), "text/html; charset=utf-8")
         elif self.path == "/api/items":
             self._send(200, json.dumps(parse(UAT_PATH.read_text())), "application/json")
         else:
             self._send(404, "not found", "text/plain")
 
     def do_POST(self):
+        if not self._host_ok() or not secrets.compare_digest(
+                self.headers.get("X-UAT-Token") or "", TOKEN):
+            return self._send(403, json.dumps({"error": "forbidden"}), "application/json")
         if self.path != "/api/item":
             return self._send(404, "not found", "text/plain")
         try:
@@ -593,7 +622,7 @@ def main():
         if not out_path.is_absolute():
             out_path = REPO_ROOT / out_path
         items_json = json.dumps(parse(UAT_PATH.read_text()))
-        standalone = PAGE.replace("data = await (await fetch('/api/items')).json();", f"data = {items_json};")
+        standalone = PAGE.replace("data = await (await fetch('/api/items')).json();", f"data = {items_json};").replace("__UAT_TOKEN__", "")
         out_path.write_text(standalone)
         print(f"Exported standalone UAT board to {out_path}")
         return

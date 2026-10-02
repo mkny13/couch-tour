@@ -145,17 +145,18 @@ variant (D233).
     # Point Mac production app at staging
     /Applications/Couch\ Tour.app/Contents/MacOS/Couch\ Tour --sync-base-url=https://couch-tour-sync-staging.mkastellec.workers.dev
     ```
-  - **Android** (`syncBaseUrl` intent extra):
-    ```bash
-    # Point Android beta back at production
-    adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
+   - **Android** (`syncBaseUrl` intent extra, debug/beta builds only — see D323):
+     ```bash
+     # Point Android beta back at production
+     adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
 
-    # Point regular debug build at production
-    adb shell am start -n dev.mike.couchtour/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
+     # Point regular debug build at production
+     adb shell am start -n dev.mike.couchtour/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync.mkastellec.workers.dev
 
-    # Point beta back to staging
-    adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync-staging.mkastellec.workers.dev
-    ```
+     # Point beta back to staging
+     adb shell am start -n dev.mike.couchtour.beta/dev.mike.couchtour.MainActivity --es syncBaseUrl https://couch-tour-sync-staging.mkastellec.workers.dev
+     ```
+     Release builds ignore `syncBaseUrl` entirely so an installed app cannot redirect sync traffic.
 - **Staging Reset**: `scripts/smoke-sync-reset.sh` empties staging tables (`progress`, `seqs`, `pairings`, `devices`, `groups`) via `wrangler d1 execute couch-tour-sync-staging --remote`. Hard-guarded against running on prod.
   ```bash
   # Dry run (prints command)
@@ -167,7 +168,7 @@ variant (D233).
 
 ## Tests
 
-794 Android unit tests, no device or emulator required:
+818 Android unit tests, no device or emulator required:
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
@@ -176,17 +177,19 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML report lands in
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-496 macOS package tests under `macos/Packages/CouchTourKit`:
+521 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test
 ```
 
-14 sync backend tests, run against real Miniflare D1 rather than a mock:
+18 sync backend tests, run against real Miniflare D1 rather than a mock:
 
 ```bash
 cd sync && npm test
 ```
+
+The `checks` workflow (`.github/workflows/checks.yml`) runs `scripts/checks/check-mockup-data.sh` on every PR; it fails when mockup/placeholder data (lorem ipsum, hardcoded artist names) shows up in shipping code outside previews. Exceptions go in `scripts/checks/mockup-allowlist.txt`, each with a reason. Self-test: `scripts/checks/test_check_mockup_data.sh`.
 
 Install to a connected device or running emulator:
 

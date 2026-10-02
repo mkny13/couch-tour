@@ -1,0 +1,269 @@
+{
+  "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+  "avg_duration": 8936.086,
+  "avg_rating": 7.6444445,
+  "created_at": "2026-08-19T14:26:53Z",
+  "duration": 723823,
+  "popularity": {
+    "momentum_score": 0.7053,
+    "trend_ratio": 0.9709,
+    "windows": {
+      "30d": {
+        "hot_score": 126.119,
+        "hours": 2829.4658,
+        "plays": 15906
+      },
+      "48h": {
+        "hot_score": 35.171,
+        "hours": 221.4478,
+        "plays": 1237
+      },
+      "7d": {
+        "hot_score": 52.2207,
+        "hours": 483.0569,
+        "plays": 2727
+      }
+    }
+  },
+  "show_count": 81,
+  "shows": [
+    {
+      "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+      "avg_duration": 11047.0,
+      "avg_rating": 6.714,
+      "created_at": "2026-08-19T14:26:52Z",
+      "date": "1997-02-13T00:00:00Z",
+      "display_date": "1997-02-13",
+      "era": null,
+      "has_soundboard_source": false,
+      "has_streamable_flac_source": false,
+      "most_recent_source_updated_at": "2026-09-17T18:46:39Z",
+      "popularity": {
+        "momentum_score": 0.1844,
+        "trend_ratio": 0.0,
+        "windows": {
+          "30d": {
+            "hot_score": 16.1245,
+            "hours": 32.22,
+            "plays": 260
+          },
+          "48h": {
+            "hot_score": 0.0,
+            "hours": 0.0,
+            "plays": 0
+          },
+          "7d": {
+            "hot_score": 0.0,
+            "hours": 0.0,
+            "plays": 0
+          }
+        }
+      },
+      "source_count": 1,
+      "tour": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "created_at": "2026-08-19T14:25:18Z",
+        "end_date": "1997-03-02T00:00:00Z",
+        "name": "Winter European Tour 1997",
+        "slug": "winter-european-tour-1997",
+        "start_date": "1997-02-13T00:00:00Z",
+        "updated_at": "2024-10-26T01:03:18Z",
+        "upstream_identifier": "35",
+        "uuid": "2cc192ad-2649-a5ab-a81c-842e7c1529d5"
+      },
+      "tour_uuid": "2cc192ad-2649-a5ab-a81c-842e7c1529d5",
+      "updated_at": "2026-09-18T08:46:43Z",
+      "uuid": "f44f2bce-3c50-9063-c281-6812112d5bd9",
+      "venue": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "created_at": "2026-08-19T14:25:20Z",
+        "latitude": 51.504014,
+        "location": "London, England",
+        "longitude": -0.224068,
+        "name": "Shepherd's Bush Empire",
+        "past_names": null,
+        "shows_at_venue": 2,
+        "slug": "shepherds-bush-empire",
+        "sortName": "Shepherd's Bush Empire",
+        "updated_at": "2026-01-02T02:23:15Z",
+        "upstream_identifier": "604",
+        "uuid": "0a0ff8aa-0d3b-8f5b-14a2-71f08a772eed"
+      },
+      "venue_uuid": "0a0ff8aa-0d3b-8f5b-14a2-71f08a772eed",
+      "year": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "avg_duration": 8936.086,
+        "avg_rating": 7.6444445,
+        "created_at": "2026-08-19T14:26:53Z",
+        "duration": 723823,
+        "popularity": null,
+        "show_count": 81,
+        "source_count": 81,
+        "updated_at": "2026-09-27T10:01:07Z",
+        "uuid": "adb306c3-b4b1-4f09-0bf2-376b9a0ce24f",
+        "year": "1997"
+      },
+      "year_uuid": "adb306c3-b4b1-4f09-0bf2-376b9a0ce24f"
+    },
+    {
+      "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+      "avg_duration": 9399.0,
+      "avg_rating": 6.578,
+      "created_at": "2026-08-19T14:26:52Z",
+      "date": "1997-02-14T00:00:00Z",
+      "display_date": "1997-02-14",
+      "era": null,
+      "has_soundboard_source": false,
+      "has_streamable_flac_source": false,
+      "most_recent_source_updated_at": "2026-09-17T18:46:11Z",
+      "popularity": {
+        "momentum_score": 0.7571,
+        "trend_ratio": 0.5941,
+        "windows": {
+          "30d": {
+            "hot_score": 13.3041,
+            "hours": 29.5914,
+            "plays": 177
+          },
+          "48h": {
+            "hot_score": 2.0,
+            "hours": 0.5142,
+            "plays": 4
+          },
+          "7d": {
+            "hot_score": 5.6569,
+            "hours": 5.9272,
+            "plays": 32
+          }
+        }
+      },
+      "source_count": 1,
+      "tour": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "created_at": "2026-08-19T14:25:18Z",
+        "end_date": "1997-03-02T00:00:00Z",
+        "name": "Winter European Tour 1997",
+        "slug": "winter-european-tour-1997",
+        "start_date": "1997-02-13T00:00:00Z",
+        "updated_at": "2024-10-26T01:03:18Z",
+        "upstream_identifier": "35",
+        "uuid": "2cc192ad-2649-a5ab-a81c-842e7c1529d5"
+      },
+      "tour_uuid": "2cc192ad-2649-a5ab-a81c-842e7c1529d5",
+      "updated_at": "2026-09-18T08:46:43Z",
+      "uuid": "437a8179-1f02-968f-7700-b5df9f2dcf8e",
+      "venue": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "created_at": "2026-08-19T14:25:20Z",
+        "latitude": 50.853104,
+        "location": "Brussels, Belgium",
+        "longitude": 4.366154,
+        "name": "Le Botanique",
+        "past_names": null,
+        "shows_at_venue": 1,
+        "slug": "le-botanique",
+        "sortName": "Le Botanique",
+        "updated_at": "2026-01-02T02:23:23Z",
+        "upstream_identifier": "374",
+        "uuid": "9cbb63f4-6691-ef35-34bc-6b8048acd72a"
+      },
+      "venue_uuid": "9cbb63f4-6691-ef35-34bc-6b8048acd72a",
+      "year": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "avg_duration": 8936.086,
+        "avg_rating": 7.6444445,
+        "created_at": "2026-08-19T14:26:53Z",
+        "duration": 723823,
+        "popularity": null,
+        "show_count": 81,
+        "source_count": 81,
+        "updated_at": "2026-09-27T10:01:07Z",
+        "uuid": "adb306c3-b4b1-4f09-0bf2-376b9a0ce24f",
+        "year": "1997"
+      },
+      "year_uuid": "adb306c3-b4b1-4f09-0bf2-376b9a0ce24f"
+    },
+    {
+      "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+      "avg_duration": 8360.0,
+      "avg_rating": 6.99,
+      "created_at": "2026-08-19T14:26:52Z",
+      "date": "1997-02-16T00:00:00Z",
+      "display_date": "1997-02-16",
+      "era": null,
+      "has_soundboard_source": true,
+      "has_streamable_flac_source": false,
+      "most_recent_source_updated_at": "2026-09-17T18:45:46Z",
+      "popularity": {
+        "momentum_score": 0.8688,
+        "trend_ratio": 1.7966,
+        "windows": {
+          "30d": {
+            "hot_score": 19.5704,
+            "hours": 40.6622,
+            "plays": 383
+          },
+          "48h": {
+            "hot_score": 6.4807,
+            "hours": 4.5292,
+            "plays": 42
+          },
+          "7d": {
+            "hot_score": 10.0995,
+            "hours": 10.7797,
+            "plays": 102
+          }
+        }
+      },
+      "source_count": 1,
+      "tour": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "created_at": "2026-08-19T14:25:18Z",
+        "end_date": "1997-03-02T00:00:00Z",
+        "name": "Winter European Tour 1997",
+        "slug": "winter-european-tour-1997",
+        "start_date": "1997-02-13T00:00:00Z",
+        "updated_at": "2024-10-26T01:03:18Z",
+        "upstream_identifier": "35",
+        "uuid": "2cc192ad-2649-a5ab-a81c-842e7c1529d5"
+      },
+      "tour_uuid": "2cc192ad-2649-a5ab-a81c-842e7c1529d5",
+      "updated_at": "2026-09-18T08:46:43Z",
+      "uuid": "5d59a656-ddc4-39cf-7cc3-26d659b02fa4",
+      "venue": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "created_at": "2026-08-19T14:25:20Z",
+        "latitude": 50.942556,
+        "location": "Cologne, Germany",
+        "longitude": 6.95936,
+        "name": "Alter Wartesaal",
+        "past_names": null,
+        "shows_at_venue": 1,
+        "slug": "alter-wartesaal",
+        "sortName": "Alter Wartesaal",
+        "updated_at": "2026-01-02T02:22:36Z",
+        "upstream_identifier": "25",
+        "uuid": "03aaefb0-c493-16f5-13ba-2ad316c139db"
+      },
+      "venue_uuid": "03aaefb0-c493-16f5-13ba-2ad316c139db",
+      "year": {
+        "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+        "avg_duration": 8936.086,
+        "avg_rating": 7.6444445,
+        "created_at": "2026-08-19T14:26:53Z",
+        "duration": 723823,
+        "popularity": null,
+        "show_count": 81,
+        "source_count": 81,
+        "updated_at": "2026-09-27T10:01:07Z",
+        "uuid": "adb306c3-b4b1-4f09-0bf2-376b9a0ce24f",
+        "year": "1997"
+      },
+      "year_uuid": "adb306c3-b4b1-4f09-0bf2-376b9a0ce24f"
+    }
+  ],
+  "source_count": 81,
+  "updated_at": "2026-09-27T10:01:07Z",
+  "uuid": "adb306c3-b4b1-4f09-0bf2-376b9a0ce24f",
+  "year": "1997"
+}

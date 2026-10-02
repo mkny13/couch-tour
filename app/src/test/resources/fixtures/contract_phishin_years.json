@@ -1,0 +1,44 @@
+[
+  {
+    "cover_art_urls": {
+      "large": "https://phish.in/blob/0yeazbkhg0xd47g53iejzugldjj5.jpg",
+      "medium": "https://phish.in/blob/ny37nigznl9f75s1fxrqkjo8ackv.jpg",
+      "small": "https://phish.in/blob/2w17h0v93n1e0d1d6sy7pwgu4105.jpg"
+    },
+    "era": "1.0",
+    "period": "1983-1987",
+    "shows_count": 93,
+    "shows_duration": 206560403,
+    "shows_with_audio_count": 34,
+    "venues_count": 28,
+    "venues_with_audio_count": 14
+  },
+  {
+    "cover_art_urls": {
+      "large": "https://phish.in/blob/k6qx82mduwxp4qjce0wezru5dsvd.jpg",
+      "medium": "https://phish.in/blob/7xwqyyylhsfacetn917j9x7i2j7w.jpg",
+      "small": "https://phish.in/blob/skrmpigqdh643pkp925yh6xr1g56.jpg"
+    },
+    "era": "1.0",
+    "period": "1988",
+    "shows_count": 94,
+    "shows_duration": 338954970,
+    "shows_with_audio_count": 44,
+    "venues_count": 40,
+    "venues_with_audio_count": 21
+  },
+  {
+    "cover_art_urls": {
+      "large": "https://phish.in/blob/zumw372mwqvvwf2phymq5ljrlz3f.jpg",
+      "medium": "https://phish.in/blob/4uu1ltvw6a00hc6s7hv7oldnquhx.jpg",
+      "small": "https://phish.in/blob/jjz4v19aeo5pnjus8oe06wnr6pjh.jpg"
+    },
+    "era": "1.0",
+    "period": "1989",
+    "shows_count": 123,
+    "shows_duration": 455235677,
+    "shows_with_audio_count": 65,
+    "venues_count": 62,
+    "venues_with_audio_count": 40
+  }
+]

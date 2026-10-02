@@ -293,6 +293,39 @@ class NextStopTest {
     }
 
     @Test
+    fun `NextStop load does not cache a partial result and retries the failed artist`() = runBlocking {
+        val ok = ArtistRef(Backend.RELISTEN, "ok", "Ok Artist")
+        val flaky = ArtistRef(Backend.RELISTEN, "flaky", "Flaky Artist")
+        val period = PeriodRef("uuid-2025", "2025")
+        val okShow = ShowSummary(artist = ok, date = "2025-07-05", tourName = "Fall Tour")
+        val flakyShow = ShowSummary(artist = flaky, date = "2025-07-01", tourName = "Fall Tour")
+        var flakyFails = true
+        val source = object : MusicSource {
+            override val backend = Backend.RELISTEN
+            override suspend fun artists() = emptyList<ArtistRef>()
+            override suspend fun periods(artist: ArtistRef): List<PeriodRef> {
+                if (artist.id == "flaky" && flakyFails) error("boom")
+                return listOf(period)
+            }
+            override suspend fun shows(artist: ArtistRef, period: PeriodRef) =
+                listOf(if (artist.id == "ok") okShow else flakyShow)
+            override suspend fun show(artist: ArtistRef, date: String, recordingId: String?) = error("unused")
+            override suspend fun search(term: String) = SearchHits()
+        }
+        NextStop.cached = null
+        val first = NextStop.load(listOf(ok, flaky), today = "2026-11-17") { source }
+        assertEquals(listOf(okShow), first)
+        assertEquals(null, NextStop.cached)
+
+        flakyFails = false
+        val second = NextStop.load(listOf(ok, flaky), today = "2026-11-17") { source }
+        assertEquals(setOf(okShow, flakyShow), second.toSet())
+        assertEquals(2, second.size)
+        assertTrue(NextStop.cached != null)
+        NextStop.cached = null
+    }
+
+    @Test
     fun `currentTours returns empty for no favorites`() = runBlocking {
         val result = currentTours(emptyList()) { error("not used") }
         assertEquals(emptyList<ShowSummary>(), result)

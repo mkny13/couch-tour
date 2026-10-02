@@ -245,36 +245,7 @@ struct HomeView: View {
             ProgressBarOverlay(fraction: frac)
 
             VStack(alignment: .leading, spacing: 0) {
-                // Header: Artist + Date + Menu
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(ArtistAbbreviations.label(for: item.artist))
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(colors.textPrimary)
-                            .lineLimit(1)
-
-                        Text(formatShowDate(item.title))
-                            .font(.system(size: 15))
-                            .foregroundStyle(colors.textPrimary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Menu {
-                        Button("Open show") { Task { await openResumeRow(item) } }
-                        Button("Play from start") { Task { await tapResume(item) } }
-                        Button("Mark completed") { Task { await markResumeRowCompleted(item) } }
-                        Button("Remove from in progress") { Task { await removeResumeRow(item) } }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 13))
-                            .foregroundStyle(colors.textMuted)
-                            .frame(width: 26, height: 26)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .frame(width: 26, height: 26)
-                }
+                inProgressHeader(item)
 
                 // Track Title
                 Text(item.trackTitle.isEmpty ? "Track" : item.trackTitle)
@@ -290,32 +261,7 @@ struct HomeView: View {
                     .padding(.top, 2)
                     .lineLimit(1)
 
-                // Bottom Row: Elapsed time + Play button
-                HStack(alignment: .center) {
-                    let posMs = (player.queueKey == item.queueKey) ? player.positionMs : item.positionMs
-                    let timeLabel = "\(fmt(posMs)) elapsed"
-                    Text(timeLabel)
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.textSubtle)
-
-                    Spacer()
-
-                    Button {
-                        Task { await tapResume(item) }
-                    } label: {
-                        Circle()
-                            .stroke(colors.accentIcon, lineWidth: 1)
-                            .frame(width: 30, height: 30)
-                            .overlay(
-                                Image(systemName: "play.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(colors.accentTintText)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Play \(item.trackTitle)")
-                }
-                .padding(.top, 12)
+                inProgressPlayRow(item)
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
@@ -328,6 +274,70 @@ struct HomeView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(colors.panelBorder, lineWidth: 1)
         )
+    }
+
+    /// Artist + date on the left, the row actions menu on the right.
+    private func inProgressHeader(_ item: PlaybackProgress) -> some View {
+        // Header: Artist + Date + Menu
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(ArtistAbbreviations.label(for: item.artist))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+
+                Text(formatShowDate(item.title))
+                    .font(.system(size: 15))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Menu {
+                Button("Open show") { Task { await openResumeRow(item) } }
+                Button("Play from start") { Task { await tapResume(item) } }
+                Button("Mark completed") { Task { await markResumeRowCompleted(item) } }
+                Button("Remove from in progress") { Task { await removeResumeRow(item) } }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13))
+                    .foregroundStyle(colors.textMuted)
+                    .frame(width: 26, height: 26)
+            }
+            .menuStyle(.borderlessButton)
+            .frame(width: 26, height: 26)
+        }
+    }
+
+    /// Elapsed time on the left, the resume button on the right.
+    private func inProgressPlayRow(_ item: PlaybackProgress) -> some View {
+        // Bottom Row: Elapsed time + Play button
+        HStack(alignment: .center) {
+            let posMs = (player.queueKey == item.queueKey) ? player.positionMs : item.positionMs
+            let timeLabel = "\(fmt(posMs)) elapsed"
+            Text(timeLabel)
+                .font(.system(size: 12))
+                .foregroundStyle(colors.textSubtle)
+
+            Spacer()
+
+            Button {
+                Task { await tapResume(item) }
+            } label: {
+                Circle()
+                    .stroke(colors.accentIcon, lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colors.accentTintText)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Play \(item.trackTitle)")
+        }
+        .padding(.top, 12)
     }
 
     // MARK: - Next Tour Stops Card

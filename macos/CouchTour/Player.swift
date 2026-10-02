@@ -701,18 +701,6 @@ final class Player: NSObject, ObservableObject {
         saveProgress(force: true)
     }
 
-    func dismissPostShowPrompt() {
-        postShowPrompt = nil
-    }
-
-    func playNextTourStop(_ show: ShowSummary) {
-        dismissPostShowPrompt()
-        Task { @MainActor in
-            guard let detail = try? await sourceFor(show.artist.backend).show(artist: show.artist, date: show.date, recordingId: nil) else { return }
-            self.play(detail: detail)
-        }
-    }
-
     private func observeCurrentItemReadyForResume() {
         guard let item = queuePlayer.currentItem else { return }
         itemStatusObservation = item.observe(\.status, options: [.new]) { [weak self] observedItem, _ in

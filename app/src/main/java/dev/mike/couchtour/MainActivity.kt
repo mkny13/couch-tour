@@ -126,8 +126,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import kotlinx.coroutines.Dispatchers
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -152,23 +154,21 @@ class MainActivity : ComponentActivity() {
         // launchMode is singleTask, so a second tap re-enters through here, not onCreate.
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false)) openNowPlaying.value = true
-        intent.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
-            SyncApi.applyConfiguredBaseUrl(this, override = override)
-        }
+        SyncApi.maybeApplyBaseUrlOverride(this, intent.getStringExtra(EXTRA_SYNC_BASE_URL))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         openNowPlaying.value = intent?.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false) == true
-        intent?.getStringExtra(EXTRA_SYNC_BASE_URL)?.let { override ->
-            SyncApi.applyConfiguredBaseUrl(this, override = override)
-        }
+        SyncApi.maybeApplyBaseUrlOverride(this, intent?.getStringExtra(EXTRA_SYNC_BASE_URL))
 
         if (savedInstanceState == null) {
             // An immediate catch-up on launch, on top of the periodic background job.
-            // Fire-and-forget: sync() is a no-op if unpaired.
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            // Fire-and-forget: sync() is a no-op if unpaired. lifecycleScope ties this launch
+            // to the Activity lifecycle so the coroutine (and the Activity reference it
+            // captures) is cancelled if the Activity is destroyed before sync completes.
+            lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     SyncSession.sync(PhishInDb.get(this@MainActivity).progressDao())
                 } catch (e: Exception) {

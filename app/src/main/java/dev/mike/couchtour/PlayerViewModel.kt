@@ -2,10 +2,12 @@ package dev.mike.couchtour
 
 import android.app.Application
 import android.content.ComponentName
+import android.os.Bundle
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -149,59 +151,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val youTubeMode = extras?.getString(Keys.YOUTUBE_MODE)?.let { YouTubePlaybackMode.fromId(it) }
         val audioFormat = playerAudioFormat(isFlac, youTubeMode)
 
-        var showDate = extras?.getString(Keys.SHOW_DATE).orEmpty()
-        var venueName = extras?.getString(Keys.VENUE_NAME).orEmpty()
-        var artistName = extras?.getString(Keys.ARTIST_NAME) ?: meta?.artist?.toString().orEmpty()
-        var artistId = extras?.getString(Keys.ARTIST_ID).orEmpty()
-
-        if (queueKey != null) {
-            when (val ref = parseQueueKey(queueKey)) {
-                null -> {}
-                else -> when (ref.kind) {
-                    QueueKind.SHOW -> {
-                        if (showDate.isEmpty()) showDate = ref.id
-                        if (artistName.isEmpty()) artistName = "Phish"
-                        if (artistId.isEmpty()) artistId = "phish"
-                    }
-                    QueueKind.RECORDING -> {
-                        parseRecordingId(ref.id)?.let { rec ->
-                            if (showDate.isEmpty()) showDate = rec.date
-                            if (artistId.isEmpty()) artistId = rec.artistSlug
-                            if (artistName.isEmpty()) artistName = rec.artistSlug.replace('-', ' ').split(' ').joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
-                        }
-                    }
-                    else -> {}
-                }
-            }
-        }
-        if (showDate.isEmpty() && show.isNotEmpty() && show.matches(Regex("\\d{4}-\\d{2}-\\d{2}.*"))) {
-            showDate = show.take(10)
-        }
-        if (artistName.isEmpty()) {
-            artistName = if (backend == Backend.PHISHIN.id || backend == null) "Phish" else "Artist"
-        }
-        if (artistId.isEmpty() && (backend == Backend.PHISHIN.id || backend == null)) {
-            artistId = "phish"
-        }
+        val venueName = extras?.getString(Keys.VENUE_NAME).orEmpty()
+        val (showDate, artistName, artistId) = resolveIdentity(extras, show, backend, meta)
 
         val isBuffering = c.playbackState == Player.STATE_BUFFERING || (c.playWhenReady && !c.isPlaying && c.playbackState != Player.STATE_ENDED && c.mediaItemCount > 0)
-
-        val queueItems = if (c.mediaItemCount > 0) {
-            (0 until c.mediaItemCount).map { i ->
-                val mItem = c.getMediaItemAt(i)
-                val mMeta = mItem.mediaMetadata
-                val mExtras = mMeta.extras
-                QueueTrackItem(
-                    index = i,
-                    mediaId = mItem.mediaId,
-                    title = mMeta.title?.toString() ?: "Track ${i + 1}",
-                    artist = mMeta.artist?.toString().orEmpty(),
-                    durationMs = mExtras?.getLong(Keys.DURATION_MS, 0L) ?: 0L,
-                    setName = mExtras?.getString(Keys.SET_NAME).orEmpty(),
-                    trackPosition = mExtras?.getInt(Keys.TRACK_POSITION, i + 1) ?: (i + 1),
-                )
-            }
-        } else emptyList()
 
         _state.value = PlayerState(
             connected = true,
@@ -239,31 +192,100 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             isJamChart = extras?.getBoolean(Keys.IS_JAM_CHART, false) == true || extras?.getString(Keys.IS_JAM_CHART) == "true",
             trackSlug = extras?.getString(Keys.TRACK_SLUG),
             jamChartNotes = extras?.getString(Keys.JAM_CHART_NOTES),
-            queue = queueItems,
+            queue = queueTracks(c),
         )
 
         // When playback reaches the end of the show (after encore), prompt for next tour stop (#85)
-        if (c.playbackState == Player.STATE_ENDED) {
-            val key = extras?.getString(Keys.QUEUE_KEY)
-            val active = activeShowSummary ?: key?.let { k ->
-                when (val ref = parseQueueKey(k)) {
-                    null -> null
-                    else -> when (ref.kind) {
-                        QueueKind.SHOW -> ShowSummary(artist = PHISH, date = ref.id, venue = show, location = null, tourName = null)
-                        QueueKind.RECORDING -> parseRecordingId(ref.id)?.let { rec ->
-                            ShowSummary(artist = ArtistRef(id = rec.artistSlug, name = rec.artistSlug, backend = Backend.RELISTEN), date = rec.date, venue = show, location = null, tourName = null)
-                        }
-                        else -> null
+        schedulePostShowPrompt(c, extras, show)
+    }
+
+    /**
+     * Resolves the show date, artist name and artist id for the current queue line. Priority:
+     * an explicit queue key (show or recording backend), then a date baked into the queue
+     * label, then the phish.in backend fallback. Returned already clamped to fallbacks so
+     * refresh() can hand the values straight to PlayerState.
+     */
+    private fun resolveIdentity(extras: Bundle?, show: String, backend: String?, meta: MediaMetadata?): Triple<String, String, String> {
+        var showDate = extras?.getString(Keys.SHOW_DATE).orEmpty()
+        var artistName = extras?.getString(Keys.ARTIST_NAME) ?: meta?.artist?.toString().orEmpty()
+        var artistId = extras?.getString(Keys.ARTIST_ID).orEmpty()
+        val queueKey = extras?.getString(Keys.QUEUE_KEY)
+        if (queueKey != null) {
+            when (val ref = parseQueueKey(queueKey)) {
+                null -> {}
+                else -> when (ref.kind) {
+                    QueueKind.SHOW -> {
+                        if (showDate.isEmpty()) showDate = ref.id
+                        if (artistName.isEmpty()) artistName = "Phish"
+                        if (artistId.isEmpty()) artistId = "phish"
                     }
+                    QueueKind.RECORDING -> {
+                        parseRecordingId(ref.id)?.let { rec ->
+                            if (showDate.isEmpty()) showDate = rec.date
+                            if (artistId.isEmpty()) artistId = rec.artistSlug
+                            if (artistName.isEmpty()) artistName = rec.artistSlug.replace('-', ' ').split(' ').joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
+                        }
+                    }
+                    else -> {}
                 }
             }
-            if (active != null && lastResolvedEndedShowDate != active.date) {
-                lastResolvedEndedShowDate = active.date
-                viewModelScope.launch {
-                    val nextStop = findNextTourStop(active.artist, active.date, active.tourName)
-                    if (nextStop != null) {
-                        _postShowPrompt.value = nextStop
+        }
+        if (showDate.isEmpty() && show.isNotEmpty() && show.matches(Regex("\\d{4}-\\d{2}-\\d{2}.*"))) {
+            showDate = show.take(10)
+        }
+        if (artistName.isEmpty()) {
+            artistName = if (backend == Backend.PHISHIN.id || backend == null) "Phish" else "Artist"
+        }
+        if (artistId.isEmpty() && (backend == Backend.PHISHIN.id || backend == null)) {
+            artistId = "phish"
+        }
+        return Triple(showDate, artistName, artistId)
+    }
+
+    private fun queueTracks(c: Player): List<QueueTrackItem> =
+        if (c.mediaItemCount > 0) {
+            (0 until c.mediaItemCount).map { i ->
+                val mItem = c.getMediaItemAt(i)
+                val mMeta = mItem.mediaMetadata
+                val mExtras = mMeta.extras
+                QueueTrackItem(
+                    index = i,
+                    mediaId = mItem.mediaId,
+                    title = mMeta.title?.toString() ?: "Track ${i + 1}",
+                    artist = mMeta.artist?.toString().orEmpty(),
+                    durationMs = mExtras?.getLong(Keys.DURATION_MS, 0L) ?: 0L,
+                    setName = mExtras?.getString(Keys.SET_NAME).orEmpty(),
+                    trackPosition = mExtras?.getInt(Keys.TRACK_POSITION, i + 1) ?: (i + 1),
+                )
+            }
+        } else emptyList()
+
+    /**
+     * After a show plays to its end (after encore, #85), prompt for the next tour stop, but
+     * only once per show and only when the identity resolved from the queue matches a real
+     * show/recording.
+     */
+    private fun schedulePostShowPrompt(c: Player, extras: Bundle?, showLabel: String) {
+        if (c.playbackState != Player.STATE_ENDED) return
+        val key = extras?.getString(Keys.QUEUE_KEY)
+        val active = activeShowSummary ?: key?.let { k ->
+            when (val ref = parseQueueKey(k)) {
+                null -> null
+                else -> when (ref.kind) {
+                    QueueKind.SHOW -> ShowSummary(artist = PHISH, date = ref.id, venue = showLabel, location = null, tourName = null)
+                    QueueKind.RECORDING -> parseRecordingId(ref.id)?.let { rec ->
+                        ShowSummary(artist = ArtistRef(id = rec.artistSlug, name = rec.artistSlug, backend = Backend.RELISTEN), date = rec.date, venue = showLabel, location = null, tourName = null)
                     }
+                    else -> null
+                }
+            }
+        }
+        if (active != null && lastResolvedEndedShowDate != active.date) {
+            lastResolvedEndedShowDate = active.date
+            viewModelScope.launch {
+                val nextStop = findNextTourStop(active.artist, active.date, active.tourName)
+                if (nextStop != null) {
+                    _postShowPrompt.value = nextStop
                 }
             }
         }
@@ -278,8 +300,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             when (summary.artist.backend) {
                 Backend.PHISHIN -> {
-                    val show = PhishInApi.show(summary.date)
-                    if (show != null) playShow(show)
+                    playShow(PhishInApi.show(summary.date))
                 }
                 Backend.RELISTEN -> {
                     val detail = runCatching { RelistenApi.show(summary.artist.id, summary.date).toShowDetail(summary.artist) }.getOrNull()

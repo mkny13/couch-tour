@@ -37,7 +37,7 @@ Dump the running beta's accessibility tree (bounded, identifier-scoped): `script
 `sync/` is a Cloudflare Worker + D1 service (`https://couch-tour-sync.mkastellec.workers.dev`).
 - **Local dev:** `cd sync && npm install && npm run db:migrate:local && npm run dev` (runs local D1 at `http://localhost:8787`).
 - **Typecheck:** `cd sync && npm run typecheck`.
-- **Tests:** `cd sync && npm test` (14 tests, real Miniflare D1, not a mock). CI runs typecheck and tests before any deploy.
+- **Tests:** `cd sync && npm test` (18 tests, real Miniflare D1, not a mock). CI runs typecheck and tests before any deploy.
 - **Deployments:** Never deploy by hand. `.github/workflows/sync-deploy.yml` deploys to staging, runs smoke tests, applies migrations, and promotes to prod on push to `main` for `sync/**`. Dispatch on demand with `gh workflow run sync-deploy.yml`.
 
 ## Names that look wrong and are not
@@ -61,6 +61,11 @@ The `progress` table stores listening history. Destructive migrations are never 
 - **Comments:** Explain *why*, not *what*.
 - **README.md:** Update test counts when adding or removing tests.
 - **UAT.md:** Record items requiring human verification (`scripts/uat-server.py`). Items marked "needs work" are active bug reports.
+
+## Escaped bugs
+
+A bug fix isn't done until the issue's *Check that now catches it* names a check that exists in the repo (a test, CI step, lint, or smoke journey under `scripts/smoke/`), or states why none is feasible.
+The fix's PR adds that check or points to it. Fill in *Escape cause* too, so the same class stops recurring.
 
 ## Accessibility identifiers
 

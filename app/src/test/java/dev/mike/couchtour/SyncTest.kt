@@ -191,7 +191,135 @@ class SyncConfigTest {
     }
 }
 
-/** Exercises SyncApi's outgoing requests against a local server, mirroring ApiRequestTest.kt. */
+/** Regression coverage for the debug-only gate on intent-supplied sync base URL overrides (D323). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class SyncBaseUrlOverrideTest {
+
+    private fun store() = SyncTokenStore(ApplicationProvider.getApplicationContext<Context>())
+    private val defaultUrl = "https://couch-tour-sync.mkastellec.workers.dev".toHttpUrl()
+
+    @After
+    fun tearDown() {
+        SyncApi.baseUrl = defaultUrl
+    }
+
+    @Test
+    fun `a release non-debug override is ignored and not persisted`() {
+        val store = store()
+        SyncApi.baseUrl = "https://original.example.com".toHttpUrl()
+
+        val accepted = SyncApi.maybeApplyBaseUrlOverride(
+            context = ApplicationProvider.getApplicationContext(),
+            override = "https://evil.example.com",
+            debug = false,
+            store = store,
+        )
+
+        assertFalse("release builds must reject intent-provided overrides", accepted)
+        assertEquals(
+            "configured URL must not be replaced by an intent override",
+            "https://original.example.com".toHttpUrl(), SyncApi.baseUrl,
+        )
+        assertNull(
+            "override must not be persisted to the token store in release builds",
+            store.baseUrlOverride,
+        )
+    }
+
+    @Test
+    fun `a release build ignores and clears an override persisted by an earlier release`() {
+        val store = store()
+        store.baseUrlOverride = "https://evil.example.com"
+
+        val target = SyncApi.applyConfiguredBaseUrl(
+            defaultUrl = defaultUrl.toString(), store = store, allowOverride = false,
+        )
+
+        assertEquals(defaultUrl, target)
+        assertEquals(defaultUrl, SyncApi.baseUrl)
+        assertNull("stale override must be wiped", store.baseUrlOverride)
+    }
+
+    @Test
+    fun `a debug override is accepted and applied through the shared policy`() {
+        val store = store()
+        SyncApi.baseUrl = "https://original.example.com".toHttpUrl()
+
+        val accepted = SyncApi.maybeApplyBaseUrlOverride(
+            context = ApplicationProvider.getApplicationContext(),
+            override = "https://custom.example.com",
+            debug = true,
+            store = store,
+        )
+
+        assertTrue("debug builds must accept intent-provided overrides", accepted)
+        assertEquals(
+            "https://custom.example.com".toHttpUrl(), SyncApi.baseUrl,
+        )
+    }
+
+    @Test
+    fun `a blank override is ignored even in debug builds`() {
+        val store = store()
+        SyncApi.baseUrl = "https://original.example.com".toHttpUrl()
+
+        val acceptedBlank = SyncApi.maybeApplyBaseUrlOverride(
+            context = ApplicationProvider.getApplicationContext(),
+            override = "   ",
+            debug = true,
+            store = store,
+        )
+        val acceptedNull = SyncApi.maybeApplyBaseUrlOverride(
+            context = ApplicationProvider.getApplicationContext(),
+            override = null,
+            debug = true,
+            store = store,
+        )
+
+        assertFalse(acceptedBlank)
+        assertFalse(acceptedNull)
+        assertEquals("https://original.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+    @Test
+    fun `defaulting to BuildConfig_DEBUG accepts overrides in test builds`() {
+        val store = store()
+        SyncApi.baseUrl = "https://original.example.com".toHttpUrl()
+
+        val accepted = SyncApi.maybeApplyBaseUrlOverride(
+            context = ApplicationProvider.getApplicationContext(),
+            override = "https://custom.example.com",
+            store = store,
+        )
+
+        assertTrue(accepted)
+        assertEquals("https://custom.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+
+    @Test
+    fun `host-change token protection still works through the gated path`() {
+        // D314's token-host clearing must still fire when a debug override switches hosts.
+        val store = store()
+        store.tokenHost = "old-host.example.com"
+        store.deviceToken = "token-123"
+        store.deviceId = "device-123"
+        SyncApi.baseUrl = defaultUrl
+
+        SyncApi.maybeApplyBaseUrlOverride(
+            context = ApplicationProvider.getApplicationContext(),
+            override = "https://new-host.example.com",
+            debug = true,
+            store = store,
+        )
+
+        // Token survives the URL resolution (clearing is deferred to SyncSession.sync()).
+        assertNotNull(store.deviceToken)
+        assertEquals("old-host.example.com", store.tokenHost)
+        assertEquals("https://new-host.example.com".toHttpUrl(), SyncApi.baseUrl)
+    }
+}
+
 class SyncApiRequestTest {
 
     private lateinit var server: MockWebServer

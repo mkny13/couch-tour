@@ -11,6 +11,9 @@ on:
       - ".github/workflows/macos-tests.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   macos-test:
     runs-on: macos-14

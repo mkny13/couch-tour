@@ -12,6 +12,9 @@ on:
   # still covers the rare direct-to-main push if it ever needs a manual re-check.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -37,3 +40,6 @@ jobs:
         with:
           name: test-report
           path: app/build/reports/tests/testDebugUnitTest/
+
+      - name: Source guard — syncBaseUrl intent extra must be debug-gated
+        run: scripts/test_sync_base_url_intent_guard.sh

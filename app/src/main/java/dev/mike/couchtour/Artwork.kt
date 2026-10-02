@@ -912,7 +912,7 @@ private fun LargeArtworkOverlay(
 }
 
 /**
- * Medium artwork overlay (AnniversaryCard, ResumeCard, RecordingHeader).
+ * Medium artwork overlay for header surfaces.
  */
 @Composable
 private fun MediumArtworkOverlay(

@@ -190,6 +190,39 @@ class CreateIssueTests(UatServerTestCase):
 
 
 class HttpTests(UatServerTestCase):
+    def _post(self, headers):
+        import urllib.request
+        server = HTTPServer(("127.0.0.1", 0), uat_server.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_address[1]}/api/item",
+            data=json.dumps({"id": "uat-901", "status": "needs-work", "note": "x"}).encode(),
+            headers={"Content-Type": "application/json", **headers},
+        )
+        return urllib.request.urlopen(req)
+
+    def test_post_without_token_is_rejected_and_files_nothing(self):
+        import urllib.error
+        create = mock.Mock(return_value=42)
+        with mock.patch.object(uat_server, "create_issue", create):
+            for headers in ({}, {"X-UAT-Token": "wrong"},
+                            {"Origin": "https://evil.example"}):
+                with self.assertRaises(urllib.error.HTTPError) as cm:
+                    self._post(headers)
+                self.assertEqual(cm.exception.code, 403)
+                cm.exception.close()
+        create.assert_not_called()
+        self.assertEqual(self.read(), SAMPLE)
+
+    def test_post_with_foreign_host_is_rejected_even_with_token(self):
+        import urllib.error
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self._post({"X-UAT-Token": uat_server.TOKEN, "Host": "evil.example"})
+        self.assertEqual(cm.exception.code, 403)
+        cm.exception.close()
+
     def test_api_item_relays_filing_result(self):
         with mock.patch.object(uat_server, "create_issue", mock.Mock(return_value=42)), \
              mock.patch.object(uat_server, "issue_state", mock.Mock(return_value="OPEN")), \
@@ -203,7 +236,7 @@ class HttpTests(UatServerTestCase):
                 f"http://127.0.0.1:{server.server_address[1]}/api/item",
                 data=json.dumps({"id": "uat-901", "status": "needs-work",
                                  "note": "it broke on launch"}).encode(),
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "X-UAT-Token": uat_server.TOKEN},
             )
             with urllib.request.urlopen(req) as r:
                 body = json.loads(r.read())
@@ -219,7 +252,7 @@ class HttpTests(UatServerTestCase):
         req = urllib.request.Request(
             f"http://127.0.0.1:{server.server_address[1]}/api/item",
             data=json.dumps({"id": "uat-999", "status": "pass", "note": ""}).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "X-UAT-Token": uat_server.TOKEN},
         )
         with self.assertRaises(urllib.error.HTTPError) as cm:
             urllib.request.urlopen(req)

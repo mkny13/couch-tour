@@ -631,6 +631,57 @@ private struct TrackTableRow: View {
         track.tags.contains { $0.name.localizedCaseInsensitiveContains("jam") }
     }
 
+    private var titleAndBadges: some View {
+        // Track Title + Badges
+        HStack(spacing: 8) {
+            Text(track.title)
+                .font(.system(size: 15, weight: isPlaying ? .medium : .regular))
+                .foregroundStyle(isPlaying ? colors.accent : colors.textPrimary)
+                .lineLimit(1)
+
+            if isJamChart {
+                Text("JAM CHART")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(0.9)
+                    .foregroundStyle(colors.accentTintText)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
+                    )
+            }
+
+            if isPlaying {
+                Text("PLAYING")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
+            }
+        }
+    }
+
+    private var trackMenu: some View {
+        // Dots Menu
+        Menu {
+            Button("Play Track", action: onTap)
+            TrackLikeButton(backend: backend, trackID: track.id, likesCount: track.likesCount, likedByUser: track.likedByUser)
+            AddToPlaylistButton {
+                [LocalPlaylistTrack(
+                    playlistId: "", backend: backend.rawValue, trackId: track.id,
+                    showDate: track.showDate ?? "", artistSlug: artistSlug, recordingId: recordingId,
+                    title: track.title, durationMs: track.durationMs, venueName: track.venueName, artUrl: track.artURL
+                )]
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13))
+                .foregroundStyle(colors.textMuted)
+                .frame(width: 30, height: 30, alignment: .trailing)
+        }
+        .menuStyle(.borderlessButton)
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 14) {
@@ -640,33 +691,7 @@ private struct TrackTableRow: View {
                     .foregroundStyle(isPlaying ? colors.accent : colors.textMuted)
                     .frame(width: 26, alignment: .trailing)
 
-                // Track Title + Badges
-                HStack(spacing: 8) {
-                    Text(track.title)
-                        .font(.system(size: 15, weight: isPlaying ? .medium : .regular))
-                        .foregroundStyle(isPlaying ? colors.accent : colors.textPrimary)
-                        .lineLimit(1)
-
-                    if isJamChart {
-                        Text("JAM CHART")
-                            .font(.system(size: 9, weight: .semibold))
-                            .tracking(0.9)
-                            .foregroundStyle(colors.accentTintText)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(colors.accentIcon.opacity(0.45), lineWidth: 1)
-                            )
-                    }
-
-                    if isPlaying {
-                        Text("PLAYING")
-                            .font(.system(size: 9, weight: .semibold))
-                            .tracking(1.1)
-                            .foregroundStyle(Color(red: 0xF2 / 255.0, green: 0xA9 / 255.0, blue: 0x3B / 255.0))
-                    }
-                }
+                titleAndBadges
 
                 Spacer()
 
@@ -676,24 +701,7 @@ private struct TrackTableRow: View {
                     .foregroundStyle(colors.textSubtle)
                     .frame(width: 52, alignment: .trailing)
 
-                // Dots Menu
-                Menu {
-                    Button("Play Track", action: onTap)
-                    TrackLikeButton(backend: backend, trackID: track.id, likesCount: track.likesCount, likedByUser: track.likedByUser)
-                    AddToPlaylistButton {
-                        [LocalPlaylistTrack(
-                            playlistId: "", backend: backend.rawValue, trackId: track.id,
-                            showDate: track.showDate ?? "", artistSlug: artistSlug, recordingId: recordingId,
-                            title: track.title, durationMs: track.durationMs, venueName: track.venueName, artUrl: track.artURL
-                        )]
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 13))
-                        .foregroundStyle(colors.textMuted)
-                        .frame(width: 30, height: 30, alignment: .trailing)
-                }
-                .menuStyle(.borderlessButton)
+                trackMenu
             }
             .padding(.vertical, 9)
             .padding(.horizontal, isPlaying ? 8 : 0)

@@ -159,13 +159,15 @@ public actor LoudnessMeasurer {
     public init(
         session: URLSession = .shared,
         decoder: SegmentDecoder = AVAudioFileSegmentDecoder(),
-        cache: SourceLoudnessCache
+        cache: SourceLoudnessCache,
+        tempDirectory: URL? = nil
     ) {
         self.session = session
         self.decoder = decoder
         self.cache = cache
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let dir = caches.appendingPathComponent("CouchTourKit-leveling", isDirectory: true)
+        // Injectable so tests get a private directory instead of sharing the real Caches one.
+        let dir = tempDirectory ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("CouchTourKit-leveling", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.tempDirectory = dir
     }

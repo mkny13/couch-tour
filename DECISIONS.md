@@ -5133,6 +5133,97 @@ Part of #430 (#435). Counterpart of Android #376 / D293.
 
 `PlaybackSettings` gains `audioQuality` (`lossless`/`compressed`, key `audio_quality`, default lossless) and `gapless` (key `gapless`, default on), matching Android's stored values (D228). `AudioQuality.resolveURL` picks FLAC vs MP3 and always falls back to the other format so a tape never becomes unplayable; the FLAC badge follows what actually plays. With gapless off, `Player` queues only the current item and inserts the next one when the queue drains (`currentItemDidChange`), so nothing is preloaded. Both settings apply from the next queue start, not mid-track.
 
+## D319 — Recorded contract fixtures (#441)
+
+Part of #405. The hand-shaped fixtures let upstream drift pass CI and break on devices (#353, #388), so `scripts/contracts/record.sh` captures real responses from the endpoints the clients actually call (11 requests: phish.in years/shows-by-year/show/search/playlists; Relisten artists/years/year/show/on-date/search). It sends a `CouchTour-contract-recorder` User-Agent, runs sequentially with a ~1 s pause, and resolves the Relisten Phish and 1997 uuids from the live responses instead of hard-coding them.
+
+- **Naming**: `contract_*.json`, written byte-identically into both the Android and CouchTourKit fixture dirs, so `macos/scripts/check-fixtures.sh` (D35) keeps passing.
+- **Trimming**: every JSON array is cut to its first 3 elements, recursively. Values and shape stay real; output is pretty-printed with sorted keys so re-records diff cleanly.
+- **Re-record**: `scripts/contracts/record.sh` from the repo root (`--out-dir DIR` writes elsewhere, for a scheduled drift check, #443), then run the Android and CouchTourKit tests. A decode failure on a fresh recording is a real DTO bug, not a fixture problem.
+- **Android**: `ContractFixturesTest` decodes each file with the production DTO and `Json` config, runs the phish.in and Relisten show through the real API clients over `MockWebServer`, and checks that the bundled curated/heuristic match assets load. `ShowsPage` and `PlaylistsPage` became `internal` for this. CouchTourKit decode tests are #442.
+- The curated-match JSON is a bundled asset, not fetched, so it is tested where it ships rather than recorded.
+
+## D320 — Weekly contract drift check (#443)
+
+Part of #405. `.github/workflows/contract-check.yml` runs Mondays (and on dispatch, never on PRs): `scripts/contracts/record.py --skip-failed` re-records the live phish.in/Relisten responses to a temp dir, then `scripts/contracts/shape_check.py` compares their shape (keys and JSON types, never values) with the committed `contract_*.json` fixtures.
+
+- **Why shape, not decode**: the DTOs use `ignoreUnknownKeys`, so a decode test can't see an added upstream key. The diff names each endpoint and path (`+` added, `-` removed, `~` retyped). Null and array length/emptiness are ignored: they are sample values, not shape.
+- **Outages are not drift**: with `--skip-failed` a failed request (timeout, HTTP error) skips that endpoint, logged in the job; only drift files an issue.
+- **Issue filing**: one open "Contract drift: upstream API shape changed" issue (`mahler`, `type:bug`); if open, the report is added as a comment. The job stays green on drift; the issue is the signal. Fixes land as a normal re-record plus DTO change.
+- Unit tests: `python3 -m unittest scripts/contracts/test_shape_check.py`.
+
+## D321 — CouchTourKit contract decode tests (#442)
+
+Part of #405. The other half of D319: the `contract_*.json` recordings are decoded by
+`ContractFixturesTests` here as well as by `ContractFixturesTest` on Android, so drift that
+only breaks the Swift DTOs fails CI rather than a user's Mac. The endpoint list mirrors the
+Kotlin one file-for-file, or the two clients would silently test different recordings again.
+
+- **Through the real clients**: the phish.in and Relisten shows are served by `MockServer`
+  and fetched via `PhishInAPI.show`/`RelistenAPI.show`, so the request path is exercised too,
+  not just the decode.
+- **`ShowsPage` is internal**: it was `private`, which `@testable` can't reach. Android did the
+  same for `ShowsPage`/`PlaylistsPage` in #461.
+- **Playlists has no Swift DTO and gets no new one**: the desktop MVP has no playlists screen
+  (D5), so there is no model here to drift. `contract_phishin_playlists.json` is parsed
+  generically to keep it loadable; D320's weekly shape check is what guards that endpoint.
+- The curated/heuristic match tests read through `CuratedMatches.shared`/`HeuristicMatches.shared`
+  rather than by file path, so they cover the resource actually shipping in the bundle.
+- Tests: `cd macos/Packages/CouchTourKit && swift test` (515).
+
+## D322 — Escaped-bug loop: Escape cause + Check that now catches it (#446)
+
+Bugs that reached beta/prod were fixed without asking what check would have caught them, so
+the same class recurred (#345–#356). The bug issue template now ends with *Escape cause* and
+*Check that now catches it* sections, and `CLAUDE.md` gains an `## Escaped bugs` rule: a bug
+fix isn't done until the second section names a check that exists in the repo (test, CI step,
+lint, or smoke journey) or says why none is feasible.
+
+- **Guidance, not a gate**: nothing enforces the sections mechanically yet. That generalization
+  belongs to mkny13/mahler#611 (gates, not guidance).
+- Part of #403.
+
+### D323: Gate Android syncBaseUrl intent extra on BuildConfig.DEBUG
+
+Fixes #480. `MainActivity` is an exported launcher Activity: any installed app can send it an
+intent with the `syncBaseUrl` extra, and the previous code persisted that override as the sync
+base URL in every build type — including release. This let a malicious app silently redirect
+all future sync traffic (pairing, progress, token rotation) to a host it controls.
+
+- **Release boundary**: the `syncBaseUrl` intent extra is now applied only when `BuildConfig.DEBUG`
+  is true — i.e. debug builds and `-PsideInstall=true` beta builds, neither of which is an
+  exported production target. Release builds ignore the extra entirely; the `BuildConfig.SYNC_BASE_URL`
+  compiled into the release variant (production host) is used unchanged and no override is persisted.
+- **Shared policy**: both `onCreate` and `onNewIntent` now route through
+  `SyncApi.maybeApplyBaseUrlOverride(context, override, debug = BuildConfig.DEBUG)`, so the two
+  lifecycle entry points cannot diverge. The existing URL validation (malformed/blank URLs fall
+  back to the configured default) and the token-host change protection (D314) remain intact and
+  apply only when an override is actually accepted.
+- **macOS unaffected**: the `--sync-base-url` launch argument and `COUCHTOUR_SYNC_BASE_URL` env var
+  continue to work on all macOS builds; the macOS override resolution lives in
+  `CouchTourKit`'s `SyncConfig.resolveBaseURL` and is out of scope here.
+- **Tests**: `SyncTest.kt` adds `SyncBaseUrlOverrideTest` covering a rejected release override
+  (`debug = false`), an accepted debug override (`debug = true`), a blank/null override in debug,
+  the `BuildConfig.DEBUG` default on test builds, and confirmation that D314's token-host
+  clearing still fires through the gated path. `scripts/test_sync_base_url_intent_guard.sh`
+  statically guards against an exported component forwarding `EXTRA_SYNC_BASE_URL` to
+  `applyConfiguredBaseUrl` without the debug gate; wired into `.github/workflows/test.yml`.
+
+Supersedes the Android portion of D314 ("`syncBaseUrl` intent extra overrides the base URL on
+launch or `onNewIntent`") while preserving D314's staging defaults, token-host protection, and
+macOS override behavior.
+
+## D324: Pin undici and sharp via npm `overrides` in `sync/` (#483)
+
+`@cloudflare/vitest-pool-workers@0.22.0` (latest) nests a miniflare/wrangler that pulls
+undici 7.29.0 and sharp 0.35.2, giving 5 high dev-only advisories in `npm audit` (production
+bundle unaffected; `npm audit --omit=dev` is 0). No upstream fix exists, and the suggested
+downgrade to 0.8.30 is unacceptable. `sync/package.json` now overrides `undici` to `^7.29.1`
+and `sharp` to `^0.35.4`; audit is clean and all 18 tests plus typecheck pass.
+Remove the overrides once vitest-pool-workers ships a release whose nested miniflare no longer
+needs them (re-check at the next security audit); if they ever break the test pool, revert and
+record the advisories as accepted instead.
+
 ## D325 — macOS sender enforces public playlist excerpts while casting (#428)
 
 D66 recorded that a receiver cannot apply Media3's `ClippingConfiguration`; the macOS sender now handles public playlist excerpts without a custom receiver. Cast `LOAD` and `SEEK` use file time (`clipStartMs` plus the entry-relative position). The sender converts receiver status back to entry-relative progress and polls status every 500 ms while an excerpt plays. At `clipEndMs` it pauses the receiver and advances the playlist. Polling stops when the entry finishes, changes, or Cast disconnects. The Cast media payload omits the excerpt's duration because it is not the MP3's full duration. This supersedes D66 for macOS; Android's Cast behavior remains as recorded there. A sender-driven boundary depends on the Mac remaining connected and may be late by a status round trip, so physical Cast playback remains a UAT check.

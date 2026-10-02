@@ -19,16 +19,3 @@ enum CardMetrics {
     /// Between cards on a shelf.
     static let shelfSpacing: CGFloat = 14
 }
-
-extension View {
-    /// The standard card background. Takes its own padding so a call site can't pad one card
-    /// differently from the next — the drift this exists to stop.
-    func cardSurface(padding: CGFloat = CardMetrics.padding) -> some View {
-        self
-            .padding(padding)
-            .background(
-                Color.secondary.opacity(CardMetrics.fillOpacity),
-                in: RoundedRectangle(cornerRadius: CardMetrics.cornerRadius)
-            )
-    }
-}
