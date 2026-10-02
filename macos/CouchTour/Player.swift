@@ -62,7 +62,6 @@ final class Player: NSObject, ObservableObject {
     /// Milliseconds into the current track.
     @Published private(set) var positionMs: Int64 = 0
     @Published private(set) var artURL: String?
-    @Published private(set) var postShowPrompt: ShowSummary?
     /// The YouTube video the user tapped in the artist page, nil when nothing YouTube is
     /// loaded. Set by `playYoutube`; the WKWebView playback surface #231 builds consumes it.
     @Published private(set) var youtubeVideo: YouTubeVideo?
@@ -272,18 +271,6 @@ final class Player: NSObject, ObservableObject {
             self.isPlaying = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             MPNowPlayingInfoCenter.default().playbackState = .stopped
-            if let finishedShow = self.show {
-                Task { @MainActor [weak self] in
-                    let nextStop = await findNextTourStop(
-                        artist: finishedShow.artist,
-                        currentDate: finishedShow.date,
-                        tourName: finishedShow.tourName
-                    )
-                    if let self, self.currentIndex == nil {
-                        self.postShowPrompt = nextStop
-                    }
-                }
-            }
         }
     }
 
@@ -449,7 +436,6 @@ final class Player: NSObject, ObservableObject {
         )
         self.tracks = filtered.tracks
         self.currentIndex = filtered.startIndex
-        postShowPrompt = nil
 
         if isCasting, let track = currentTrack {
             positionMs = resumePositionMs
@@ -480,7 +466,6 @@ final class Player: NSObject, ObservableObject {
         show = nil
         recording = nil
         queueKey = nil
-        postShowPrompt = nil
         youtubeVideo = video
         artURL = video.thumbnailURL
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
@@ -594,7 +579,6 @@ final class Player: NSObject, ObservableObject {
             skipFiller: playbackSettings?.skipFiller ?? false
         )
         self.tracks = filtered.tracks
-        postShowPrompt = nil
         queuePlayer.removeAllItems()
         // New queue → new items → new taps. Drop the old per-item gain state first.
         gainStorageByItem.removeAll()
@@ -674,18 +658,6 @@ final class Player: NSObject, ObservableObject {
             isPlaying = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             MPNowPlayingInfoCenter.default().playbackState = .stopped
-            if let finishedShow = self.show {
-                Task { @MainActor [weak self] in
-                    let nextStop = await findNextTourStop(
-                        artist: finishedShow.artist,
-                        currentDate: finishedShow.date,
-                        tourName: finishedShow.tourName
-                    )
-                    if let self, self.currentIndex == nil {
-                        self.postShowPrompt = nextStop
-                    }
-                }
-            }
             return
         }
         currentIndex = index
