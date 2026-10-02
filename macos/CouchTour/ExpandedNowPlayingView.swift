@@ -322,6 +322,7 @@ struct ExpandedNowPlayingView: View {
                                             .foregroundStyle(colors.accent)
                                         }
                                         .buttonStyle(.plain)
+                                        .accessibilityIdentifier(AXIdentifiers.jamChartSourceLink)
                                     }
                                 }
                                 .frame(maxWidth: 560, alignment: .leading)

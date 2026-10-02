@@ -654,7 +654,11 @@ mac_run_launch_cold_start() {
   fi
 
   # Preflight needs Beta already running, so a real cold start means quitting it.
-  mac::relaunch
+  if ! mac::relaunch; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "sidebar.nav.home not present after relaunching $APP_NAME"
+    return 0
+  fi
 
   if mac::wait_for_id "sidebar.nav.home" "$TIMEOUT" >/dev/null; then
     smoke::result "mac" "$id" "PASS" "sidebar.nav.home present after cold relaunch"
@@ -671,7 +675,7 @@ mac_run_home_sections_after_relaunch() {
 
   # Fixture: seeded-favorite (requires in-progress track and favorited artist)
   local in_prog
-  in_prog="$(mac::ax_query "home.in_progress")"
+  in_prog="$(mac::ax_query "home.in_progress.card")"
   local fav_rows
   fav_rows="$(mac::ax_query "sidebar.favorites.row")"
 
@@ -685,11 +689,16 @@ mac_run_home_sections_after_relaunch() {
     return 0
   fi
 
-  mac::relaunch
+  if ! mac::relaunch; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "sidebar.nav.home not present after relaunching $APP_NAME"
+    return 0
+  fi
 
   local missing=()
-  if ! mac::wait_for_id "home.in_progress" "$TIMEOUT" >/dev/null; then
-    missing+=("home.in_progress")
+  # The empty shelf also exposes home.in_progress, so only a card proves the track survived.
+  if ! mac::wait_for_id "home.in_progress.card" "$TIMEOUT" >/dev/null; then
+    missing+=("home.in_progress.card")
   fi
   if ! mac::wait_for_id "home.next_tour_stops" "$TIMEOUT" >/dev/null; then
     missing+=("home.next_tour_stops")
@@ -699,7 +708,7 @@ mac_run_home_sections_after_relaunch() {
   fi
 
   if [[ ${#missing[@]} -eq 0 ]]; then
-    smoke::result "mac" "$id" "PASS" "home.in_progress, home.next_tour_stops, and home.on_this_date present after relaunch"
+    smoke::result "mac" "$id" "PASS" "home.in_progress.card, home.next_tour_stops, and home.on_this_date present after relaunch"
   else
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "missing sections after relaunch: ${missing[*]}"
@@ -805,7 +814,11 @@ mac_run_favorite_persists_across_relaunch() {
   local row_id
   row_id="$(echo "$fav_rows" | head -n1 | cut -f1)"
 
-  mac::relaunch
+  if ! mac::relaunch; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "sidebar.nav.home not present after relaunching $APP_NAME"
+    return 0
+  fi
 
   if mac::wait_for_id "$row_id" "$TIMEOUT" >/dev/null; then
     smoke::result "mac" "$id" "PASS" "favorited artist row '$row_id' persisted across relaunch"
@@ -901,6 +914,17 @@ mac_run_next_stop_chip_focus() {
   smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for artist chip and artist target screen (platform gap)"
 }
 
+# A visible note card is not enough: the journey requires the phish.in source link too.
+mac_jam_chart_report() {
+  local id="$1"
+  if [[ -n "$(mac::ax_query "jam_chart.source_link")" ]]; then
+    smoke::result "mac" "$id" "PASS" "jam_chart.note and jam_chart.source_link are present"
+  else
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "jam_chart.note shown without jam_chart.source_link"
+  fi
+}
+
 mac_run_jam_chart_note_details() {
   local id="jam-chart-note-details"
   smoke::require_journeys_file "$id"
@@ -910,7 +934,7 @@ mac_run_jam_chart_note_details() {
   local existing_note
   existing_note="$(mac::ax_query "jam_chart.note")"
   if [[ -n "$existing_note" ]]; then
-    smoke::result "mac" "$id" "PASS" "jam_chart.note is present with note details"
+    mac_jam_chart_report "$id"
     return 0
   fi
 
@@ -935,7 +959,7 @@ mac_run_jam_chart_note_details() {
   fi
 
   if mac::wait_for_id "jam_chart.note" "$TIMEOUT" >/dev/null; then
-    smoke::result "mac" "$id" "PASS" "jam_chart.note is present with note details"
+    mac_jam_chart_report "$id"
   else
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "jam_chart.note not displayed"

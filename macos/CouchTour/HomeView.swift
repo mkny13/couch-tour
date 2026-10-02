@@ -186,6 +186,7 @@ struct HomeView: View {
                 HStack(spacing: 14) {
                     ForEach(recent, id: \.queueKey) { item in
                         inProgressCard(item)
+                            .accessibilityIdentifier(AXIdentifiers.homeInProgressCard)
                     }
                 }
                 .padding(.horizontal, 24)
