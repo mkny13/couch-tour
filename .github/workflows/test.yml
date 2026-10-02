@@ -6,6 +6,20 @@ name: Unit tests
 # here instead. Same reasoning as build-debug-apk.yml, which says so for the APK build.
 on:
   pull_request:
+    # Docs-only and macos/**-only PRs can't change anything the Android suite or the source
+    # guard reads. Same set as build-debug-apk.yml, plus the guard script. No required status
+    # check depends on this workflow (main has no branch protection), so skipping the whole
+    # workflow is safe rather than keeping the job and skipping its steps.
+    paths:
+      - "app/**"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "scripts/test_sync_base_url_intent_guard.sh"
+      - ".github/workflows/test.yml"
   # No push:[main] trigger — merges go through a PR (CLAUDE.md's autonomous merge policy), and
   # a squash-merged commit is the same diff the pull_request run already tested, so a second
   # run here would just be ~50-90s of redundant CI time on every merge. workflow_dispatch below
