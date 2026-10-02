@@ -4,7 +4,7 @@ import GRDB
 // Local playlists (#59, port of Android's LocalPlaylist.kt + Progress.kt's MIGRATION_7_8).
 // Account-free, spans both backends: an ordered list of refs (backend, show date, and for
 // Relisten an artist slug and tape id) resolved back to real tracks at play time, since
-// neither backend has a fetch-track-by-id endpoint (D161 in DECISIONS.md). New tables only,
+// neither backend has a fetch-track-by-id endpoint (D161 in docs/decisions/DECISIONS-ARCHIVE.md). New tables only,
 // on the same phishin.db/dbQueue ProgressStore already opens — sharing its one connection
 // rather than a second one to the same file, see ProgressStore.dbQueue.
 
