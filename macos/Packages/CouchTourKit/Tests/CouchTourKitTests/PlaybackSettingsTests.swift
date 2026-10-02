@@ -60,4 +60,34 @@ final class PlaybackSettingsTests: XCTestCase {
 
         wait(for: [expectation], timeout: 1.0)
     }
+
+    func testAudioQualityAndGaplessDefaults() {
+        let settings = PlaybackSettings(defaults: defaults)
+        XCTAssertEqual(settings.audioQuality, .lossless)
+        XCTAssertTrue(settings.gapless)
+    }
+
+    func testAudioQualityAndGaplessPersistAcrossInstances() {
+        let settings = PlaybackSettings(defaults: defaults)
+        settings.audioQuality = .compressed
+        settings.gapless = false
+        XCTAssertEqual(defaults.string(forKey: "audio_quality"), "compressed")
+        let reloaded = PlaybackSettings(defaults: defaults)
+        XCTAssertEqual(reloaded.audioQuality, .compressed)
+        XCTAssertFalse(reloaded.gapless)
+    }
+
+    func testUnknownStoredQualityFallsBackToLossless() {
+        defaults.set("opus", forKey: "audio_quality")
+        XCTAssertEqual(PlaybackSettings(defaults: defaults).audioQuality, .lossless)
+    }
+
+    func testResolveURLHonorsQualityWithFallback() {
+        XCTAssertEqual(AudioQuality.lossless.resolveURL(flac: "f", mp3: "m"), "f")
+        XCTAssertEqual(AudioQuality.lossless.resolveURL(flac: nil, mp3: "m"), "m")
+        XCTAssertEqual(AudioQuality.compressed.resolveURL(flac: "f", mp3: "m"), "m")
+        XCTAssertEqual(AudioQuality.compressed.resolveURL(flac: "f", mp3: ""), "f")
+        XCTAssertFalse(AudioQuality.compressed.playsFlac(flac: "f", mp3: "m"))
+        XCTAssertTrue(AudioQuality.lossless.playsFlac(flac: "f", mp3: "m"))
+    }
 }

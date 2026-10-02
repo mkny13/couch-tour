@@ -114,13 +114,13 @@ struct PlayerRailView: View {
                                 if let taper = rec.taper, !taper.isEmpty {
                                     parts.append(taper)
                                 }
-                                if rec.hasFlac {
+                                if rec.hasFlac && player.audioQuality == .lossless {
                                     parts.append("FLAC")
                                 }
                                 return parts.joined(separator: " · ")
                             }
                             let isSbd = show.tags.contains { $0.name.localizedCaseInsensitiveContains("sbd") }
-                            let hasFlac = player.currentTrack?.flacUrl?.isEmpty == false
+                            let hasFlac = player.playsFlac(player.currentTrack)
                             var parts: [String] = []
                             parts.append(isSbd ? "SBD" : "AUD")
                             if hasFlac { parts.append("FLAC") }

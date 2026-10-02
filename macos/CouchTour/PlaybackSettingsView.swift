@@ -21,6 +21,17 @@ struct PlaybackSettingsView: View {
                 .pickerStyle(.segmented)
             }
             Section {
+                Picker("Audio Quality", selection: $settings.audioQuality) {
+                    ForEach(AudioQuality.allCases) { quality in
+                        Text(quality.title).tag(quality)
+                    }
+                }
+                Toggle("Gapless playback", isOn: $settings.gapless)
+                Text("Takes effect when the next show or track starts. Tracks without the chosen format fall back to the other one.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle("Skip filler tracks", isOn: $settings.skipFiller)
                 Text("Automatically bypasses non-music tracks (intros, outros, tuning, stage banter, crowd noise, and stage announcements) during playback.")
                     .font(.caption)

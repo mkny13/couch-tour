@@ -71,7 +71,7 @@ Historical implementation details and architectural choices are logged separatel
 
 ### 9. Settings: Audio Quality, Gapless & Dead-Row Removal (Shipped — #141, D228, Android)
 
-- **Audio Quality Preference**: persisted FLAC/MP3 choice (`PlaybackSettings.AudioQuality`) honoured at queue-build time in `MediaItems.coreMediaItem`; under MP3 the `Keys.FLAC_URL` extra is dropped too, so Cast hand-back and the Now Playing quality badge agree with what actually plays. A FLAC-only tape still plays FLAC. phish.in shows stay MP3-only — the preference is "prefer lossless", not a guarantee. **macOS control still open.**
+- **Audio Quality Preference**: persisted FLAC/MP3 choice (`PlaybackSettings.AudioQuality`) honoured at queue-build time in `MediaItems.coreMediaItem`; under MP3 the `Keys.FLAC_URL` extra is dropped too, so Cast hand-back and the Now Playing quality badge agree with what actually plays. A FLAC-only tape still plays FLAC. phish.in shows stay MP3-only — the preference is "prefer lossless", not a guarantee. macOS shipped in #429 (D318).
 - **Gapless Playback**: the previously dead toggle became a real pref applied by `PlaybackService` as an `ExoPlayer.PreloadConfiguration` (10s next-item read-ahead) plus explicit `setPauseAtEndOfMediaItems(false)`, collected live so it applies to a running queue. Media3's decode path has no sample-exact cross-item seam (offload-only); this closes the buffering stall, which is the audible part of a segue.
 - **Dead rows removed**: the Crossfade row and the whole DOWNLOADS & STORAGE section deleted (#65 not planned) — no Settings row advertises a feature that isn't coming. Sign-out with confirmation was already wired and verified.
 
@@ -128,7 +128,7 @@ flowchart LR
 
     subgraph NearTerm ["Phase 2 Remaining"]
         direction TB
-        M1["macOS Audio Quality Control — unbuilt, untracked (#141 closed)"]
+        M1["macOS Audio Quality Control — shipped (#429, D318)"]
         M2["Tag Browse UI: Show List — unbuilt, untracked (#67 closed)"]
     end
 
@@ -172,7 +172,7 @@ Working prompts for this phase's batches: [prompts/phase-2-batch-prompts.md](pro
 
 | Issue | Feature | Description | Platforms | Status |
 |---|---|---|---|---|
-| **#141** | **Audio Quality Preference** | Turn the Settings "Audio quality" row into a real, persisted preference driving FLAC/MP3 selection. The capability already ships (D187, D189 — FLAC preferred, MP3 rewritten at Cast time); only the user-facing control is missing. | Android, macOS | Android shipped (D228: quality preference, gapless preload wiring, Crossfade row and DOWNLOADS & STORAGE section removed); #141 is closed (it was the Android issue) — the macOS control is unbuilt and **no open issue tracks it** |
+| **#141** | **Audio Quality Preference** | Turn the Settings "Audio quality" row into a real, persisted preference driving FLAC/MP3 selection. The capability already ships (D187, D189 — FLAC preferred, MP3 rewritten at Cast time); only the user-facing control is missing. | Android, macOS | Android shipped (D228: quality preference, gapless preload wiring, Crossfade row and DOWNLOADS & STORAGE section removed); #141 is closed (it was the Android issue) — macOS shipped in #429 (D318) |
 | **#65** | ~~Offline Downloads~~ | **Not planned** — closed 2026-09-05. Downloads are deliberately out of scope. The Settings "DOWNLOADS & STORAGE" section (dead "Downloaded shows" row and "Wi-Fi only downloads" toggle) is removed as part of #141. | — | Not planned |
 | **#67** | **Browse & Filter by Tag** | Expose browse views for tags returned by the search API (e.g. soundboard, guest appearances, bustouts). | Android, macOS | Search filter shipped (D206, verified `uat-004`); #67 is closed — the show-list interaction is unbuilt and **no open issue tracks it** |
 | **#21** | **Trending & Momentum Browse** | Add recency-weighted sorting using Relisten's `momentum_score`, `trend_ratio`, and `hot_score` (48h / 7d / 30d windows). | Android, macOS | Shipped (D206, verified in UAT `uat-001`, `uat-002`) |

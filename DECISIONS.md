@@ -5128,3 +5128,7 @@ Part of #430 (#435). Counterpart of Android #376 / D293.
 - **Copy** puts `exportText()` (both generations, full) on `NSPasteboard.general`. **Clear** asks for confirmation, then calls `clear()` (both files and marks) and reloads.
 - **Threading**: the log's inspection APIs block on its serial queue and hit disk, so every call runs in `Task.detached`; the main actor only assigns results.
 - The view owns its own `DiagnosticsLog()` on the default directory; the log's queue serializes it against any other instance only per-instance, which is acceptable until app-wide instrumentation (separate sub-issue) introduces a shared one.
+
+## D318 — macOS audio quality and gapless preferences (#429)
+
+`PlaybackSettings` gains `audioQuality` (`lossless`/`compressed`, key `audio_quality`, default lossless) and `gapless` (key `gapless`, default on), matching Android's stored values (D228). `AudioQuality.resolveURL` picks FLAC vs MP3 and always falls back to the other format so a tape never becomes unplayable; the FLAC badge follows what actually plays. With gapless off, `Player` queues only the current item and inserts the next one when the queue drains (`currentItemDidChange`), so nothing is preloaded. Both settings apply from the next queue start, not mid-track.
