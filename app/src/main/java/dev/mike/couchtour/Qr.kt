@@ -1,8 +1,11 @@
 package dev.mike.couchtour
 
 import android.Manifest
+import androidx.camera.core.ExperimentalGetImage
+import androidx.annotation.OptIn
+import androidx.core.graphics.set
+import androidx.core.graphics.createBitmap
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -43,10 +46,10 @@ import com.google.zxing.qrcode.QRCodeWriter
  */
 fun qrCodeBitmap(text: String, sizePx: Int = 512): ImageBitmap {
     val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, sizePx, sizePx)
-    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(sizePx, sizePx)
     for (x in 0 until sizePx) {
         for (y in 0 until sizePx) {
-            bitmap.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            bitmap[x, y] = if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
         }
     }
     return bitmap.asImageBitmap()
@@ -70,6 +73,7 @@ fun looksLikePairingCode(scannedText: String?): String? =
  * they point it at the right one, not a security boundary.
  */
 @Composable
+@OptIn(ExperimentalGetImage::class)
 fun ScanScreen(nav: NavHostController) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current

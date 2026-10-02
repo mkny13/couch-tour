@@ -391,13 +391,13 @@ fun parseArtworkDateComponents(date: String?): ArtworkDateComponents {
  */
 @Composable
 fun ShowArtwork(
+    modifier: Modifier = Modifier,
     artUrl: String? = null,
     show: ShowSummary? = null,
     artistName: String? = null,
     date: String? = null,
     venue: String? = null,
     size: Dp? = null,
-    modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
     val resolvedArtUrl = artUrl ?: show?.artUrl

@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -72,7 +73,7 @@ object PlaybackSettings {
     fun setSkipFiller(enabled: Boolean) {
         _skipFiller.value = enabled
         if (::prefs.isInitialized) {
-            prefs.edit().putBoolean(KEY_SKIP_FILLER, enabled).apply()
+            prefs.edit { putBoolean(KEY_SKIP_FILLER, enabled) }
         }
     }
 
@@ -83,21 +84,21 @@ object PlaybackSettings {
     fun setGapless(enabled: Boolean) {
         _gapless.value = enabled
         if (::prefs.isInitialized) {
-            prefs.edit().putBoolean(KEY_GAPLESS, enabled).apply()
+            prefs.edit { putBoolean(KEY_GAPLESS, enabled) }
         }
     }
 
     fun setAudioQuality(quality: AudioQuality) {
         _audioQuality.value = quality
         if (::prefs.isInitialized) {
-            prefs.edit().putString(KEY_AUDIO_QUALITY, quality.storageValue).apply()
+            prefs.edit { putString(KEY_AUDIO_QUALITY, quality.storageValue) }
         }
     }
 
     fun setLevelVolume(enabled: Boolean) {
         _levelVolume.value = enabled
         if (::prefs.isInitialized) {
-            prefs.edit().putBoolean(KEY_LEVEL_VOLUME, enabled).apply()
+            prefs.edit { putBoolean(KEY_LEVEL_VOLUME, enabled) }
         }
     }
 

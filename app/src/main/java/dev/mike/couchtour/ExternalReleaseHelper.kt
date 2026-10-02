@@ -1,12 +1,13 @@
 package dev.mike.couchtour
 
 import android.content.Intent
+import androidx.core.net.toUri
 import android.net.Uri
 
 object ExternalReleaseHelper {
     fun buildIntent(release: ExternalRelease): Intent {
         val webUrl = release.url
-        val uri = Uri.parse(webUrl)
+        val uri = webUrl.toUri()
         
         val deepLinkStr = when (release.platform) {
             ExternalReleasePlatform.SPOTIFY -> {
@@ -23,7 +24,7 @@ object ExternalReleaseHelper {
             }
         }
         
-        val deepLinkIntent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLinkStr))
+        val deepLinkIntent = Intent(Intent.ACTION_VIEW, deepLinkStr.toUri())
         
         // Add fallback intent or something? Actually Intent.createChooser?
         // Let's just return the deep link intent. If ActivityNotFoundException is thrown, we launch the web URL.

@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,7 +33,7 @@ object Favorites {
         val on = key !in _keys.value
         val updated = if (key in _keys.value) _keys.value - key else _keys.value + key
         _keys.value = updated
-        prefs.edit().putStringSet(KEY_ARTISTS, updated).apply()
+        prefs.edit { putStringSet(KEY_ARTISTS, updated) }
         DiagnosticsLog.log("library.favorite", "kind" to "artist", "key" to key, "on" to on)
     }
 }

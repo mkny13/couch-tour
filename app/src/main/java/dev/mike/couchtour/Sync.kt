@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import androidx.core.content.edit
 import android.content.SharedPreferences
 import android.os.Build
 import android.util.Log
@@ -336,7 +337,7 @@ class SyncTokenStore(context: Context) {
         get() = prefs?.getString(KEY_DEVICE_TOKEN, null) ?: memoryToken
         set(value) {
             memoryToken = value
-            prefs?.edit()?.apply { if (value == null) remove(KEY_DEVICE_TOKEN) else putString(KEY_DEVICE_TOKEN, value) }?.apply()
+            prefs?.edit { if (value == null) remove(KEY_DEVICE_TOKEN) else putString(KEY_DEVICE_TOKEN, value) }
             if (value != null && tokenHost == null) {
                 tokenHost = SyncApi.baseUrl.host
             }
@@ -346,13 +347,13 @@ class SyncTokenStore(context: Context) {
         get() = prefs?.getString(KEY_TOKEN_HOST, null) ?: memoryTokenHost
         set(value) {
             memoryTokenHost = value
-            prefs?.edit()?.apply { if (value == null) remove(KEY_TOKEN_HOST) else putString(KEY_TOKEN_HOST, value) }?.apply()
+            prefs?.edit { if (value == null) remove(KEY_TOKEN_HOST) else putString(KEY_TOKEN_HOST, value) }
         }
 
     var baseUrlOverride: String?
         get() = prefs?.getString(KEY_BASE_URL_OVERRIDE, null)
         set(value) {
-            prefs?.edit()?.apply { if (value == null) remove(KEY_BASE_URL_OVERRIDE) else putString(KEY_BASE_URL_OVERRIDE, value) }?.apply()
+            prefs?.edit { if (value == null) remove(KEY_BASE_URL_OVERRIDE) else putString(KEY_BASE_URL_OVERRIDE, value) }
         }
 
 
@@ -360,7 +361,7 @@ class SyncTokenStore(context: Context) {
         get() = prefs?.getString(KEY_DEVICE_ID, null) ?: memoryDeviceId
         set(value) {
             memoryDeviceId = value
-            prefs?.edit()?.apply { if (value == null) remove(KEY_DEVICE_ID) else putString(KEY_DEVICE_ID, value) }?.apply()
+            prefs?.edit { if (value == null) remove(KEY_DEVICE_ID) else putString(KEY_DEVICE_ID, value) }
         }
 
     /**
@@ -373,7 +374,7 @@ class SyncTokenStore(context: Context) {
         get() = prefs?.getLong(KEY_LAST_SEQ, 0L) ?: memoryLastSeq
         set(value) {
             memoryLastSeq = value
-            prefs?.edit()?.putLong(KEY_LAST_SEQ, value)?.apply()
+            prefs?.edit { putLong(KEY_LAST_SEQ, value) }
         }
 
     /** The push watermark: the highest local `updatedAt` already sent to the server. */
@@ -381,7 +382,7 @@ class SyncTokenStore(context: Context) {
         get() = prefs?.getLong(KEY_LAST_PUSH_WATERMARK, 0L) ?: memoryLastPushWatermark
         set(value) {
             memoryLastPushWatermark = value
-            prefs?.edit()?.putLong(KEY_LAST_PUSH_WATERMARK, value)?.apply()
+            prefs?.edit { putLong(KEY_LAST_PUSH_WATERMARK, value) }
         }
 
     /** Wall-clock time of the last successful sync round trip, for the "Last synced" UI. 0
@@ -390,7 +391,7 @@ class SyncTokenStore(context: Context) {
         get() = prefs?.getLong(KEY_LAST_SYNCED_AT, 0L) ?: memoryLastSyncedAt
         set(value) {
             memoryLastSyncedAt = value
-            prefs?.edit()?.putLong(KEY_LAST_SYNCED_AT, value)?.apply()
+            prefs?.edit { putLong(KEY_LAST_SYNCED_AT, value) }
         }
 
     fun clear() {
@@ -400,7 +401,7 @@ class SyncTokenStore(context: Context) {
         memoryLastSeq = 0L
         memoryLastPushWatermark = 0L
         memoryLastSyncedAt = 0L
-        prefs?.edit()?.clear()?.apply()
+        prefs?.edit { clear() }
     }
 }
 

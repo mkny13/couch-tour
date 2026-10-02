@@ -1,6 +1,7 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -123,12 +124,13 @@ object LikedTracks {
         _ids.value = updated.keys.toSet()
         _entries.value = updated.values.sortedByDescending { it.likedAt }
 
-        val editor = prefs.edit().putString(KEY_RECORDS, json.encodeToString(updated))
         val legacy = prefs.getStringSet(KEY_TRACKS, null)
-        if (legacy != null && id in legacy) {
-            editor.putStringSet(KEY_TRACKS, legacy - id)
+        prefs.edit {
+            putString(KEY_RECORDS, json.encodeToString(updated))
+            if (legacy != null && id in legacy) {
+                putStringSet(KEY_TRACKS, legacy - id)
+            }
         }
-        editor.apply()
 
         DiagnosticsLog.log("library.favorite", "kind" to "track", "id" to id, "on" to on)
     }

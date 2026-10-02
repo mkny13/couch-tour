@@ -1,6 +1,8 @@
 package dev.mike.couchtour
 
 import android.content.Context
+import androidx.media3.common.util.UnstableApi
+import androidx.annotation.OptIn
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -42,6 +44,7 @@ private val RECEIVER_APP_ID: String = CastMediaControlIntent.DEFAULT_MEDIA_RECEI
  * publishes a `MediaSession` from [PlaybackService], and a second one would mean two sets
  * of lockscreen controls and every track scrobbled twice.
  */
+@OptIn(UnstableApi::class)
 class CastOptionsProvider : OptionsProvider {
 
     override fun getCastOptions(context: Context): CastOptions =
@@ -60,6 +63,7 @@ class CastOptionsProvider : OptionsProvider {
 }
 
 /** The Cast connection, such as it is: which device we're on, and how to get off it. */
+@OptIn(UnstableApi::class)
 object Casting {
 
     private val _castContext = MutableStateFlow<CastContext?>(null)
@@ -147,6 +151,7 @@ private const val KEY_ARTWORK = "artwork"
  * Not carried: [MediaItem.ClippingConfiguration]. A receiver plays whole files, so a
  * playlist excerpt casts as the full track — see DECISIONS.md.
  */
+@OptIn(UnstableApi::class)
 class CastItemConverter : MediaItemConverter {
 
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
@@ -211,6 +216,7 @@ class CastItemConverter : MediaItemConverter {
 }
 
 /** Packs the fields the app can't lose into the Cast item's custom data. */
+@OptIn(UnstableApi::class)
 internal fun castCustomData(mediaItem: MediaItem): JSONObject {
     val extras = mediaItem.mediaMetadata.extras
     return JSONObject().apply {
@@ -222,6 +228,7 @@ internal fun castCustomData(mediaItem: MediaItem): JSONObject {
 }
 
 /** Unpacks what [castCustomData] wrote. Absent keys stay absent rather than becoming "". */
+@OptIn(UnstableApi::class)
 internal fun castExtras(custom: JSONObject?): Bundle = Bundle().apply {
     for (key in Keys.ALL) custom.optionalString(key)?.let { putString(key, it) }
 }
