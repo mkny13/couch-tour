@@ -638,8 +638,12 @@ mac::relaunch() {
     sleep 0.25
   done
 
-  # Beta was frontmost before the quit, so reopening it in front is not a steal.
-  open -b "$BUNDLE_ID"
+  # Preserve focus by default in case the owner switched apps while Beta quit.
+  if [[ "$ALLOW_FOCUS" == "true" ]]; then
+    open -b "$BUNDLE_ID"
+  else
+    open -g -b "$BUNDLE_ID"
+  fi
 
   if ! mac::wait_for_id "sidebar.nav.home" "$TIMEOUT" >/dev/null; then
     # Don't abort: a broken cold start must surface as a journey FAIL.
