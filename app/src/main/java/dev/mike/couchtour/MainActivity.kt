@@ -1,5 +1,7 @@
 package dev.mike.couchtour
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -9,12 +11,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,20 +29,16 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
@@ -51,22 +46,15 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Sync
@@ -90,34 +78,27 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.Role
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -353,765 +334,6 @@ fun App(
 }
 
 // ---------------------------------------------------------------- screens
-
-@Composable
-fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val rawArtists = loadOnce { loadArtistsByBackend() }
-    val favoriteKeys by Favorites.keys.collectAsState()
-    // A derived merge rather than part of loadOnce's cached fetch: it must re-run whenever
-    // the user favorites/unfavorites an artist, not just once per screen load.
-    val artists = remember(rawArtists.value, favoriteKeys) {
-        rawArtists.value?.map { mergeArtists(it, favoriteKeys) }
-    }
-    val recent by vm.progressDao.inProgress().collectAsState(initial = emptyList())
-    val historyCount by vm.progressDao.historyCount().collectAsState(initial = 0)
-    val username by Session.username.collectAsState()
-    var query by rememberSaveable { mutableStateOf("") }
-    val term = query.trim()
-    val results = searchFor(term)
-
-    Column(Modifier.fillMaxSize()) {
-        val favoritedArtists = artists?.getOrNull()?.filter { it.key in favoriteKeys }.orEmpty()
-        val preferences by vm.artistTourPreferenceDao.getAllPreferences().collectAsState(initial = emptyList())
-        val preferencesMap = remember(preferences) { preferences.associateBy { it.artistKey } }
-        var tourPickerArtist by remember { mutableStateOf<ArtistRef?>(null) }
-        var focusedArtistKey by rememberSaveable { mutableStateOf<String?>(null) }
-
-        LaunchedEffect(favoriteKeys) {
-            if (focusedArtistKey != null && focusedArtistKey !in favoriteKeys) {
-                focusedArtistKey = null
-            }
-        }
-
-        // A second, independent load rather than part of loadArtistsByBackend's: it is a
-        // multi-request walk of the favorited artists' catalogs (#13), far slower than the
-        // artist list, and the screen's first paint must not wait on it. Keyed on the date and
-        // the favorites, which is exactly what the answer depends on.
-        val today = remember { java.time.LocalDate.now() }
-        val dateHeader = remember(today) {
-            today.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM d", java.util.Locale.US)).uppercase()
-        }
-        val ledger = LocalLedgerColors.current
-        val todayStr = remember(today) { today.toString() }
-        var onThisDateRetry by remember { mutableIntStateOf(0) }
-        val onThisDate = loadOnce(Triple(todayStr, favoritedArtists.map { it.key }, onThisDateRetry)) {
-            OnThisDate.load(favoritedArtists, todayStr)
-        }
-        var nextStopRetry by remember { mutableIntStateOf(0) }
-        val nextStopKey = remember(todayStr, favoritedArtists.map { it.key }, preferencesMap, nextStopRetry) {
-            listOf(todayStr, favoritedArtists.map { it.key }, preferencesMap, nextStopRetry)
-        }
-        val nextStopShows = loadOnce(nextStopKey) {
-            NextStop.load(favoritedArtists, todayStr, preferencesMap)
-        }
-        val finishedKeys by vm.progressDao.finishedKeys().collectAsState(initial = emptyList())
-        val nextStop = remember(nextStopShows.value, finishedKeys, focusedArtistKey) {
-            val loadedShows = nextStopShows.value?.getOrNull().orEmpty()
-            val candidates = focusedCandidates(loadedShows, focusedArtistKey)
-            oldestUnplayed(candidates, playedShowIds(finishedKeys))
-        }
-
-
-        LazyColumn(Modifier.fillMaxSize()) {
-            // Date header + "Surprise me" chip
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = dateHeader,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.6.sp,
-                        color = ledger.textSubtle,
-                        modifier = Modifier.weight(1f)
-                    )
-                    FeedbackButton(
-                        nav = nav,
-                        modifier = Modifier.size(36.dp),
-                        iconSize = 20.dp,
-                        tint = ledger.textMuted
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    SurpriseMeChip(surpriseMeArtists(favoritedArtists, artists?.getOrNull().orEmpty()), nav)
-                }
-            }
-
-            // IN PROGRESS section
-            if (recent.isNotEmpty()) {
-                item {
-                    Column(Modifier.testTag(A11yTags.HOME_SECTION_IN_PROGRESS)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { nav.navigate("history") }
-                            ) {
-                                Text(
-                                    text = "IN PROGRESS",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.2.sp,
-                                    color = ledger.textMuted
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                    contentDescription = "History",
-                                    tint = ledger.textMuted,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                            Text(
-                                text = "${recent.size} of $historyCount",
-                                fontSize = 12.sp,
-                                color = ledger.accentIcon,
-                                modifier = Modifier.clickable { nav.navigate("history") }
-                            )
-                        }
-                        GradientHairline(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp)
-                        )
-                        recent.take(4).forEach { p ->
-                            InProgressLedgerRow(p, vm, nav, Modifier.testTag(A11yTags.homeInProgressRow(p.queueKey)))
-                        }
-                    }
-                }
-            }
-
-            // NEXT TOUR STOP Card
-            if (nextStop != null || favoritedArtists.isNotEmpty()) {
-                val show = nextStop
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 10.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(ledger.cardSurface)
-                            .border(1.dp, ledger.panelBorder, RoundedCornerShape(10.dp))
-                            .testTag(A11yTags.HOME_SECTION_NEXT_TOUR_STOPS)
-                    ) {
-                        Column {
-                            // Top Amber/Pink hairline
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(2.dp)
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(Color(0xFFF2A93B), Color(0xFFF06BB0), Color.Transparent)
-                                        )
-                                    )
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 14.dp, top = 10.dp, end = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "NEXT TOUR STOP",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.2.sp,
-                                    color = ledger.textMuted
-                                )
-                                Spacer(Modifier.weight(1f))
-                                val targetPickerArtist = favoritedArtists.firstOrNull { it.key == focusedArtistKey }
-                                    ?: show?.artist
-                                    ?: favoritedArtists.firstOrNull()
-                                if (targetPickerArtist != null) {
-                                    Text(
-                                        text = "Change tour…",
-                                        fontSize = 12.sp,
-                                        color = ledger.textSubtle,
-                                        modifier = Modifier.clickable { tourPickerArtist = targetPickerArtist }
-                                    )
-                                }
-                            }
-                            if (favoritedArtists.isNotEmpty()) {
-                                LazyRow(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    items(favoritedArtists, key = { it.key }) { artist ->
-                                        val selected = (focusedArtistKey ?: show?.artist?.key) == artist.key
-                                        Box(
-                                            modifier = Modifier
-                                                .height(26.dp)
-                                                .clip(RoundedCornerShape(13.dp))
-                                                .background(
-                                                    if (selected) Color(0x299184D9) else Color.Transparent
-                                                )
-                                                .border(
-                                                    1.dp,
-                                                    if (selected) ledger.accentIcon else ledger.controlOutline,
-                                                    RoundedCornerShape(13.dp)
-                                                )
-                                                .clickable { focusedArtistKey = if (focusedArtistKey == artist.key) null else artist.key }
-                                                .padding(horizontal = 11.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = artist.name,
-                                                fontSize = 12.sp,
-                                                color = if (selected) ledger.accentTintText else ledger.textSecondary
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            val nextStopError = nextStopShows.value?.isFailure == true
-                            if (nextStopError) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "Couldn't load tour stops.",
-                                        fontSize = 12.sp,
-                                        color = ledger.textSubtle,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-                                    Button(onClick = { nextStopRetry++ }) {
-                                        Text("Retry")
-                                    }
-                                }
-                            } else if (focusedArtistKey != null && show == null) {
-                                val artistName = favoritedArtists.firstOrNull { it.key == focusedArtistKey }?.name.orEmpty()
-                                Text(
-                                    text = "Nothing to catch up on $artistName.",
-                                    fontSize = 12.sp,
-                                    color = ledger.textSubtle,
-                                    modifier = Modifier.padding(start = 14.dp, bottom = 12.dp)
-                                )
-                            }
-                            if (show != null && !nextStopError) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                        .testTag(A11yTags.homeNextTourStopRow("${show.artist.key}-${show.date}")),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable {
-                                                when (show.artist.backend) {
-                                                    Backend.PHISHIN -> nav.navigate("show/${show.date}")
-                                                    Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
-                                                    // Home's in-progress rows are tape shows;
-                                                    // YouTube artists have none.
-                                                    Backend.YOUTUBE -> Unit
-                                                }
-                                            }
-                                    ) {
-                                        Text(
-                                            text = show.artist.name,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = ledger.textPrimary
-                                        )
-                                        Text(
-                                            text = show.date,
-                                            fontSize = 14.sp,
-                                            color = ledger.textSecondary,
-                                            modifier = Modifier.padding(top = 1.dp)
-                                        )
-                                        val subtitle = listOfNotNull(
-                                            show.where.ifBlank { null },
-                                            show.tourName
-                                        ).joinToString(" · ")
-                                        Text(
-                                            text = subtitle,
-                                            fontSize = 12.sp,
-                                            color = ledger.textSubtle,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    if (show.rating > 0.0) {
-                                        Text(
-                                            text = "★ ${"%.1f".format(java.util.Locale.US, show.rating)}",
-                                            fontSize = 12.sp,
-                                            color = ledger.ratingAmber,
-                                            modifier = Modifier.padding(horizontal = 8.dp)
-                                        )
-                                    }
-                                    CircularPlayButton(
-                                        isPlaying = false,
-                                        onClick = { vm.playNextTourStop(show) },
-                                        size = 34.dp,
-                                        iconSize = 16.dp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ON THIS DATE section
-            loadedWithRetry(onThisDate.value, onRetry = { onThisDateRetry++ }) { shows ->
-                if (shows.isNotEmpty()) {
-                    item {
-                        Column(Modifier.testTag(A11yTags.HOME_SECTION_ON_THIS_DATE)) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "ON THIS DATE",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    letterSpacing = 1.2.sp,
-                                    color = ledger.textMuted
-                                )
-                                Text(
-                                    text = "${shows.size} ${plural(shows.size, "show")}",
-                                    fontSize = 12.sp,
-                                    color = ledger.textSubtle
-                                )
-                            }
-                            GradientHairline(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp)
-                            )
-                            shows.forEach { show ->
-                                OnThisDateLedgerRow(show, nav, Modifier.testTag(A11yTags.homeOnThisDateRow("${show.artist.key}-${show.date}")))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Separate from the full "Artists" list below (Relisten parity, #14) — quick
-            // access to the bands the user cares about, rather than scrolling a merged list
-            // that can run to hundreds of entries. Favoriting doesn't remove an artist from
-            // that full list, so it still shows up in both places.
-            if (favoritedArtists.isNotEmpty()) {
-                item {
-                    Column(Modifier.testTag(A11yTags.FAVORITES_LIST)) {
-                        SectionHeader("Favorites", divided = true)
-                        favoritedArtists.forEach { artist ->
-                            RowItem(
-                                title = artist.name,
-                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                                artUrl = null,
-                                modifier = Modifier.testTag(A11yTags.favoritesRow(artist.key)),
-                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
-                            )
-                        }
-                    }
-                }
-            }
-
-            item { SectionHeader("Artists", divided = true) }
-            item {
-                RowItem(
-                    title = "Browse artists",
-                    subtitle = artists?.getOrNull()?.let { "${it.size} ${plural(it.size, "artist")} on phish.in and Relisten" }
-                        ?: "Explore artists on phish.in and Relisten",
-                    artUrl = null,
-                    onClick = { nav.navigate("artists") }
-                )
-            }
-
-            item { SectionHeader("Your phish.in account", divided = true) }
-            if (username == null) {
-                item {
-                    RowItem(
-                        title = "Log in",
-                        subtitle = "See your saved shows, tracks, and playlists",
-                        artUrl = null,
-                        onClick = { nav.navigate("login") }
-                    )
-                }
-            } else {
-                item {
-                    RowItem("My shows", "Shows you've liked", null) { nav.navigate("mine/shows") }
-                }
-                item {
-                    RowItem("My tracks", "Tracks you've liked", null) { nav.navigate("mine/tracks") }
-                }
-                item {
-                    RowItem("My playlists", "Created by you and liked", null) {
-                        nav.navigate("mine/playlists")
-                    }
-                }
-                item {
-                    RowItem("Signed in as $username", "Tap to log out", null) { Session.logout() }
-                }
-            }
-            item {
-                RowItem("Browse playlists", "Public playlists on phish.in", null) {
-                    nav.navigate("playlists")
-                }
-            }
-            item {
-                // Account-free (#12), so it sits outside the phish.in-account section above —
-                // and isn't titled "My playlists" too, which that section's row already is.
-                RowItem("Local playlists", "Mix tracks from any artist, saved on this device", null) {
-                    nav.navigate("local-playlists")
-                }
-            }
-
-            item { SectionHeader("Playback", divided = true) }
-            item {
-                val skipFiller by PlaybackSettings.skipFiller.collectAsState()
-                RowItem(
-                    title = "Skip filler tracks",
-                    subtitle = "Skip intros, tuning, and banter during playback",
-                    artUrl = null,
-                    trailingContent = {
-                        Switch(
-                            checked = skipFiller,
-                            onCheckedChange = { PlaybackSettings.setSkipFiller(it) },
-                        )
-                    },
-                    onClick = { PlaybackSettings.toggle() },
-                )
-            }
-
-            item { SectionHeader("Appearance", divided = true) }
-            item {
-                val currentTheme by ThemeSettings.themeMode.collectAsState()
-                var showThemeDialog by rememberSaveable { mutableStateOf(false) }
-                RowItem(
-                    title = "Theme",
-                    subtitle = when (currentTheme) {
-                        ThemeMode.AUTO -> "Auto (system default)"
-                        ThemeMode.LIGHT -> "Light"
-                        ThemeMode.DARK -> "Dark"
-                    },
-                    artUrl = null,
-                    onClick = { showThemeDialog = true },
-                )
-                if (showThemeDialog) {
-                    ThemePickerDialog(
-                        currentMode = currentTheme,
-                        onDismiss = { showThemeDialog = false },
-                        onSelect = {
-                            ThemeSettings.setThemeMode(it)
-                            showThemeDialog = false
-                        },
-                    )
-                }
-            }
-
-            item { SectionHeader("Sync", divided = true) }
-            item {
-                val paired by SyncSession.paired.collectAsState()
-                RowItem(
-                    title = "Sync across devices",
-                    subtitle = if (paired) "Paired — manage devices" else "Not paired",
-                    artUrl = null,
-                    onClick = { nav.navigate("sync") }
-                )
-            }
-
-            // Diagnostic detail, not a feature — small, muted, and at the literal bottom of
-            // the scrollable list so it never competes with the content above (#43).
-            item {
-                Text(
-                    "Couch Tour ${BuildConfig.VERSION_NAME}",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 24.dp, bottom = 16.dp)
-                )
-            }
-        }
-
-        tourPickerArtist?.let { artist ->
-            TourPickerDialog(
-                artist = artist,
-                currentPreference = preferencesMap[artist.key] ?: preferencesMap[artist.id],
-                onDismiss = { tourPickerArtist = null },
-                onSave = { tour, yr ->
-                    vm.setArtistTourPreference(artist.key, tour, yr)
-                    tourPickerArtist = null
-                },
-                onClear = {
-                    vm.clearArtistTourPreference(artist.key)
-                    tourPickerArtist = null
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
-    var busy by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val ledger = LocalLedgerColors.current
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(13.dp))
-            .background(Color.Transparent)
-            .border(1.dp, ledger.controlOutline, RoundedCornerShape(13.dp))
-            .clickable(enabled = !busy && artists.isNotEmpty()) {
-                busy = true
-                scope.launch {
-                    runCatching { pickRandomShow(artists) }
-                        .onSuccess { show ->
-                            when (show.artist.backend) {
-                                Backend.PHISHIN -> nav.navigate("show/${show.date}")
-                                Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
-                                // Surprise me draws from the tape backends; YouTube
-                                // artists have no shows, so this can't come up.
-                                Backend.YOUTUBE -> Unit
-                            }
-                        }
-                    busy = false
-                }
-            }
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Default.Shuffle,
-                contentDescription = null,
-                tint = ledger.accentIcon,
-                modifier = Modifier.size(12.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = if (busy) "Finding…" else "Surprise me",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = ledger.textSecondary
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController, modifier: Modifier = Modifier) {
-    val ledger = LocalLedgerColors.current
-    val playerState by vm.state.collectAsState()
-    val isCurrentlyPlaying = playerState.hasQueue && playerState.queueKey == progress.queueKey
-    val fraction = if (isCurrentlyPlaying && playerState.durationMs > 0) {
-        (playerState.positionMs.toFloat() / playerState.durationMs.toFloat()).coerceIn(0f, 1f)
-    } else if (progress.positionMs > 0) {
-        // When duration is unknown from offline progress, estimate reasonable progress based on position
-        (progress.positionMs.toFloat() / (progress.positionMs + 300_000L).toFloat()).coerceIn(0.1f, 0.95f)
-    } else {
-        0.05f
-    }
-    var menuOpen by remember { mutableStateOf(false) }
-    val isPlaylist = progress.queueKey.startsWith("playlist:") || progress.queueKey.startsWith("local-playlist:")
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = { openQueue(progress, nav) },
-                onLongClick = { menuOpen = true }
-            )
-            .padding(horizontal = 20.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = progress.artist.ifBlank { "Phish" },
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = ledger.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 136.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = formatShowDate(progress.title),
-                fontSize = 15.sp,
-                color = ledger.textSecondary,
-                maxLines = 1
-            )
-            Text(
-                text = progress.trackTitle,
-                fontSize = 14.sp,
-                color = ledger.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.End,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp, end = 12.dp)
-            )
-            CircularPlayButton(
-                isPlaying = isCurrentlyPlaying && playerState.isPlaying,
-                onClick = {
-                    if (isCurrentlyPlaying) {
-                        vm.togglePlayPause()
-                    } else {
-                        vm.resume(progress)
-                    }
-                },
-                size = 30.dp,
-                iconSize = 15.dp
-            )
-        }
-        // Bottom 2px progress bar overlay
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .align(Alignment.BottomCenter)
-                .background(ledger.textPrimary.copy(alpha = 0.10f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction)
-                    .height(2.dp)
-                    .background(Color(0xFFF06BB0))
-            )
-        }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text("Resume playback") },
-                leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    vm.resume(progress)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text(if (isPlaylist) "Open playlist" else "Open show") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    openQueue(progress, nav)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Mark completed") },
-                leadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    vm.markCompleted(progress)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Remove from In Progress") },
-                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    vm.dismiss(progress)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Delete from history") },
-                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    vm.forget(progress)
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController, modifier: Modifier = Modifier) {
-    val ledger = LocalLedgerColors.current
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    when (show.artist.backend) {
-                        Backend.PHISHIN -> nav.navigate("show/${show.date}")
-                        Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
-                        // On-this-date rows are tape shows; YouTube artists have none.
-                        Backend.YOUTUBE -> Unit
-                    }
-                }
-                .padding(horizontal = 20.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val year = show.date.take(4)
-                    Text(
-                        text = year,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = ledger.textPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = show.artist.name,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = ledger.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                val venueLocation = show.where.ifBlank { null }
-                if (venueLocation != null) {
-                    Text(
-                        text = venueLocation,
-                        fontSize = 12.sp,
-                        color = ledger.textSubtle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 1.dp)
-                    )
-                }
-            }
-            if (show.rating > 0.0) {
-                Text(
-                    text = "★ ${"%.1f".format(java.util.Locale.US, show.rating)}",
-                    fontSize = 12.sp,
-                    color = ledger.ratingAmber,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            } else if (show.likesCount > 0) {
-                Text(
-                    text = "♥ ${show.likesCount}",
-                    fontSize = 12.sp,
-                    color = Color(0xFFF06BB0),
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-        }
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 20.dp),
-            thickness = 1.dp,
-            color = ledger.listDivider
-        )
-    }
-}
 
 @Composable
 fun ShowsScreen(period: String, nav: NavHostController) {
@@ -2530,30 +1752,6 @@ internal fun AddTracksToPlaylistDialog(
 }
 
 @Composable
-private fun RenamePlaylistDialog(currentName: String, onDismiss: () -> Unit, onRename: (String) -> Unit) {
-    var name by rememberSaveable(currentName) { mutableStateOf(currentName) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rename playlist") },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(enabled = name.isNotBlank() && name.trim() != currentName, onClick = { onRename(name.trim()) }) {
-                Text("Rename")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-@Composable
 internal fun ThemePickerDialog(
     currentMode: ThemeMode,
     onDismiss: () -> Unit,
@@ -2600,7 +1798,7 @@ internal fun ThemePickerDialog(
 }
 
 @Composable
-private fun TourPickerDialog(
+internal fun TourPickerDialog(
     artist: ArtistRef,
     currentPreference: ArtistTourPreferenceEntity?,
     onDismiss: () -> Unit,
@@ -3141,691 +2339,6 @@ internal fun SearchResultsList(
     }
 }
 
-@Composable
-fun LoginScreen(nav: NavHostController) {
-    var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    Column(Modifier.fillMaxSize()) {
-        Header("Log in to phish.in", nav)
-        Text(
-            "phish.in is a separate website hosting the Phish archive. Logging in shows your " +
-                "liked shows, tracks, and playlists — for Phish only, not the other artists in " +
-                "this app. The password is sent once to get a token and is never stored; only " +
-                "the token is kept, encrypted on this device.",
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it; error = null },
-            label = { Text("Email") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it; error = null },
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        Button(
-            enabled = !busy && email.isNotBlank() && password.isNotBlank(),
-            onClick = {
-                busy = true
-                error = null
-                scope.launch {
-                    runCatching { Session.login(email.trim(), password) }
-                        .onSuccess { nav.popBackStack() }
-                        .onFailure {
-                            error = if (it is ApiException && it.unauthorized) {
-                                "Email or password not recognised."
-                            } else {
-                                "Couldn't log in: ${it.message}"
-                            }
-                            busy = false
-                        }
-                }
-            },
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        ) { Text(if (busy) "Logging in…" else "Log in") }
-
-        error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
-        }
-    }
-}
-
-/** Pairing and device management for progress sync (D119-D127, QR pairing D145). */
-@Composable
-fun SyncScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val paired by SyncSession.paired.collectAsState()
-    var pairingResult by remember { mutableStateOf<PairStartResponse?>(null) }
-    var claimCode by rememberSaveable { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var refreshKey by remember { mutableIntStateOf(0) }
-    var devicesState by remember { mutableStateOf<Result<List<DeviceInfo>>?>(null) }
-    val scope = rememberCoroutineScope()
-
-    // Compose Navigation's standard way to get a result back from a pushed screen: the
-    // scanner writes into *this* entry's SavedStateHandle before popping itself off, since
-    // it can't hand a return value back through the composable call itself.
-    val scannedCode = nav.currentBackStackEntry
-        ?.savedStateHandle
-        ?.getStateFlow<String?>("scannedCode", null)
-        ?.collectAsState()
-    LaunchedEffect(scannedCode?.value) {
-        scannedCode?.value?.let {
-            claimCode = it
-            error = null
-            nav.currentBackStackEntry?.savedStateHandle?.set("scannedCode", null)
-        }
-    }
-
-    // Live refresh the device list while this screen is open, with exponential backoff (#209).
-    LaunchedEffect(paired, refreshKey) {
-        if (!paired) return@LaunchedEffect
-        devicesState = null
-        var intervalMs = 5_000L
-        val maxIntervalMs = 60_000L
-        while (true) {
-            val res = runCatching { SyncSession.devices() }
-            val newList = res.getOrNull()
-            
-            if (devicesState?.isSuccess == true && res.isSuccess && devicesState?.getOrNull() == newList) {
-                intervalMs = (intervalMs * 1.5).toLong().coerceAtMost(maxIntervalMs)
-            } else {
-                devicesState = res
-                intervalMs = 5_000L
-            }
-            delay(intervalMs)
-        }
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        Header("Sync", nav)
-        Text(
-            "Sync keeps listening history and resume position in step across your paired " +
-                "devices. Pairing is one-time; after that, devices sync on their own.",
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        val lastError by SyncSession.lastError.collectAsState()
-        // Unconditional, not inside `if (paired)`: an auto-unlink on a bad token flips paired
-        // to false in the same beat this message is set, so keeping it scoped to the paired
-        // block would erase the explanation at exactly the moment it's needed (D172).
-        lastError?.let {
-            Text(
-                it,
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
-        if (paired) {
-            RowItem("This device is paired", "Tap to unlink", null) {
-                SyncSession.unlink()
-                SyncSession.clearError()
-                pairingResult = null
-            }
-
-            val syncing by SyncSession.syncing.collectAsState()
-            val lastSyncedAt by SyncSession.lastSyncedAt.collectAsState()
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    if (lastSyncedAt == 0L) "Never synced" else "Last synced ${relativeTime(lastSyncedAt)}",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(
-                    enabled = !syncing,
-                    onClick = { scope.launch { runCatching { SyncSession.sync(vm.progressDao) } } }
-                ) { Text(if (syncing) "Syncing…" else "Sync now") }
-            }
-        }
-
-        pairingResult?.let { result ->
-            Column(Modifier.padding(16.dp)) {
-                Text(
-                    "Enter this code on the other device:",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    result.code,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 4.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                Text(
-                    "Expires in 10 minutes",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                // White backing behind the QR itself — the surrounding theme is dark, and a
-                // QR scanner needs real light/dark contrast, not whatever the app's palette is.
-                Surface(color = Color.White, modifier = Modifier.padding(top = 16.dp)) {
-                    Image(
-                        bitmap = remember(result.code) { qrCodeBitmap(result.code) },
-                        contentDescription = "QR code for pairing code ${result.code}",
-                        modifier = Modifier.padding(12.dp).size(200.dp)
-                    )
-                }
-            }
-        }
-
-        Button(
-            enabled = !busy,
-            onClick = {
-                busy = true
-                error = null
-                scope.launch {
-                    runCatching { SyncSession.startPairing() }
-                        .onSuccess { pairingResult = it }
-                        .onFailure { error = "Couldn't start pairing: ${it.message}" }
-                    busy = false
-                }
-            },
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        ) { Text(if (paired) "Add another device" else "Pair this device") }
-
-        if (!paired) {
-            HorizontalDivider(
-                color = Color.White.copy(alpha = 0.10f),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
-            )
-            Text(
-                "Have a code from another device?",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            OutlinedTextField(
-                value = claimCode,
-                onValueChange = { claimCode = it.uppercase(); error = null },
-                label = { Text("Code") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            TextButton(
-                onClick = { nav.navigate("scan") },
-                modifier = Modifier.padding(horizontal = 8.dp)
-            ) { Text("Scan QR code instead") }
-            Button(
-                enabled = !busy && claimCode.isNotBlank(),
-                onClick = {
-                    busy = true
-                    error = null
-                    scope.launch {
-                        runCatching { SyncSession.claimPairing(claimCode.trim()) }
-                            .onSuccess {
-                                claimCode = ""
-                                // Sync straight away rather than leaving both devices looking
-                                // empty until a later timer fires — see claimPairing's note.
-                                runCatching { SyncSession.sync(vm.progressDao) }
-                                    .onFailure { error = "Paired, but the first sync failed: ${it.message}" }
-                            }
-                            .onFailure { error = "Couldn't join: ${it.message}" }
-                        busy = false
-                    }
-                },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            ) { Text(if (busy) "Joining…" else "Join") }
-        }
-
-        error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
-        }
-
-        if (paired) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Devices",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = { refreshKey++ }) {
-                    Icon(Icons.Default.Refresh, "Refresh devices")
-                }
-            }
-            HorizontalDivider()
-            Loaded(devicesState) { list ->
-                list.forEach { device ->
-                    RowItem(
-                        title = device.name + if (device.isSelf) " (this device)" else "",
-                        subtitle = device.platform,
-                        artUrl = null,
-                        trailing = "Revoke",
-                        onClick = {
-                            scope.launch {
-                                runCatching { SyncSession.revoke(device.deviceId) }
-                                refreshKey++
-                            }
-                        }
-                    )
-                }
-            }
-        }
-
-        Text(
-            "Couch Tour ${BuildConfig.VERSION_NAME}",
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp, bottom = 16.dp)
-        )
-    }
-}
-
-@Composable
-fun PlaylistsScreen(title: String, nav: NavHostController, load: suspend () -> List<Playlist>) {
-    val data = loadOnce(title) { load() }
-    Column(Modifier.fillMaxSize()) {
-        Header(title, nav)
-        Loaded(data.value) { lists ->
-            if (lists.isEmpty()) {
-                Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp))
-            } else {
-                LazyColumn { items(lists, key = { it.slug }) { PlaylistRow(it, nav) } }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlaylistRow(playlist: Playlist, nav: NavHostController) {
-    RowItem(
-        title = playlist.name,
-        subtitle = listOfNotNull(
-            playlist.username?.let { "by $it" },
-            "${playlist.tracksCount} ${plural(playlist.tracksCount, "track")}",
-        ).joinToString(" · "),
-        artUrl = null,
-        trailing = fmt(playlist.duration),
-        onClick = { nav.navigate("playlist/${playlist.slug}") }
-    )
-}
-
-@Composable
-fun PlaylistScreen(slug: String, vm: PlayerViewModel, nav: NavHostController) {
-    val data = loadOnce(slug) { PhishInApi.playlist(slug) }
-    val saved = loadOnce(slug) { vm.progressFor(playlistQueueKey(slug)) }
-    var query by rememberSaveable { mutableStateOf("") }
-
-    Column(Modifier.fillMaxSize()) {
-        Header("Playlist", nav)
-        Loaded(data.value) { pl ->
-            val entries = pl.entries.filter { it.track.playable }
-            val filtered = entries.filterByTitleIndexed(query)
-            val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
-            LazyColumn {
-                item {
-                    Row(
-                        Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(pl.name, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-                        Text(
-                            listOfNotNull(
-                                pl.username?.let { "by $it" },
-                                "${entries.size} tracks",
-                                fmt(pl.duration),
-                            ).joinToString(" · "),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp
-                            )
-                            pl.description?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 6.dp))
-                            }
-                        }
-                        LikeButton(Likable.Playlist, pl.id, pl.likedByUser, pl.likesCount)
-                    }
-                }
-                if (entries.size > 1) {
-                    item {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            singleLine = true,
-                            placeholder = { Text("Search this playlist…") },
-                            leadingIcon = { Icon(Icons.Default.Search, null) },
-                            trailingIcon = {
-                                if (query.isNotEmpty()) {
-                                    IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear") }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                if (progress != null) {
-                    item {
-                        ResumeBanner(progress) {
-                            vm.playPlaylist(pl, progress.trackIndex, progress.positionMs)
-                        }
-                    }
-                }
-                if (filtered.isEmpty()) {
-                    item {
-                        Text(
-                            "No tracks match \"$query\".",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                }
-                items(filtered, key = { (_, e) -> "e-${e.position}-${e.track.id}" }) { (i, e) ->
-                    RowItem(
-                        title = e.track.title,
-                        subtitle = listOfNotNull(
-                            e.track.showDate, e.track.venueName
-                        ).joinToString(" · "),
-                        artUrl = e.track.showAlbumCoverUrl,
-                        trailing = fmt(e.duration),
-                        trailingContent = {
-                            LikeButton(
-                                Likable.Track, e.track.id,
-                                e.track.likedByUser, e.track.likesCount,
-                            )
-                        },
-                        onClick = { vm.playPlaylist(pl, i, 0) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Local playlists spanning both backends (#12) — account-free, unlike phish.in's own
- * [PlaylistsScreen]/[PlaylistScreen], which is why this is a separate screen pair rather than
- * a third filter on those (D161).
- */
-@Composable
-fun LocalPlaylistsScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
-    var creating by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    Column(Modifier.fillMaxSize()) {
-        Header("Local playlists", nav)
-        Button(
-            onClick = { creating = true },
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("New playlist")
-        }
-        if (playlists.isEmpty()) {
-            Text(
-                "No playlists yet. Add a track to one from its playlist button.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
-            )
-        } else {
-            LazyColumn {
-                items(playlists, key = { it.id }) { playlist ->
-                    RowItem(
-                        title = playlist.name,
-                        subtitle = "${playlist.trackCount} ${plural(playlist.trackCount, "track")}",
-                        artUrl = null,
-                        onClick = { nav.navigate("local-playlist/${playlist.id}") },
-                    )
-                }
-            }
-        }
-    }
-    if (creating) {
-        NewPlaylistDialog(
-            onDismiss = { creating = false },
-            onCreate = { name ->
-                creating = false
-                scope.launch {
-                    val id = vm.createLocalPlaylist(name)
-                    nav.navigate("local-playlist/$id")
-                }
-            },
-        )
-    }
-}
-
-@Composable
-fun LocalPlaylistScreen(id: String, vm: PlayerViewModel, nav: NavHostController) {
-    val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
-    val playlist = playlists.firstOrNull { it.id == id }
-    val tracks by vm.localPlaylistDao.tracks(id).collectAsState(initial = emptyList())
-    val saved = loadOnce(id) { vm.progressFor(localPlaylistQueueKey(id)) }
-    val progress = saved.value?.getOrNull()?.takeIf { !it.finished }
-    var renaming by remember { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
-    // Reordering writes positions computed against `tracks`' full indices — doing that while
-    // a filter narrows what's on screen would scramble the playlist (#90), so reordering is
-    // simply unavailable until the filter is cleared, rather than silently acting on the
-    // wrong rows or clearing the user's search out from under them.
-    val reorderable = query.isBlank()
-
-    Column(Modifier.fillMaxSize()) {
-        Header(playlist?.name ?: "Playlist", nav)
-        if (playlist == null) {
-            Loading()
-        } else {
-            val filtered = tracks.filterByTitleIndexed(query)
-            LazyColumn {
-                item {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "${tracks.size} ${plural(tracks.size, "track")}",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(onClick = { renaming = true }) {
-                            Icon(Icons.Default.Edit, "Rename playlist")
-                        }
-                        IconButton(onClick = { vm.deleteLocalPlaylist(id); nav.popBackStack() }) {
-                            Icon(Icons.Default.Delete, "Delete playlist")
-                        }
-                    }
-                }
-                if (tracks.size > 1) {
-                    item {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            singleLine = true,
-                            placeholder = { Text("Search this playlist…") },
-                            leadingIcon = { Icon(Icons.Default.Search, null) },
-                            trailingIcon = {
-                                if (query.isNotEmpty()) {
-                                    IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear") }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                if (progress != null) {
-                    item {
-                        ResumeBanner(progress) {
-                            vm.playLocalPlaylist(id, progress.trackIndex, progress.positionMs)
-                        }
-                    }
-                }
-                if (tracks.isEmpty()) {
-                    item {
-                        Text(
-                            "No tracks yet.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                } else if (filtered.isEmpty()) {
-                    item {
-                        Text(
-                            "No tracks match \"$query\".",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                } else {
-                    items(filtered, key = { (_, t) -> t.rowId }) { (i, t) ->
-                        RowItem(
-                            title = t.title,
-                            subtitle = listOfNotNull(t.showDate, t.venueName).joinToString(" · "),
-                            artUrl = t.artUrl,
-                            trailing = fmt(t.durationMs),
-                            trailingContent = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
-                                        enabled = reorderable && i > 0,
-                                        onClick = { vm.moveLocalPlaylistTrack(id, tracks, i, i - 1) },
-                                    ) {
-                                        Icon(
-                                            Icons.Default.KeyboardArrowUp,
-                                            "Move up",
-                                            tint = if (reorderable && i > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                                        )
-                                    }
-                                    IconButton(
-                                        enabled = reorderable && i < tracks.lastIndex,
-                                        onClick = { vm.moveLocalPlaylistTrack(id, tracks, i, i + 1) },
-                                    ) {
-                                        Icon(
-                                            Icons.Default.KeyboardArrowDown,
-                                            "Move down",
-                                            tint = if (reorderable && i < tracks.lastIndex) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                                        )
-                                    }
-                                    IconButton(onClick = { vm.removeFromLocalPlaylist(t.rowId, id) }) {
-                                        Icon(Icons.Default.Close, "Remove from playlist")
-                                    }
-                                }
-                            },
-                            onClick = { vm.playLocalPlaylist(id, i, 0) },
-                        )
-                    }
-                }
-            }
-        }
-    }
-    if (renaming && playlist != null) {
-        RenamePlaylistDialog(
-            currentName = playlist.name,
-            onDismiss = { renaming = false },
-            onRename = { newName ->
-                renaming = false
-                vm.renameLocalPlaylist(id, newName)
-            },
-        )
-    }
-}
-
-@Composable
-fun MyShowsScreen(nav: NavHostController) {
-    val data = loadOnce("my-shows") { PhishInApi.likedShows() }
-    Column(Modifier.fillMaxSize()) {
-        Header("My shows", nav)
-        Loaded(data.value) { shows ->
-            if (shows.isEmpty()) {
-                Text(
-                    "No liked shows yet. Like them on phish.in and they'll appear here.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                LazyColumn {
-                    items(shows, key = { it.date }) { show ->
-                        RowItem(
-                            title = show.date,
-                            subtitle = listOfNotNull(show.venueName, show.location)
-                                .joinToString(" · "),
-                            artUrl = show.coverArtUrls?.small,
-                            onClick = { nav.navigate("show/${show.date}") }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun MyTracksScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val data = loadOnce("my-tracks") { PhishInApi.likedTracks() }
-    Column(Modifier.fillMaxSize()) {
-        Header("My tracks", nav)
-        Loaded(data.value) { tracks ->
-            if (tracks.isEmpty()) {
-                Text(
-                    "No liked tracks yet. Like them on phish.in and they'll appear here.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                val playable = tracks.filter { it.playable }
-                LazyColumn {
-                    item {
-                        Button(
-                            onClick = { vm.shuffle(playable, "My tracks") },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Icon(Icons.Default.Shuffle, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Shuffle all ${playable.size}")
-                        }
-                    }
-                    items(tracks, key = { it.id }) { track ->
-                        RowItem(
-                            title = track.title,
-                            subtitle = listOfNotNull(
-                                track.showDate, track.venueName, track.venueLocation
-                            ).joinToString(" · "),
-                            artUrl = track.showAlbumCoverUrl,
-                            trailing = fmt(track.duration),
-                            trailingContent = {
-                                LikeButton(
-                                    Likable.Track, track.id,
-                                    track.likedByUser, track.likesCount,
-                                )
-                            },
-                            // A single liked track plays inside its show; shuffle
-                            // above plays the liked tracks themselves.
-                            onClick = { vm.playTrack(track) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------- pieces
 
 @Composable
@@ -4053,7 +2566,7 @@ private fun ShowHeader(
 }
 
 @Composable
-private fun ResumeBanner(progress: Progress, onResume: () -> Unit) {
+internal fun ResumeBanner(progress: Progress, onResume: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -4097,61 +2610,8 @@ internal fun openQueueKey(
     }
 }
 
-private fun openQueue(progress: Progress, nav: NavHostController) =
+internal fun openQueue(progress: Progress, nav: NavHostController) =
     openQueueKey(progress.queueKey, nav)
-
-/**
- * Everything ever played: still going, finished, or removed from "Continue listening" by
- * hand. Removing something from the home row hides it here rather than destroying it.
- */
-@Composable
-fun HistoryScreen(vm: PlayerViewModel, nav: NavHostController) {
-    val history by vm.progressDao.history().collectAsState(initial = emptyList())
-
-    Column(Modifier.fillMaxSize()) {
-        Header("History", nav)
-        if (history.isEmpty()) {
-            Text(
-                "Shows and playlists you've played will appear here.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp)
-            )
-            return
-        }
-        LazyColumn {
-            items(history, key = { it.queueKey }) { p ->
-                val displayTitle = historyDisplayTitle(p.title, p.queueKey)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) {
-                        RowItem(
-                            title = displayTitle,
-                            subtitle = p.subtitle,
-                            artUrl = p.artUrl,
-                            artistName = p.artist,
-                            date = displayTitle,
-                            venue = p.subtitle,
-                            onClick = { openQueue(p, nav) },
-                            trailing = when {
-                                p.finished -> "✓ completed"
-                                p.dismissed -> "removed · ${fmt(p.positionMs)}"
-                                else -> "at ${fmt(p.positionMs)}"
-                            },
-                            trailingSecondary = relativeTime(p.updatedAt),
-                        )
-                    }
-                    IconButton(onClick = { vm.forget(p) }) {
-                        Icon(
-                            Icons.Default.Close,
-                            "Delete $displayTitle from history",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 
 @Composable
 private fun TrackRow(track: Track, number: Int, date: String, artUrl: String?, vm: PlayerViewModel, onClick: () -> Unit) {
@@ -4541,7 +3001,7 @@ fun Header(
  * distinct blocks rather than one continuous list; the first section on a screen omits it.
  */
 @Composable
-private fun SectionHeader(text: String, divided: Boolean = false) {
+internal fun SectionHeader(text: String, divided: Boolean = false) {
     Column {
         if (divided) {
             Spacer(Modifier.height(20.dp))
@@ -4559,7 +3019,7 @@ private fun SectionHeader(text: String, divided: Boolean = false) {
 }
 
 @Composable
-private fun RowItem(
+internal fun RowItem(
     title: String,
     subtitle: String? = null,
     artUrl: String? = null,
@@ -4640,7 +3100,7 @@ private fun ErrorText(t: Throwable) {
 /** Collapses the load/loading/error scaffold every detail screen repeats: nothing while
  *  [result] is in flight (null), [ErrorText] on failure, [content] once it resolves. */
 @Composable
-private fun <T> Loaded(result: Result<T>?, content: @Composable (T) -> Unit) {
+internal fun <T> Loaded(result: Result<T>?, content: @Composable (T) -> Unit) {
     when (result) {
         null -> Loading()
         else -> result.fold(onSuccess = { content(it) }, onFailure = { ErrorText(it) })
@@ -4659,7 +3119,7 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.loaded(
     }
 }
 
-private fun <T> androidx.compose.foundation.lazy.LazyListScope.loadedWithRetry(
+internal fun <T> androidx.compose.foundation.lazy.LazyListScope.loadedWithRetry(
     result: Result<T>?,
     onRetry: () -> Unit,
     content: androidx.compose.foundation.lazy.LazyListScope.(T) -> Unit,
@@ -4694,7 +3154,7 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.loadedWithRetry(
  * of its own — [SearchHits.failed] carries what didn't answer.
  */
 @Composable
-private fun searchFor(term: String): State<SearchHits?> =
+internal fun searchFor(term: String): State<SearchHits?> =
     produceState<SearchHits?>(initialValue = null, key1 = term) {
         if (term.length < 3) {
             value = null
@@ -4707,7 +3167,7 @@ private fun searchFor(term: String): State<SearchHits?> =
 
 /** Runs [block] once per [key], exposing null while in flight. */
 @Composable
-private fun <T> loadOnce(key: Any = Unit, block: suspend () -> T): State<Result<T>?> =
+internal fun <T> loadOnce(key: Any = Unit, block: suspend () -> T): State<Result<T>?> =
     produceState<Result<T>?>(initialValue = null, key1 = key) {
         value = runCatching { block() }
     }
