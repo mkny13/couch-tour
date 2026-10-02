@@ -5182,3 +5182,33 @@ lint, or smoke journey) or says why none is feasible.
 - **Guidance, not a gate**: nothing enforces the sections mechanically yet. That generalization
   belongs to mkny13/mahler#611 (gates, not guidance).
 - Part of #403.
+
+### D323: Gate Android syncBaseUrl intent extra on BuildConfig.DEBUG
+
+Fixes #480. `MainActivity` is an exported launcher Activity: any installed app can send it an
+intent with the `syncBaseUrl` extra, and the previous code persisted that override as the sync
+base URL in every build type — including release. This let a malicious app silently redirect
+all future sync traffic (pairing, progress, token rotation) to a host it controls.
+
+- **Release boundary**: the `syncBaseUrl` intent extra is now applied only when `BuildConfig.DEBUG`
+  is true — i.e. debug builds and `-PsideInstall=true` beta builds, neither of which is an
+  exported production target. Release builds ignore the extra entirely; the `BuildConfig.SYNC_BASE_URL`
+  compiled into the release variant (production host) is used unchanged and no override is persisted.
+- **Shared policy**: both `onCreate` and `onNewIntent` now route through
+  `SyncApi.maybeApplyBaseUrlOverride(context, override, debug = BuildConfig.DEBUG)`, so the two
+  lifecycle entry points cannot diverge. The existing URL validation (malformed/blank URLs fall
+  back to the configured default) and the token-host change protection (D314) remain intact and
+  apply only when an override is actually accepted.
+- **macOS unaffected**: the `--sync-base-url` launch argument and `COUCHTOUR_SYNC_BASE_URL` env var
+  continue to work on all macOS builds; the macOS override resolution lives in
+  `CouchTourKit`'s `SyncConfig.resolveBaseURL` and is out of scope here.
+- **Tests**: `SyncTest.kt` adds `SyncBaseUrlOverrideTest` covering a rejected release override
+  (`debug = false`), an accepted debug override (`debug = true`), a blank/null override in debug,
+  the `BuildConfig.DEBUG` default on test builds, and confirmation that D314's token-host
+  clearing still fires through the gated path. `scripts/test_sync_base_url_intent_guard.sh`
+  statically guards against an exported component forwarding `EXTRA_SYNC_BASE_URL` to
+  `applyConfiguredBaseUrl` without the debug gate; wired into `.github/workflows/test.yml`.
+
+Supersedes the Android portion of D314 ("`syncBaseUrl` intent extra overrides the base URL on
+launch or `onNewIntent`") while preserving D314's staging defaults, token-host protection, and
+macOS override behavior.

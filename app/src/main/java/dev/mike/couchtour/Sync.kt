@@ -165,6 +165,32 @@ object SyncApi {
         return applyConfiguredBaseUrl(defaultUrl, override, tokenStore)
     }
 
+    /**
+     * Applies a sync base URL [override] from an intent extra, but only when [debug] is true.
+     * Returns true if the override was accepted and applied, false if it was rejected.
+     *
+     * This gates intent-supplied URL overrides on [debug] so that release builds — whose
+     * exported launcher Activity is reachable by any installed app — cannot be silently
+     * redirected to a host an attacker controls (D323). Debug and beta builds (which set
+     * BuildConfig.DEBUG=true) retain the override for switching between staging, production,
+     * and local hosts. The existing URL validation and token-host change protections in
+     * [applyConfiguredBaseUrl] remain intact and apply only when an override is accepted.
+     */
+    fun maybeApplyBaseUrlOverride(
+        context: Context,
+        override: String?,
+        debug: Boolean = BuildConfig.DEBUG,
+        store: SyncTokenStore? = null,
+    ): Boolean {
+        if (!debug || override == null || override.isBlank()) return false
+        if (store != null) {
+            applyConfiguredBaseUrl(override = override, store = store)
+        } else {
+            applyConfiguredBaseUrl(context, override = override)
+        }
+        return true
+    }
+
     private val JSON_MEDIA = "application/json".toMediaType()
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
