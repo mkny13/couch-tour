@@ -5128,3 +5128,13 @@ Part of #430 (#435). Counterpart of Android #376 / D293.
 - **Copy** puts `exportText()` (both generations, full) on `NSPasteboard.general`. **Clear** asks for confirmation, then calls `clear()` (both files and marks) and reloads.
 - **Threading**: the log's inspection APIs block on its serial queue and hit disk, so every call runs in `Task.detached`; the main actor only assigns results.
 - The view owns its own `DiagnosticsLog()` on the default directory; the log's queue serializes it against any other instance only per-instance, which is acceptable until app-wide instrumentation (separate sub-issue) introduces a shared one.
+
+## D317: Diagnostics instrumentation event vocabulary (macOS)
+
+Status: accepted. Mirrors Android D294. Builds on D315/D316 (#433, #435); #434.
+
+- Subsystems record through `Diagnostics` (CouchTourKit), a process-wide holder for one `DiagnosticsLog`. `log` is nil until the app calls `Diagnostics.installDefault()` at launch, so tests never write to the real log. The Settings viewer reads the same instance so marks are visible there.
+- `api.call` (PhishInAPI, RelistenAPI, SyncAPI): `path=<percent-encoded path>`, `phase=start|end|failed`, `ms`, `status` on end, error type name on failed. Path only: query strings and headers are never logged. (A phish.in search term is part of the path by API design.)
+- `sync.start`, `sync.end` (`pulled`, `pushed`, `ms`), `sync.error` (`code`, `ms`). Codes are short classifications (`unauthorized`, `network`, `server`, `gone`, `not_found`, `rate_limited`, `decode`, `http_N`, `unknown`), never the exception text. Sets the `Last sync` mark. Cancellation is not logged.
+- `playback.start`, `playback.stop` (`posMs`), `playback.error` (`domain`, `errno` from `AVPlayerItemFailedToPlayToEndTime`), each with `show` and `track`. Sets the `Last playback` mark. Emitted from `Player`'s rate and failure observers; no per-second position logging.
+- Field names avoid the redaction keywords (`code`-compound keys such as `errorCode` would print `***`), hence `errno`.

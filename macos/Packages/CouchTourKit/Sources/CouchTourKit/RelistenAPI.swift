@@ -759,7 +759,7 @@ public enum RelistenAPI {
     private static func get(_ url: URL) async throws -> Data {
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Diagnostics.timedCall(request) { try await URLSession.shared.data(for: request) }
         guard let http = response as? HTTPURLResponse else { throw APIException("No HTTP response") }
         guard (200...299).contains(http.statusCode) else { throw APIException("HTTP \(http.statusCode)", code: http.statusCode) }
         return data

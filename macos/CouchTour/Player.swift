@@ -127,6 +127,7 @@ final class Player: NSObject, ObservableObject {
 
     private let queuePlayer = AVQueuePlayer()
     private let recorder: ProgressRecorder
+    private var failureObserver: NSObjectProtocol?
     private let progressStore: ProgressStore?
     private let syncSession: SyncSession?
     private let playbackSettings: PlaybackSettings?
@@ -623,9 +624,23 @@ final class Player: NSObject, ObservableObject {
                 let isPlaying = newRate > 0
                 guard self.isPlaying != isPlaying else { return }
                 self.isPlaying = isPlaying
+                if isPlaying {
+                    Diagnostics.playbackStart(show: self.show?.date, trackIndex: self.currentIndex)
+                } else {
+                    Diagnostics.playbackStop(show: self.show?.date, trackIndex: self.currentIndex, positionMs: self.positionMs)
+                }
                 self.updateNowPlayingElapsedTime()
                 if isPlaying { self.claimNowPlaying(playing: true) }
                 self.saveProgress(force: true)
+            }
+        }
+        failureObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime, object: nil, queue: .main
+        ) { [weak self] note in
+            let error = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+            Task { @MainActor in
+                guard let self, !self.isCasting else { return }
+                Diagnostics.playbackError(show: self.show?.date, trackIndex: self.currentIndex, error: error)
             }
         }
         timeObserverToken = queuePlayer.addPeriodicTimeObserver(

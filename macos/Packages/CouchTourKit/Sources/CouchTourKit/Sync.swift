@@ -260,7 +260,7 @@ public enum SyncAPI {
     }
 
     private static func execute(_ request: URLRequest) async throws -> HTTPResult {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Diagnostics.timedCall(request) { try await URLSession.shared.data(for: request) }
         guard let http = response as? HTTPURLResponse else { throw SyncException("No HTTP response") }
         let rotated = http.value(forHTTPHeaderField: "X-Sync-Token-Rotated")
         return HTTPResult(code: http.statusCode, data: data, rotatedToken: rotated)
@@ -479,6 +479,40 @@ public final class SyncSession: ObservableObject {
     /// Usually one round trip: only a first pair (watermark 0, so the whole progress table is
     /// "changed") has enough backlog to need more than one.
     public func sync(_ progressStore: ProgressStore) async throws {
+        guard store.deviceToken != nil else { return }
+        let began = Date()
+        pulledCount = 0
+        pushedCount = 0
+        Diagnostics.event(.info, "sync.start")
+        handledFailure = nil
+        do {
+            try await performSync(progressStore)
+            let ms = Int(Date().timeIntervalSince(began) * 1000)
+            let stamp = ISO8601DateFormatter().string(from: Date())
+            // An unauthorized sync unlinks and returns normally; it is still a failure.
+            if let handledFailure {
+                Diagnostics.event(.error, "sync.error", [("code", handledFailure), ("ms", String(ms))])
+                Diagnostics.mark("Last sync", "\(stamp) \(handledFailure)")
+                return
+            }
+            Diagnostics.event(.info, "sync.end", [("pulled", String(pulledCount)), ("pushed", String(pushedCount)), ("ms", String(ms))])
+            Diagnostics.mark("Last sync", "\(stamp) ok")
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let code = Diagnostics.code(for: error)
+            let ms = Int(Date().timeIntervalSince(began) * 1000)
+            Diagnostics.event(.error, "sync.error", [("code", code), ("ms", String(ms))])
+            Diagnostics.mark("Last sync", "\(ISO8601DateFormatter().string(from: Date())) \(code)")
+            throw error
+        }
+    }
+
+    private var pulledCount = 0
+    private var handledFailure: String?
+    private var pushedCount = 0
+
+    private func performSync(_ progressStore: ProgressStore) async throws {
         guard let token = store.deviceToken else { return }
 
         isSyncing = true
@@ -492,6 +526,7 @@ public final class SyncSession: ObservableObject {
                 // until the user re-pairs, rather than retrying a request that can't succeed.
                 // This used to be silent — the device would just stop syncing forever with
                 // nothing on screen to explain why, which is exactly what happened live (D172).
+                handledFailure = "unauthorized"
                 unlink()
                 lastError = "This device was unlinked — its pairing was revoked or expired. " +
                     "Re-pair to resume syncing."
@@ -499,7 +534,7 @@ public final class SyncSession: ObservableObject {
                 // Cursor predates the tombstone retention floor: start over from scratch.
                 // since = 0 never 410s (D126), so this terminates in one extra round trip.
                 store.lastSeq = 0
-                try await sync(progressStore)
+                try await performSync(progressStore)
             } else {
                 lastError = error.message
                 throw error
@@ -533,6 +568,8 @@ public final class SyncSession: ObservableObject {
         }
 
         for change in response.changes { try progressStore.put(change.toEntity()) }
+        pulledCount += response.changes.count
+        pushedCount += toPush.count
         store.lastSeq = response.seq
         if let maxUpdatedAt = toPush.map({ $0.updatedAt }).max() {
             store.lastPushWatermark = maxUpdatedAt
