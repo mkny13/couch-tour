@@ -12,6 +12,9 @@ on:
   # still covers the rare direct-to-main push if it ever needs a manual re-check.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
