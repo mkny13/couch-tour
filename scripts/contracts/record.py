@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Records real phish.in and Relisten responses as contract fixtures (see DECISIONS.md).
+"""Records real phish.in and Relisten responses as contract fixtures (see DECISIONS.md and docs/decisions/DECISIONS-ARCHIVE.md).
 
 Hits the endpoints the clients actually call (Api.kt, Relisten.kt), trims every JSON array to
 its first 3 elements so fixtures stay small while values and shape stay real, and writes the
