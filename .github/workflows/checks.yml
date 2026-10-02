@@ -1,0 +1,17 @@
+name: Checks
+
+# Grep-level gates that need no Java/Gradle, so they fail in seconds (see test.yml for the suite).
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  mockup-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Self-test the mockup-data check
+        run: scripts/checks/test_check_mockup_data.sh
+      - name: Check shipping code for mockup/placeholder data
+        run: scripts/checks/check-mockup-data.sh

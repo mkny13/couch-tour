@@ -188,6 +188,8 @@ cd macos/Packages/CouchTourKit && swift test
 cd sync && npm test
 ```
 
+The `checks` workflow (`.github/workflows/checks.yml`) runs `scripts/checks/check-mockup-data.sh` on every PR; it fails when mockup/placeholder data (lorem ipsum, hardcoded artist names) shows up in shipping code outside previews. Exceptions go in `scripts/checks/mockup-allowlist.txt`, each with a reason. Self-test: `scripts/checks/test_check_mockup_data.sh`.
+
 Install to a connected device or running emulator:
 
 ```bash

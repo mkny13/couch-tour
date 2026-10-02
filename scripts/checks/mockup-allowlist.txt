@@ -1,0 +1,19 @@
+# path:pattern  # reason   (reason is mandatory; pattern is the name printed in the failure message)
+app/src/main/java/dev/mike/couchtour/ArtistAbbreviations.kt:"Grateful Dead"  # real artist -> abbreviation table
+app/src/main/java/dev/mike/couchtour/ArtistAbbreviations.kt:"TAB"  # real artist -> abbreviation table
+app/src/main/java/dev/mike/couchtour/ArtistAbbreviations.kt:"WSP"  # real artist -> abbreviation table
+app/src/main/java/dev/mike/couchtour/ArtistAbbreviations.kt:"Widespread Panic"  # real artist -> abbreviation table
+app/src/main/java/dev/mike/couchtour/ArtistAbbreviations.kt:"Perpetual Groove"  # real artist -> abbreviation table
+app/src/main/java/dev/mike/couchtour/ArtistAbbreviations.kt:"pgroove"  # real artist -> abbreviation table
+app/src/main/java/dev/mike/couchtour/ArtistAbbreviations.kt:"Goose"  # real artist -> abbreviation table
+macos/Packages/CouchTourKit/Sources/CouchTourKit/ArtistAbbreviations.swift:"Grateful Dead"  # real artist -> abbreviation table (macOS twin)
+macos/Packages/CouchTourKit/Sources/CouchTourKit/ArtistAbbreviations.swift:"TAB"  # real artist -> abbreviation table (macOS twin)
+macos/Packages/CouchTourKit/Sources/CouchTourKit/ArtistAbbreviations.swift:"WSP"  # real artist -> abbreviation table (macOS twin)
+macos/Packages/CouchTourKit/Sources/CouchTourKit/ArtistAbbreviations.swift:"Widespread Panic"  # real artist -> abbreviation table (macOS twin)
+macos/Packages/CouchTourKit/Sources/CouchTourKit/ArtistAbbreviations.swift:"Perpetual Groove"  # real artist -> abbreviation table (macOS twin)
+macos/Packages/CouchTourKit/Sources/CouchTourKit/ArtistAbbreviations.swift:"pgroove"  # real artist -> abbreviation table (macOS twin)
+macos/Packages/CouchTourKit/Sources/CouchTourKit/ArtistAbbreviations.swift:"Goose"  # real artist -> abbreviation table (macOS twin)
+macos/Packages/CouchTourKit/Sources/CouchTourKit/Artwork.swift:"WSP"  # per-artist artwork palette keyed by real artist slug
+macos/Packages/CouchTourKit/Sources/CouchTourKit/Artwork.swift:"TAB"  # per-artist artwork palette keyed by real artist slug
+app/src/main/java/dev/mike/couchtour/Artwork.kt:"Grateful Dead"  # KDoc example of the monogram derivation, not data
+macos/CouchTour/FeedbackButton.swift:"Grateful Dead"  # doc comment example, not data
