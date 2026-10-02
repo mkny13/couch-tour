@@ -1,0 +1,4721 @@
+# Decision log archive
+
+Older entries moved verbatim, in order, out of [DECISIONS.md](../../DECISIONS.md) (D1–D266 iteration sections, minus the Architecture, Scope and Data quirks sections that stay there). Nothing was edited. Grep both files when you look up a D-number.
+
+## Iteration 2
+
+**D13 — "Stop at encore" needed no code.**
+The app queues exactly one show and ExoPlayer's default `repeatMode` is `REPEAT_MODE_OFF`,
+so playback already ends after the last track. Setting it explicitly would have been a
+redundant line that only restated the default, so it isn't there. This is the behaviour to
+protect if a "play next show" feature ever gets added.
+
+**D14 — Search covers shows and tracks only.**
+`/search/{term}` also returns songs, venues, tags, and playlists. Shows and tracks are the
+two that are immediately actionable with screens that already exist — open a show, play a
+performance. The rest would each need a new screen; deferred rather than half-built.
+
+**D15 — Tapping a search result queues its whole show.**
+Search hits carry `show_date`, so tapping a track fetches its show, finds that track's index
+in the playable list, and starts there. The alternative — playing the single track alone —
+would strand you at the end of one song mid-set.
+
+**D16 — Search is debounced 300ms and needs 3+ characters.**
+The 3-character floor is the API's rule, not mine; shorter terms are rejected. The debounce
+comes free from `produceState`, which cancels the prior coroutine when the term changes.
+
+**D17 — The scrubber toggle is temporary.**
+The button in the mini player exists only so the two styles can be compared on-device. Once
+you pick one, the toggle and the losing branch both come out.
+
+**D18 — Waveforms are tinted, not drawn as-is.**
+The PNGs are 1100x70 greyscale-plus-alpha, so the shape lives in the alpha channel. The same
+bitmap gets drawn twice — once in a muted colour, once clipped to the play position in the
+accent colour. First attempt used `Color.DarkGray` for the unplayed portion, which was almost
+invisible against the player background; it's now `onSurfaceVariant` at 45% alpha.
+
+## Iteration 3 — finished shows and the archive
+
+**D19 — A real Room migration, not a destructive one.**
+Adding `finished` took the schema to version 2. `fallbackToDestructiveMigration()` would
+have been one line instead of six, but it drops the table — and the listening history in
+that table is the entire reason the table exists. Verified on a populated v1 database:
+both rows survived with the new column defaulted to 0.
+
+**D20 — `finished` is derived from player state, never passed in.**
+First attempt marked the flag from inside `onPlaybackStateChanged(STATE_ENDED)`. That
+looked right and was wrong: ending a queue also fires `onIsPlayingChanged(false)`, which
+ran a moment later and wrote `finished = false` straight back over it. The flag never
+survived. It is now computed inside the save itself as
+`player.playbackState == Player.STATE_ENDED`, so every listener that fires at the end of a
+queue writes the same value and none of them can race. It also self-clears: playing the
+show again naturally writes `false`.
+
+**D21 — Rows already at the end of a show were not backfilled as finished.**
+The migration defaults every existing row to 0, including shows that had in fact been
+played out before the flag existed. Inferring it from `positionMs` against a track
+duration the table doesn't store would mean guessing. They sort themselves out the next
+time they're played.
+
+**D22 — A finished show restarts from the top.**
+Its stored position is the last second of the encore, so resuming there stops again
+immediately — the wart that prompted this work. Both entry points are handled: the archive
+row opens the show screen, and the show screen hides its resume banner when finished.
+
+**D23 — Dismiss deletes the row rather than hiding it.**
+"Remove from Continue listening" is a plain delete, so a dismissed show is genuinely
+forgotten rather than accumulating invisible state. Playing it again starts it over as a
+new row. The archive has the same control.
+
+**D24 — A plain clickable Box for the dismiss button, not `IconButton`.**
+`IconButton` enforces a 48dp minimum touch target that overflowed the 132dp artwork and
+spilled onto the neighbouring card.
+
+## Iteration 4 — auth, playlists, and your library
+
+**D25 — The JWT goes in an `X-Auth-Token` header, not `Authorization: Bearer`.**
+The OpenAPI spec documents no auth header at all, and probing can't tell you: a missing
+token and a bogus `Bearer` token both return an identical bare `401 {"message":
+"Unauthorized"}`. Guessing Bearer would have failed in a way that looked like "wrong
+password" forever. Confirmed instead from phish.in's source (`jcraigk/phishin`) in four
+places, including `app/api/api_v2/helpers/shared_helpers.rb#current_user` and the site's
+own JS client. `Authorization: Bearer` exists too, but it carries API keys — a different
+mechanism entirely.
+
+**D26 — `?filter=mine` silently returns everything when unauthenticated.**
+Not a 401 — a 200 with all 2,504 public playlists. Presenting that as "your playlists"
+would be badly wrong, so the filtered calls are only reachable behind a signed-in state.
+This is the same class of trap as `year=1983-1987` returning an empty list. By contrast
+`liked_by_user=true` does the safe thing and returns 0 entries unauthenticated.
+
+**D27 — The password is never stored, and the token is encrypted at rest.**
+The password is used for exactly one request and discarded. The JWT goes into
+`EncryptedSharedPreferences`. If the Android keystore is in an unrecoverable state (device
+restore, key reset) the store is wiped and reopened once, and failing that the token is
+held in memory only — the session ends when the process does, but nothing sensitive is
+ever written in the clear and the app doesn't crash on launch.
+
+**D28 — `android:allowBackup` is now false.**
+It was true from the first commit, which was harmless when the app stored nothing but
+playback positions. With an auth token on disk, cloud backup becomes a way for the token
+to leave the device.
+
+**D29 — A 401 on a request that carried a token logs you out.**
+Without this, an expired or revoked JWT leaves the app looking signed in while every
+personal screen shows an error. Deliberately scoped to requests that actually sent a
+token, so a wrong password at the login screen doesn't trip it.
+
+**D30 — Playlist entries are clipped, not played whole.**
+Entries carry `starts_at_second` / `ends_at_second`, because a playlist can excerpt a jam
+out of a longer track. Ignoring them would play the wrong audio, so entries map to a
+Media3 `ClippingConfiguration`. Entry `duration` is the clipped length and is what the UI
+shows.
+
+**D31 — Playlist queues use the `playlist:<slug>` key reserved in D6.**
+"Continue listening" therefore shows whichever thing you actually played: a show played
+from a show page shows the show, a playlist shows the playlist name, its author, and its
+track count. No schema change was needed — this is what the namespaced key was for.
+
+**D32 — "My playlists" merges the `mine` and `liked` filters.**
+They are separate API calls with no combined option, so the screen requests both and
+deduplicates by slug.
+
+**D33 — Search shows playlists, but songs, venues, and tags are still skipped.**
+Playlists became actionable once there was a playlist screen to open. The rest still have
+no destination.
+
+**D34 — Rows without artwork no longer reserve the image slot.**
+Account and playlist rows have no cover, and the empty 48dp box left them looking
+mysteriously indented.
+
+## Iteration 5 — tests, history, and card actions
+
+**D35 — Tests are plain JVM unit tests, no device needed.**
+92 of them, run with `./gradlew testDebugUnitTest`. JSON parsing runs against trimmed real
+API responses kept in `app/src/test/resources/fixtures`, so a decoder that isn't tolerant
+of unknown fields fails in CI rather than in your hands. Request-level behaviour is checked
+against a local MockWebServer, and the Room work runs under Robolectric.
+
+**D36 — A few pure functions moved out of the Compose files to be testable.**
+`fmt`, `plural` and the scrubber's position maths lived in files that import Compose, which
+drags UI classes into a plain JVM test. They now live in `Format.kt` and `Queue.kt`. The
+queue-key prefix handling became a real parser (`parseQueueKey`) instead of inline
+`startsWith` checks, which is both tested and safer — an unrecognised key is skipped rather
+than being fetched as the wrong kind of thing.
+
+**D37 — The most valuable tests pin down the traps, not the happy path.**
+Specifically: that the JWT goes in `X-Auth-Token` and that no `Authorization` header is
+ever sent; that a single-year period uses `year=` and a range uses `year_range=`; that a
+401 on a token-bearing request logs out but a rejected login does not; and that both
+database migrations preserve real rows. Each of those is a bug that previously shipped or
+nearly shipped.
+
+**D38 — Dismissing no longer deletes. This reverses D23.**
+You asked for history to include things removed from "Continue listening", which the old
+behaviour made impossible. `dismissed` is now its own flag (schema v3): the row leaves the
+home row but stays in history, and playing it again clears the flag and brings it back.
+Deleting outright is still available, from the history screen.
+
+**D39 — "Archive" became "History", and it holds everything.**
+It previously listed only finished shows. It now lists every queue you've played — in
+progress, finished, or dismissed — newest first, tagged `✓ completed`, `removed · <time>`,
+or `at <time>`.
+
+**D40 — Tapping a "Continue listening" card opens it; a play button plays it.**
+Tapping used to start playback immediately, which made it impossible to go look at a
+playlist you were partway through. Long-press opens a menu with open / mark completed /
+remove. The old X button is gone — removal lives in that menu now.
+
+**D41 — Every screen header has a home button.**
+Back only unwinds one step, which is tedious from a playlist several levels deep.
+
+**D42 — Shuffle deliberately records no progress.**
+"Shuffle all" on My tracks plays your liked tracks in random order. It is the one queue
+that is not resumable, and that is on purpose: resuming would re-fetch and re-shuffle, so
+a saved index would point at a different track than the one you left. Rather than record a
+position that would silently lie, the shuffle queue carries no queue key at all — and the
+saver already skips anything without one, so no special case was needed.
+
+**D43 — The launcher icon is "PH".**
+The previous glyph was meant to be abstract and just read as an "H". Still a placeholder.
+
+## Iteration 6 — Last.fm and section dividers
+
+**D44 — The Last.fm API key must come from you; I won't register one.**
+Creating an API account is an account action, so it isn't mine to do. The key and shared
+secret are read from `local.properties` (already gitignored) into `BuildConfig` at compile
+time, which keeps the secret out of the repo. Absent, they compile to empty strings and the
+app reports Last.fm as unconfigured rather than failing oddly. The alternative — pasting
+them into a settings screen on the phone — is easy to switch to if you'd rather.
+
+**D45 — Browser auth, not the mobile-session flow.**
+`auth.getMobileSession` would need your Last.fm password typed into this app. The browser
+flow (`auth.getToken` → approve on last.fm → `auth.getSession`) never exposes it, so the app
+only ever holds a session key. That key is stored in the same encrypted preferences as the
+phish.in JWT.
+
+**D46 — Scrobbles are queued in the database, not fired and forgotten.**
+Playing offline is the normal case on a train, and a scrobbler that drops those plays isn't
+worth having. Plays go into a `pending_scrobbles` table (schema v4) and drain on the next
+successful submission or when playback starts. A failed submission stops the drain and
+leaves the row, rather than hammering the API or discarding the play.
+
+**D47 — Scrobble timing follows Last.fm's rules and counts listened time, not the playhead.**
+A track counts once it has been played for half its length or four minutes, whichever comes
+first, and only if it is longer than 30 seconds. The scrobbler accumulates actual listening
+time, so seeking to the end of a track doesn't fake a play and a long pause doesn't keep
+counting. The four-minute rule matters here more than for most music: it means a 20-minute
+Tweezer registers at four minutes rather than ten.
+
+**D48 — Track duration is filled in late.**
+The player reports no duration at the moment a track becomes current — only once it has
+prepared the media — so the scrobbler takes the duration on the periodic tick instead. A
+scrobbler that read it at transition time would treat every track as ineligible.
+
+**D49 — Sections are separated by a rule and an accent-coloured heading.**
+Previously every section was grey small-caps text on the same background, so the home
+screen read as one long list.
+
+## Iteration 7 — the Last.fm app makes most of D44 unnecessary
+
+Mike spotted that the official Last.fm app has a "Scrobble from…" list that picks up any
+app publishing an Android MediaSession — which this app already does. That route needs no
+API key and no built-in scrobbler at all, and it is now the recommended one.
+
+**D50 — The album is the show, not the queue.**
+The MediaSession previously published the queue as `albumTitle`, so an external scrobbler
+reading it would log a playlist track with the album "Phish.net Key Jams Pt 1 · by
+mfhgreyboy · 99 tracks". Every track carries its own `show_date` and `venue_name`, even
+inside a playlist, so the album is now built from the track: "1990-11-02 · Glenn Miller
+Ballroom". Verified by reading the published session with `dumpsys media_session`, which is
+exactly what the Last.fm app sees.
+
+**D51 — Queue identity moved to `subtitle`.**
+Fixing D50 would otherwise have broken the earlier requirement that "Continue listening"
+and the mini player show the playlist you started from rather than the underlying show.
+Those two facts now live in different fields: `albumTitle` is the show (for scrobblers),
+`subtitle` is the queue (for our UI).
+
+**D52 — The built-in scrobbler stays, but is now clearly the fallback.**
+It still earns its place if you'd rather not run the Last.fm app, and the work is done and
+tested. The Last.fm screen leads with the app-based route and warns not to enable both,
+because two scrobblers watching the same playback means every track is logged twice.
+
+## Iteration 8 — likes and now-playing navigation
+
+**D53 — The like fields were in the API all along; the models just ignored them.**
+`likes_count` and `liked_by_user` come back on shows, tracks, and playlists, and none of
+them were in the models. `Show` didn't even read its own `id`, which liking requires.
+
+**D54 — The like button owns its state and rolls back on failure.**
+It flips immediately so the row feels responsive, then reverts the heart and the count if
+the request fails, rather than leaving a like on screen that never reached the server.
+Signed out it still shows the count — that's public — but tapping does nothing rather than
+erroring.
+
+**D55 — Tapping the notification resolves its destination on arrival, not in advance.**
+A `PendingIntent` is built once when the session is created, but the queue changes as
+playback moves, so a baked-in destination would go stale within a track. The intent instead
+carries a flag; the activity reads the *current* queue key from the MediaController and
+navigates then. Because the activity is `singleTask`, a second tap re-enters through
+`onNewIntent` rather than `onCreate`, so both paths set the flag.
+
+**D56 — The now-playing cover opens the queue you started from.**
+Same navigation as the notification, so a playlist opens the playlist rather than the show
+the current track came from. Shuffle has no queue key, so its cover is deliberately inert —
+there is nothing to open.
+
+**D57 — Hearts belong on every track list, not just the show screen.**
+The like button was added to the show screen's own row component, but playlists, search
+results and My tracks use the shared `RowItem`, which never got one — so three of the four
+places a track appears had no heart at all. `RowItem` now takes a trailing slot. Worth
+noting the unit tests could not have caught this: they proved the API and the models were
+right, and the models were right. The gap was purely which rows the button was wired into,
+which only looking at the screens reveals.
+
+### Auth — now confirmed
+
+This section previously flagged every authenticated path as untested, because I could not
+create an account or type a password. Mike logged in on a real device and confirmed My
+Shows, My Tracks, and My Playlists all return his data, so `X-Auth-Token` is correct and
+D25 holds.
+
+Still unverified by me, for the same reason: "Shuffle all" on My tracks, which needs a
+signed-in account to have any tracks to shuffle. Its queue-building path is shared with
+playlists, which is verified, but the button itself has only been exercised by tests.
+
+## Iteration 9 — Google Cast
+
+**D58 — Cast is a second player behind the same MediaSession, not a second mode.**
+The service now owns two players — the local ExoPlayer and, once the framework has
+initialised, a `CastPlayer` — and hands the session whichever one is live. Everything above
+the service is unchanged and unaware: the UI's `MediaController`, the progress writer, the
+scrobbler and the notification all talk to `session.player` and neither know nor care where
+the audio is coming out. The alternative, a parallel cast path with its own controls, would
+have meant a second copy of every rule in this file.
+
+**D59 — Queue items now declare a MIME type.**
+`audio/mpeg`, hardcoded — the archive is all MP3. ExoPlayer sniffs the container and never
+needed it, but media3's Cast converter throws `"The item must specify its mimeType"`, so
+without it playback works locally and dies on the first track the moment you cast. That is
+the kind of failure a test can catch without a Chromecast in the room, so there is one.
+
+**D60 — Our own `MediaItemConverter`.**
+`MediaMetadata.extras` is where the queue key, the queue title and the waveform live, and
+media3's default converter drops all of it — it carries only what a TV displays. Media3
+caches the items it sent and normally rebuilds its timeline from that cache, so the loss
+only surfaces where the cache is empty: a session resumed after the app was killed, or a
+queue started by another sender. Those are precisely the cases where losing the queue key
+means casting silently stops recording your position. The extras now ride in the queue
+item's `customData`, which the receiver echoes back untouched.
+
+**D61 — Switching players never clears the outgoing queue.**
+It stops it. `clearMediaItems()` empties the timeline, which puts the player in
+`STATE_ENDED`, which the progress writer reads as "played through to the encore" (D20) —
+so every cast would have marked the show finished and dropped it out of "Continue
+listening". `stop()` leaves the queue where it is and lands in `STATE_IDLE`.
+
+**D62 — Casting continues playing; coming back from the TV lands paused.**
+Sending to a Chromecast picks up mid-track and keeps going, which is the whole point. The
+reverse is not symmetrical: a cast session usually ends because someone else took the TV or
+the network dropped, and a phone that suddenly starts playing out loud in that room is not
+what anyone asked for. The queue is loaded at the same position, ready for the play button.
+
+**D63 — The device picker is Compose, not `MediaRouteButton`.**
+The Cast SDK's button is a plain Android view whose chooser dialog needs an AppCompat theme
+and a `FragmentActivity` to show itself; this app is Compose on a `ComponentActivity` with a
+Material theme, so adopting it would have meant changing the activity's base class and the
+app theme to satisfy a single button. Driving `MediaRouter` directly is about the same
+amount of code, and the dialog matches the rest of the app. Active scanning runs only while
+the picker is open; the rest of the time the button sits on passive discovery, and it is
+invisible entirely when there is nothing to cast to.
+
+**D64 — The Cast SDK's own notification and media session are switched off.**
+`CastMediaOptions` can publish its own `MediaSession` and notification. This app already
+publishes one (that is the reason it isn't a WebView, D1), and two of them means two sets of
+lockscreen controls and every track scrobbled twice by the Last.fm app.
+
+**D65 — The stock Default Media Receiver, no registered receiver app.**
+Registering a custom receiver is a Google Cast Developer Console account action, and it
+isn't mine to do (same rule as D44). The default receiver plays progressive MP3 over HTTPS,
+which is exactly what phish.in serves.
+
+The visible cost, confirmed on Mike's TV: the receiver's own name, "Default Media Receiver",
+sits above the track info, because that string is the app name Google registered for the
+stock receiver's ID and no metadata we send can override it. The fix is a **Styled Media
+Receiver** — registered in the console under whatever name should appear on the TV, with the
+CSS field left empty so there is still nothing to host. It costs a one-off $5 developer
+registration and yields an app ID, at which point `RECEIVER_APP_ID` in `Cast.kt` is a
+one-line change. Mike's call, since it's his account and his $5.
+
+**D66 — Playlist excerpts cast as whole tracks. Known, unfixed.**
+Entries can be clipped (D30) and a receiver plays whole files; Cast has no equivalent of
+`ClippingConfiguration`. The excerpt is right on the phone and long on the TV. Fixing it
+properly needs the receiver told to seek and stop at a boundary, which the default receiver
+won't do — it would take a custom receiver, which D65 rules out for now.
+
+**D67 — A handoff mid-track no longer restarts the scrobble clock.**
+Both players announce the same track around a switch, and the scrobbler treated that as a
+track change: it reset its accumulated listening time, so a 20-minute jam could scrobble
+once on the phone and again four minutes later on the TV. It now ignores an announcement
+for the track it is already watching.
+
+**D68 — Cast initialises quietly, and is allowed never to arrive.**
+A phone with no Play services, or an outdated one, is a normal phone. Initialisation is
+asynchronous and best-effort; the service attaches the cast player whenever it turns up, the
+button never appears if it doesn't, and nothing else in the app changes either way.
+
+### Hardware — now confirmed
+
+This section previously flagged the whole feature as untested, because no Chromecast had been
+near it. Mike has since cast to a real device: discovery, the picker, the receiver playing a
+phish.in URL, and the handoff all work. The one thing that didn't was volume — see D71.
+
+## Iteration 10 — Player layout
+
+**D69 — The player's transport moved to its own row, and the track display shows both labels.**
+On a real device the three controls were sharing one row with the artwork and the text, which
+made them small targets and squeezed the text column to the point that the queue label was
+truncated mid-word. Worse, the show a track came from was not displayed at all — a playlist
+jumps between shows every track, so the date and venue are the interesting part. The transport
+now sits on its own centred row at the bottom of the player, where the thumb already is, with
+targets big enough to hit without looking; the text column gets the full width and three lines:
+track, show (`albumTitle`), queue (`subtitle`). Where a track has no show of its own,
+`albumFor` already falls back to the queue label, so the show line would repeat the queue line
+verbatim — the state layer blanks it in that case rather than printing it twice. The player is
+taller than it was; it is the bottom bar of a `Scaffold`, so the list above simply gets
+shorter, which is the trade Mike asked for.
+
+The third line is also where "Casting to <device>" goes (D58), so casting costs the queue
+label rather than the show — the queue is one tap away on the cover, the device isn't.
+
+## Iteration 11 — removing built-in scrobbling
+
+**D70 — The built-in scrobbler was removed on 2026-07-27, ahead of the Play Store release.
+This supersedes D44–D48 and D52.**
+The scrobbler was one more thing collecting and transmitting data — a Last.fm API key and
+session key, a queue of tracks written to disk, and outbound calls to
+ws.audioscrobbler.com — for a feature Iteration 7 had already made optional in practice: the
+official Last.fm app's "Scrobble from…" route reads the same track, artist, and album
+straight off the MediaSession, with no API key and nothing shipped in this app. Shrinking
+the privacy and data-collection surface before going to a public store outweighed keeping a
+fallback nobody needed to use. `LastFm.kt`, `Scrobbler.kt`, the Last.fm settings screen, and
+the `pending_scrobbles` table are gone; schema v5's `MIGRATION_4_5` drops the now-orphaned
+table. External scrobbling via the MediaSession is unaffected.
+
+## Iteration 12 — cast volume
+
+**D71 — Volume on a Chromecast needed media3 1.9+, not code of ours.**
+Casting worked, but the volume slider read 0 and wouldn't move. It wasn't a wiring mistake:
+media3 1.5.1's `CastPlayer` — the version D58 was built on — declines to implement device
+volume at all. `getDeviceVolume()` is `return 0` with the comment "not supported", every
+setter is an empty method, its `DeviceInfo` never sets a maximum volume, and none of
+`COMMAND_GET_DEVICE_VOLUME` / `COMMAND_SET_DEVICE_VOLUME` / `COMMAND_ADJUST_DEVICE_VOLUME` are
+in its available commands. The session layer reads exactly those three things: no adjust
+command means the volume provider it publishes to the system is `VOLUME_CONTROL_FIXED`, and a
+fixed provider reporting volume 0 out of a maximum of 0 is precisely the dead slider Mike saw.
+Nothing this app could do from outside the player would have moved it.
+
+Media3 implemented it in 1.8.0 and split the cast-only player out as `RemoteCastPlayer` in
+1.9, which is what the service now builds: real `getDeviceVolume`, setters that call
+`CastSession.setVolume`, a 20-step maximum, the three commands advertised, and an
+`EVENT_DEVICE_VOLUME_CHANGED` when the volume changes at the other end — so turning it up with
+the TV remote moves the phone's slider too. Media3 went 1.5.1 → 1.10.1 in one step, which was
+possible without further work because the Play Store preparation had already taken `compileSdk`
+to 36; 1.10 requires it. `play-services-cast-framework` and `mediarouter` are pinned to the
+versions media3-cast itself depends on, so the declared version is the one that resolves.
+
+The upgrade also makes `CastPlayer` a deprecated wrapper over a new local-plus-remote player
+that does its own switching. Not adopted: our handoff rules are deliberate (D61, D62), and
+swapping them for someone else's semantics is not a volume fix.
+
+## Iteration 13 — the show line
+
+**D72 — The show line is blanked on a prefix, not on equality. Refines D69.**
+D69 blanked the show line only when it matched the queue line exactly, which covered the case
+it was written for — a track with no show of its own, where `albumFor` falls back to the queue
+label verbatim. It missed the common one. Playing a show from its own page, the queue line is
+the show line *plus the city*: `1997-11-17 · McNichols Arena` against
+`1997-11-17 · McNichols Arena · Denver, CO`. Not equal, so both rendered, and the player said
+the date and venue twice on the path most used. A `startsWith` test catches both cases, keeps
+the city, and leaves playlists alone, where the show and the queue are unrelated strings and
+both lines earn their place. Seen on a screen, not in a test: the two strings differ, so
+nothing short of rendering them together shows the problem.
+
+## Iteration 14 — Android Auto
+
+**D73 — Android Auto browses through the existing MediaSession; `PlaybackService` gained a
+browse tree, not a second service.**
+`PlaybackService` became a `MediaLibraryService` rather than sitting alongside a separate one —
+Auto (and, if it's ever pursued, Automotive) connects through `onGetSession` like every other
+controller, and the dual-player handoff (D61, D62) doesn't care who's asking. The tree is
+Root → Years → shows, with an extra Tour layer inserted only where a period has more than one
+distinct `tour_name` — the early ranged periods (`"1983-1987"` and the like) are usually the
+case that needs it; a single-tour or tourless year, which is most of them, goes straight to its
+shows. A Continue Listening node is built from `progressDao.inProgress()`, and its resume media
+IDs wrap the same namespaced `queueKey` (D6) rather than inventing a second identifier scheme.
+
+Resuming from Continue Listening lands on the right *track*, not the right *second*: Auto plays
+from the top of whichever item is tapped, and there's no hook for a mid-track start position on
+a system-driven tap the way `PlayerViewModel.resume()` gets one from a direct
+`MediaController.setMediaItems` call. Slicing the already-fetched track list at `trackIndex`
+gets the right track for free; true position resumption would need Media3's
+`onPlaybackResumption` callback, which is a separate, real piece of work and not done here.
+
+A parent id that fails to parse, or a `PhishInApi` call that throws — no signal in a moving
+car is the expected case, not an edge one — both return an empty child list rather than an
+error result. `LibraryResult.ofError` wants a `SessionError`; an empty folder is a safe, always-
+available fallback that needs none of the guessing that picking the "right" error code would.
+
+No `onConnect` override was needed: `MediaSession.ConnectionResult.AcceptedResultBuilder`
+already switches on `session is MediaLibrarySession` to grant the library browsing commands
+alongside the usual playback ones.
+
+Android Automotive OS — the full in-car OS with no phone, as opposed to Auto's phone
+projection — is out of scope, same as the issue that asked for this scoped it:
+`automotive_app_desc.xml` declares `<uses name="media"/>` for Auto only, with no
+`minCarApiLevel`, and there's no handling of the "recent root" request Automotive uses for its
+resume-on-boot flow.
+
+This environment couldn't run `./gradlew`: Google's Maven, where every `androidx.media3`
+artifact is hosted, wasn't reachable from it. The Media3 API surface this relies on —
+`MediaLibrarySession.Builder`'s constructor, the `Callback` method signatures, the
+`LibraryResult` factories — was checked against the `androidx/media` source on GitHub instead
+of an actual compile. Run `testDebugUnitTest` (it now includes `BrowseTest`) on a machine with
+the Android SDK before this ships.
+
+## Iteration 15 — multi-artist support via Relisten
+
+**D74 — Relisten, not archive.org directly, as the second backend.** archive.org's raw
+`/metadata/{id}` is free-text taper filenames — no setlists, no song identity, no set
+boundaries. Relisten already normalises archive.org into exactly that: artists, years,
+shows, and recordings with real track titles. Going straight to archive.org would mean
+rebuilding Relisten, for worse data.
+
+**D75 — phish.in stays the Phish backend; Relisten adds everyone else.** Relisten also
+carries Phish (sourced from phish.in upstream), but without waveforms, cover art, likes,
+playlists, or login. Keeping phish.in for Phish means zero regression in the existing test
+suite and zero churn to the login/likes/playlists paths, which stay phish.in-only features.
+
+**D76 — `Progress` gained an `artist` column (schema v6) rather than folding the band into
+`subtitle`.** Grouping history by artist off a display string would mean splitting on a
+separator a venue name is free to contain — the first "Barton Hall · Ithaca, NY" show breaks
+it. `MIGRATION_5_6` backfills every existing row to "Phish", which isn't a guess: until
+Relisten existed, phish.in was the only thing the app could play, so every row already in
+the table genuinely was Phish.
+
+**D77 — A recording's source UUID is part of the queue key, not just its date.** Relisten
+carries around nine tapes of an average Grateful Dead show, each with its own track
+boundaries — Cornell's ten sources run 20 to 25 tracks each. A stored `trackIndex` means
+different music depending on the tape, so the key is `relisten:<slug>/<date>/<uuid>`, with
+`/` as the inner delimiter to sidestep the first-colon-only rule the other two prefixes use.
+
+**D78 — Relisten's own `features` flags drive the UI, not guesses.** `features.sets` is
+false for Grateful Dead (a single wrapper set literally named "Set" on every source) and
+true for Phish; `features.multiple_sources` is the inverse. Both were verified against the
+live API rather than assumed — the next decision is exactly the kind of thing a guess would
+have gotten wrong.
+
+**D79 — The default tape is never tie-broken on `is_soundboard`.** Sources arrive
+pre-sorted by `avg_rating_weighted` descending, so the default tape is
+`sources.firstOrNull()`. Cornell's soundboard ranks 4th (8.21 against the top tape's 8.26);
+preferring soundboards would override Relisten's own ranking and hand the user a
+worse-rated recording.
+
+**D80 — Relisten track duration is seconds; converted to milliseconds on the way in.**
+Everything else in the app — `Format.fmt`, `MediaItems.kt`, Cast — is milliseconds. Pinned
+with a test, since a duration 1000× off looks fine until someone opens the scrubber.
+
+**D81 — MP3 only; Relisten's FLAC is ignored.** Media3 plays FLAC, but Cast's MIME type is
+hardcoded to `audio/mpeg` (D59) and the stock receiver expects progressive MP3. Taking
+MP3-only keeps the Cast path working unchanged; FLAC support is its own future piece of
+work.
+
+**D82 — Android Auto's browse tree and the phone's screens share one `MusicSource` seam.**
+`sourceFor(backend)` resolves to `PhishInSource` or `RelistenCatalogSource`, and both the
+Compose screens and `PlaybackService`'s browse tree call through it, rather than a second,
+Auto-only implementation of the same browsing logic.
+
+See [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md) for the full working history — the API
+facts pinned down against the live service, the phase-by-phase build order, and the open
+questions O1 through O5.
+
+## Iteration 16 — search across every artist
+
+**D83 — `MusicSource` gained a `search` capability, fanned out by `searchAll` with
+per-backend failure isolation.** Iteration 15 gave every backend a shared browse seam but
+left `searchFor` calling `PhishInApi.search` alone, so Relisten's ~200 artists were
+unreachable from the search box. `searchAll` runs both backends' `search(term)`
+concurrently and merges the results with `SearchHits.plus`; a backend that throws
+contributes `SearchHits(failed = setOf(that backend))` instead of failing the whole query,
+so one backend being down costs its own section, not the other's results.
+
+**D84 — Results are grouped by type, with an artist filter-chip row, not grouped by
+artist.** The existing Shows/Tracks/Playlists section layout stayed rather than being
+replaced by per-artist grouping, which keeps the phish.in-only path visually unchanged. A
+`FilterChip` row appears only when a query's hits span more than one artist — "Scarlet
+Begonias" hits eight — and filtering is pure and client-side over the already-fetched
+`SearchHits`, so switching chips costs no refetch.
+
+**D85 — Relisten's own Phish hits are dropped from search, same as browsing.** phish.in is
+the Phish backend (D75); a Relisten hit for the `phish` slug would be a near-duplicate row
+leading to a screen with no waveform, cover art, likes, or playlists. `toSearchHits()`
+filters every bucket on the slug before mapping.
+
+**D86 — Songs and venues travel as `song:`/`venue:`-namespaced `PeriodRef` ids, reusing the
+existing shows route rather than a new screen.** `PeriodRef.id` was already opaque to
+everything but the backend that issues it (phish.in already branches on shape to pick
+`year_range=` over `year=`), so a song or venue hit becomes a `PeriodRef` whose id carries a
+prefix `RelistenCatalogSource.shows()` dispatches on to `/v3/artists/{slug}/songs/{uuid}` or
+`.../venues/{uuid}` instead of the ordinary year lookup. Tapping a hit lands on
+`ArtistShowsScreen` exactly as browsing a year does — no new screen, no new route, and
+nothing for Android Auto's browse tree to learn about.
+
+**D87 — The `Sources` and `Tours` search buckets are ignored.** `Sources` matches free text
+in taper notes and descriptions — a "scarlet begonias" query returns 20 tapes whose notes
+happen to mention the song, capped and arbitrary against the hundreds that exist, and
+strictly worse than the precise `Songs` hit for the same query. `Tours` has no destination
+screen in the app, same reasoning as D14 for tags. `RelistenSearchResults` declares no DTO
+for either bucket; `ignoreUnknownKeys` drops them for free.
+
+**D88 — A Relisten "Shows" search hit has no venue, unlike a browsed show.** `/v3/search`'s
+`Shows` bucket carries `slim_artist`, `display_date`, `source_count`, and `avg_rating`, but
+only a `venue_uuid` — no populated venue. A show row reached from search therefore shows
+just the date and band; the venue only appears once the show itself is opened and fetched
+through the ordinary per-show endpoint, which does return one.
+
+## Iteration 17 — Home becomes an artist list, and a real player
+
+**D89 — Home is a merged artist list, Phish pinned first.** P7's "Artists" screen
+deliberately left Phish out of its own list because Home was already Phish's page
+(`ArtistsScreen`'s old doc comment said so explicitly). That made Home and Auto's browse
+root disagree — Auto already puts Artists above Years, on the reasoning that Relisten
+carries far more artists than phish.in has years. `mergeArtists` (`Catalog.kt`) merges
+`PhishInSource.artists()` and `RelistenCatalogSource.artists()`, keeping Phish first — it's
+the only artist with an account, likes, and playlists behind it — and sorting the rest by
+show count. If one backend fails, the other still renders; only failure on both surfaces an
+error, so a Relisten outage can't hide Phish. Relisten separately archives its own Phish
+collection (slug `phish`, a different show count than phish.in's — the same fact D85 in
+Iteration 16 found for search), so `mergeArtists` drops it by name rather than showing
+"Phish" twice.
+
+**D90 — Phish keeps its own show/track screens rather than folding into the generic
+Relisten path.** Both paths already share `ArtistScreen` for year browsing (`ArtistScreen`
+already worked for any backend via `sourceFor(backend).periods(artist)`), but a period tap
+branches: Phish goes to `shows/{period}` → `show/{date}`, Relisten goes to
+`artist/{backend}/{id}/{period}` → `recording/…`. The Phish-only screens carry the
+`LikeButton` and the "partial" audio-status badge, neither of which exists on the Relisten
+DTOs — collapsing to one screen would mean adding backend branches inside it rather than
+keeping two small ones.
+
+**D91 — The theme stopped being `darkColorScheme()` with zero overrides.** The player's
+small text was `Color.Gray` (`#888888`) hardcoded over `surfaceVariant` (`#49454F`) — a
+2.9:1 contrast ratio, under WCAG AA's 4.5:1 floor, at 11–12sp on the timestamps and queue
+line. `Theme.kt` replaces the M3 baseline-purple scheme with a dark-only palette built from
+the launcher icon's green (`colors.xml`'s `#1B3A2F`), and every `Color.Gray`/`Color.LightGray`
+literal (25 call sites) became `MaterialTheme.colorScheme.onSurfaceVariant`, ~9:1 against
+the new `surfaceContainer` tokens. `themes.xml` keeps its `android:Theme.Material.NoActionBar`
+parent — the Cast chooser's chooser dialog depends on not being AppCompat (D-earlier in
+Iteration 9) — and only gains a matching `windowBackground` plus transparent system bars for
+`enableEdgeToEdge()`.
+
+**D92 — The bottom bar shrank to a compact strip; a full Now Playing screen does what the
+bar used to.** The whole player used to be one 200dp+ bottom bar: art, title, waveform,
+timestamps, and an oversized 60/68/60dp transport row, all stacked. `MiniPlayer` is now ~72dp
+— art, title, one play/pause button, a 2dp progress line — and tapping it opens
+`NowPlayingScreen` (`NowPlaying.kt`) with the waveform, full transport, and a background
+gradient tinted from the artwork's dark-vibrant swatch (`androidx.palette`, falling back to
+`primaryContainer` when there's no art — every Relisten show today). This also fixed a real
+bug: `EXTRA_OPEN_NOW_PLAYING` waited for a queue *key* and opened the show's track list, so
+shuffle queues (no key) never opened anything and even a keyed queue landed one screen short
+of the player. It now waits for `hasQueue` and navigates straight to `NowPlayingScreen`. The
+`Scaffold`'s bottom bar also now hides on the `player` route itself — otherwise the compact
+bar and the full player it opens into would show stacked on top of each other, caught by
+running the app in the emulator rather than by the unit suite, which has no Compose UI tests.
+
+**D93 — Audio focus is requested by hand instead of via ExoPlayer's `handleAudioFocus = true`
+(issue #23).** `PlaybackService`'s audio attributes use `AUDIO_CONTENT_TYPE_MUSIC`, which
+Media3's `AudioFocusManager` marks `willPauseWhenDucked = false` when building the platform
+`AudioFocusRequest`. On API 26+ that tells the OS it may duck the stream itself at the mixer
+without ever calling back into the app — so `AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK` never
+reaches ExoPlayer's own duck-to-20% code path, and mixer-level ducking turned out to be
+inaudible on real hardware. `PlaybackService` now builds the player with
+`handleAudioFocus = false` and runs its own `AudioFocusRequest`/`OnAudioFocusChangeListener`,
+setting `player.volume` to `0.2f`/`1f` directly on duck/regain and pausing (remembering to
+resume) on a full transient loss. Scoped to `localPlayer` only — casting doesn't touch phone
+audio, so `RemoteCastPlayer` is untouched.
+
+## Iteration 18 — a native macOS client (D94-D115)
+
+ROADMAP.md's desktop bullet had sat unanswered since the ROADMAP was split out of this file.
+This iteration answers the form-factor question and starts the macOS client at
+`macos/Packages/CouchTourKit`, a SwiftPM package holding every piece of logic (API clients,
+the backend-neutral catalog model, the queue-key grammar, and progress storage), with an
+Xcode app target on top still to come. Personal-use MVP: browse and play both backends,
+resume, and a History screen. No login, likes, playlists, casting, or search.
+
+**D94 — Native macOS (SwiftUI + AVFoundation), not Compose Desktop or a web wrapper.**
+The Android app has roughly 1,000 lines that are already Android-free — `Api.kt`,
+`Relisten.kt`, `Catalog.kt`, `Queue.kt`, `Format.kt` — plus around 113 plain JUnit tests, all
+of which Compose Desktop would have reused verbatim. Going native throws that away and adds
+Swift as a third language to the project. What it buys, matching D1's original reasoning for
+Android over a WebView, is real OS integration: `MPNowPlayingInfoCenter`, hardware media
+keys, and AirPlay, none of which the JVM exposes without JNI. Because the logic is
+reimplemented rather than shared, the two clients' contracts (queue-key grammar, the
+`progress` schema) are pinned by porting the Android tests 1:1 rather than by convention.
+
+**D95 — Logic lives in a local SwiftPM package (`CouchTourKit`), not directly in the app
+target.** Testable with `swift test` alone, no Xcode required — which mattered concretely:
+Xcode isn't installed in the environment this was built in, so everything above the app
+shell had to be written and, in principle, verified without it. Also keeps the door open to
+an iOS client later without re-splitting the code.
+
+**D96 — GRDB over SwiftData for progress storage.** The schema is written by hand to match
+Android's `progress` table at schema v6 exactly: same columns, same types, same
+`queueKey` primary key
+(`app/schemas/dev.mike.couchtour.PhishInDb/6.json`). SwiftData's on-disk format is opaque
+and Apple-controlled, which would have made that parity — and therefore any future sync —
+materially harder to guarantee. No sync is being built now, but keeping the schema
+byte-identical is what would keep it an additive change later instead of a migration on
+both sides.
+
+**D97 — The desktop database starts at the v6 shape in a single initial migration.** It does
+not replay Android's `MIGRATION_1_2` through `MIGRATION_5_6`, because there is no desktop
+data predating v6 to migrate — a fresh install has nothing to preserve. Same filename,
+`phishin.db`, at `~/Library/Application Support/dev.mike.couchtour/`, for the same reason
+Android kept that filename through its own app rename: a future "import from your phone"
+step becomes a file copy, not a translation.
+
+**D98 — No sync in this MVP; the schema and queue-key grammar are kept identical so it stays
+additive.** `QueueKeyTests` ports `QueueTest.kt`'s cases verbatim to pin this. The one thing
+explicitly deferred rather than solved: `clear()` deletes a row today on both clients, and a
+deletion can't be reconciled by last-write-wins on `updatedAt` alone — a future sync design
+will need a tombstone (`deletedAt`), added to both clients together, not to macOS alone.
+
+**D99 — Test fixtures are copied from the Android test resources, not shared by reference,**
+with `macos/scripts/check-fixtures.sh` diffing the two copies so they can't silently drift.
+A shared fixture directory would have meant either client reaching outside its own module
+boundary; a duplicate-with-a-guard was simpler and keeps each package self-contained.
+
+**D100 — Swift 5 language mode, not Swift 6's strict concurrency, for the MVP.** The
+`async`/`await` API surface ports 1:1 either way; strict data-race checking is a cost worth
+deferring until there's UI code exercising it. Revisit before any public release.
+
+**D101 — Deployment target macOS 14.** Every API used (SwiftUI's `NavigationSplitView`,
+`AVQueuePlayer`, `MPRemoteCommandCenter`) exists there; targeting the latest OS would cost
+real users nothing more than closing off a public release to older machines for no benefit
+this MVP needs.
+
+**D102 — The GitHub repo was renamed from `couch-tour-android` to `couch-tour`,** since it now
+holds two clients. Old URLs redirect. Done — the local `origin` remote was updated to match.
+
+**D103 — `CouchTour.xcodeproj` is generated by XcodeGen from `macos/project.yml`, not
+committed.** The project file itself is machine-generated, mostly-opaque XML that merges
+badly; `project.yml` is the actual source of truth for targets, sources, and build settings,
+regenerated with `xcodegen generate` after adding files or changing settings. This is the
+Swift-ecosystem analogue of never hand-editing Room's generated schema JSON — the generated
+artifact is derived, not authored.
+
+**D104 — The app target defaults to App Sandbox on, with only the network-client
+entitlement.** Both API clients only ever make outbound HTTPS `GET` requests, so that's all
+the entitlement surface needs today. Sandboxed by default rather than opting in later keeps
+a future Mac App Store submission from being a retrofit, matching the Android app's own
+Play Store preparation.
+
+**D105 — Playback is `AVQueuePlayer` over the whole remaining track list, not one item at a
+time.** `AVQueuePlayer` only ever advances forward and drains to empty when the last item
+finishes — there is no "next show" to roll into because only one show's tracks are ever
+loaded, so stopping at the encore (D13) falls out of the design rather than needing code for
+it. "Previous track" has no native support in `AVQueuePlayer`, so `skipToPrevious()` rebuilds
+the queue from one track earlier — the same path a mid-show tap uses.
+
+**D106 — Now Playing metadata mirrors Android's MediaSession exactly (D50): album is the show,
+not the queue.** `Player.albumTitle(for:show:)` ports `albumFor` from Android's
+`MediaItems.kt` — `"1997-11-17 · McNichols Arena"`, falling back to the queue title/subtitle
+only when a track carries no show info of its own. This is what would let an external
+scrobbler (e.g. the Last.fm app, which reads `MPNowPlayingInfoCenter` the same way it reads
+Android's MediaSession) work without the app doing anything scrobbling-specific — same
+reasoning as D70's removal of built-in scrobbling.
+
+**D107 — Verified live, not just by inspection: the system Now Playing widget's own pause
+button paused the app, and the mini player reflected it back.** `MPRemoteCommandCenter`
+requires no special sandboxing entitlement to work — it's registered automatically for any
+regular foreground app. Artwork (`MPMediaItemPropertyArtwork`) is not wired up yet; the Now
+Playing widget shows title/artist/album/elapsed time only. Logged here rather than silently
+shipped, since it's the one piece of D106's metadata parity still missing.
+
+**D108 — Progress writing lives in `Player`/`ProgressRecorder`, not the UI**, the same
+ownership Android's `PlaybackService.saveNow()` has and for the same reason: the player is
+what actually knows when a track changed or the queue drained, not whichever screen happened
+to trigger playback. `ProgressRecorder` is a separate type from `Player` (matching the plan's
+file layout) purely for readability — it holds no state of its own beyond the 5s save
+throttle.
+
+**D109 — `Player.play(detail:startIndex:resumePositionMs:)` takes a whole `ShowDetail`, not a
+bare show+tracks pair.** `ShowDetail.queueKey` is what the recorder needs to write a row, and
+computing it requires the recording (D-equivalent of Android's `ShowDetail.queueKey` getter,
+ported in Catalog.swift). Passing the pair separately, as the M3 signature did, would have
+left the player unable to know what key it was even playing.
+
+**D110 — Resuming re-fetches the show over the network rather than trusting the stored
+denormalised fields for anything but display.** `Resume.swift`'s `resolveShowDetail` parses
+the queue key back into backend/date/recording-id and calls the same `MusicSource.show(...)`
+browsing already uses — mirroring Android's `PlayerViewModel.resume`. The row's `artist`
+field is used to skip a second Relisten artist lookup (denormalised for exactly this, per
+`ProgressStore.swift`), but track URLs and durations always come fresh from the API.
+
+**D111 — A finished queue resumes at track 0, not at its last-known position** (D22): `resume`
+checks `progress.finished` before deciding where to start, rather than blindly trusting
+`trackIndex`/`positionMs` on every row. `markFinished` itself never rewrites those fields, so
+the stopping point survives as a historical fact even once the flag flips.
+
+**D112 — Verified live end-to-end, not just read: a show played for several seconds, the app
+was fully quit (not backgrounded) and relaunched, and Continue Listening resumed the correct
+track at the correct position.** Separately, playing one Relisten tape, switching the browsed
+tape via the picker, and playing a track on the second tape produced two independent History
+rows for the same date — tapping each resumed its own tape and track, never the other's.
+This is what confirms the queue-key design (D77) actually delivers the property it was built
+for, not just that it compiles.
+
+**D113 — Installed to `/Applications` via `macos/scripts/install.sh`, ad-hoc signed, no Apple
+Developer account.** Gatekeeper only quarantines files downloaded from the internet; a
+locally built `.app` never gets that flag, so `codesign`'s `adhoc` signature is enough to run
+normally with no security prompt. The script rebuilds Release, replaces whatever's at
+`/Applications/Couch Tour.app`, and relaunches — the same one-liner for every future update
+until this needs real notarization (a paid account, only relevant if this is ever distributed
+to a machine other than the one that built it).
+
+**D114 — Two Swift traps worth remembering, both only caught by the real compiler, not by
+static review.**
+1. `Progress` collides with Foundation's bridged `NSProgress` the moment any file imports
+   Foundation (which `XCTest` does implicitly) — the type in `ProgressStore.swift` is named
+   `PlaybackProgress` for exactly this reason. Don't rename it back.
+2. Swift's synthesized `Decodable` does **not** apply a property's default value when a JSON
+   key is simply absent — unlike kotlinx.serialization on the Android side, which does. Every
+   DTO in `PhishInAPI.swift`/`RelistenAPI.swift` that has optional-looking fields carries a
+   hand-written `init(from decoder:)` with `decodeIfPresent(...) ?? default` for this reason;
+   a new DTO that skips this will crash on the first response missing an optional key, not on
+   `swift build`.
+
+**D115 — The environment blocker this iteration hit is now moot, noted only so it isn't
+mistaken for a live issue.** Command Line Tools alone (no Xcode) could not compile *any*
+SwiftPM manifest here — confirmed with an empty, unrelated test package — which blocked `swift
+test` until Xcode was installed. Once it was, both `swift test` and `xcodebuild` worked on the
+first real attempt. If a future session hits the identical `PackageDescription.Package
+.__allocating_init` linker error, the fix is the same: install Xcode, don't debug the Command
+Line Tools install.
+
+## Iteration 19 — the deletedAt tombstone (D116-D118)
+
+First step of cross-client progress sync, designed but not yet built beyond this: the schema
+change D98 flagged as a prerequisite, landed on both clients ahead of any network code so it
+can be exercised and tested on its own.
+
+**D116 — `clear()` tombstones the row instead of deleting it; every read query filters the
+tombstone back out.** A real `DELETE` is indistinguishable, to a future sync client, from a
+row that was simply never pushed yet — nothing left behind to say "this was removed," so a
+device that synced before the delete would push its own copy back and silently resurrect it.
+Filtering `deletedAt IS NULL` into `inProgress`, `history`, `historyCount`, `artists`,
+`historyFor`, and `get` keeps the tombstone invisible to the rest of the app; only a raw query
+against the table sees it, which is exactly what the new tests exercise to pin the behavior
+down. `clear()` also bumps `updatedAt`, the same field any other write would, so a delete
+competes on equal footing with a concurrent play under ordinary last-write-wins.
+
+**D117 — `deletedAt` is a nullable epoch-millis column, not a boolean alongside a separate
+timestamp.** `NULL` means live, a value means "cleared at this time," in one column instead of
+two that could disagree. `finished` and `dismissed` stay boolean because both are pure UI
+state a user can toggle back and forth; `deletedAt` is closer to `updatedAt` in kind — a fact
+about when something happened — so it follows that column's shape instead.
+
+**D118 — macOS registers the tombstone as a second migration, `v7_deletedAt`, not folded into
+`v6_initial`.** The MVP shipped and is presumably already installed; GRDB's migrator replays
+only migrations a given database hasn't seen, so folding the new column into the first
+migration would mean an existing install never runs it. Same reasoning as why `MIGRATION_6_7`
+is a new migration on the Android side rather than a change to `MIGRATION_5_6`.
+
+## Iteration 20 — the sync backend, built and deployed (D119-D127)
+
+A Cloudflare Worker + D1 service at `sync/`, built and exercised end to end against a local
+D1 instance first (`wrangler dev`, no Cloudflare account touched), then deployed for real
+once Mike authenticated `wrangler login` under his own account.
+
+**D119 — Cloudflare Workers + D1, signed off before any code.** $0 at this scale (100k
+requests/day free tier against a two-device app doing maybe 50/day), no idle-pause unlike a
+free-tier Supabase project pausing after 7 days, and D1 being SQLite means the server's
+`progress` table is the client's table plus two columns rather than a schema translation.
+
+**D120 — Device tokens are opaque random strings hashed at rest, not JWTs, with two-slot
+rotation.** `devices.tokenHash` is `SHA-256` of the live token; a database leak yields no
+working credentials. Not a JWT: there's no third party to verify one against, and JWT
+revocation needs a denylist anyway, so a row lookup is both simpler and instantly revocable —
+`DELETE /devices/{id}` takes effect on literally the next request. Rotation (past 90 days)
+writes the old hash into `previousTokenHash`/`previousTokenExpiresAt` rather than just
+overwriting `tokenHash`, so a client that crashes between receiving `X-Sync-Token-Rotated` and
+persisting it has 48 hours to retry before it's actually locked out.
+
+**D121 — the stale-cursor check compares `since` against a seq-scale `retentionFloorSeq`, not
+a timestamp.** The first implementation compared `since` (a `seq` value — a small monotonic
+per-group counter) against `now - 180 days` (an epoch-millis threshold), which is a unit
+mismatch: it fired the `410 Gone` path on every request, caught by the very first live test
+against local D1 rather than by `tsc`, since both sides were typed as plain `number`.
+`retentionFloorSeq` lives on the `seqs` table, one seq-scale value per group, and rises only
+when a future purge job removes old tombstones — which doesn't exist yet, so the floor is
+permanently 0 today and this path cannot fire in practice. It's implemented and tested now
+(by hand-setting the floor in a local DB) so the contract exists before the purge job does,
+rather than being retrofitted around whatever the job happens to produce.
+
+**D122 — `POST /pair/claim` takes a `pairingId` alongside the code, not the code alone.**
+**Superseded by D127** — a UUID pairing id isn't something a human can type, which broke the
+one thing text-entry pairing exists for. A wrong-code guess against a bare code has no row to
+attach an attempt count to — `codeHash` only matches on an exact hit, so there's nothing to
+increment on a miss. Carrying the pairing id (embedded in the same QR/deep-link payload as the
+code) gives the five-attempts-then-burn rule an actual row to burn.
+
+**D123 — conflict resolution accepts an incoming write when `updatedAt >= existing.updatedAt`,
+not `>`.** On an exact tie this favors whichever push reaches the server later, which is
+`seq`'s tie-break in effect without a separate comparison: the later arrival is, by
+construction, the one being applied right now. Applying accepted rows and bumping the `seqs`
+counter happen in one `env.DB.batch()` — D1 has no interactive transactions, so a
+read-the-counter-then-write-the-rows sequence across two round trips would race if two devices
+pushed to the same group at once.
+
+**D124 — verified live against local D1, every path exercised with real HTTP requests, not
+just written and typechecked:** bootstrap pairing and claim, a device joining an existing
+group, wrong-code attempts burning a pairing on the fifth try, a push/pull round trip between
+two devices, an older write losing to a newer one and a newer one overwriting it, `GET
+/devices` listing both with the right `isSelf`, `DELETE /devices/{id}` taking effect on the
+very next request, the `410` path at and around the retention floor, and token rotation
+(backdating `tokenIssuedAt` past 90 days) confirming both the rotated and the pre-rotation
+token work afterward.
+
+**D125 — deployed to production, smoke-tested, and the test data cleaned back out.**
+`wrangler login` (OAuth) needed a second attempt: the first run was launched with a shell `&`
+inside one tool call rather than kept alive as its own tracked process, so the callback
+listener was already dead by the time the browser redirected back to it — "localhost refused
+to connect" was that death, not a Cloudflare-side failure. Once actually kept running,
+`wrangler d1 create couch-tour-sync` and `wrangler deploy` succeeded on the first real
+attempt; the service is live at `https://couch-tour-sync.mkastellec.workers.dev`.
+`wrangler.toml`'s `database_id` now points at the real database. A smoke-test pairing was
+run against production to confirm the deployed Worker actually answers (not just that `wrangler
+deploy` exited 0), then deleted by hand — the one thing this MVP has no delete-a-whole-group
+endpoint for yet, so cleanup went straight through `wrangler d1 execute --remote`.
+
+**D126 — `since = 0` never triggers the retention-floor `410`, no matter how far
+`retentionFloorSeq` has moved.** Found and fixed while starting the client work, before any
+purge job existed to expose it live: the check as first written was `since <
+retentionFloorSeq`, which rejects every brand-new pairing the instant the floor ever moves off
+0, since 0 is less than any positive number. A fresh client has nothing to distrust — it isn't
+resuming an old cursor, it's asking for the entire current table — so the floor only applies
+once `since` is actually a prior position, not the starting one. Verified both sides of the
+boundary against local D1 (`since=0` succeeds under a floor of 5; `since=1` still 410s), then
+redeployed to production.
+
+**D127 — pairing is claimed by the code alone; `pairingId` is gone from the wire contract
+(supersedes D122).** Caught while starting the Android pairing screen: D122's fix for
+attempt-counting needed a `pairingId` on the claim request, but that id is a UUID — asking
+someone to type it defeats the entire reason "the code is also shown as text so it can be
+typed" was a requirement in the first place. `POST /pair/claim` now looks the pairing up by
+`codeHash` directly, and the per-row `attempts` counter (and its column) is gone with it — an
+8-character base32 code is roughly 10^12 possibilities against a 10-minute TTL, which is
+already impractical to brute-force without a counter bolted on. `pairings.attempts` was
+dropped via `ALTER TABLE ... DROP COLUMN` on both local and production D1 rather than left as
+dead weight; production had zero real rows at the time, so this cost nothing to do cleanly.
+Re-verified end to end against production after redeploying: bootstrap, claim by code alone,
+cleanup.
+
+## Iteration 21 — wiring sync into both clients (D128-D136)
+
+The backend from Iteration 20 talks to nothing yet. This iteration adds the client half on
+both platforms: pairing, the push/pull cycle, token storage, background cadence, and a
+minimal settings screen — text-code pairing only, no QR (D131).
+
+**D128 — Android's sync client mirrors `Api.kt`/`Auth.kt`'s existing shape exactly.**
+`SyncApi` is OkHttp + kotlinx.serialization with `Authorization: Bearer`, its own client
+deliberately separate from `PhishInApi`'s `X-Auth-Token` JWT — an unrelated service with an
+unrelated identity. `SyncTokenStore` is `EncryptedSharedPreferences` under `couchtour_sync`,
+not `phishin_auth`, so signing out of phish.in can't unpair this device from sync.
+
+**D129 — `lastSeq`/`lastPushWatermark` were missing the memory fallback `deviceToken`/`deviceId`
+already had; found by a real test failure, not by inspection.** `EncryptedSharedPreferences
+.create()` itself throws under Robolectric (no real Android Keystore in the test JVM) — which
+`TokenStore` survives because every field falls back to an in-memory copy when the encrypted
+store is unavailable, and `SyncTokenStore` copied that pattern for `deviceToken`/`deviceId`
+but not the two cursor fields, whose setters silently no-op'd instead. A round-trip test
+caught it immediately (`expected:<42> but was:<0>`). Fixed with the same
+`memoryLastSeq`/`memoryLastPushWatermark` shape, so all four fields now degrade consistently
+— on a real device this only matters if the Keystore itself is in a bad state, but it's the
+same resilience the rest of the class already promises.
+
+**D130 — `androidx.work` (2.11.2) is a new dependency, for a periodic sync job constrained to
+`NetworkType.CONNECTED`; scheduling it is wrapped in try/catch.** 15 minutes is WorkManager's
+own floor for periodic work, matched on the macOS side (D133) for the same cadence on both
+platforms. `WorkManager.getInstance()` throws when WorkManager's own initialization hasn't
+run — true of every Robolectric test (deliberately: no `Configuration.Provider` wired up for
+tests, so no other test needs to know sync exists) and conceivably true of a real device in
+some unanticipated state. Background scheduling failing is not a reason to crash app
+startup — the immediate on-launch sync in `CouchTourApp` runs regardless, so pairing still
+becomes useful even if the periodic job never registers.
+
+**D131 — pairing is claimed by typing the code; no QR in this pass, on either platform.**
+Generating a QR (a new dependency, trivial) and scanning one (camera + a scanning library,
+not trivial on Android) don't change the wire protocol at all — D127 already made the code
+alone sufficient — so this is a pure follow-up rather than something blocking the rest of the
+feature. Tracked in ROADMAP.md.
+
+**D132 — macOS Keychain access sits behind a `KeychainStoring` protocol so `swift test` never
+touches the real system keychain.** `SystemKeychain` is the real `SecItem`-based
+implementation; tests inject `InMemoryKeychain`. An unattended CI or dev run should not be
+able to trigger a Keychain access prompt, which a raw `SecItemAdd`/`SecItemCopyMatching` call
+against the real login keychain risks doing depending on the machine's state. The same
+reasoning extended to `SyncTokenStore`'s non-secret cursors: they're constructor-injectable
+`UserDefaults`, defaulting to `.standard` in the app but a freshly-named suite per test in
+`SyncTests.swift` (`removePersistentDomain` in `tearDown`) — an earlier draft reused `#file`
+as the suite name, which would have shared one real on-disk UserDefaults domain across every
+test in the file and left it there after the run, since unlike `.standard` a named suite is
+real persistent storage, not something Xcode resets between runs on its own.
+
+**D133 — macOS sync cadence is a `Task` loop plus `NSApplication.didBecomeActiveNotification`,
+not `BGTaskScheduler`.** The MVP has no background-execution entitlement request, and
+`RootView`'s `.task` modifier already spans the whole app run in practice, so a 15-minute
+`Task.sleep` loop (matching Android's WorkManager floor, D130) needs nothing extra — sync
+fires immediately on launch, again whenever the app returns to the foreground, and every 15
+minutes it stays open. A real background-refresh mechanism is a bigger, separate piece of
+work than this MVP needed to unblock the rest of the feature.
+
+**D134 — `MockServer`'s `URLProtocol` shim needed a body reader, because `httpBody` comes
+back `nil` for exactly the requests that pass through it.** Every existing use of
+`MockServer` was GET-only, so nothing had exercised a POST/DELETE body until `Sync.swift`'s
+tests — the first attempt asserted directly against `request.httpBody` and failed
+(`"{"since":1,...}" is not equal to ""`) because Foundation converts a request's body to
+`httpBodyStream` before handing the canonical request to a custom `URLProtocol`, and
+`URLRequest.httpBody` never reflects that back. `MockServer.swift` gained
+`URLRequest.bodyString`, draining the stream by hand when `httpBody` is absent.
+
+**D135 — verified with real builds on both platforms, not just the unit suites.**
+`./gradlew assembleDebug` succeeds (`testDebugUnitTest` is 214/214 — 21 new sync tests over
+Iteration 20's baseline). `xcodebuild` succeeds for the macOS app target, and the built app
+was launched and left running for several seconds with nothing in the system log — the
+Keychain calls `AppModel.init()` makes via `SyncSession()` happen on literally every launch,
+so this exercised the real `SystemKeychain` path, not a mock. `swift test` is 117/117.
+
+**D136 — a Swift test flaked on rerun from an assertion this codebase's own conventions
+should have caught: exact-string equality against `JSONEncoder` output.** `testSyncDoesNot
+RepushARowAlreadyAtTheWatermark` passed the first time and failed the next `swift test` run
+with the identical JSON content in a different key order
+(`{"since":1,"changes":[]}` vs. `{"changes":[],"since":1}`) — `JSONEncoder`'s key order is not
+guaranteed stable across process launches on Apple's Foundation, unlike kotlinx.serialization
+on the Android side, which does guarantee declaration order (confirmed: the equivalent Kotlin
+test asserts exact-string equality safely). Fixed by checking content
+(`body.contains(#""since":1"#)`) rather than the exact byte layout, the same approach the
+sibling push-test already used. Re-run five times clean afterward before trusting it.
+
+## Iteration 22 — a side-installable beta build (D137)
+
+**D137 — `-PsideInstall=true` builds `dev.mike.couchtour.beta` ("Couch Tour Beta"), gated
+behind a Gradle property so every ordinary debug build is untouched.** Wanted for exactly one
+reason: testing the new sync feature (Iteration 21) without disturbing the working v0.12
+sideload — every prior release has shared one `applicationId` and one debug signing key
+specifically so a new CI build updates the previous install in place (see
+`build-debug-apk.yml`'s own comment on that, and the v0.2a incident that motivated it), which
+is right for normal releases but wrong for a beta the tester wants to run *alongside* the
+known-good build. `android:label` moved from `@string/app_name` to a manifest placeholder
+(`${appLabel}`) so the two installs are distinguishable in the launcher without a duplicate
+resource declaration — `resValue` was the first attempt and fails outright, since `app_name`
+already exists in `strings.xml`; a manifest placeholder is a separate mechanism from generated
+resources and doesn't collide. `strings.xml` itself is now empty of purpose and was removed
+rather than left holding a value nothing reads. `namespace` (the compiled Kotlin package,
+`dev.mike.couchtour`) is untouched — only `applicationId` (the install identity) changes, so
+the one fully-qualified class reference in the manifest (`CastOptionsProvider`) keeps
+resolving correctly. Wired into `build-debug-apk.yml` as an opt-in `side_install` input,
+alongside a `prerelease` input (existing releases v0.1-v0.12 never used GitHub's own
+pre-release flag; this one does, being genuinely experimental).
+
+## Iteration 23 — a real pairing attempt, and two bugs it found (D138-D139)
+
+The first actual cross-device pairing attempt — phone code, typed into the Mac app — failed
+immediately, before any of the sync logic itself was exercised. Both bugs were purely in the
+claim path.
+
+**D138 — macOS's code field didn't uppercase input; Android's already did.** Pairing codes
+are generated all-uppercase (`sync/src/crypto.ts`'s `randomPairingCode`) and looked up by
+exact `codeHash`, so a code typed or autocompleted in lowercase hashes to a different value
+and gets a flat 401. Caught live: the phone showed `7S9UGDQP`, the Mac's field held `7s9ugdqp`
+verbatim. Fixed with `.onChange(of: claimCode) { claimCode = $0.uppercased() }` on the
+TextField, matching what Android's `onValueChange` already did — this was an asymmetry
+between the two clients' pairing screens, not a protocol bug.
+
+**D139 — `SyncException` didn't conform to `LocalizedError`, so every failure looked
+identical.** The actual 401 was invisible: `error.localizedDescription` fell back to Swift's
+generic bridged-NSError text, `"The operation couldn't be completed. (CouchTourKit
+.SyncException error 1.)"`, for a plain wrong-code rejection — indistinguishable on screen
+from a network failure or a server bug. Fixed by adding `errorDescription { message }`, so
+the UI shows what the server actually said (`"incorrect code"`, `"pairing expired"`, etc.).
+This is the kind of bug unit tests don't catch on their own — nothing was asserting against
+`localizedDescription` before this, only against `.unauthorized`/`.gone` on the typed error
+directly (D124's tests). A regression test now pins the string itself.
+
+## Iteration 24 — sync never actually worked; the emulator round trip that proved it (D140-D143)
+
+Pairing succeeded, then nothing synced and the Android app crashed on every subsequent
+launch. One root cause under both symptoms, plus two things that turned a recoverable error
+into an unrecoverable one.
+
+**D140 — both clients omitted null optionals, and D1's `bind()` rejects `undefined`, so every
+push 500'd.** kotlinx.serialization writes only properties differing from their default unless
+`encodeDefaults` is set; Swift's synthesized `encode(to:)` uses `encodeIfPresent` for
+Optionals. Both therefore dropped `artUrl`/`deletedAt` entirely rather than sending null — and
+`artUrl` is null for every Relisten row, so this was every push, not an edge case. Confirmed
+by replaying both payload shapes against production: the documented shape 200s, the shape the
+clients actually sent 500s. Fixed in three places, deliberately: the server normalizes
+`?? null` (a client getting this wrong must not be able to 500 the endpoint), Android sets
+`encodeDefaults = true`, and `SyncProgressWire` gained a hand-written `encode(to:)`. Server
+side alone would have been enough to unbreak it; the client fixes keep the wire format
+matching `ProgressFields` as documented.
+
+**D141 — an exception escaping the launch-sync coroutine took the whole app down.**
+`CoroutineScope(Dispatchers.IO).launch { SyncSession.sync(...) }` with no handler: anything
+`sync` rethrows (D140's 500, an offline device, a captive portal) reached the default uncaught
+handler and killed the process on launch. Unpaired devices were unaffected only because
+`sync` returns early with no token — which is exactly why this appeared the moment pairing
+started working. The comment already claimed failures were "covered by the periodic job's own
+retry"; that is now true rather than aspirational.
+
+**D142 — pairing didn't trigger a sync, so a working pair still looked broken.** Both clients
+only synced on launch, on foreground, or on a 15-minute timer — none of which fire while
+sitting on the Sync screen having just paired. Even with D140 fixed, the first thing a user
+sees after pairing would have been an unchanged, empty History. Both clients now sync
+immediately on a successful claim, surfacing "Paired, but the first sync failed" rather than
+silently doing nothing.
+
+**D143 — verified on a real emulator, end to end, not just by unit test.** `phishin_test` AVD:
+installed the beta, paired via the UI, played a track (Mac muted), force-stopped and
+relaunched — no crash, and the launch sync pushed `show:2026-01-28` / "Hey Stranger" at
+60770ms to the server. A second device then joined by code and pulled that exact row back
+down. Test group and all its rows deleted afterward; the real Pixel/Mac group was never
+touched. Two incidental findings worth keeping: the emulator's default DNS is broken (fixed
+with `-dns-server 8.8.8.8`, nothing to do with the app), and the app's own error reporting was
+already correct — a DNS failure surfaced "Couldn't start pairing: Unable to resolve host"
+exactly as intended.
+
+## Iteration 25 — tightening sync latency: a debounced push on play/pause/track-change (D144)
+
+**D144 — both clients now push within ~2s of a play/pause/track-change event, instead of
+waiting up to 15 minutes for the next launch/foreground/timer sync.** `SyncSession` on both
+platforms gained `requestDebouncedPush` — cancel any in-flight debounce, wait (2s in
+production, overridable for tests), then run the same `sync()` push/pull cycle. Called from
+exactly the events that already bypass the local 5s throttle: Android's `playerListener`
+(`onIsPlayingChanged`/`onMediaItemTransition`/`onPlaybackStateChanged` in
+`PlaybackService.kt`) and macOS's `saveProgress(force: true)` call sites in `Player.swift`
+(rate change, track change, seek, queue start) — never the periodic 5s local-write tick, which
+would otherwise reset the debounce every half-second while merely sitting on a paused screen.
+The debounce coalesces bursts — several of those listeners fire for the same real event — into
+one push rather than one per callback.
+
+Verified live against the real production backend, not just unit tests (per the project's own
+sync-testing standard): paired the Android emulator fresh, joined its pairing code from a
+`curl`-simulated second device (deliberately not Mike's real Mac, which was already paired to
+his actual Pixel/Mac group — touching that risked disrupting a live pairing to prove a client
+timing change), then toggled play/pause via `adb shell input keyevent
+KEYCODE_MEDIA_PLAY_PAUSE` and polled the sync endpoint. The push's server-recorded `updatedAt`
+landed roughly 1.7s after the toggle — consistent with the 2s debounce plus network/clock
+variance, and nowhere near the old 15-minute worst case. The disposable test group (both
+devices, plus its `progress`/`pairings`/`seqs`/`devices`/`groups` rows) was deleted from
+production D1 afterward via `wrangler d1 execute --remote`; Mike's real Pixel 9 Pro
+XL/Mac Mini group was confirmed untouched (`revokedAt IS NULL` on both, same as before the
+test).
+
+Coalescing behavior itself is covered by a unit test on each platform (`SyncTest.kt`,
+`SyncTests.swift`) — three rapid `requestDebouncedPush` calls with a short test-only delay
+produce exactly one push, using the same mock-server harness the rest of the sync suite uses,
+rather than depending on the live round trip above to catch a regression here.
+
+## Iteration 26 — a beta-badged icon variant (D145)
+
+**D145 — The side-installed beta build gets its own icon, not just its own label.**
+D137 made `-PsideInstall=true` install alongside the regular app under
+`dev.mike.couchtour.beta` with the label "Couch Tour Beta," but both builds still showed the
+identical launcher icon — the only way to tell them apart in the app drawer was reading a
+label that gets truncated ("Couch Tour…" on a narrow grid). `ic_launcher_beta_foreground.png`
+adds a small amber "BETA" pill inside the ring, low enough to sit clear of the adaptive
+icon's circular safe zone (verified against a simulated true-circle mask, the same check the
+base icon used). Wired the same way `appLabel` already was: a new `appIcon` manifest
+placeholder (`ic_launcher` normally, `ic_launcher_beta` under `sideInstall`), with
+`AndroidManifest.xml`'s `android:icon` now `@mipmap/${appIcon}` instead of a literal
+resource.
+
+**D146 — macOS finally has a real app icon, base and beta.** The desktop app has shipped
+since Iteration 18 without ever setting `ASSETCATALOG_COMPILER_APPICON_NAME` — every build
+carried Xcode's default placeholder icon. Added `AppIcon.appiconset` (all mac idiom sizes,
+16 through 512 at 1x/2x) generated from the same source art as the Android icon, and a
+second `AppIcon-Beta.appiconset` with a diagonal ribbon banner — the standard desktop
+convention, since macOS icons aren't circle-masked the way Android's adaptive icons are, so
+Android's inline pill wouldn't read as clearly here. Only the base `AppIcon` is wired into
+the one macOS target that exists (`ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` in
+`project.yml`); the beta set is a ready asset, not yet attached to a target, since macOS has
+no beta-build mechanism analogous to Android's `sideInstall` yet — building one (bundle id,
+signing, `install.sh` changes) is a separate decision.
+
+## Iteration 27 — QR pairing, generation on both platforms, scanning on Android (D147)
+
+**D147 — pairing codes are now also shown as a QR, and Android can scan one to fill the Code
+field.** A pure follow-up on top of D127/D131's existing text-code protocol, not a protocol
+change — the code itself is still the only thing either endpoint ever sees. **Generation**:
+Android encodes with `zxing-core` (`QRCodeWriter` → `BitMatrix` → a hand-painted `Bitmap`,
+`Qr.kt`); macOS uses `CIQRCodeGenerator` directly (`Qr.swift`) — CoreImage already ships with
+the OS, so no new dependency there, matching the ROADMAP's own prediction. Both render at "H"
+error-correction and scale the generator's one-pixel-per-module output up before rasterizing,
+or the result is a handful of pixels blurred across whatever frame SwiftUI/Compose gives it.
+**Scanning** (Android only — ROADMAP.md never called for a macOS scanner, and this iteration
+didn't add one): CameraX + ML Kit's on-device barcode scanner, gated behind a runtime `CAMERA`
+permission request (`ScanScreen` in `Qr.kt`), landing on a new `"scan"` nav route. A scanned
+payload only ever autofills the existing Code field — it's checked against
+`BASE32_NO_AMBIGUOUS` (`sync/src/crypto.ts`)'s exact 8-character alphabet
+(`looksLikePairingCode`) before being trusted, so pointing the camera at an unrelated QR before
+finding the right one doesn't briefly populate the field with garbage. The regex is a UX
+filter, not a security boundary — the server already validates the code independently on
+claim.
+
+Verified two different ways, deliberately not by hand-eyeballing a scan through the emulator's
+synthetic "emulated" camera backend (its default test-pattern feed has nothing to scan a real
+QR from, and reconfiguring it to VirtualScene for one image is disproportionate to what's
+being checked here): the Android encoder's output was decoded back with `pyzbar`
+(a different library from the one that encoded it) and matched the source code exactly; the
+macOS encoder's algorithm was run standalone (outside the signed app, which was mid-fight with
+repeated Keychain re-prompts from an unrelated ad-hoc-signing quirk — same binary, different
+signature every rebuild, D113) through Apple's own `VNDetectBarcodesRequest`, which also
+decoded it correctly. `looksLikePairingCode`'s matching rule and the `qrCodeBitmap` encoder
+both got unit tests of their own (`QrTest.kt`) alongside the live decode checks, so a
+regression here doesn't depend on either external verification path catching it again.
+
+## Iteration 28 — the 180-day tombstone purge, finally wired to a job (D148)
+
+**D148 — a daily Cloudflare Cron Trigger now actually raises `retentionFloorSeq` and deletes
+the tombstones it covers, exercising the `410` path D121/D126 built and tested but that has
+never once fired in production.** `purgeOldTombstones` (`sync/src/index.ts`) finds every
+group with a `deletedAt`-tombstoned row older than 180 days, and per group, in one
+`env.DB.batch()`: raises `retentionFloorSeq` to the highest `seq` among the rows about to be
+purged (never lowers it — `MAX(retentionFloorSeq, ?)`), then deletes those rows. The order
+inside the batch is load-bearing, not incidental: raising the floor *before* deleting means a
+client can never observe a state where the gap exists but nothing has told it to distrust that
+gap yet. Wired to `wrangler.toml`'s `[triggers] crons = ["0 4 * * *"]` (an arbitrary off-peak
+UTC hour — this app has no real peak) via the Worker's `scheduled` export, `ctx.waitUntil`-ed
+so the platform doesn't tear the isolate down mid-purge.
+
+No admin-triggerable HTTP endpoint was added to fire this on demand in production — it would
+be one more unauthenticated surface on a service that currently has none, for a job whose only
+consumer is a cron schedule. Verified instead with `wrangler dev --test-scheduled`'s
+`/__scheduled` endpoint, which runs the exact deployed code against a real (local) D1 instance
+over a real HTTP round trip — not a mock, and a stronger check than a hand-invoked function
+call: seeded a group with an old tombstone at seq 4 flanked by live rows at seq 1-3 and 5,
+confirmed `since=3` synced clean beforehand, ran `/__scheduled`, then confirmed all three
+boundary cases the contract promises actually hold — `since=3` now `410`s exactly as designed,
+`since=4` (a device that had already synced through the tombstone's own seq) still succeeds,
+and `since=0` (D126's full-resync exemption) still succeeds regardless of how far the floor has
+moved. This is the first time any of the three has been observed against the job's real SQL
+rather than a hand-set `retentionFloorSeq` in a unit test. Deployed to production and
+smoke-tested (a disposable pair/start round trip, cleaned up immediately after) to confirm the
+Worker with the new `scheduled` export still serves ordinary requests; the cron itself will
+next fire for real at its scheduled UTC hour, or can be fired early from the Cloudflare
+dashboard's own "Trigger Cron" test button if that's wanted sooner. Harmless either way at the
+current 2-device scale — there are no tombstones anywhere near 180 days old yet.
+
+## Iteration 29 — sync status visibility: last-synced, sync now, last-played (D149)
+
+**D149 — the Sync screen now shows when it last actually talked to the server, plus a manual
+"Sync now" button; History and Continue Listening tiles show when each show was last played.**
+All of sync's activity was previously invisible between launches — no way to tell "sync is
+working, just hasn't fired yet" apart from "sync is broken." `SyncTokenStore` gained a
+`lastSyncedAt` wall-clock timestamp
+(0/`nil` = never), written at the same point `lastSeq` already is: the end of a *successful*
+`sync()` round trip, not on the unpaired no-op or a failed attempt — the debounced push from
+D144 already syncs frequently enough that this reads as "how long ago sync last actually
+succeeded," not just "the user's own last tap." `SyncSession` also gained `isSyncing`/`syncing`
+(Swift/Kotlin), for the button's disabled/label state — set at the top of `sync()`, cleared in
+a `finally`/`defer` so it can't get stuck true on a thrown `SyncException`. macOS's `SyncView`
+had its `onPaired` closure renamed to `sync` and reused for the new button, rather than adding
+a second closure parameter that would do the exact same thing under a different name.
+
+"Last played" labels ("5m ago", "3h ago", "2d ago", falling back to "MMM d" past a week) use a
+new `relativeTime` helper, ported identically to both platforms' existing `Format.kt`/
+`Format.swift` — no new column needed, since `Progress.updatedAt`/`PlaybackProgress.updatedAt`
+already means "last touched," which is "last played" for a row that isn't actively playing
+(nothing else updates a finished/dismissed row's timestamp). Shown on both History and Continue
+Listening. Android: History's `RowItem` gained an optional `trailingSecondary` slot (default
+`nil`, every other call site unaffected) for a second dimmer line under the existing
+position/status text; `ResumeCard` (Continue Listening) gained a third `Text` line the same
+way. macOS: rather than duplicate it per screen, it lives once in the shared `ProgressRow` —
+used by both `HistoryView` and `ContinueListeningView` — as a third line under the subtitle;
+`HistoryView`'s own trailing column went back to just its status text once the row itself
+started carrying the timestamp, so it isn't shown twice.
+
+Verified live end to end on Android (a disposable test pairing, not Mike's real group):
+"Never synced" showing correctly before any pull/push had happened (pairing only mints a code,
+it doesn't sync until the other side joins), tapping "Sync now" flipping it to "Last synced
+just now," a real history tile showing "at 4:05" over "5h ago", and the same "5h ago" showing
+on that show's Continue Listening card — both against the actual `updatedAt` in the local
+database. Test group deleted from production D1 afterward. The macOS side is covered by
+`SyncTokenStoreTests`/`SyncSessionTests` (round-tripping `lastSyncedAt`,
+`sync()` setting it on success) rather than a live GUI check — the installed app was mid the
+same ad-hoc-signing Keychain-reprompt loop D147 ran into, and denying that prompt makes the
+paired-only UI this feature lives in impossible to reach without either Mike's login password
+(never entered) or touching his real pairing (declined for the same reason as D147).
+
+## Iteration 30 — a pre-release security pass over sync (D150-D154)
+
+A deliberate sweep across the sync backend and both clients ahead of the Play Store release
+(issue #26) — not a hunt for a known vulnerability, but a walk through each attack surface to
+confirm what already held and fix what didn't. Most of it held. What follows is what changed.
+
+### D150 — rate limiting only the one unauthenticated path that grows the database
+
+`POST /pair/start` with no bearer token bootstraps a group, a device, a seq counter, and a
+pairing row on every call. That is the only endpoint where a caller holding no credentials can
+make D1 grow, and nothing capped it: a script could have filled the 10 GB database with orphan
+groups. `/pair/claim` needs no limit of its own — D127's argument still holds, 8 base32
+characters against a 10-minute window — and `/sync` and `/devices` need none either, since
+abusing them costs an attacker a valid device token first and revoking one is a single request.
+
+Implemented with the Workers `ratelimit` binding (`[[ratelimits]]` in `wrangler.toml`) rather
+than a Cloudflare Rate Limiting rule or a D1-backed counter. A dashboard rule would be
+configuration living outside the repo, invisible to anyone reading this code and lost on any
+account rebuild; a D1 counter would answer a flood of requests by adding a database write to
+each one, which is the thing being defended against. 5 per 10s per IP sits far above a human
+tapping "Pair" and far below useful abuse. The binding counts per Cloudflare location rather
+than globally, so this raises the cost of scripted bootstrap rather than making it impossible
+— worth stating plainly, since the limit reads stricter than it is.
+
+### D151 — `POST /sync` validates every element, and caps how many it will take
+
+`handleSync` type-checked `since` and `changes` at the top level and then cast the array
+`as ProgressFields[]` — a claim the type system accepted and nothing had checked. A row with a
+numeric `title` or a missing `queueKey` would either write nonsense into D1 or throw inside
+`.bind()` and 500 the endpoint. Every field is now parsed individually (`parseProgressFields`),
+with lengths bounded so a single row can't approach D1's 2 MB per-row ceiling, and a malformed
+element returns a 400 naming the offending field and index rather than a 500.
+
+`changes` was also unbounded. It now caps at 500 entries with a 413, plus a cheap
+`Content-Length` pre-check that rejects an oversized body before it is ever parsed. The
+Content-Length check is a fast path, not the guarantee — it is absent on a chunked upload — so
+the entry cap is what actually bounds the work.
+
+### D152 — the D1 bound-parameter limit was a live bug, not just a hardening gap
+
+Found while auditing the above, and the most consequential thing in this pass: D1 allows at
+most **100 bound parameters per query**, and `applyIncomingChanges` built a
+`queueKey IN (?, ?, …)` lookup binding one per incoming row plus the `groupId`. Any push of 100
+or more rows died on `D1_ERROR: too many SQL variables`. Confirmed against `wrangler dev`: 99
+changes returned 200, 100 returned 500, and the boundary sat exactly where the arithmetic said
+it would.
+
+This was reachable in normal use, not just under attack. Both clients pushed the entire
+`changedSince` result in one request, and a first pair starts from watermark 0 — so the whole
+progress table is "changed." Any user with 100+ shows of history would have had their first
+sync fail permanently, in the one table this app exists to never lose. It had not been hit only
+because no test pairing had ever carried that much history.
+
+The lookup is now chunked at 90 keys per query. The clients chunk too (D153), so the two limits
+are independent: the server no longer breaks regardless of what a client sends, and a
+well-behaved client never approaches the cap anyway.
+
+### D153 — both clients drain a push backlog across several round trips
+
+With the server capping a push at 500, a client that sent everything at once would simply fail
+differently, so `sync` on both platforms now loops: push a bounded batch (400, leaving headroom
+under the server's own 500), apply what comes back, and go again while rows remain. In normal
+use this is still one round trip — only a first pair has the backlog to need more.
+
+The subtle part is the batch boundary. The push watermark advances to the batch's highest
+`updatedAt`, and `changedSince` is strictly `>`, so cutting through a run of rows that share one
+millisecond would leave the remainder permanently unoffered — a silent lost write. A batch is
+therefore trimmed back to the run boundary, and only when the run actually continues past the
+cut; a single millisecond holding more rows than the batch size is sent whole rather than
+stalling forever, which the gap between 400 and 500 leaves room for. The first cut of this
+trimmed unconditionally and quietly dropped one row per batch, which is exactly the class of
+bug this table cannot afford — the tests covering all four cases exist because of it.
+
+### D154 — errors are ours to shape, and CORS stays absent on purpose
+
+An uncaught throw left the response to the platform. Under `wrangler dev` that means the
+exception, the stack trace, and the developer's absolute filesystem paths returned to the
+client; in production it means Cloudflare's generic 1101 page. The second is fine and the first
+is not, but neither is ours to depend on, and the `no seq counter for group ${groupId}` throw
+was the thing standing to leak. The `fetch` handler now wraps its router: details go to
+`console.error`, the client gets a bare `{"error":"internal error"}` 500. Verified by forcing
+that throw locally.
+
+No `Access-Control-*` headers anywhere, and that stays deliberate rather than accidental. Both
+clients are native — OkHttp and URLSession — and no browser ever calls this. Omitting
+`Access-Control-Allow-Origin` means a page on any origin can still send a request but cannot
+read the response, which is the right default for an API whose entire auth model is a bearer
+token. Adding permissive CORS "just in case" would be a strict downgrade.
+
+### What was checked and found already correct
+
+Recorded because the value of a security pass is as much in what it rules out as in what it
+changes. Every D1 query is `groupId`-scoped to the authenticated device, with two deliberate
+exceptions that are correct: the pairing lookup is by code alone (the claimer has no group
+yet — the code is the authorization), and the revoke path looks a device up by id and then
+403s if it isn't in the caller's group. Every query is parameterized; no user data is ever
+interpolated into SQL. The cron-only tombstone purge is not reachable over `fetch` —
+`/cdn-cgi/handler/scheduled` is a `wrangler dev` affordance, and production returns Cloudflare
+error 1042 without the request ever reaching the Worker.
+
+On the clients: Android's `EncryptedSharedPreferences` fallback degrades to memory-only and
+never writes a token in the clear, and the only thing it logs is that the store was
+unavailable. macOS keeps the device token and id in Keychain (not synchronizable, so a future
+iOS client can't silently inherit this Mac's identity) and only non-sensitive cursors in
+`UserDefaults`. No token, JWT, or pairing code reaches `Log.*`, `os_log`, or `print` on either
+platform. All three services are HTTPS-only with no cleartext fallback and no ATS exemption.
+The two `exported="true"` manifest components are the launcher activity, which reads a single
+boolean extra, and the Media3 service, whose browse tree parses media ids through
+`BrowseNode.parse` — already returning null for anything unrecognised rather than guessing.
+`npm audit` is clean; the Android release tree has no known-vulnerable dependency.
+
+## Iteration 31 — sharing a show or track (D155-D156)
+
+Standard Android sharing (#19), Relisten parity — the app had no `Intent.ACTION_SEND` at all
+before this. Android-only: no equivalent request exists yet for the macOS client.
+
+### D155 — the share link comes from each backend's real web app, confirmed live, not guessed
+
+`ShowSummary`/`PlayableTrack` are backend-neutral (Catalog.kt) on purpose, so the URL a share
+sheet should link to is a function of `Backend` (`showShareUrl`/`trackShareUrl` in Catalog.kt)
+rather than a field threaded through the model — the same pattern the file already uses for
+its backend-dispatch mapping (D36).
+
+Both URL schemes were checked against the real sites rather than assumed, since a share
+feature whose links don't resolve is worse than no share feature:
+
+- **phish.in** publishes a real page per show (`/<date>`) and per track (`/<date>/<slug>`) —
+  confirmed by fetching both live and checking `og:url`/`og:title` echo back exactly, and
+  that an unrecognised track slug falls back to the show's own title rather than 404ing (so
+  the slug is genuinely validated server-side, not decorative). The slug already existed in
+  every API response `Track` decodes (`show.json`'s fixture had it uncaptured) — it just
+  wasn't mapped to a field. It is now (`Track.slug`).
+- **Relisten**'s web app (`relisten.net`, distinct from the `api.relisten.net` this app
+  already talks to) serves `/<artist-slug>/<date>` for a show — confirmed the same way, and
+  confirmed Relisten's server actually 404s an unknown route (`<title>404 - Page Not
+  Found</title>`) rather than a catch-all SPA shell always returning 200, so a 200 here means
+  the page is real. No equivalent per-track or per-source page exists:
+  `/<artist>/<date>/<source-uuid>` 404s live the same way. `trackShareUrl` returns null for
+  Relisten rather than construct a link to a page that doesn't exist; callers fall back to
+  the show's link, keeping the track's title in the shared text even though the link points
+  at the show.
+
+### D156 — track sharing lives on the track row, not the Now Playing screen
+
+The issue named either placement as acceptable for "share the specific track." Now Playing's
+`PlayerState` carries only display strings and a `queueKey` (which identifies a queue, not an
+individual track within it) — the same gap already noted against the not-yet-built like
+button on that screen (ROADMAP.md). Extending `PlayerState` with a track id was out of scope
+for this issue on its own; the track row already has the full `PlayableTrack`/`Track` in
+hand, so that's where the share action landed, next to the existing like button
+(`TrackRow`/`RecordingTrackRow`), following the same self-contained-row-composable shape
+`LikeButton` already established rather than threading an `onShare` callback up through both
+screens.
+
+Tested at the two levels the issue anticipated: `ShareUrlTest` covers `showShareUrl`/
+`trackShareUrl`/`showShareText`/`trackShareText` as plain functions (including phish.in's
+slug-present/absent cases and Relisten's fallback), and a Robolectric `LaunchShareTest`
+constructs the actual `Intent` and asserts `ACTION_CHOOSER` wraps a `text/plain`
+`ACTION_SEND` with the right `EXTRA_TEXT` — the chooser itself, and whether recipients can
+actually open the link, still need a manual on-device check per the issue's own testing note.
+
+### D157 — "Surprise me" pulls from the full merged catalog, not just the browsed artist
+
+Neither `PhishInApi` nor `Relisten.kt` exposes a random-show endpoint, so `pickRandomShow`
+(Catalog.kt) walks the same artist → period → show path the browse screens do: a random
+artist from `mergeArtists()`'s merged list, then a random period, then a random show — 2-3
+sequential calls, same cost as browsing by hand, and no attempt to weight or cache across
+artists for a first pass.
+
+Global rather than scoped to whatever artist is currently being browsed: the button lives on
+the Home screen, one level above any single artist's screens, and Relisten's own version is
+global too. Phish being pinned first in the merged list (D-noted in `mergeArtists`'s doc
+comment) doesn't change the odds here — every artist gets an equal, not weighted, chance,
+same as any other entry in the list.
+
+A period whose shows are all `partial` (audio known incomplete) still returns one of them
+rather than costing another round trip to find a period with a complete show — an edge case,
+not the common path, so it wasn't worth a second fetch to avoid.
+
+Tested with a fake `MusicSource` and an injected `Random` (`CatalogTest.kt`): one test
+confirms every artist in a merged set is reachable across many seeds, two more confirm the
+partial-audio filter and its fallback. The button itself (`SurpriseMeButton`, MainActivity.kt)
+follows the same busy/error-state shape `LoginScreen` already established, and is the first
+item in the Home screen's list — always the first thing visible below the search field.
+
+See [ROADMAP.md](ROADMAP.md) for what's not built yet and the open questions about what's
+next.
+
+## Iteration 32 — browse shows by top rated / popular (#21, D158-D159)
+
+### D158 — the two backends' data shapes are genuinely asymmetric, so the two browse surfaces are too
+
+phish.in's `/shows` endpoint already sorts server-side (`sort=likes_count:desc`, confirmed
+live), so "Popular" is one query with a different sort param — no client-side work at all.
+Relisten's per-tape rating (`RelistenSource.avgRatingWeighted`) is one fetch per show, which
+doesn't scale to a global "top rated" browse, so the two features aren't the same shape and
+weren't forced into one.
+
+Implemented as a synthetic period rather than a new screen: `PhishInSource.periods()`
+prepends `PeriodRef(POPULAR_PERIOD_ID, "Popular")` ahead of the real years (Catalog.kt),
+so "Popular" rides the same `periods()`/`shows()` seam MainActivity's `ArtistScreen` and
+Android Auto's `yearsChildren`/`yearChildren` already consume, rather than a one-off route
+bolted on beside it. `"Popular" > "2024"` lexicographically (`'P' > '9'`), so it sorts first
+wherever periods are ordered by label descending, with no separate pinning logic. Auto's
+`yearChildren` short-circuits the popular id straight to a flat show list rather than the
+usual tour-grouping branch — grouping ~100 shows spanning 30-some years by tour name would
+produce close to one folder per show, not the handful of tours a real year produces.
+
+### D159 — Relisten's shows list carries `avg_rating` and `popularity` for free; only the first is used this pass
+
+The issue that opened this work assumed Relisten had no bulk-rated endpoint and rating lived
+only on `RelistenSource` (fetched per show, one round trip each) — reasonable, since that's
+all `RelistenShowSummary` (Relisten.kt) captured, and `ignoreUnknownKeys` had been silently
+dropping the rest. Checking the live API (`/v3/artists/{uuid}/years/{yearUuid}`) directly
+found otherwise: every show in a year's list already carries `avg_rating` (0-10, populated
+for the near-totality of shows checked) and a `popularity` object — `momentum_score`,
+`trend_ratio`, and a `hot_score` per 48h/7d/30d window. Both ride along in the exact fetch
+`ArtistShowsScreen` already makes; sorting by either costs nothing extra.
+
+Only `avg_rating` shipped this pass, as a Date/Top rated toggle (`FilterChip` row, matching
+the pattern `SearchResultsList`'s artist chips already established) on `ArtistShowsScreen` —
+scoped to a period already drilled into, same as the issue's own fallback suggestion, except
+it turned out to need no bounding at all since the data was already in hand. `popularity` was
+deliberately left unused: which window makes a good "trending" signal is a real product
+call (48h swings on tour-opener hype vs. 30d for something more stable), not a decision to
+make silently inside an unrelated PR, and phish.in has no equivalent recency-weighted number
+against it (`likes_count` is a raw, unweighted total) — a Relisten-only "Trending" mode would
+be another backend asymmetry to justify. Left concrete for a follow-up (field names,
+`RelistenSourceSet` reasoning, ROADMAP.md's #21 entry) rather than re-flagged as "no data
+source", which is what the original issue text assumed and is no longer true.
+
+`RelistenShowSummary.avgRating` maps straight to a new `ShowSummary.rating` (Catalog.kt,
+default `0.0` — meaningless for phish.in, which has no per-show rating concept). Pinned
+against the real `relisten_year.json` fixture already in the test suite, which turned out to
+already contain the field: Cornell 5/8/77 rates `9.438597` (`RelistenParsingTest`).
+Request-shape coverage for the phish.in side lives in `ApiRequestTest` (`popularShows()`'s
+query params, and `PhishInSource.periods()`/`.shows()` routing the synthetic period
+correctly). Both browse surfaces were also driven live end-to-end on the `phishin_test`
+emulator, not just unit-tested: Phish → Popular shows Big Cypress '99 (428 likes) first, and
+Grateful Dead → 1995 → Top rated re-sorts around a real 10.0.
+
+**D160 — Likes for Relisten tracks (#11) are local-only, following #14's favorites pattern
+rather than phish.in's `LikeButton`.** phish.in's existing `LikeButton` (MainActivity.kt) is
+gated on a signed-in `Session.username` and calls `PhishInApi.like`/`.unlike` with a `Long`
+id against a server-side, public `likesCount` — none of that holds for Relisten, which has no
+account system, no server-side likes, and a `String` (`uuid`) track id
+(`PlayableTrack.id`). Rather than bend `LikeButton`/`Likable`/`PhishInApi` to fit, this adds a
+second, Relisten-only store, `LikedTracks` (LikedTracks.kt) — a `SharedPreferences`-backed
+`Set<String>` of track ids with a `MutableStateFlow`, `init(context)` called from
+`CouchTourApp.onCreate()` alongside `Favorites.init` — and a plain heart `IconButton`
+(`LikeTrackButton`) on `RecordingTrackRow`, where phish.in's own `LikeButton` already lives on
+its equivalent (`TrackRow`).
+
+Scope was deliberately kept to track-row screens that already hold a `PlayableTrack`, not
+extended into `PlayerState`/`NowPlayingScreen`: the issue and ROADMAP.md both flag that
+`PlayerState` (PlayerViewModel.kt) carries no track id or liked-state field at all today, so
+*neither* backend's likes show up on Now Playing — that gap predates this change and isn't
+specific to Relisten. Closing it means adding a track id (and, per backend, its liked state)
+to `PlayerState` and reading it from both `LikeButton` and `LikedTracks`, which is real,
+separable work; folding it into this pass would have mixed a wiring change with a new
+account-free feature. Left as the open ROADMAP.md follow-up it already was.
+
+`LikedTracks`'s shape — a settable/queryable `Set<String>` of track keys — is deliberately the
+same as `Favorites`'s, since #12 (cross-backend playlists) is expected to share this storage
+layer per ROADMAP.md; #12 can build on it as-is rather than needing rework.
+Tested the same way as `Favorites` (`LikedTracksTest.kt`, Robolectric + `ApplicationProvider`):
+toggle on/off, and persistence across a fresh `init` on the same context.
+
+**D161 — Local playlists (#12) use Room, not `SharedPreferences`, reversing D160's own
+expectation; a stored track needs enough context to be refetched, which is more than a bare
+id.** D160 assumed #12 would reuse `LikedTracks`'/`Favorites`' `Set<String>` shape — reasonable
+before actually reading what a playlist needs to store. It doesn't hold: a playlist is
+*ordered*, holds *structured per-entry data*, and there can be several of them, which is
+relational data `SharedPreferences`-as-one-JSON-blob handles by rewriting the whole blob on
+every single-track mutation. `PhishInDb` already has exactly this shape of table (`Progress`)
+and an established migration pattern, so `local_playlists` (`LocalPlaylistEntity`: id, name,
+a denormalised `trackCount`, timestamps) and `local_playlist_tracks`
+(`LocalPlaylistTrackEntity`, one row per entry, `MIGRATION_7_8`, `local_playlist_tracks`
+`ON DELETE CASCADE`s its playlist) followed that instead (`LocalPlaylist.kt`).
+
+The harder problem `PlayableTrack.id` alone doesn't solve: neither backend has a fetch-track-
+by-id endpoint, so playing a stored track later means refetching the show it lives in and
+finding the track inside it — the same trick `PlayerViewModel.playTrack()`/`.resume()`
+already use for a single track. A `LocalPlaylistTrackEntity` row is that trick's inputs, made
+storable: `backend` + `trackId` + `showDate`, plus Relisten-only `artistSlug` (no
+fetch-by-slug-less lookup exists) and `recordingId` (a show can have several tapes with
+different track splits — null falls back to the default tape, same as `MusicSource.show`).
+The rest (`title`, `durationMs`, `venueName`, `artUrl`) is denormalised display data, so the
+playlist screen renders without a fetch per row, same tradeoff `Progress` already makes.
+
+Resolution happens at play time, not at add time: `resolveLocalPlaylistTracks`
+(`LocalPlaylist.kt`) groups a playlist's stored rows by distinct show/tape, fetches each once
+(not once per track), and looks the track up inside the result. A reference that no longer
+resolves — deleted show, track dropped from a tape — is skipped rather than failing the whole
+playlist, since there's no precedent anywhere else in the app for "a stored reference stopped
+resolving" and skip-not-crash matches how a missing recording id already degrades elsewhere
+(`RelistenShowWithSources.toShowDetail`'s fallback to the default tape). This mirrors
+resuming rather than caching a URL: phish.in URLs aren't guaranteed stable, and every other
+resumable queue in the app already refetches rather than trusting a stored one.
+
+A local playlist gets its own `QueueKind.LOCAL_PLAYLIST` / `"local-playlist:"` key prefix
+(`Queue.kt`) rather than reusing `QueueKind.PLAYLIST`'s `"playlist:"` — a local id routed
+through that kind would hit `PhishInApi.playlist(id)`, which has no such slug. Wired into
+`PlayerViewModel.resume()` and `PlaybackService`'s Auto "Continue listening" resume path
+(`resumeChildren`) the same way every other kind already is, sharing one
+`localPlaylistQueueItems(dao, id)` builder between phone and Auto (D73's contract: the two
+must produce identical queues for the same inputs).
+
+One real cross-backend wrinkle: every existing queue (`QueueInfo.artist`) publishes one
+artist for the whole queue to the MediaSession external scrobblers read (D50) — true for a
+show, a phish.in playlist, or a Relisten tape, but not for a playlist that mixes both. Rather
+than widen `QueueInfo` itself, `coreMediaItem` (MediaItems.kt) grew an `artist` param
+defaulting to `info.artist` — every existing caller is unaffected — and the new
+`localPlaylistTrackItems` is the one caller that passes a real per-track artist through
+(`ResolvedLocalTrack.artistName`). This also fixes `Progress.artist` for free: `saveNow()`
+(`PlaybackService.kt`) already reads the *currently playing item's* own artist metadata
+rather than a queue-wide value, so "Continue listening" groups a mixed playlist's history
+entries under whichever artist is actually playing, not a queue-wide guess.
+
+Deliberately out of scope for this pass, to keep it from ballooning into #12 plus half of
+phish.in's playlist feature: importing an existing phish.in playlist's tracks into a local
+one (there's no write API on phish.in's side to build against either way — playlists there
+are still browse-only, per ROADMAP.md's "Not in the app yet"); excerpts
+(`startsAtSecond`/`endsAtSecond`, phish.in's own playlists support this — D30 — but the issue
+never asked for parity); renaming a playlist after creation; and manually reordering tracks
+(adding always appends; removing is supported). None of these are precluded by the schema —
+`LocalPlaylistTrackEntity.position` already supports a real reorder, an excerpt pair of
+columns would slot in next to it — they're just not built. Also out of scope: browsing local
+playlists from Android Auto (resuming one that's already "Continue listening" works, wired
+above, but there's no new browse-tree root to pick one from scratch, unlike the phone's
+Library screen) — Auto's browse tree already has a documented follow-up to unify
+(ROADMAP.md #28), and a third root wasn't worth adding ahead of that.
+
+Tested at three layers: `LocalPlaylistDaoTest.kt` (Room, in-memory db — add/remove
+transactions, cascade delete, ordering), `LocalPlaylistResolveTest.kt` (`MockWebServer` per
+backend, matching `SearchFanOutTest`'s pattern — a phish.in-only, a Relisten-only, and a
+genuinely mixed playlist resolve correctly, and a stale or unreachable reference is skipped,
+not thrown), `MigrationTest.kt`'s new v7→v8 section (existing `progress` rows survive
+untouched; the migrated db accepts a real playlist write), and `MediaItemsTest.kt`'s new
+cases (a mixed playlist's `MediaItem`s carry each track's own artist, not the queue's).
+
+### D162 — the request bound is split by backend, and the daily answer is cached in memory not Room
+
+Home screen "on this date" playlist (#13), sitting on top of favorite artists (#14). Neither
+backend has a month/day-across-years query — phish.in's `/shows` only takes `year=` or
+`year_range=` (`PhishInApi.showsForPeriod`), Relisten's catalog is a per-year fetch
+(`RelistenApi.year`) — so finding matches means fetching shows a period at a time and
+filtering client-side on the date string. That makes this a cost problem more than a UI one,
+and the cost is lopsided between backends, which is why the two get different bounds instead
+of one shared cap:
+
+- **phish.in**: no year bound. The whole archive is under 2,000 shows with audio across ~35
+  periods; `phishInRanges` (`OnThisDate.kt`) greedily batches consecutive periods into
+  `year_range=` requests capped at 900 shows each — comfortably under the API's
+  `per_page=1000` — so covering every Phish year end to end costs about four requests. The
+  bound is self-sizing against each period's own `showsWithAudioCount` rather than a
+  hardcoded year list, so it keeps holding as the archive grows.
+- **Relisten**: `RELISTEN_YEAR_BUDGET` (12) year-fetches total, split evenly across at most
+  `MAX_RELISTEN_ARTISTS` (3) favorited artists, most recent years first. Relisten has no
+  range endpoint — one request per year per artist — so without a cap, favoriting a handful
+  of deep-archive artists would mean dozens of requests on every Home screen visit.
+  Favoriting twelve Relisten artists costs exactly what favoriting three does; the extras
+  simply don't participate.
+- Worst case is about nineteen requests. Run at most once a day: `OnThisDate` wraps
+  `showsOnDate` in a one-entry in-memory cache keyed on today's date plus the sorted
+  favorited-artist keys, the same shape as `RelistenCatalogSource.cachedArtists`'s in-memory
+  cache rather than a new Room table — the answer only changes once a day, and the `progress`
+  table has no business holding throwaway catalog data. Process death re-fetches, which is
+  the right trade for a once-a-day result.
+
+Wired into `HomeScreen` as a second, independent `loadOnce` (`MainActivity.kt`) keyed on the
+date and the favorited artists' keys, separate from `loadArtistsByBackend`'s — it must not
+block the screen's first paint on a multi-request fetch. The section (`SectionHeader("On this
+date", divided = true)` + a `LazyRow` of `AnniversaryCard`s, geometry matching `ResumeCard`)
+renders only inside `loaded()`'s success branch and only when non-empty: no header, spinner,
+or error text on a day with no matches, or before any artist is favorited — it's a discovery
+extra layered on top of the screen, not something the user asked for, so its absence should
+read as nothing rather than as breakage.
+
+`pickAnniversaryShows` reuses `pickRandomShow`'s injectable-`Random` idiom (D36) rather than
+inventing a second random-pick pattern for the "random selection" the issue asked for:
+shuffle the matches, take a bounded handful (`MAX_ANNIVERSARY_SHOWS`, 8), then sort
+date-descending so the row doesn't reshuffle on every recomposition.
+
+Everything lives in pure functions and one suspend orchestrator behind the existing
+`MusicSource` seam (`OnThisDate.kt`), the same split `Catalog.kt` already uses for
+`mergeArtists`/`pickRandomShow` — `OnThisDateTest.kt` covers the date matching, the range
+batching, the Relisten budget split, and the fan-out (including one artist's fetch failing
+without sinking the others) with a fake source and no network call.
+
+Out of scope for this pass, left for #22 (the next Couch Tour stop, a related "shows relevant
+to favorited artists" query): no shared helper yet between the two, but `showsOnDate`'s shape
+— dispatch on backend through `MusicSource`, bound the request count, cache once-a-day — is
+worth reusing if #22 needs the same thing.
+
+### D163 — app version is threaded from the release tag on Android, hand-bumped on macOS
+
+#43. Both `BuildConfig.VERSION_NAME` and `MARKETING_VERSION` were static placeholders,
+disconnected from the `release_tag` (e.g. `v0.23`) that `build-debug-apk.yml` already used to
+name the GitHub Release and its APK asset — displaying either would have shown the same
+string forever.
+
+- **Android**: `app/build.gradle.kts`'s `versionName` now reads `-PversionName`
+  (`project.findProperty("versionName") as? String ?: "1.0"`), and
+  `build-debug-apk.yml`'s "Assemble debug APK" step passes `-PversionName="$RELEASE_TAG"`
+  whenever `release_tag` is set, alongside (not instead of) `-PsideInstall=true` when both are
+  set — a beta side-install cut with a release tag gets both. Plain pushes and dispatches
+  without a tag keep the placeholder. `buildFeatures.buildConfig = true` had to be turned on
+  explicitly — AGP 8 disables `BuildConfig` generation by default. Surfaced as a small,
+  `onSurfaceVariant`-at-60%-alpha, centered caption (`"Couch Tour ${BuildConfig.VERSION_NAME}"`)
+  as the literal last item in `HomeScreen`'s `LazyColumn`, after the Sync section — the most
+  out-of-the-way spot without a dedicated Settings screen, which doesn't exist yet.
+- **macOS**: no release-tag pipeline exists yet (no macOS CI at all — see CLAUDE.md), so this
+  stays manual: `MARKETING_VERSION` in `macos/project.yml` gets bumped by hand alongside each
+  notable build, same as before, just now actually looked at. `SyncView` — the closest thing
+  to a settings screen today — reads it back at runtime via
+  `Bundle.main.infoDictionary?["CFBundleShortVersionString"]` rather than hardcoding a second
+  copy of the string in Swift, so a hand-bump to `project.yml` is the only place that needs
+  touching. Shown as a `.caption`/`.secondary`, centered `Section` at the bottom of the form.
+  Building a whole Settings scene or an "About" panel just for this (both currently
+  unscheduled — see ROADMAP.md and #25) was ruled out as more than the issue asked for.
+### D164 — the tour is derived from the latest show, not asked for; the unplayed half stays live, not cached
+
+"Next Couch Tour stop" (#22), the last item in the personal-library cluster, sitting on top of
+favorite artists (#14) and reusing `showsOnDate`'s shape as D162 flagged: dispatch on backend
+through `MusicSource`, bound the request count, cache once a day (`NextStop.kt`). It's a
+sibling of `OnThisDate.kt`, not an extension of it — the two problems (anniversary matching,
+tour derivation) share no step past the fan-out skeleton, so a shared helper would be an
+abstraction bought for two callers with nothing in common.
+
+Neither backend has a "current tour" concept. `PeriodRef`s are years, not tours, so the only
+way to find one is to fetch an artist's most recent shows and read `ShowSummary.tourName` off
+them — the current tour is whichever one the latest show belongs to. An artist whose latest
+show carries no tour name (older or single-show periods often don't) simply doesn't
+participate, the same opt-out `showsOnAnniversary` gives a malformed date.
+
+Two periods are fetched per artist, not one: a tour crossing New Year — latest show in
+January, the rest of the run the previous December — would otherwise expose only its tail,
+and since this picks the *oldest* show in the tour, a missing older half doesn't degrade the
+answer, it makes it wrong. `recentPeriods` sorts on `PeriodRef.label` rather than `id` — id is
+the year itself on phish.in but an opaque uuid on Relisten (`RelistenYear.toPeriodRef`), while
+label is a plain year string on both, including the synthetic `POPULAR_PERIOD_ID` ("Popular"),
+which drops out for not parsing as one.
+
+Unlike D162's cache, the "unplayed" half of the answer is deliberately *not* baked into the
+daily one: it depends on the `progress` table, which changes the instant a show finishes,
+while the catalog fetch only changes once a day. So `NextStop.load` caches `currentTours`'
+network result exactly like `OnThisDate.load` does, and `oldestUnplayed` runs fresh on every
+recomposition against `ProgressDao.finishedKeys()` — a `Flow`, so finishing a show updates the
+row without a screen reload. No migration: a new `@Query` doesn't touch the schema hash,
+`version` stays 8.
+
+Matching "have I played this?" across backends needed one small addition to `Queue.kt`:
+`recordingShowKey(artistSlug, date)`, a Relisten recording key with its tape id dropped. A
+favorited-artist catalog fetch never resolves to a specific tape, so the match has to be "any
+tape of that night", not the exact key `ProgressDao` stores against — `showId`/`playedShowIds`
+reparse a stored key back down to that identity rather than fuzzy-matching key prefixes.
+
+The request bound is per-backend like D162's Relisten cap, not shared: `MAX_TOUR_ARTISTS` (3)
+participate per backend, each costing 1 `periods()` + 2 `shows()` calls — worst case about
+twelve requests, cheaper than D162's nineteen since there's no year budget to split.
+
+Rendered as a `SectionHeader` + `RowItem` on Home, between "History" and "On this date" —
+not the button the issue's title names. `SurpriseMeButton` is a button because its answer is
+computed on tap and is meant to be a surprise; here the answer is already fetched, and hiding
+the tour/date/venue behind a tap throws away exactly the context that makes it worth tapping.
+Silent when there's nothing to show, same intent as D162's "absence reads as nothing" — but
+genuinely silent this time: it branches on the result directly rather than through `loaded()`,
+whose null branch emits a spinner.
+
+Tested at one layer: `NextStopTest.kt` covers period selection, tour derivation (including a
+New Year run's December half), the cross-backend played-show match, the oldest-unplayed pick
+with its tie-break, the fan-out's per-backend cap and failure isolation, and the cache key —
+all against a fake `MusicSource`, no network, following `OnThisDateTest.kt`'s pattern.
+
+Deliberately out of scope: a "tour" is inferred from `tourName` matching alone, with no
+recency cutoff — an artist whose last tour was years ago still yields a valid answer, which
+reads as a feature (there's always a next stop to catch up on) rather than a bug for this
+pass.
+
+### D165 — both backends' "Not Part of a Tour" is a sentinel, not a real tour name
+
+Found on a real device within minutes of D164 shipping: favoriting Grateful Dead surfaced
+"1994-02-25 · Grateful Dead — Not Part of a Tour" as the next stop, when the band hasn't
+toured since 1995. `currentTourShows` (`NextStop.kt`) took `ShowSummary.tourName` at face
+value, but confirmed live against both APIs, neither leaves the field blank or null for a
+standalone show — they both send the literal string `"Not Part of a Tour"`. Treated as a real
+tour name, every such show across an artist's two most recent fetched periods got lumped
+together as if they were one tour, so a defunct or lightly-touring artist's oldest untoured
+show would win the cross-artist pick every time and quietly crowd out artists that actually
+have a current tour.
+
+Fixed by giving the sentinel the same opt-out `currentTourShows` already gave a blank or null
+`tourName` (D164): if the most recent show is tagged "Not Part of a Tour", the artist simply
+doesn't participate, same as one with no current tour at all. Covered by a new
+`NextStopTest.kt` case built from the exact string both APIs return, confirmed by querying
+them directly rather than guessing at the shape.
+
+Mike suggested a richer fix in the same conversation: rather than an inactive artist silently
+opting out, offer a picker to choose which past tour or era to track for "catching up" on.
+Left for a follow-up rather than folded into this pass — it is a real UI addition (where does
+it live, how is "tour" enumerated for a picker), not a bug fix, and deserves its own design
+pass. Noted in ROADMAP.md.
+
+### D166 — three small desktop player fixes, pulled forward from #25's batch
+
+#25 ("Desktop UI improvements") is explicitly a batch to split from, not a single unit of
+work — ROADMAP.md's build order already named three items in it as small and worth pulling
+forward ahead of the rest: the scrubber seek-thrash fix, the `skipToNext` disable asymmetry,
+and menu-bar `Commands`. This does those three and leaves the rest of #25 (a real Now Playing
+view, artwork, volume control, a Settings scene, desktop search, history grouping, the tape
+switcher's own Source-picker rework) for later passes.
+
+- **Scrubber** (`MiniPlayerView.swift`): the `Slider`'s `value` binding called `player.seek`
+  on every intermediate value, so dragging issued a continuous stream of seeks at
+  `AVPlayer`. Now tracked with a local `@State private var dragPositionMs: Double?` and
+  `Slider`'s `onEditingChanged` — the displayed position follows the drag locally, and
+  `player.seek(toMs:)` fires exactly once, when the drag ends.
+- **`skipToNext` disable** (`MiniPlayerView.swift`): `skipToPrevious` was already disabled at
+  `currentIndex == 0`; `skipToNext` had no equivalent at the end of the queue. Added
+  `.disabled((player.currentIndex ?? -1) >= player.tracks.count - 1)`, the same bounds check
+  mirrored in the new menu commands below.
+- **Menu-bar `Commands`** (`CouchTourApp.swift`): a new "Playback" `CommandMenu` — Play/Pause
+  (bare Space, matching standard macOS media-app convention), Next Track and Previous Track
+  (Cmd+Right/Cmd+Left, modified rather than the bare arrow keys browse already uses for list
+  navigation, so the two don't collide). Confirmed live: the menu renders in the correct
+  standard position (between View and Window), and Next/Previous correctly start disabled
+  with no queue loaded.
+
+**Testing limits worth being honest about.** `macos/CouchTour` has no unit test target — this
+is UI code verified by building and running, same as `CLAUDE.md` asks for. I was able to
+build, install, and drive the app directly (`osascript`/`System Events`, window-scoped
+`screencapture` rather than a full-desktop grab — this machine had several personal windows
+open), and confirmed the Commands menu live end to end. I could not get a synthetic click via
+`System Events` to trigger `ShowDetailView.TrackRow`'s `.onTapGesture` and actually start
+playback — clicks that worked fine for `List` row *navigation* (artist → year → show) didn't
+register on this particular tap gesture, a pre-existing interaction that isn't part of this
+change. That blocked live verification of the scrubber drag behavior and the `skipToNext`
+disable state while a queue is actually loaded; both are covered by code review and the same
+bounds-check pattern already proven live in the Commands menu, but a real interactive pass —
+starting a show and dragging the scrubber, confirming the button disables on the last
+track — is worth five minutes on a real device before calling this done.
+
+Also: `macos/scripts/install.sh` picked the first `find` match under DerivedData rather than
+the newest, so with more than one stale `CouchTour-*` folder around (routine — `xcodegen
+generate` gives the project a fresh identity on every run, so old DerivedData folders pile up
+instead of being reused) it could silently install a build from days earlier. Found while
+verifying this change — the install script handed back a binary with none of these edits in
+it. Fixed to sort by mtime and take the newest.
+
+One live-testing wrinkle, unrelated to the fix itself and not code to "fix": a fresh ad-hoc
+signature (which a clean rebuild produces) needs the Keychain to re-authorize
+`SyncSession`'s stored token, which blocks app launch behind a password prompt neither an
+agent nor a script should be answering. It resolved itself by relaunching a build whose
+signature had already been trusted in an earlier session — noted here in case a similarly
+inexplicable hang shows up again.
+
+### D167 — a Now Playing inspector, artwork everywhere, and a volume control (#25, player surface)
+
+The second slice pulled from #25's batch (D166 pulled the first three small items). This one
+takes the whole player-surface bullet group: a real Now Playing view, artwork in the app and
+the system widget, and a volume control. Browse (#17's Source-picker rework, search, history
+grouping, venue/city on drill-in) and a Settings scene are left for later slices — #25 is
+explicitly meant to be split, not done in one pass.
+
+**Placement: a trailing `.inspector` panel**, not a separate window or a fifth sidebar
+section. A window would need its own artwork/transport duplicated and is one more window to
+manage; a sidebar section was rejected because `RootView.swift` deliberately builds a fresh
+`NavigationStack` per section (Artists → Periods → Shows → Show state must not leak across
+sections), so visiting a "Now Playing" section would reset browse's drill-down every time —
+exactly the state loss the issue's "see the rest of the show while browsing elsewhere" is
+asking to avoid. The inspector needs a toolbar to toggle it, which also delivers #25's "no
+toolbar on the detail pane" item as a side effect.
+
+**No transport controls in the panel.** `MiniPlayerView` is always on screen directly below
+the inspector whenever a show is loaded (`RootView.swift`), so duplicating play/pause/skip/
+scrub a few points above it would be redundant chrome. The panel is artwork, identity, and the
+full track queue; `MiniPlayerView` stays the only transport.
+
+**Queue.** `NowPlayingInspector` reads `player.tracks` — the whole show's track list, which
+`Player` already holds independent of how much of it is actually loaded into `AVQueuePlayer`
+(only a suffix starting at the current index ever is). Grouped by set with the same
+first-appearance-order logic `ShowDetailView` already had; that logic moved out to
+`TrackGroups.swift` so both views share it rather than duplicating it. Tapping any row calls
+`player.seek(toTrack:)`, which rebuilds the queue from that index — the same mechanism
+`ShowDetailView`'s track rows already use.
+
+**Artwork.** `ArtworkView` wraps `AsyncImage` with a `music.note` placeholder — needed because
+Relisten show summaries carry no art at all, so the placeholder is the common case there, not
+an edge case. Used at 36pt in the mini player and 160pt in the inspector. The system Now
+Playing widget needed a separate path: `MPNowPlayingInfoCenter`'s `MPMediaItemArtwork` wants an
+`NSImage`, not a URL, and `updateNowPlayingInfo()` rebuilds its whole info dictionary on every
+track change — including before an async fetch can possibly have completed — so `Player` now
+fetches into a cached `NSImage` (`loadArtwork(for:)`, keyed against the URL that requested it so
+a stale load can't land after the show has already changed again) and includes it from that
+cache rather than fetching inline. This closes D107, which shipped Now Playing metadata
+without artwork specifically because this wasn't built yet.
+
+**Volume.** `Player.volume` (0...1) is app-level, not system volume — a `@Published` property
+with `didSet` writing through to `queuePlayer.volume` and `UserDefaults` so it survives a
+relaunch; `init` also sets `queuePlayer.volume` directly since `didSet` doesn't fire for an
+initializer assignment. `toggleMute()` stashes the pre-mute level rather than just zeroing it,
+so unmuting restores where it was. Lives in the mini player, not the inspector, so it's
+reachable without opening the panel.
+
+**One change outside the strict scope, flagged deliberately.** `ShowDetailView`'s `TrackRow`
+used `.contentShape(Rectangle()).onTapGesture`, which D166 found doesn't reliably respond to a
+synthetic click via `System Events` — the exact thing that blocked live verification of
+anything needing a loaded queue in that pass, and would have blocked this one too, since none
+of this PR's changes are observable without one. Switched to `Button(...).buttonStyle(.plain)`,
+mirrored in the new `QueueRow`. Three-line change, keyboard- and VoiceOver-accessible either
+way, and plausibly unblocks the automated pass — but stands on its own accessibility merit even
+if it turns out not to.
+
+**Testing limits, worth being just as honest about as D166 was.** The build succeeds
+(`xcodebuild`) and `swift test` stays green (124/124 — CouchTourKit itself is untouched by this
+pass; the 94/94 D166 cited has grown since). Live verification hit the exact hang D166 already
+documented and moved on from: `xcodegen generate` gives the project a fresh identity, so
+`install.sh`'s Release build carries a fresh ad-hoc signature, and this machine's login keychain
+holds a real `sync.deviceToken` from an actual paired device (the live sync verification from
+D116-D148) — `SyncSession.init` reads it unconditionally via `AppModel`, at launch, before any
+UI appears. `sample` confirmed the main thread parked in `SecItemCopyMatching`, and a
+`SecurityAgent` process was running — the OS asking to authorize the new signature against that
+real credential. Per D166 and CLAUDE.md, that prompt is never one to answer non-interactively;
+the process was killed instead, twice, without touching it. This worktree has no
+previously-trusted build of its own to fall back to (D166's was a different worktree, a
+different DerivedData path), so nothing in this PR was clicked through live — verification here
+is code review only: the diff was read start to finish, the build was confirmed clean, and two
+real issues were caught and fixed that way (stale artwork surviving a show switch until the new
+fetch resolved, and `.navigationTitle` not being guaranteed to render inside an `.inspector`
+panel that isn't itself a `NavigationStack` — both described above). A real interactive pass —
+toggling the inspector, playing a show, confirming artwork appears in both the panel and
+Control Center's Now Playing widget, dragging the volume slider and hearing it — is worth five
+minutes on a real device before calling this fully done, the same ask D166 closed with.
+
+**Also found and fixed while exploring this issue, unrelated to the change itself:** Android's
+History screen is not actually grouped by artist, contrary to `HistoryView.swift`'s comment and
+two lines in ROADMAP.md. `MainActivity.kt`'s `HistoryScreen` is a flat `LazyColumn` over
+`ProgressDao.history()`; the grouping DAO methods added for it (`Progress.artists()`,
+`Progress.historyFor()`) are real but referenced only by tests, never by any screen. Corrected
+in both places rather than left to mislead whichever slice eventually ports "History grouped by
+artist" to macOS.
+
+### D168 — the Source-picker rework lands on macOS, plus two inherited Relisten bugs (#25, browse)
+
+The third slice pulled from #25's batch (D166 did the small player fixes; D167 did the whole
+player-surface group). This one takes the show-detail items from #25's browse group: the tape
+switcher was still a bare `Picker` labeled "Tape" — #17's rework shipped on Android but never
+landed here — and `ShowDetailView` dropped the venue/city on drill-in. Search and history
+grouping stay out of this slice; search is its own stack macOS has none of (`MusicSource` has
+no `search` at all), confirmed as the next desktop slice rather than folded in here, and history
+grouping is a fresh design per D167's correction, not a port.
+
+**Two bugs found while porting, fixed in the same pass.** Confirming the port against Android's
+`RecordingRef`/`SourceRow` turned up two places macOS's `RelistenSource` mapping had drifted
+from fixes Android already made:
+
+- **Blank taper/lineage rendered empty.** Relisten sends `""` rather than omitting these on
+  many sources; `RelistenAPI.swift`'s `toRecordingRef()` did `taper ?? (isSoundboard ? ... :
+  ...)`, so a blank taper produced an empty row label and a bare "Lineage:" with nothing after
+  it. A blank string satisfies Swift's `??` the same way it satisfies Kotlin's `?:` — neither
+  language's nil-coalescing treats `""` as absent. Fixed with a small `Optional<String>.nonBlank`
+  helper, mirroring Android's `taper?.takeIf { it.isNotBlank() }` (`Relisten.kt:207-217`).
+- **`looksLikeMatrix` never ported.** Android's `RecordingRef` has the computed property since
+  #17 shipped; macOS's `RecordingRef` (`Catalog.swift`) had all seven of `RecordingRef`'s stored
+  fields but not the derived one. Added verbatim, including the doc comment's framing — a
+  substring match on free text, a hint for the UI, not a fact, since Relisten has no structured
+  matrix flag.
+
+Both are covered in `CouchTourKitTests` now: `CatalogTests` for `looksLikeMatrix` (taper match,
+lineage match, case-insensitivity, negative), `RelistenParsingTests` for the blank-taper and
+blank-lineage fallbacks, built directly against `RelistenSource`'s own init rather than a new
+JSON fixture — the same pattern `testFlattensSetsInIndexOrderAndDropsTracksWithNoMp3Url` already
+uses for a constructed edge case.
+
+**Picker: a `.popover`, not a sheet.** The macOS analogue of Android's `ModalBottomSheet`:
+anchored to the row that opened it, dismissed by clicking away, lighter than a modal sheet for
+what's fundamentally a picker. `SourceRow` carries what Android's does — label, an "SBD" badge,
+a "Matrix?" badge (the `?` stays, marking the heuristic), `★ rating · N reviews` when rated,
+`Taper:` suppressed when it would just repeat the label, `Lineage:` when present, current source
+checkmarked. No client-side sort — Relisten already returns sources ranked by
+`avg_rating_weighted` desc (D79), and the current source is pinned first the same way the old
+`Picker` built its list.
+
+**Gate fix.** The old gate opened whenever `hasMultipleSources && (!alternates.isEmpty ||
+recording != nil)` — the `recording != nil` arm rendered a one-item picker with nothing to pick
+on a single-source show. Aligned to Android's `hasMultipleSources && alternates.isNotEmpty()`.
+
+**Position carry across a source switch — the behavioral half of #17 macOS lacked entirely.**
+Before this, picking a different source swapped the displayed track list but left the player on
+the old source. `switchSource(to:)` captures the pre-switch queue key, reloads, and — only if
+that queue key is still what the player has loaded (i.e. this show's queue is what's actually
+playing, not just what's being browsed) — restarts on the new source at the same track index and
+position via `player.play(detail:startIndex:resumePositionMs:)`, which already took exactly
+these parameters. Index is clamped to the new source's track count and read fresh from the
+player right before the call (not snapshotted before the network fetch), since tapers split
+tracks differently — the same approximation Android's picker documents, not something to imply
+is exact.
+
+**`navigationSubtitle`.** `ShowDetailView` now sets `.navigationSubtitle(show.where_)` alongside
+`navigationTitle(show.date)`, restoring the venue/city `ShowsView`'s list row already shows.
+
+**Testing.** `swift test` is the real gate here and it's green — 131/131, up from 124 (D167's
+count), with both bug fixes covered by tests that failed against the pre-fix code. `xcodebuild`
+succeeds; no new source files, so no `xcodegen generate` was needed. Live verification hit the
+same environmental wall D166/D167 already documented and moved past — any code change produces a
+fresh ad-hoc signature via `install.sh`, and this machine's login keychain holds a real
+`sync.deviceToken` from an actual paired device that `SyncSession.init` reads unconditionally at
+launch, parking the main thread behind a Keychain re-authorization prompt no agent should answer.
+Unlike D167, the cost of that here is smaller: `looksLikeMatrix` and the blank-string fixes are
+pure model logic, fully proven by `swift test` independent of the UI. What's unverified live is
+the popover's rendering and the position-carry across a real source switch — flagged in the PR
+for a manual pass, same as the prior two entries.
+
+### D169 — desktop search: a sidebar section, porting Android's whole stack (#25, D5 walk-back)
+
+The fourth slice pulled from #25's batch (D166 did the small player fixes, D167 the
+player-surface group, D168 the show-detail browse group). This one adds the piece ROADMAP.md
+carried as an open question until now — search — settled yes and filed as the next slice.
+macOS had none of it: `MusicSource` declared only `artists()`/`periods()`/`shows()`/`show()`,
+and the desktop MVP's original scoping comment (`Catalog.swift`, D5) explicitly named search
+as out of scope alongside login/likes/playlists. Login/likes/playlists stay out; search is now
+in.
+
+**Port, not fresh design.** Android's whole stack (`Catalog.kt`'s `MusicSource.search`/
+`searchAll`/`SearchHits`, `Api.kt`'s phish.in search, `Relisten.kt`'s search DTOs and the
+`song:`/`venue:`-prefixed `PeriodRef` trick) transferred close to verbatim. The one deliberate
+omission: `SearchHits.playlists` isn't ported — the desktop MVP has no `Playlist` model or
+playlists screen at all (D5), so there's nothing for a playlist hit to land on.
+
+**Placement: a new sidebar section, confirmed with Mike over two other options** (a toolbar
+`.searchable` over the Artists browse pane, and a ⌘F palette sheet). Both lost for the same
+reason D167 rejected a Now Playing sidebar section: `RootView.swift` deliberately builds a
+fresh `NavigationStack` per section so Artists → Periods → Shows → Show drill-down doesn't
+leak. But that constraint cuts the opposite way for search than it did for Now Playing — a
+toolbar search field would fight the drill-down (what does typing mean three levels into
+1977?) and collide with the existing Now Playing toolbar button, and a sheet would need to
+dismiss itself before pushing onto whatever browse stack happens to be visible. A sidebar
+section is a destination, not a companion, so it gets its own stack the same way
+Artists/History/Sync already do.
+
+**A phish.in track hit opens its show, confirmed with Mike over auto-play-on-arrival.**
+`ShowDetailView` already shows the full setlist and the track is one click away; auto-play
+would need `ShowDetailView` to accept and act on an optional start-track id, one more moving
+part for what search's own hit list already makes reachable. A track with no `show_date` is
+dropped from the list entirely rather than pushing a `ShowSummary` that can't load.
+
+**Two encoding traps, the actual reason this needed its own request tests.**
+- phish.in's `/search/{term}` puts the term in the *path*, and `PhishInAPI.path(_:)`'s
+  `URL.appendPathComponent` treats `/` as a separator — a raw slash in the term would silently
+  become an extra path segment and 404. `PhishInAPI.search(_:)` bypasses `path(_:)` for this
+  one call and builds `percentEncodedPath` by hand, escaping `/` explicitly. The test asserting
+  this had to be written against `URLComponents.percentEncodedPath`, not `RequestTests`'
+  existing `pathSegments` helper — that helper splits the already percent-*decoded* `URL.path`,
+  so it would pass even if the bug were live.
+- Relisten's is the opposite shape on purpose (`?q=` query param, not a path segment) —
+  `RelistenAPI.path(_:)` returns a bare `URL` here, unlike `PhishInAPI`'s `URLComponents`, so
+  `search(_:)` builds its own `URLComponents` to attach the query item.
+
+**A second `navigationDestination(for: ShowSummary.self)` would have been silently wrong.**
+`ShowsView` (reached when a song/venue slice hit pushes it) already declares that destination
+for its own list. SwiftUI supports only one `navigationDestination` per data type per
+`NavigationStack`, no matter how deep the declaring view sits — a second declaration for the
+same type doesn't error, it silently drops one of them. `SearchView`'s own direct show links
+(the Shows section, track hits) go through a private `SearchDestination` wrapper with its own
+declaration instead of sharing `ShowSummary`'s.
+
+**`MockServer` gained host-scoped `enqueue`.** The fan-out test (`SearchFanOutTests`, port of
+`SearchFanOutTest.kt`) needs two backends racing concurrently, and the existing `MockServer` is
+one global `URLProtocol` with a single FIFO response queue — two concurrent requests would
+drain it in a nondeterministic order. `enqueue(_:forHost:)` (default `nil`, matching any
+request) lets a test pin a response to a specific mock host without touching any existing
+unscoped call.
+
+**`.searchFocused` needs macOS 15; this project's deployment target is 14** (`project.yml`).
+⌘F still switches to the Search section on any supported OS via `appModel.selection` — a
+`FocusOnRequest` view modifier gates the actual field-focusing behind
+`if #available(macOS 15, *)`, so 14 gets the section switch without the auto-focus rather than
+failing to build.
+
+**Fixtures copied verbatim, not trimmed fresh.** `check-fixtures.sh` requires every macOS
+fixture to byte-match an Android counterpart, and Android already had all four this needed
+(`search.json`, `relisten_search.json`, `relisten_song_shows.json`,
+`relisten_venue_shows.json`) — copied as-is rather than re-trimmed from a live response.
+
+**Testing.** `swift test` is 155/155, up from 131 (D168's count) — the model layer
+(`SearchHits`'s combinators, both backends' DTOs and mapping, the prefix dispatch, both
+encoding traps, the fan-out) is fully proven independent of the UI. `xcodebuild` succeeds;
+`xcodegen generate` was needed (`SearchView.swift` is a new source file). Live verification hit
+the same wall D166-D168 all documented: this machine's login keychain holds a real
+`sync.deviceToken` from a paired device, and `SyncSession.init` reads it unconditionally at
+launch — any `install.sh` rebuild gets a fresh ad-hoc signature, parking the main thread in
+`SecItemCopyMatching` behind a Keychain re-authorization prompt no agent should answer. Nothing
+UI-facing in this PR was clicked through live; verification here is `swift test` plus a full
+read of the diff. A manual pass is worth five minutes on a real device before calling this
+fully done: type a query and watch grouped hits appear, click a song hit and land on that
+song's shows, click a venue hit the same way, click a show hit and a track hit and land on the
+right show, confirm ⌘F both switches to Search and (on macOS 15+) focuses the field, and
+confirm switching sections away and back resets the query as expected.
+
+## Iteration 33 — a macOS beta build, and its icon mirrors Android's badge (D170)
+
+### D170 — `CouchTourBeta`: a second Xcode target, its own sandbox container, and an amber-pill icon like Android's
+
+Mirrors D137 (Android's `sideInstall`): a new `CouchTourBeta` target in `project.yml`, bundle
+id `dev.mike.couchtour.mac.beta`, display name "Couch Tour Beta" — installs alongside the
+regular app instead of replacing it (`macos/scripts/install-beta.sh`, parallel to
+`install.sh`, building the `CouchTourBeta` scheme into `Couch Tour Beta.app`).
+
+**Data isolation turned out to already be free, then got a belt-and-suspenders seam anyway.**
+macOS App Sandbox scopes an app's container by bundle id, so prod and beta land in separate
+`~/Library/Containers/<bundle-id>/` trees — confirmed empirically
+(`dev.mike.couchtour.mac` vs `...mac.beta`), no code required. Added the seam regardless:
+`ProgressStore.defaultURL(appSupportDirName:)` and `SystemKeychain(service:)` now take
+overridable parameters (defaults unchanged — the regular app's on-disk path and Keychain
+service are untouchable, same "names that look wrong and are not" reasoning CLAUDE.md gives
+Android's `phishin.db`), and `AppModel.swift` passes the beta-only values behind a
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS: BETA` flag set only on the new target. Sandbox isolation
+being real doesn't mean it's wise to be the only thing standing between a build config typo
+and silently corrupting the real listening history.
+
+**The icon now mirrors Android's badge, reversing D146's call.** D146 gave macOS a diagonal
+ribbon (`AppIcon-Beta.appiconset`) because "Android's inline pill wouldn't read as clearly" on
+a non-circle-masked mac icon. At Mike's request this iteration replaced it: an amber
+(`#FFB71B`) pill with black bold "BETA" text, composited onto the same base art
+(`icon_512x512@2x.png` as the 1024px master, ImageMagick, Lanczos-downsampled to all 10
+required sizes) in the same position Android's `ic_launcher_beta_foreground.png` uses —
+legible down to 128@2x (256px), same trade-off the ribbon always made at 16/32px.
+
+**Live-paired into a new group, separate from prod.** The existing sync pairing (D138-D143:
+Mike's real Pixel 9 Pro XL and his Mac Mini) was left untouched. A second, beta-only group now
+links this macOS build, Mike's phone's side-installed beta APK, and the `phishin_test`
+emulator — all three paired and a sync round-trip confirmed ("Last synced just now" on the
+emulator's Sync screen).
+
+**One live mistake, and what it confirmed about `unlink()`:** an accidental tap hit "Unlink
+this device" instead of "Add another device" on the macOS beta app mid-session. `unlink()`
+(`Sync.swift`) is local-only — `store.clear()`, no server call — so the server-side device row
+was untouched (not revoked), but the local Keychain token was gone for good, with no way to
+recover it. Rejoining needed a fresh invite code from a device still in the group (Mike's
+phone), the same as pairing for the first time — confirming by accident that a lost local
+token is unrecoverable by design (D127: the server never re-mints a token for an existing
+device id, or a leaked database row plus a guessed id would be enough to impersonate a
+device). The orphaned `Mac Mini` row was revoked from the phone's Devices list afterward.
+
+## Iteration 34 — closing out #25: a Settings scene and History filtered by artist (D171)
+
+### D171 — Sync moves into a real Settings scene; History gets a last-played-ordered artist filter
+
+The last two items in #25's batch, both confirmed with Mike before building. This closes #25 —
+every UI gap the issue collected (player surface D166-D167, browse D168, search D169, the beta
+build D170 was a separate track) is now done.
+
+**Settings: Sync moves in, the sidebar section goes away.** `CouchTourApp.swift` declares a
+`Settings` scene holding the same `SyncView` the sidebar used to show — that's the whole change
+macOS needs for ⌘, to work; no `Commands` entry required. Sync is the only settings-like surface
+this app has (the one other persisted preference, volume, already lives in the mini player,
+where it belongs), so nothing was invented to fill out a General tab — the alternative Mike
+turned down. Two things a `Settings` scene gets wrong by default if you don't watch for them:
+it does **not** inherit the environment a `WindowGroup` sets up, so a view built assuming
+`@EnvironmentObject` access would crash on open rather than fail to compile (`SyncView` already
+took `syncSession` and `sync` as plain parameters, so this was a check, not a fix); and
+`.navigationTitle` isn't guaranteed to render outside a `NavigationStack` — `SyncView`'s
+`.navigationTitle("Sync")` came out for the same reason D167 dropped one from `.inspector`. A
+bare `Form` in a Settings window also sizes badly without a `.frame(width:)`.
+
+**History stays flat and newest-first; it gains a filter, not sections or a drill-down.**
+Mike's call, and the reasoning holds up: History mostly answers "what did I just play", and
+both grouping alternatives cost an extra click or a mode switch to get back to that. The filter
+is the same shape `SearchView`'s own artist picker already uses — a menu-style `Picker`, shown
+only when there's more than one artist, selection falling back to "everything" (not literally
+reset) once the artist it names is no longer present, the identical accident-of-key-reuse
+behavior `SearchView.resultsList` documents.
+
+**`ProgressStore.artists()`/`historyFor(artist:)` stayed unused on purpose, despite looking
+purpose-built for this.** Both exist and are tested — Android-parity groundwork, same as
+`Progress.artists()`/`historyFor()` on the Kotlin side, referenced only by tests there too. But
+`artists()` orders alphabetically (`ORDER BY artist`), the opposite of what Mike asked for, and
+`historyFor(artist:)` would be an unnecessary second query against a list `HistoryView` already
+holds in memory. `history()` is already `updatedAt` descending, so a fresh free function,
+`historyArtists(_:)` in `ProgressStore.swift`, gets last-played order for free — first
+appearance in an already-sorted list is last-played order, no second query, no sort. Neither
+existing method was touched or deleted; CLAUDE.md's guidance against removing pre-existing code
+that isn't in the way applies here even though it now looks stranger to leave unused than it did
+before this landed.
+
+**No shared filter component between `SearchView` and `HistoryView`.** Search filters
+`ArtistRef` keyed on backend+id; History filters plain artist strings pulled straight off
+`PlaybackProgress`. Two small, differently-typed filters, not one abstraction pretending
+they're the same thing — the speculative generality CLAUDE.md's simplicity section warns off.
+
+**Testing.** `swift test` is 159/159, up from 155 (D169's count) — `historyArtists`'s ordering,
+dedup-at-most-recent, blank-artist skip (with the row still surviving `history()` itself), and
+empty-history cases are all covered independent of the UI; the Settings scene is pure wiring
+with nothing to unit-test, covered by the build instead. `xcodebuild` succeeds on both
+`CouchTour` and `CouchTourBeta` (they share these source files); no new source files, so no
+`xcodegen generate` was needed. Live verification hit the same wall D166-D170 all documented:
+this machine's login keychain holds a real `sync.deviceToken` from a paired device, and
+`SyncSession.init` reads it unconditionally at launch — any `install.sh` rebuild gets a fresh
+ad-hoc signature, parking the main thread in `SecItemCopyMatching` behind a Keychain
+re-authorization prompt no agent should answer. Nothing UI-facing in this PR was clicked
+through live; verification here is `swift test` plus a full read of the diff. A manual pass is
+worth a few minutes on a real device before calling this fully done: ⌘, opens Settings with
+pairing/devices/sync-now/the version string all rendering at a sensible window size; Sync is
+gone from the sidebar and nothing else there shifted; History's artist picker appears only with
+more than one artist, orders most-recently-played first, narrows the list on selection, and
+"All artists" restores everything including any blank-artist row.
+
+## Iteration 35 — Continue Listening going stale on macOS after a background sync (D172)
+
+### D172 — `ContinueListeningView`/`HistoryView` reload on `syncSession.lastSyncedAt`, not just on queue change
+
+Reported by Mike as "sync is not actually working — phone and desktop show as synced but
+continue listening entries don't match." The sync protocol itself (push/pull, last-write-wins,
+D119-D149) was fine; the bug was downstream, on macOS only.
+
+**Root cause: the two SwiftUI views never re-queried after a sync pull.** Android's
+`ProgressDao.inProgress()` returns a Room `Flow`, which re-emits automatically on any write to
+the `progress` table — including the writes `SyncSession.syncOnce` makes via `progressDao.put()`
+when applying pulled rows. `ContinueListeningView`/`HistoryView` have no such mechanism: they
+load `rows` once via `.task` on appear, and again `.onChange(of: player.queueKey)` when local
+playback moves to a new queue. `AppModel.syncNow()` — fired on launch, on
+`didBecomeActiveNotification`, and every 15 minutes (`RootView.swift`) — writes straight to
+`ProgressStore` through `SyncSession.sync`, but nothing told either view to look again. A sync
+could complete correctly, `lastSyncedAt` would update, and the on-disk row for a show played on
+the other device would be exactly right — while the visible list kept showing whatever was
+loaded before that sync ran, sometimes since app launch.
+
+**Fix: both views also reload `.onChange(of: appModel.syncSession.lastSyncedAt)`.**
+`SyncSession.lastSyncedAt` is already `@Published` and already updated only on a successful sync
+round trip, so this is the cheapest correct signal — no new plumbing, no GRDB
+`ValueObservation`/`DatabasePublisher` needed for what's otherwise a two-line fix. A real
+`ValueObservation` would be the more "correct" reactive-DB approach (and would also catch local
+writes this same gap misses, e.g. a resume from `ShowDetail`'s saved-progress banner not
+updating an already-open Continue Listening list), but that's a bigger change than this bug
+needs; left for later if staleness shows up somewhere `syncSession.lastSyncedAt` doesn't cover.
+
+**Testing.** `swift test`: 159/159, unchanged — this bug was never reachable from
+`CouchTourKit`'s own tests, since `ProgressStore`/`SyncSession` are both correct; it lived
+entirely in the app-target views, which the package tests don't touch. `xcodebuild` succeeds.
+Not verified live against a real paired device — same Keychain-reauth wall D166-D171 hit; a
+manual check is worth doing: play something on the phone, let the Mac's next sync tick (or
+foreground it) go by without touching playback locally, and confirm Continue Listening picks up
+the new row without switching sidebar sections.
+
+## Iteration 36 — a failing sync used to say nothing about it (D173)
+
+### D173 — `SyncSession.lastError` on both platforms; every previously-silent failure path now sets it
+
+D172 fixed the UI staleness Mike reported, but the underlying report — "sync is not actually
+working" — turned out to be a second, real bug once he checked: the phone's Settings showed
+"nothing linked" while the Mac still listed the phone as a paired device. The phone's local
+token had gone bad (most likely an app reinstall/data clear, or a prior 401 that
+auto-`unlink()`ed it) and `sync()` is a documented no-op when unpaired — `guard let token = ...
+else { return }` / `val token = store.deviceToken ?: return`. It had been silently doing
+nothing on every launch, foreground, 15-minute timer, and debounced push, with zero indication
+anywhere. Re-pairing the phone was the actual fix; this decision is about making the *next*
+version of this failure visible instead of silent.
+
+**Every sync failure path used to swallow its error.** `AppModel.syncNow()` is `Task { try?
+await syncSession.sync(progressStore) }`; Android's periodic worker, debounced push, and "Sync
+now" button all wrap `SyncSession.sync(...)` in `runCatching`/`try`/`Result.retry()` with
+nothing surfaced to the UI. An auto-unlink on a 401 is even quieter — `unlink()` runs and
+`paired` flips to false with no explanation at all for why. None of these paths were bugs
+exactly (background sync failing shouldn't crash anything, and `Result.retry()` is the right
+WorkManager behavior), but stacked together they meant a device could stop syncing entirely and
+never say so — exactly what happened here.
+
+**Fix: `SyncSession` (both platforms) gets a `lastError: String?`/`StateFlow<String?>`,** set
+inside `sync()`/`sync(_:)` itself rather than by each caller, so every existing call site — the
+periodic job, the debounce, the manual button, an auto-unlink — gets it for free with no changes
+to their own error handling:
+- A full round trip succeeding clears it.
+- The `unauthorized` branch now also sets an explanatory message before calling `unlink()`, so
+  the moment a device gets kicked back to "not paired," it says why instead of just changing
+  state silently.
+- The `gone` branch is unchanged (D126's transparent full-resync retry isn't a user-facing
+  failure).
+- A catch-all beyond `SyncException` was added on both platforms, because a plain network
+  failure (no connectivity, DNS, timeout) was never a `SyncException` and was escaping `sync()`
+  entirely uncaught before this — on macOS in particular, `AppModel.syncNow()`'s `try?` meant
+  this class of failure left literally no trace anywhere.
+- `CancellationException`/`CancellationError` is explicitly re-thrown untouched before the
+  catch-all runs, on both platforms — a debounced push superseding an in-flight one cancels the
+  coroutine/Task it's running in, and that's routine, not a failure; recording it as
+  `lastError` would flash a false "sync failed" banner on every rapid track change.
+- `clearError()` lets a deliberate, unrelated state change (the user tapping "unlink"
+  themselves) drop a stale message rather than leaving an old "was revoked" explanation on
+  screen after an intentional action.
+
+**UI: both Settings/Sync screens show `lastError` unconditionally, not nested inside "if
+paired."** The auto-unlink case is exactly why — `paired` flips to false in the same beat the
+error is set, so scoping the message to the paired section would erase the explanation at the
+one moment it's needed. Android's `SyncScreen` and macOS's `SyncView` both show it as a plain
+red-styled `Text` right below the intro copy.
+
+**Testing.** Both platforms already had a `SyncSession`/`SyncTokenStore` test suite
+(`SyncSessionTest`/`SyncTokenStoreTest` on Android, `SyncSessionTests`/`SyncTokenStoreTests` on
+macOS, both against a real local mock server) — corrected here from an earlier draft of this
+entry that claimed Android had none. Four matching cases were added to each (an unauthorized
+response sets an error, a server error sets `lastError` and rethrows, a successful sync clears a
+prior error, `clearError()` resets it). Android: `testDebugUnitTest` green (JAVA_HOME pointed at
+Android Studio's bundled JDK, per CLAUDE.md). macOS: `swift test` 163/163, up from 159;
+`xcodebuild` succeeds. Not verified live — same Keychain-reauth wall as D172; the one thing worth
+confirming by hand is the scenario that motivated this: unlink a device from the *other* one's
+Devices list, then check that the now-unauthorized device's next sync attempt shows the
+"unlinked" message instead of just silently going back to "not paired."
+
+## Iteration 37 — the other way a device silently drops out of sync (D174)
+
+### D174 — `SyncTokenStore.recoveredFromReset` surfaces an Android Keystore reset via `lastError`, not just a `Log.w`
+
+Mike asked whether he'd have to re-pair on every future update, and whether that's avoidable.
+Answering that required actually finding out how his phone lost its token in the first place —
+D173 made *a* silent failure visible, but didn't explain *this* one, since a bad-token 401 and a
+locally-wiped token look identical from the server's side (both just present as "unpaired").
+
+**A normal update shouldn't do this.** `applicationId` and `versionCode` (static `1`, bumped
+only by suffix for the beta variant, D137) are stable across builds, and the debug signing key
+is restored from a repo secret specifically so every CI build signs identically (the comment on
+"Restore debug keystore" in `build-debug-apk.yml` documents the exact failure — "App not
+installed" — this already fixed once). A same-key, same-package APK installed over itself is an
+update, not a reinstall, and Android preserves app data across those. So routine releases are not
+the mechanism — but Android's Keystore-backed `EncryptedSharedPreferences` *can* independently go
+bad (an OS-level key-material invalidation, unrelated to anything this app does), and
+`SyncTokenStore`'s existing fallback for that — inherited from `TokenStore`'s established
+pattern, not new here — silently deletes and recreates the prefs file the moment that happens:
+
+```kotlin
+private val prefs: SharedPreferences? = open(context) ?: run {
+    context.deleteSharedPreferences(SYNC_PREFS)
+    open(context)
+}
+```
+
+That delete-and-recreate is the right recovery — the alternative is a permanently undecryptable
+file and a device stuck in memory-only mode forever, worse than losing one token — but until now
+it was invisible: a `Log.w("SyncTokenStore", "Encrypted prefs unavailable...")` nobody would
+ever see, then a silently empty store. This is very likely the actual mechanism behind "the
+phone shows nothing linked": not something tied to updating per se, but a Keystore hiccup that
+happened to get noticed after one.
+
+**Fix: `SyncTokenStore.recoveredFromReset` is `true` whenever this fallback fired**, and
+`SyncSession.init` checks it and sets `lastError` (D173's mechanism, for free) to an explanation
+distinct from the 401 message — this is a local storage event, not a revoked pairing. Doesn't
+prevent the underlying Keystore failure (that's outside this app's control) or guarantee it
+won't recur, but the next time it happens, Mike sees why on the very next launch instead of
+discovering it days or weeks later by noticing Continue Listening had quietly stopped merging.
+
+Deliberately Android-only — macOS stores the token in Keychain via `SystemKeychain`, not an
+encrypted-prefs file with this specific delete-and-recreate shape, and Keychain access failures
+there manifest as the interactive re-authorization prompt D147/D166-D172 already documented, not
+silent data loss.
+
+**Testing.** `testDebugUnitTest` green. No test added for the fallback path itself — `open()` is
+private and forcing a real `EncryptedSharedPreferences.create` failure isn't something
+Robolectric's Keystore shadow can easily simulate, and neither the pre-existing `SyncTokenStore`
+nor `TokenStore` tests exercise that branch either, so this doesn't leave a new gap relative to
+established coverage.
+
+## Iteration 38 — a 30+ second Android resume traced to one un-parallelized fetch (D175)
+
+### D175 — `resolveLocalPlaylistTracks` fetches distinct shows/tapes concurrently, not one at a time
+
+Mike reported resuming playback on Android taking 30+ seconds even on good wifi, much slower
+than phish.in itself or any other media app. Tracing the resume path (`PlayerViewModel.resume`
+→ `playShow`/`playPlaylist`/`playRecording` → `start()` → Media3) showed the ordinary
+single-show/playlist/recording resume does exactly one API call before `ExoPlayer.prepare()`,
+and a direct timing check against phish.in's own API put a single `show()` fetch under 200ms —
+neither explains a 30-second stall on its own.
+
+The actual mechanism was `resolveLocalPlaylistTracks` (`LocalPlaylist.kt`), the function that
+rebuilds a local playlist's (D161, #12) queue by refetching every distinct show/tape its tracks
+belong to, since neither backend has a fetch-by-id endpoint. It used Kotlin's stdlib
+`Iterable<K>.associateWith { suspendingSelector }` — which is a `for` loop that awaits each
+call before starting the next, not a fan-out. A "favorites across years" playlist spanning N
+distinct shows paid N *sequential* HTTP round trips — at roughly half a second apiece including
+TLS and JSON parsing, 30–60 distinct shows reproduces a 30+ second stall purely from
+serialization, independent of bandwidth. This is exactly the kind of playlist the "good wifi,
+still 30+ seconds" report describes, and it's also why the comparison to phish.in itself and to
+other media apps felt so stark — neither has an equivalent cross-show mixtape feature to be slow
+at.
+
+**Fix:** both fan-outs (the phish.in per-date fetch and the Relisten per-show-per-tape fetch)
+now use `coroutineScope { refs.map { async { ... } }.awaitAll() }` instead of `associateWith`,
+so all distinct shows/tapes resolve in parallel and the wall-clock cost is one round trip, not N.
+The two backends still run as two sequential *stages* (Relisten needs its artist list resolved
+before it can look up shows), but within each stage every distinct show/tape fetches
+concurrently.
+
+**Testing.** Added `` `a playlist spanning several shows resolves each show correctly when
+fetched concurrently` `` to `LocalPlaylistResolveTest.kt`, using a custom `MockWebServer`
+`Dispatcher` that routes by request path rather than enqueue order — proving each show still
+resolves to its own track regardless of what order the now-concurrent requests actually arrive
+in, which a plain FIFO `enqueue()` sequence couldn't have verified once the fetches stopped
+being sequential. `testDebugUnitTest` green, 327 tests.
+
+## Iteration 39 — D175 didn't explain Mike's actual case, so instrument before guessing again (D176)
+
+### D176 — Timing/connection-reuse logging on `PhishInApi`/`RelistenApi`, not a speculative fix
+
+D175 fixed a real bug, but Mike clarified his 30+ second resume wasn't a local (mixtape)
+playlist — it was resuming a recent, ordinary play. Re-tracing that path found nothing
+provably broken: `PlayerViewModel.resume()` makes exactly one `PhishInApi.show()`/`playlist()`
+call for `QueueKind.SHOW`/`PLAYLIST` (two sequential calls for `RECORDING`, needing the artist
+list before the tape), `MediaItems.kt`'s `showTrackItems`/`playlistTrackItems`/
+`recordingTrackItems` are pure in-memory mappers with no per-track fetches, `PlaybackService`
+does nothing blocking in `onCreate`, and a direct `curl` against phish.in's `/shows/{date}`
+endpoint returned under 200ms every time.
+
+**The one candidate that fits "30+ seconds, good wifi" and isn't ruled out:** both
+`PhishInApi` and `RelistenApi` (`Api.kt`, `Relisten.kt`) hold a process-lifetime `OkHttpClient`
+with a 30s read timeout, OkHttp's default connection pool, and no ping/health-check. If the
+process sits backgrounded a while (screen off, radio doze, a router/carrier NAT re-mapping an
+idle socket) — exactly the moment before someone taps "resume a recent play" — the pooled
+keep-alive connection can go silently dead. The next request writes fine but never gets a
+response, and nothing notices until the 30s read timeout fires; the retried request then
+succeeds in the same ~100-200ms `curl` already showed. That upper bound landing right at
+"30+ seconds" is what makes this the leading theory over anything else checked.
+
+Rather than tune timeouts against a guess, add just enough logging to confirm or kill it on
+Mike's own device next time it happens: `ApiTiming.kt`'s `TimingEventListener` (attached to
+both clients via `eventListenerFactory`) logs each call's connection-acquired timing and
+whether the connection was reused or freshly opened, plus elapsed time on completion/failure —
+the reused-without-a-fresh-connect signal is the direct proof of a stale pooled socket.
+`PlayerViewModel.resume()` also now logs its own elapsed time and, for the first time, logs
+failures instead of silently swallowing them via `runCatching` — and `start()` logs when a tap
+arrives before `MediaController` has finished connecting (a separate, real gap found during
+this pass: that tap is currently dropped with no feedback and no retry).
+
+**Testing.** The `TimingEventListener`'s `Log.d`/`Log.w` calls run inside `ApiRequestTest`,
+`RelistenRequestTest`, and `SearchFanOutTest` — none of which use Robolectric, so they hit the
+unmocked `android.util.Log` stub, which throws rather than logging. Wrapped only those calls in
+`runCatching` (real device logging is unaffected; `Log` never throws there) rather than adding
+Robolectric to tests that were deliberately kept lightweight. No new tests — this is
+diagnostic-only and changes no resume behavior. `testDebugUnitTest` green, 327 tests
+(unchanged).
+
+## Iteration 40 — Space play/pause never fired (#84, D177)
+
+### D177 — bare Space is an `NSEvent` monitor, not a SwiftUI `keyboardShortcut`
+
+D166 wired Play/Pause to `.keyboardShortcut(.space, modifiers: [])` on the Playback
+`CommandMenu`, matching Music/Podcasts. That shortcut never actually arrived at the action
+once a `List` had focus — which is the app's usual state (sidebar, artists, shows, history).
+SwiftUI delivers Command-modified shortcuts fine (⌘→ / ⌘← still work); it does not deliver
+bare Space, because AppKit treats that key as "activate the focused control." Mike filed it
+as a high-priority bug (#84).
+
+Fix is a local `NSEvent` keyDown monitor on `Player` (`SpacePlaybackHotkey.swift`): swallow
+bare Space and call `togglePlayPause()`, except when the first-responder chain is an
+`NSTextView`/`NSTextField` (Search, Settings, playlist naming) or an AppKit modal is up
+(those still need Space for the default button). Held-Space repeats are swallowed without
+toggling, so holding the key doesn't stutter. The menu item stays, without a
+`.keyboardShortcut(.space)` — leaving that in place would steal Space from Search even after
+the monitor declined to handle it.
+
+**Testing.** `macos/CouchTour` still has no unit test target; this is the same UI-code
+constraint D166 documented. Policy is a small pure helper (`isBareSpace` /
+`isEditingText` / `shouldHandle`) so a later app-target test can pin it without spinning up
+`AVQueuePlayer`. Verified by compiling the app target.
+
+## Iteration 41 — Persistent toggle to skip filler tracks (#49, D178)
+
+### D178 — Filler track detection and playback queue filtering on Android and macOS
+
+Neither phish.in nor Relisten exposes a structured segment-type flag, so filler tracks (intro,
+outro, tuning, stage banter, chatter, crowd noise, announcements, encore break) are identified via
+keyword and compound title heuristics (`isFillerTrack(title)` in Kotlin and Swift CouchTourKit).
+Real music tracks — including Grateful Dead's "Drums" and "Space", Phish's "Divided Sky", "The
+Curtain With", "Tweezer Reprise", etc. — are preserved.
+
+**Queue filtering behavior:**
+- Off by default (`skipFiller = false`).
+- Stored persistently via `SharedPreferences` on Android (`PlaybackSettings.kt`) and `UserDefaults`
+  on macOS (`PlaybackSettings.swift`).
+- When enabled, filler tracks are omitted during playback queue construction (`MediaItems.kt` /
+  `PlayerViewModel.kt` on Android, `Player.swift` / `filterPlaybackTracks` on macOS).
+- If starting playback from index 0 and track 0 is filler (e.g. an "Intro" or "Tuning" track),
+  playback automatically advances to the first non-filler track.
+- If the user explicitly taps a filler track from the show track list, that track is retained at the
+  start index so it plays immediately, while subsequent filler tracks in the queue are skipped.
+- Browse UI and setlists continue to display all tracks normally.
+
+**UI Controls:**
+- Android: Toggle switch under a new "Playback" section on `HomeScreen`.
+- macOS: Toggle switch under a new "Playback" tab in `Settings` (⌘,), and under the `Playback`
+  menu bar menu.
+
+**Testing:**
+- Swift (`CouchTourKitTests`): `FillerTrackTests.swift` testing keyword heuristics and playback
+  filtering; 210/210 tests passing.
+- macOS app target (`xcodebuild`): Debug and Beta schemes built and verified.
+- Android (`FillerTracksTest.kt`): unit tests for title heuristics, queue filtering, and
+  preference persistence; 332/332 tests passing.
+
+## Iteration 42 — hardware play/pause still went to Spotify (D179)
+
+### D179 — macOS media keys follow `playbackState`, not whoever is making sound
+
+D107 registered `MPRemoteCommandCenter.shared()` and published `nowPlayingInfo`, and the
+Control Center widget's pause button did pause Couch Tour when that widget was showing us.
+The keyboard play/pause key (F8 / the dedicated media key) is a different path: macOS
+routes it to whichever app last set `MPNowPlayingInfoCenter.playbackState = .playing`.
+Spotify sets that even while paused in the background. We never set `playbackState` at
+all — on macOS the system does not infer it from `AVPlayer` the way iOS does — so the
+key kept going to Spotify while Couch Tour was the thing actually playing. (`MPNowPlayingSession`
+looks like the right API for this and is what iOS 16+ uses; it is unavailable on macOS.)
+
+Fix (`Player.swift`): set `playbackState` to `.playing` / `.paused` / `.stopped` next to
+the existing metadata, and re-assert `.playing` whenever we start or resume so we take
+the slot back if Spotify held it. Remote commands stay on `.shared()`. Space (#84 / D177)
+is unchanged — that key never goes through Now Playing.
+
+**Testing.** Same app-target constraint as D166/D177. Verified by compiling and installing
+Couch Tour Beta; confirming the media key pauses Couch Tour while Spotify is open in the
+background is the live check.
+
+## Iteration 43 — Build version visibility on main UI and Settings (D181)
+
+### D181 — Surfacing build version on macOS and Android main UI and Settings
+
+Previously, build version information was only visible after scrolling to the bottom of the Home screen on Android or under the Sync tab in Settings on macOS.
+
+**1. Main UI Visibility:**
+- **Android**: `HomeScreen`'s top title header now displays `BuildConfig.VERSION_NAME` alongside the app title ("Couch Tour").
+- **macOS**: `RootView`'s sidebar displays `Bundle.main.appVersionString` (e.g. "Couch Tour 0.1" / "Couch Tour Beta 0.1") in a `.safeAreaInset(edge: .bottom)` footer.
+
+**2. Settings Visibility:**
+- **Android**: `SyncScreen` (and the existing `HomeScreen` settings section) includes the centered version footer.
+- **macOS**: All tabs in the `Settings` window (`PlaybackSettingsView`, `AccountView`, `SyncView`) consistently include the version footer at the bottom.
+
+**Testing:**
+- Swift unit tests (`swift test`): 210/210 passing.
+- macOS Xcode targets (`CouchTour` and `CouchTourBeta`): debug builds succeeded.
+- Android unit tests (`./gradlew testDebugUnitTest`): 332/332 passing.
+
+## Iteration 44 — Visual indicators for listened tracks and completed shows (D182)
+
+### D182 — Tracking listened tracks and completed shows
+
+Per Issue #83:
+- **Track Listened State**: A track is considered "listened to" when playback reaches $\ge 90\%$ of total duration. Track IDs are persisted in `SharedPreferences` via `ListenedTracks.kt` and surfaced across the app as a subtle checkmark (`Icons.Default.Check`) next to the track number or title in `TrackRow`, `RecordingTrackRow`, search track results, local playlists, and liked tracks.
+- **Show Completion**: A show is marked `finished = true` in `Progress` when ExoPlayer reaches `STATE_ENDED` or when the last non-filler track in the queue finishes ($\ge 90\%$). Completed shows display a completed checkmark / "DONE" badge across show lists, headers, search results, liked shows, and anniversary cards.
+
+**Testing:**
+- Android unit tests (`ListenedTracksTest.kt`, `ProgressDaoTest.kt`, `MigrationTest.kt`, full suite): 334/334 passing.
+- macOS unit tests (`swift test`): 210/210 passing.
+
+## Iteration 45 — Desktop personal-library and account parity (#56–#59, D180)
+
+Closing out the personal-library and account parity cluster on macOS ([DESKTOP-PARITY-PLAN.md](DESKTOP-PARITY-PLAN.md)):
+
+### D180 — Cross-backend local playlists on macOS with concurrent track resolution (#59)
+
+- **#59 Local playlists**: Adds `local_playlists` and `local_playlist_tracks` GRDB tables to `phishin.db` via `LocalPlaylistStore(sharing:)`.
+- **Queue Key**: Adds `.localPlaylist` (`"local-playlist:<uuid>"`) `QueueKind`, maintaining byte-identical parity with Android.
+- **Resolution**: `resolveLocalPlaylistTracks` groups stored track references by distinct show/tape and resolves distinct shows concurrently (D175 parity), skipping unresolvable references cleanly.
+- **UI**: Added a "Playlists" sidebar section, playlist detail view (play-from-here, remove, delete), and "Add to Playlist" popover on track rows.
+
+**Testing:**
+- `swift test`: 210/210 passing.
+- `xcodebuild`: Both `CouchTour` and `CouchTourBeta` debug schemes succeeded.
+
+## Iteration 46 — Like button on the Now Playing surface (#63, D183)
+
+### D183 — Track likes surfaced directly on Now Playing and MiniPlayer
+
+Per Issue #63, liking a track previously required being on a track-row list screen that directly held a `Track` or `PlayableTrack`. `PlayerState` on Android carried no track ID, backend discriminator, or like metadata.
+
+**Android:**
+- `MediaItems.kt`: `coreMediaItem` attaches `track_id`, `backend`, `liked`, and `likes_count` into `MediaMetadata.extras` bundles across `mediaItem`, `recordingMediaItem`, and `localPlaylistTrackItems`.
+- `PlaybackService.kt`: `Keys` includes `BACKEND`, `TRACK_ID`, `LIKED`, `LIKES_COUNT`, and exposes them in `Keys.ALL` for Cast / session propagation.
+- `PlayerViewModel.kt`: `PlayerState` includes `trackId: String?`, `backend: String?`, `likedByUser: Boolean`, `likesCount: Int`, read from current media item metadata in `refresh()`.
+- `MainActivity.kt`: `LikeButton` (phish.in account-gated with count) and `LikeTrackButton` (Relisten local like) exposed internally and embedded in `MiniPlayer`.
+- `NowPlaying.kt`: `NowPlayingScreen` displays `LikeButton` or `LikeTrackButton` inline with track/show title metadata.
+
+**macOS:**
+- `NowPlayingInspector.swift`: Displays `TrackLikeButton` for active `player.currentTrack` in the inspector header.
+- `MiniPlayerView.swift`: Displays `TrackLikeButton` directly in the persistent transport bar alongside track/show titles.
+- As requested, `macos/CouchTour/Player.swift` was left untouched.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 336/336 tests passing (including new like metadata extras tests in `MediaItemsTest.kt`).
+- macOS Swift package tests (`swift test`): 210/210 tests passing.
+- macOS app build (`xcodebuild`): Build succeeded.
+
+## Iteration 47 — Local playlist editing: rename & manual reorder (#69, D184)
+
+### D184 — Local playlist management (rename and track reordering)
+
+Follow-up to #12 and #59: Local playlists originally shipped with append and remove only.
+
+**Android:**
+- `LocalPlaylist.kt`: Added `renamePlaylist`, `updateTrackPosition`, and `reorderTracks` to `LocalPlaylistDao`. `reorderTracks` updates track `position` indices sequentially in a single `@Transaction` and updates `updatedAt`.
+- `PlayerViewModel.kt`: Added `renameLocalPlaylist`, `reorderLocalPlaylistTracks`, and `moveLocalPlaylistTrack`.
+- `MainActivity.kt`: Added `RenamePlaylistDialog`, a rename button in `LocalPlaylistScreen`'s header, and Move Up (`Icons.Default.KeyboardArrowUp`) / Move Down (`Icons.Default.KeyboardArrowDown`) buttons on each playlist track row.
+- `LocalPlaylistDaoTest.kt`: Unit tests for `renamePlaylist` and `reorderTracks`.
+
+**macOS:**
+- `LocalPlaylist.swift`: Added `renamePlaylist(id:name:now:)` and `reorderTracks(playlistId:orderedRowIds:now:)` to `LocalPlaylistStore`.
+- `LocalPlaylistTests.swift`: Unit tests for `renamePlaylist` and `reorderTracks`.
+- `LocalPlaylistView.swift`: Added Rename button in toolbar (`RenamePlaylistSheet`), drag-and-drop `.onMove` reordering, Move Up/Down buttons, and row context menus.
+
+## Iteration 48 — Live refresh for Sync device list (#64, D185)
+
+### D185 — Polling & manual refresh for paired sync device list
+
+Per Issue #64, both `SyncView.swift` (macOS) and `SyncScreen` (Android) previously only fetched `devices()` on initial mount or upon local pairing changes. When another device joined or was revoked elsewhere, the device list did not update until the screen was closed and reopened.
+
+**Android:**
+- `MainActivity.kt`: Added a periodic polling `LaunchedEffect(paired)` that triggers a refresh every 5 seconds while paired and viewing `SyncScreen`. Added a manual refresh `IconButton` (`Icons.Default.Refresh`) in the Devices section header.
+
+**macOS:**
+- `SyncView.swift`: Switched `.task` to `.task(id: syncSession.paired)` with a 5-second polling loop while paired and active. Added an explicit refresh button (`Image(systemName: "arrow.clockwise")`) in the Devices section header.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 338/338 tests passing.
+- macOS Swift package tests (`swift test`): 212/212 tests passing.
+- macOS app target build (`xcodebuild`): Build succeeded.
+
+## Iteration 49 — Unified Android Auto browse hierarchy (#28, D186)
+
+### D186 — Unified artist catalog on Android Auto
+
+Per Issue #28 and [MULTI-ARTIST-PLAN.md](MULTI-ARTIST-PLAN.md), Android Auto previously separated Phish into a top-level "Years" root while "Artists" only listed Relisten bands.
+
+- `Catalog.kt`: Made `loadArtistsByBackend()` an `internal suspend fun` shared between `MainActivity.kt` and `PlaybackService.kt`.
+- `PlaybackService.kt`:
+  - `onCreate()` initializes `Favorites.init(this)` so favorite keys are ready for head-unit browsing.
+  - `rootChildren()` exposes "Artists" as the single unified catalog root alongside "Continue Listening".
+  - `artistsChildren()` loads the merged artist catalog (`loadArtistsByBackend()` + `mergeArtists`), pinning Phish and favorited artists first, followed by Relisten artists sorted by show count.
+  - `artistPeriodsChildren`, `artistShowsChildren`, and `recordingChildren` route Phish uniformly through `BrowseNode.Artist("phishin", "phish")` and `PhishInSource`.
+  - Legacy `BrowseNode.Years` nodes remain parseable for backwards compatibility with stale or cached head-unit IDs.
+- `BrowseTest.kt`: Added tests verifying roundtrip parsing of unified `BrowseNode.Artist("phishin", "phish")` and child nodes.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 338/338 tests passing.
+- macOS Swift package tests (`swift test`): 212/212 tests passing.
+- macOS app target build (`xcodebuild`): Build succeeded.
+
+## Iteration 50 — FLAC Streaming & Post-Show Tour Stop Prompt (#27, #85, D187-D188)
+
+### D187 — FLAC streaming support with Cast MP3 fallback (#27)
+
+Per Issue #27, Relisten / archive.org sources often provide lossless FLAC streams via `flac_url`.
+
+- **Lossless Stream Resolution:**
+  - `RelistenSourceTrack` parses `flac_url` (nullable) alongside `mp3_url` in both Kotlin (`Relisten.kt`) and Swift (`RelistenAPI.swift`), propagating it through `PlayableTrack` (`Catalog.kt`, `Catalog.swift`).
+  - Local playback on Android (`MediaItems.kt`) configures ExoPlayer `MediaItem` with `flacUrl` and `MimeTypes.AUDIO_FLAC` when present, retaining `mp3_url` in extras.
+  - Local and AirPlay playback on macOS (`Player.swift`) passes `flacUrl` to `AVPlayerItem` for AVFoundation streaming.
+- **Intelligent Cast Fallback:**
+  - Google Cast hardware/receivers may fail on raw FLAC audio streams. In `Cast.kt` (`CastItemConverter`), media items with `flac_url` are transparently rewritten to stream `mp3_url` (`MimeTypes.AUDIO_MPEG`) to the receiver, preserving the lossless FLAC URL in `customData` so it can be restored when playback returns to local.
+
+### D188 — Post-show next tour stop prompt (#85)
+
+Per Issue #85 and the resolved decision in `ROADMAP.md` that playback must stop at the end of a show's encore rather than automatically rolling into an unrequested show, users now receive an interactive prompt to continue to the next consecutive stop on tour.
+
+- **Tour Stop Resolution:**
+  - Pure function `resolveNextConsecutiveShow(currentDate:tourName:candidateShows:)` determines the next chronological show in the same tour (or falls back to the next chronological show overall if the tour has completed or is untoured).
+  - Suspend/async helper `findNextTourStop(artist:currentDate:tourName:)` fetches surrounding period shows and resolves the next stop (`NextStop.kt`, `NextStop.swift`).
+- **Player & Surface Integration:**
+  - Android (`PlayerViewModel.kt`): Observes queue completion (`Player.STATE_ENDED`) and resolves the next tour stop into `postShowPrompt: StateFlow<ShowSummary?>`. Rendered as an interactive card in `NowPlayingScreen` (`NowPlaying.kt`) and `MiniPlayer` (`MainActivity.kt`) with "Play" and "Dismiss" actions.
+  - macOS (`Player.swift`): On queue draining in `currentItemDidChange()`, queries `findNextTourStop` and updates `@Published var postShowPrompt: ShowSummary?`. Rendered as an interactive banner in `NowPlayingInspector.swift` and `MiniPlayerView.swift`.
+
+### D189 — Audio quality indicators in Now Playing surfaces & Source Selector quality badges (#27 follow-up)
+
+Following up on FLAC streaming support (#27), users need clarity on whether lossless FLAC or progressive MP3 audio is currently playing, as well as the best available audio quality tier for each recording/source in multi-source tape pickers.
+
+- **Data Models:**
+  - `RecordingRef` on both Android (`Catalog.kt`) and macOS (`Catalog.swift`) carries `hasFlac: Boolean`/`Bool = false`.
+  - `RelistenSource.toRecordingRef()` (`Relisten.kt`, `RelistenAPI.swift`) inspects track metadata across source sets (`sets.any { ... flacUrl.isNotBlank() }`) to populate `hasFlac`.
+  - `PlayerState` on Android (`PlayerViewModel.kt`) provides `audioFormat` (`"FLAC"` vs `"MP3"`) and `isFlac: Boolean`.
+- **UI Surfaces:**
+  - **Now Playing & MiniPlayer**:
+    - Android (`NowPlaying.kt`, `MainActivity.kt`): `AudioQualityBadge` renders format badge ("FLAC" in secondary container, "MP3" in surface variant) in `NowPlayingScreen` and `MiniPlayer`.
+    - macOS (`NowPlayingInspector.swift`, `MiniPlayerView.swift`): Renders green "FLAC" badge or secondary "MP3" badge in the inspector and mini player bar.
+  - **Source / Tape Selectors**:
+    - Android (`MainActivity.kt`): `SourceRow` inside `SourcePicker` bottom sheet and `recordingLabel` display a "FLAC" or "MP3" badge alongside "SBD" / "Matrix?".
+    - macOS (`ShowDetailView.swift`): `sourceRow` and `SourceRow` inside `SourcePicker` popover display "FLAC" or "MP3" badge next to source labels.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 344/344 tests passing.
+- macOS Swift package tests (`swift test`): 216/216 tests passing.
+- macOS app target build (`xcodebuild`): Build succeeded (`CouchTour`).
+
+## Iteration 51 — Next Couch Tour Stop Tour Picker for Defunct Artists (#68, D190)
+
+### D190 — Next Couch Tour Stop Tour Picker for Defunct Artists (#68)
+
+For defunct or non-touring artists (such as the Grateful Dead), the latest shows in the archive are often marked with the sentinel `"Not Part of a Tour"` rather than belonging to an active touring cycle. Previously, such artists either opted out of the Next Couch Tour Stop shelf entirely or had untoured standalone shows fall back arbitrarily.
+
+To give users full control over which era, tour, or year they want to track on the Next Couch Tour Stop shelf for any artist:
+
+- **Schema Migration v9:**
+  - **Android (Room):** `MIGRATION_8_9` in `Progress.kt` adds table `artist_tour_preferences` (`artist_key` TEXT PRIMARY KEY, `tour_name` TEXT, `year` TEXT, `updated_at` INTEGER NOT NULL).
+  - **macOS (GRDB):** Migration v9 in `ProgressStore.swift` creates `artist_tour_preferences` table with matching schema and constraints.
+- **Preference Storage & DAOs:**
+  - `ArtistTourPreferenceEntity` and `ArtistTourPreferenceDao` (`Progress.kt`) provide CRUD operations (`getPreference`, `getAllPreferences`, `setPreference`, `deletePreference`).
+  - `ArtistTourPreference` (`ProgressStore.swift`), persisted via `ProgressStore.saveTourPreference`/`getTourPreference`/etc., not a separate store class.
+- **NextStop Resolution Engine:**
+  - `NextStop.kt` & `NextStop.swift`: `tourFor` checks for a configured preference. If a specific `tour_name` is selected, all candidate periods are queried to find matching tour shows. If a specific `year` is selected, candidate shows are fetched from that year's period. If no preference is set, the engine falls back to standard `recentPeriods(TOUR_PERIODS)` and `currentTourShows`.
+  - Cache key `NextStop.cacheKey` incorporates sorted artist keys and preference mappings (`artist_key:tour_name:year`) so network caches invalidate immediately when preferences change.
+- **Interactive Tour Picker UI:**
+  - **Android:** `TourPickerDialog` in `MainActivity.kt` provides a searchable dialog allowing users to pick from past tours or individual years for any defunct or favorited artist.
+  - **macOS:** `TourPickerSheet.swift` provides a native SwiftUI sheet for selecting tours and years with instant persistence.
+
+## Iteration 52 — Unified Tag Model & Normalization across Phish.in and Relisten (#67, D191)
+
+### D191 — Unified Tag Model & Normalization across Phish.in and Relisten (#67)
+
+Live music archives feature rich metadata descriptors—such as soundboard recordings, matrix sources, guest appearances, and bustouts. However, Phish.in exposes explicit structured tag endpoints while Relisten expresses source properties via boolean flags and taper notes.
+
+- **Unified Domain Model:**
+  - `TagRef` and `Tag` domain models (`Catalog.kt`, `Catalog.swift`) represent unified tag descriptors with `name: String`, `description: String?`, `color: String?`, and `priority: Int`.
+- **Phish.in Tag Ingestion:**
+  - `PhishInAPI` and `Api.kt` ingest native tags from `phish.in/api/v2/tags` and nested show / track metadata, mapping them directly to `TagRef` collections on `ShowSummary`, `ShowDetail`, and `PlayableTrack`.
+- **Relisten Synthetic Tag Normalization:**
+  - `deriveSyntheticTags(isSoundboard, looksLikeMatrix, hasFlac)` generates standardized synthetic tags across Relisten sources and recordings:
+    - `"SBD"` (priority 100): Soundboard recording
+    - `"Matrix"` (priority 90): Matrix recording (SBD + AUD)
+    - `"FLAC"` (priority 80): Lossless FLAC audio stream
+- **Tag Filtering & Discovery Surfaces:**
+  - `filterByTag(tagName)` / `filterShowsByTag` / `filterTracksByTag` provide pure, platform-neutral filtering across show and track lists.
+  - Interactive horizontal tag filter chip bars integrated into Show listings (`ShowsView.swift`, `MainActivity.kt`), Search surfaces (`SearchView.swift`), and Show detail headers.
+
+## Iteration 53 — Recency-Weighted Momentum & Trending Sort (#21, D192)
+
+### D192 — Recency-Weighted Momentum & Trending Sort across 48h, 7d, 30d time windows (#21)
+
+Relisten tracks multi-window listening velocity and trending metrics for archival recordings, but these signals were previously unused for catalog discovery.
+
+- **Popularity & Momentum Data Model:**
+  - `Popularity` model on Android (`Catalog.kt`) and macOS (`Catalog.swift`) encapsulates `momentumScore`, `trendRatio`, `hotScore48h`, `hotScore7d`, and `hotScore30d`.
+  - Parsed from Relisten API v2/v3 responses (`Relisten.kt`, `RelistenAPI.swift`) and mapped onto `ShowSummary` and `ShowDetail`.
+- **Multi-Window Sorting Modes:**
+  - `ShowSortMode` enum provides comprehensive sorting algorithms:
+    - `DATE_ASC` ("Date (Oldest)") / `DATE_DESC` ("Date (Newest)")
+    - `TOP_RATED` ("Top Rated"): sorted by rating descending, tie-broken by date.
+    - `TRENDING_48H` ("Trending (48h)"): sorted by 48-hour velocity (`hotScore48h`), tie-broken by `momentumScore`, `rating`, `date`.
+    - `HOT_7D` ("Hot (7d)"): sorted by 7-day velocity (`hotScore7d`), tie-broken by `momentumScore`, `rating`, `date`.
+    - `POPULAR_30D` ("Popular (30d)"): sorted by 30-day velocity (`hotScore30d`), tie-broken by `momentumScore`, `rating`, `date`.
+    - `MOMENTUM` ("Momentum"): sorted by overall momentum score (`momentumScore`), tie-broken by `hotScore48h`, `rating`, `date`.
+- **UI Surfaces:**
+  - Sort mode selectors and menus in `MainActivity.kt` and `ShowsView.swift` / `PeriodsView.swift`.
+  - Visual momentum indicators (e.g. `⚡ 12.4` and `★ 4.8`) rendered on show rows, cards, and detail headers.
+
+## Iteration 54 — Deterministic Procedural Show Artwork & Cassette Graphics (#62, D193)
+
+### D193 — Deterministic Procedural Show Artwork & Cassette Graphic Placeholders (#62)
+
+Live concert recordings in Relisten and archive.org lack standardized square album artwork, previously falling back to generic grey placeholder icons across browse grids, player views, and notifications.
+
+- **Deterministic Procedural Artwork Generation:**
+  - Implemented `Artwork.kt` (Android / Jetpack Compose) and `Artwork.swift` (macOS SwiftPM / SwiftUI) with pure deterministic generators (`ShowArtworkGenerator`, `ArtworkPalette`).
+  - Uses 64-bit FNV-1a hashing on seed strings composed of normalized artist names and show dates (`"artist:yyyy-MM-dd"`).
+- **Curated & Procedural Palettes:**
+  - Curated distinct color schemes for iconic live bands (Grateful Dead psychedelic amber/rose/indigo, Jerry Garcia Band burgundy/gold, Phish aqua/purple, Goose neon teal, Billy Strings bluegrass cedar).
+  - 12 procedural fallback palettes derived from vintage concert posters, light shows, and cassette tape aesthetics.
+- **Procedural Cassette & Concert Poster Graphics:**
+  - Renders vintage cassette J-card tape shells, magnetic spools, textured header stripes, and stylized date/venue typography directly on canvas.
+  - Replaces all generic placeholder icons across Browse views (`ShowsView`, `ArtistsView`, `PeriodsView`), Show Details (`ShowDetailView`), History, Continue Listening, MiniPlayer, and Now Playing surfaces.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 461/461 tests passing.
+- macOS Swift package tests (`swift test`): 346/346 tests passing.
+- macOS Xcode project generation (`xcodegen generate`): Verified clean project generation.
+
+## Iteration 55 — macOS Home Screen & Feature Parity with Android (D194)
+
+### D194 — Native macOS Home Dashboard & Discovery Parity
+
+Brought the macOS client to full feature parity with Android's home dashboard:
+
+- **Anniversary Engine (`OnThisDate.swift`):**
+  - Added concurrent multi-artist fetching for historical shows matching today's calendar date across favorited Phish and Relisten artists.
+  - Implemented phish.in chunked batch querying under the 900-show request limit, with in-memory caching and automatic invalidation.
+- **1-Click "Surprise Me" Player (`Catalog.swift`):**
+  - Added `pickRandomShow(artists:source:)` for instantaneous random concert discovery and playback.
+- **Native macOS Home Screen (`HomeView.swift`):**
+  - Header with "Surprise Me" action.
+  - Horizontal card carousels for "Continue Listening" and "On This Date".
+  - "Next Couch Tour Stop" card resolving unplayed tour shows with `TourPickerSheet` for configuring historical tours.
+  - "Favorite Artists" grid with show counts and star toggles.
+  - "Library & Explore" navigation shortcuts (Browse Artists, Playlists, History).
+  - "Settings & Status" overview with live phish.in connection, skip filler toggle, and device sync status.
+- **Root Navigation Integration (`RootView.swift`, `AppModel.swift`):**
+  - Added `.home` ("Home", `house` icon) as the default top destination in `SidebarSection`.
+
+## Iteration 56 — macOS Auto-Updates with Sparkle 2.x & GitHub Release Packaging (#60, D195)
+
+### D195 — Sparkle 2.x Auto-Updates, Appcast Channels, and Ad-Hoc Library Validation
+
+Implemented native background auto-updates and manual update checks for distributed macOS binaries (#60).
+
+- **Sparkle 2.x Framework Integration (`Updater.swift`, `project.yml`):**
+  - Integrated `Sparkle` 2.6.4 Swift Package into `CouchTour` (Production) and `CouchTourBeta` (Beta) schemes.
+  - Wrapped `SPUStandardUpdaterController` in `UpdaterViewModel` (`Updater.swift`) exposing published `canCheckForUpdates` and `automaticallyChecksForUpdates`.
+  - Configured appcast channels and public EdDSA signing keys in `Info.plist`:
+    - Production Feed: `https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml`
+    - Beta Feed: `https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml`
+    - `SUEnableAutomaticChecks: true`
+- **UI Surfaces:**
+  - Added "Check for Updates..." to the macOS application menu (`CommandGroup(after: .appInfo)` in `CouchTourApp.swift`).
+  - Added "Software Updates" section with automatic checks toggle in Settings window (`PlaybackSettingsView.swift`).
+  - Added "Check for Updates..." action in the sidebar footer (`RootView.swift`).
+- **Ad-Hoc Signing & Library Validation:**
+  - Set `com.apple.security.cs.disable-library-validation: true` and deep code-signing (`codesign --force --deep --sign -`) in `install.sh` / `install-beta.sh` so ad-hoc signed local builds load embedded `Sparkle.framework` without dyld signature validation crashes.
+- **Automated GitHub Release Packaging (`macos-release.yml`):**
+  - Added GitHub Actions workflow to build release `.app` bundles, package into `.zip` archives, and upload binaries alongside `appcast.xml` to GitHub Releases.
+
+## Iteration 57 — Desktop Cast & AirPlay Sender Integration on macOS (#10, D196)
+
+### D196 — Google Cast Sender Protocol, Bonjour Discovery, and AirPlay Route Selection (#10)
+
+Brought full remote casting capabilities to Couch Tour's macOS desktop client, mirroring the Android Cast implementation (D58, D62, D64, D68, D81, D187):
+
+- **Portable Google Cast Domain & Protocol Engine (`CouchTourKit`):**
+  - `CastModels.swift`: `CastDevice`, `CastKeys`, and `CastMediaStatus` models.
+  - `CastItemConverter`: Formats track/show metadata and queue items into Cast receiver media dictionaries, with lossless FLAC-to-MP3 fallback stream URL rewrite while preserving `flac_url` in `customData` (D187).
+  - `CastCodec.swift`: Pure Swift encoder/decoder for Google Cast V2 framing (4-byte length prefix + Protobuf packet binary + JSON payloads).
+  - `CastPlaybackStateMachine.swift`: Manages connection lifecycle, request sequencing, heartbeat pings/pongs, receiver status negotiation, media transport commands, and track finish events.
+- **macOS Discovery & TLS Connection (`macos/CouchTour`):**
+  - `CastDiscovery.swift`: Uses Network.framework `NWBrowser` for Bonjour DNS-SD (`_googlecast._tcp.local.`), parsing TXT records (`fn`, `md`, `id`) into a reactive list of available Cast devices.
+  - `CastClient.swift`: Manages TLS `NWConnection` to port 8009 with custom SecTrust handling for Cast devices' self-signed certificates, driving the state machine and dispatching playback updates.
+  - `AirRoutePicker.swift`: Wraps `AVRoutePickerView` via `NSViewRepresentable` for routing audio to AirPlay receivers, Apple TVs, and HomePods.
+- **Player & Transport Integration (`Player.swift`):**
+  - Connects/disconnects Cast receiver sessions, transparently routing play/pause, skip next/previous, seeking, and volume.
+  - Pauses local `queuePlayer` while casting and keeps `ProgressRecorder` / `SyncSession` synchronized with remote playback ticks.
+  - Coming back from the TV lands paused (following D62).
+- **UI Surfaces & Menu Controls (`MiniPlayerView.swift`, `NowPlayingInspector.swift`, `CastRoutePicker.swift`, `CouchTourApp.swift`):**
+  - Added `CastRoutePickerButton` popover in MiniPlayer and Now Playing inspector with live discovered Cast receivers list and embedded AirPlay picker.
+  - Active "Casting to [Device Name]" badge with 1-click disconnect and device switching.
+  - Added "Disconnect Cast" action to macOS Playback menu.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 355/355 tests passing (+9 new Cast tests).
+- macOS Xcode project generation (`xcodegen generate`) and app target build (`xcodebuild`): Build succeeded (`CouchTour`).
+
+## Iteration 58 — phish.in Sign-In Fix on macOS Clients (D197)
+
+### D197 — Unauthenticated Login Requests, Email Whitespace Sanitization, and Keychain Memory Fallback
+
+Fixed issues preventing phish.in account login on macOS clients:
+
+- **Unauthenticated Login Requests (`PhishInAPI.swift`):**
+  - `PhishInAPI.send` and `post` now support an `authenticated: Bool` flag (defaulting to `true`).
+  - `PhishInAPI.login` explicitly passes `authenticated: false`, preventing stale or expired `X-Auth-Token` headers from being sent with login credentials, which caused the backend to reject valid logins.
+- **Email Whitespace Sanitization (`AccountView.swift`):**
+  - Trimmed leading/trailing whitespace and newlines from email inputs before sending, matching Android's `Session.login(email.trim(), password)` behavior.
+- **In-Memory Keychain Fallback (`PhishInAuth.swift`):**
+  - Added `memoryJwt` and `memoryUsername` cache/fallback to `PhishInTokenStore`, matching Android's `TokenStore` in `Auth.kt`. If Keychain access encounters signature changes or authorization prompts, the active session is reliably retained in memory for the app's lifetime.
+- **Interactive Home Screen Status (`HomeView.swift`):**
+  - Wrapped "phish.in Account" and "Sync" status cards in `HomeView` with buttons presenting modal sheets for `AccountView` and `SyncView`.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 355/355 tests passing.
+- macOS app builds (`xcodebuild`): `CouchTour` and `CouchTourBeta` clean builds verified.
+
+## Iteration 59 — macOS Auto-Update Pipeline Fix: Key Rotation and CI-Automated Appcasts (D198)
+
+### D198 — Sparkle Key Rotation, Automated Signing, and Appcast Generation in CI
+
+Auto-update was silently non-functional since D195 shipped: `appcast.xml`/`appcast-beta.xml` were hand-written once and never updated on later releases, and neither had a `sparkle:edSignature` — Sparkle 2.x refuses any update that doesn't verify against `SUPublicEDKey`, so even a current appcast entry would have been rejected. The original private EdDSA key was never durably saved anywhere and could not be recovered.
+
+- **Key rotation (`macos/project.yml`):** Generated a new EdDSA keypair via Sparkle's `generate_keys` tool; `SUPublicEDKey` updated for both `CouchTour` and `CouchTourBeta` targets. Every existing install (including production betas already in the field) has the old public key baked into its `Info.plist` and can never trust anything signed with the new key — a one-time manual reinstall is required to get back onto the auto-update chain.
+- **CI-automated signing and appcast generation (`macos-release.yml`):** After building and uploading the release zip, a new step runs Sparkle's `generate_appcast` tool (bundled with the SPM package under `macos/build/SourcePackages/artifacts/sparkle/Sparkle/bin/`) against a staging directory containing the new zip and the existing appcast file, signing with the private key from the `SPARKLE_PRIVATE_KEY` repo secret (piped via `--ed-key-file -`, never written to disk). A following step checks out `main` and commits the regenerated `appcast.xml`/`appcast-beta.xml` directly, so the feed `SUFeedURL` points at (raw GitHub content on `main`) always reflects the latest signed release without a manual editing step.
+- **Build-number bug, the actual root cause (`macos-release.yml`):** `CURRENT_PROJECT_VERSION` (`CFBundleVersion`, exposed to Sparkle as `sparkle:version`) is hardcoded to `"1"` in `project.yml` for every build and was never overridden per-release — only `MARKETING_VERSION` was. Sparkle's update-availability check compares `sparkle:version`, not the human-readable `sparkle:shortVersionString`, so with every release reporting build `"1"`, Sparkle could never have perceived *any* release as newer than what's installed, independent of the signature/appcast problems above. Fixed by overriding `CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"` at `xcodebuild` time — monotonically increasing across every run of this workflow.
+- **Double `-beta` suffix (`macos-release.yml`):** since betas started being tagged `vX.Y-beta` (matching the release tag itself) rather than plain `vX.Y`, the version computation appended `-beta` to a `clean_ver` that already ended in `-beta`, producing `MARKETING_VERSION` values like `0.55-beta-beta`. Fixed by stripping a trailing `-beta` from `clean_ver` before reapplying it.
+- **Also fixed in the same pass (`macos-release.yml`):** the workflow's `xcodegen generate` step was producing a `.pbxproj` in `projectFormat: xcode16_0` (xcodegen's new default) that the runner's default Xcode 15.4 couldn't open ("future Xcode project file format (77)") — this had made every prior run of `macos-release.yml` fail before even reaching the signing/versioning problems above. Fixed by explicitly selecting the Xcode 16.2 install already present on the `macos-14` runner image.
+
+**Verification:** dispatched `macos-release.yml` for `v0.55-beta` end-to-end — build succeeded, zip uploaded, `appcast-beta.xml` regenerated with a valid `sparkle:edSignature` and a real incrementing `sparkle:version`, and committed to `main`.
+
+## Iteration 60 — macOS periodic progress tick fires while paused, clobbering a synced-in advance (D199)
+
+### D199 — `Player`'s `AVQueuePlayer` time observer gates `saveProgress` on `isPlaying`, matching Android
+
+Reported live by Mike: played Halley's Comet (Phish, 2026-07-27) on the Mac, then resumed and
+continued into the next track on Android the next day. Back at the Mac — left open and paused
+on Halley's Comet the whole time, never relaunched — Continue Listening still showed Halley's
+Comet even though Sync reported a successful round trip and a "just now" timestamp on the stale
+row. D172/D173 (the last two sync-staleness bugs) were both already fixed and correctly in
+place — `ContinueListeningView`/`HomeView` do reload on `syncSession.lastSyncedAt`, and a real
+sync failure would have surfaced via `lastError`. This was a third, different bug.
+
+**Root cause: `Player.observePlayer()`'s periodic time observer isn't gated on playback state.**
+`AVQueuePlayer.addPeriodicTimeObserver` keeps invoking its block on schedule even while
+`rate == 0` (paused) — a known AVFoundation behavior, not a bug in Apple's framework. The
+observer called `saveProgress(force: false)` unconditionally on every tick, which reaches
+`ProgressRecorder.saveTick` and — subject only to its 5s internal throttle, not to whether
+anything actually changed — rewrites the local `progress` row for the still-loaded, unmoving
+queue with a fresh `updatedAt = now()`. `ProgressRecorder`'s own doc comment already says the
+intended rule is "write every 5s *while playing*," but nothing enforced that; the periodic
+observer fired regardless.
+
+That stale-but-freshly-timestamped local row is exactly what broke sync: the next round trip's
+`changedSince(lastPushWatermark)` saw it as legitimately changed and pushed it to the server,
+where last-write-wins by `updatedAt` let it silently overwrite Android's genuinely newer
+progress — even though the Mac's own data was actually the *older* state. The sync itself
+worked correctly end to end; it just synced the wrong snapshot outward.
+
+**Android already has the right shape for this.** `PlaybackService.kt`'s equivalent tick
+explicitly checks `if (active.isPlaying) saveNow()` before writing anything on its 5s loop; this
+worktree's job (`desktop-android-parity`) is exactly to find and close gaps like this one where
+macOS diverges from an already-correct Android behavior.
+
+**Fix:** wrap the `saveProgress(force: false)` call inside the periodic time observer in
+`if self.isPlaying { ... }` ([Player.swift](macos/CouchTour/Player.swift)) — mirroring
+Android's gate. `positionMs` is still updated unconditionally (harmless — it doesn't move while
+paused), only the store write and its throttle-tracked `lastSaveTime` are skipped. All other
+`saveProgress(force: true)` call sites (play/pause toggle, track change, seek, cast handoff)
+are untouched — those are real events and are supposed to write immediately regardless of
+`isPlaying`.
+
+**Testing:** `swift test` — 355/355, unaffected (this bug lived entirely in the app-target
+`Player.swift`, which the SwiftPM package's own tests don't reach). `xcodebuild` succeeds. Not
+independently verified live beyond the build — the actual repro (leave a show loaded-paused
+overnight, advance it on another device, come back) takes real elapsed time to confirm; worth a
+manual check on the next beta.
+
+## Iteration 61 — macOS Home Screen UX Polish, Batch A (#97, #98, #100, #101, D200)
+
+### D200 — Tour Picker Reload Ordering, Starred-Artist Surprise Me, Continue Listening Split Targets, and a macOS Feedback Launcher
+
+Four independent Home-screen fixes filed from Mike's own testing of macOS beta v0.57-beta
+(2026-08-26), worked as Batch A of the macOS UX polish pass (see
+[prompts/macos-ux-polish-batches.md](prompts/macos-ux-polish-batches.md)).
+
+- **#100 — Next Stop shelf stale after saving a tour/year (`HomeView.swift`):**
+  `.sheet(item: $tourPickerArtist)` had no `onDismiss:`, so `TourPickerSheet.savePreference()`/
+  `clearPreference()` (both take the identical dismiss-without-reload shape) correctly
+  invalidated `NextStop`'s cache but nothing re-read it — `reloadDiscovery()` only ran on
+  `.task` and on `appModel.favorites.keys` changing, neither of which a tour preference save
+  touches. Fixed by adding `onDismiss: { await reloadProgress(); await reloadDiscovery() }`,
+  in that order — `reloadDiscovery()` reads `tourPreferences` from state, so it has to run
+  *after* `reloadProgress()` has refreshed that state, or it just recomputes the same stale
+  answer. **Android already invalidates correctly** — `MainActivity.kt`'s
+  `nextStopShows = loadOnce(Triple(today, favoritedArtists.keys, preferencesMap))` is keyed on
+  `preferencesMap`, itself `remember`'d off `getAllPreferences().collectAsState()`, a reactive
+  Room `Flow` — any DB write recomposes automatically. Left unchanged.
+- **#101 — "Surprise Me" pulls from starred artists, not the whole catalog (supersedes D157):**
+  Added `surpriseMeArtists(favorited:merged:)` to `Catalog.swift`/`Catalog.kt` — favorited when
+  non-empty, falling back to the full merged catalog otherwise. The fallback (rather than
+  disabling the button) was the deliberate call for the empty case: a first-run user with
+  nothing starred yet would otherwise find Surprise Me permanently dead, which is a worse
+  experience than the novelty-grade global draw D157 originally shipped. Both platforms agree.
+  `pickRandomShow` itself is unchanged — it already took whatever artist list it was handed.
+- **#98 — Continue Listening cards/rows split into two non-overlapping targets:**
+  `ResumeCardView` (`HomeView.swift`) and `ProgressRow` (`ContinueListeningView.swift`, also
+  used by `HistoryView.swift`) previously had exactly one meaning for the whole surface: resume.
+  Split so artwork/title/subtitle open the show page and a separate, much larger Resume button
+  (full-width below the text on the Home card; a `play.circle.fill` icon on sidebar/History
+  rows) resumes. Avoided the click-swallowing nesting the issue warned about (`Button` nested
+  in another `Button`'s or `NavigationLink`'s label loses clicks on macOS) by keeping the two
+  targets as *siblings* — the artwork is its own plain-style `Button`, Resume is a second,
+  separate `Button`, and the title/subtitle block uses `.onTapGesture` rather than a third
+  nested control — never one control inside another's label.
+  - Resolving a stored `PlaybackProgress` row to a navigable target needed a lookup, so added
+    `resolveNavigationTarget(for:localPlaylistStore:)` to `Resume.swift` rather than inventing a
+    second path: it reuses `resolveShowDetail` (the same resolution `resume(_:player:...)`
+    already does) for `.show`/`.recording` rows, taking `.summary` off the resulting
+    `ShowDetail`. Local playlists are the one case that can't reuse that path as-is —
+    `resolveShowDetail`'s `.localPlaylist` branch builds a synthetic `ShowSummary` (backend
+    `.phishin`, id `"local:<uuid>"`, date `"<n> tracks"`) meant for `Player.play(detail:)`, not
+    for `ShowDetailView`, which re-fetches by `artist.backend`/`date` and would call
+    `PhishInAPI.show(date: "<n> tracks")` — a guaranteed-failure request. So
+    `resolveNavigationTarget` checks `QueueRef.kind` first: a `.localPlaylist` row resolves via
+    a cheap local `LocalPlaylistStore.playlist(id:)` read and navigates to `LocalPlaylistView`
+    instead, the same destination `LocalPlaylistsView` already registers.
+  - Pushed via `.navigationDestination(item:)` bound to a `@State private var
+    resumeNavigationTarget: ResumeNavigationTarget?` (an enum over `.show`/`.localPlaylist`) in
+    each of `HomeView`, `ContinueListeningView`, and `HistoryView` — the value isn't known until
+    the async resolve on tap completes, so a static `NavigationLink(value:)` (used elsewhere in
+    these same files for already-known `ShowSummary`s) doesn't apply; the two destination
+    mechanisms coexist without conflict since `ResumeNavigationTarget` is a distinct type from
+    `ShowSummary`.
+  - `HistoryView.swift`'s `ProgressRow(row:)` call site wasn't in this batch's file list but
+    broke the build once `ProgressRow`'s signature changed (Swift reported it as "unable to
+    type-check this expression in reasonable time" — a misleading error the compiler tends to
+    emit for a mismatched SwiftUI-builder call site rather than a clear "missing arguments").
+    Updated it to the same split/resolve pattern rather than leave it broken; History gains the
+    same navigate-vs-resume behavior Continue Listening does, which was already the correct
+    direction for consistency.
+- **#97 — macOS Feedback button:** Quiet `questionmark.bubble` icon button (`FeedbackButton.swift`)
+  next to Surprise Me in `HomeView`'s header — deliberately unobtrusive, `.buttonStyle(.borderless)`,
+  not competing with Surprise Me's prominent styling. Opens
+  `https://github.com/mkny13/couch-tour/issues/new` pre-filled via `NSWorkspace.shared.open`,
+  mirroring Android's `FeedbackButton.kt`. The URL/body construction (`feedbackIssueURL(context:)`)
+  lives in `CouchTourKit/Feedback.swift` as a pure function over a `FeedbackContext` struct so it's
+  unit-testable without touching `Bundle`/`ProcessInfo`/`sysctl` — those live-environment reads stay
+  in the app-target `FeedbackButton.swift`, gathering `ProcessInfo.processInfo.operatingSystemVersionString`
+  for macOS version, `sysctlbyname("hw.model", ...)` for hardware model, `appModel.selection` for
+  current screen, and `#if BETA` for channel. **Uses `Bundle.main.appMarketingVersion` (bare, e.g.
+  `"0.57-beta"`), not `appVersionString`** (which already prefixes the display name, e.g. `"Couch
+  Tour Beta 0.57-beta"`) for both the title and the body's App Version field — using the latter would
+  have reproduced the exact "Couch Tour Couch Tour Beta" duplication this same batch's #98 work
+  fixed in the Home footer a few commits ago. Title follows Android's `Feedback (Couch Tour
+  <version>)` shape exactly so issues sort together.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 361/361 (+6: 2 for `surpriseMeArtists`, 4 for
+  `feedbackIssueURL`).
+- Android unit tests (`testDebugUnitTest`): passing, +2 for `surpriseMeArtists`.
+- macOS Xcode project generation and both app target builds (`CouchTour`, `CouchTourBeta`):
+  succeed.
+- Not independently verified with a live click-through of the running app — this environment's
+  GUI automation couldn't safely drive the built app without operating on Mike's live desktop
+  session (unrelated open windows/other tools) or his real, in-use `progressStore` databases;
+  worth a manual pass on the next beta, particularly the two-target hit-testing on #98's cards.
+
+## Iteration 62 — Batch A Manual-Test Follow-Ups: Doubled Back Buttons and a Global Feedback Button (D201)
+
+### D201 — `navigationBarBackButtonHidden` for the Pre-Existing Double Back Button, Feedback Button Moved to `RootView`'s Global Toolbar
+
+Two fixes from Mike's manual test pass on D200's beta (v0.59-beta/v0.60):
+
+- **Doubled back buttons on every drilled-down view (`ShowDetailView`, `PeriodsView`,
+  `ShowsView`, `LocalPlaylistView`):** pre-existing since #96 (`BackButtonToolbarItem`,
+  `cb824b6`), not introduced by this batch — it just went unnoticed until #98 opened a brand
+  new push path (History → Show Detail) that made it visible for the first time. Root cause:
+  macOS's `NavigationStack` renders its own automatic back chevron once there's navigation
+  history, and `#96`'s custom `BackButtonToolbarItem` (`.navigation` placement, `⌘[` shortcut)
+  never suppressed it — a well-documented SwiftUI gap (Apple Developer Forums' "Duplicate back
+  buttons" thread describes exactly this). Root screens (Home, Artists, etc.) correctly show
+  neither button — there's no navigation history yet — which is why Mike also observed "pages
+  like Artists have none": expected, not a second bug. Fixed once, at the source: `.
+  navigationBackButton()` (`BackButton.swift`) now chains `.navigationBarBackButtonHidden(true)`
+  before adding the custom toolbar item, so every one of the four call sites is fixed without
+  touching them individually.
+- **Feedback button, moved from `HomeView`'s header to `RootView`'s persistent toolbar:** Mike
+  wanted it reachable from every screen, not just Home. `RootView.swift`'s `detail:` pane
+  already has a `.toolbar` on the outer `Group` wrapping the per-section `switch` — the same
+  toolbar the "Now Playing" button lives in, applied once and persisting across every sidebar
+  section rather than being redeclared per-section. Added `FeedbackButton` there as a sibling
+  `ToolbarItem`, removed it from `HomeView`'s `headerSection`. `currentScreen: appModel.selection
+  ?? .home` is now sourced from `RootView` directly, which if anything makes the "Screen" field
+  in the filed issue's body more accurate than before — it now reflects whatever section is
+  actually on screen when the button is pressed, not just Home.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 361/361, unaffected — both fixes are app-target-only
+  (`BackButton.swift`, `RootView.swift`, `HomeView.swift`).
+- macOS Xcode project generation and both app target builds (`CouchTour`, `CouchTourBeta`):
+  succeed.
+- Not independently verified live — same GUI-automation constraint as D200; worth confirming on
+  the next beta that exactly one back chevron shows on drilled-down views and that Feedback is
+  reachable and reports the correct current screen from a non-Home section.
+
+## Iteration 63 — Batch B: Player Bar Navigation (D202)
+
+### D202 — Cross-Section Navigation Route on `AppModel`, Landing on Artists (#99)
+
+`MiniPlayerView` and `NowPlayingInspector` rendered the track title, date, and artist name as
+inert text (#99), unlike Android's `NowPlaying.kt`, which makes the same identity block
+navigable. The wrinkle: `MiniPlayerView` sits in `RootView`'s outer `VStack`, outside the
+`NavigationSplitView` entirely, so it has no `NavigationStack` of its own to push onto, and
+each sidebar section deliberately gets a *fresh* `NavigationStack` (`RootView.swift`) so
+drill-down state doesn't leak between sections. A click there has to reach across sections.
+
+**Artists receives the push, for both a show and an artist.** It's the only section whose
+existing push chain already resolves to both destinations: `ArtistsView` →
+(`ArtistRef`) → `PeriodsView` → (`PeriodRef`) → `ShowsView` → (`ShowSummary`) →
+`ShowDetailView`. Landing an artist click on `PeriodsView` and a show click on `ShowDetailView`
+needed no new screen, just a way to jump straight there. `#98` and any future player-bar-style
+entry point should reuse this same route rather than inventing a second one.
+
+**Mechanism: `AppModel.pendingArtistsDestination` (`PlayerBarDestination`, `.show`/`.artist`,
+defined in `CouchTourKit/Catalog.swift` since it's just `ShowSummary`/`ArtistRef` payloads —
+no SwiftUI), set alongside `selection = .artists` by `AppModel.navigate(to:)`.** Follows the
+one-shot pattern `focusSearchField` already established: the receiving view consumes the value
+and clears it, so a later visit to Artists doesn't re-push a stale destination. Deliberately
+the *only* mechanism — no second pending-navigation concept alongside `selection` /
+`showNowPlaying` / `focusSearchField`.
+
+**`ArtistsView` now owns its `NavigationStack` and an explicit `NavigationPath`** (moved out of
+`RootView`'s `NavigationStack { ArtistsView() }` wrapping, which had no path to push onto) so it
+has somewhere to push the pending destination. Still gets a fresh instance whenever the sidebar
+switches away from and back to Artists — that property came from the *enclosing* `switch`
+discarding and recreating the whole subtree, not from where the `NavigationStack` literally
+sits, so moving it inside doesn't undo RootView's isolation.
+
+**Consuming the pending destination *replaces* the path (`NavigationPath([show])`), rather than
+appending to whatever the user had already drilled into.** This was the answer to the case the
+issue flagged as worth checking by hand: a view pushed from the player bar onto a section stack
+the user never drilled into renders a Back button (`#96`'s `BackButtonToolbarItem`) that
+dismisses to that section's root — which, with append, could have been some unrelated
+Periods/Shows list left over from earlier browsing. With replace, the pushed destination is
+always the *only* entry on the path, so Back always pops to the Artists list itself — the one
+screen guaranteed to make sense regardless of whether the user ever browsed here. Confirmed by
+hand (see Testing below): it does land somewhere sensible.
+
+**Bug caught only by manual testing, not by the type system:** `ArtistsView`'s
+`.onChange(of: appModel.pendingArtistsDestination)` alone silently no-ops on the exact path this
+feature exists for. `AppModel.navigate(to:)` sets `pendingArtistsDestination` *and*
+`selection = .artists` in the same call — which, when the player bar is clicked from any other
+section, mounts `ArtistsView` (and its `onChange` modifier) for the first time with the
+destination already set. `onChange` only fires on a transition it *observes while attached*; a
+modifier that starts existing with a non-nil value was never attached in time to see the nil →
+value edge, so it never fires. Fixed by also consuming the pending destination from `.onAppear`
+(`onChange` still does the work for a second player-bar click while already on Artists, where
+the view was already mounted and does observe the transition). Worth remembering for any future
+one-shot AppModel signal consumed by a view that might be mounting for the first time at the
+same moment the signal is set.
+
+Same navigable identity applied to `NowPlayingInspector`'s header block, which rendered the same
+text inertly.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 364/364 (+3, `PlayerBarDestination` equality/
+  hashability in `CatalogTests.swift` — a `NavigationPath` push relies on that to distinguish
+  shows and artists correctly).
+- macOS Xcode project generation and app target build (`CouchTour`): succeeds.
+- Verified live, end to end, via `screencapture -l<windowID>` (isolates the app's own window
+  from other on-screen apps/tools) plus `System Events` accessibility actions: started a Grateful
+  Dead show, browsed to an unrelated section (Playlists, then separately History), clicked the
+  date/title/artist in the player bar from there, and confirmed landing on the right show or
+  artist page each time with no stale browsed-to stack underneath. Clicked Back from a
+  player-bar-pushed show and confirmed it lands on the Artists list, not a screen the user never
+  visited. Also verified the same three clicks from the Now Playing inspector's header. This
+  live pass is what caught the `onAppear`/`onChange` bug above — it would not have been caught
+  by `swift test` or a build-only check.
+
+
+## Iteration 64 — Batch C2: the macOS sidebar comes out (D203)
+
+### D203 — No sidebar: Home is the hub, one `NavigationStack`, a breadcrumb, and search as chrome (#102)
+
+The macOS client grew screen by screen and it showed (#102). Two problems, one pass.
+
+**The sidebar is gone entirely** — not trimmed, not replaced with a tab strip. C1 mocked a tab
+strip up and Mike rejected it as the same menu-of-destinations in a smaller box. The argument
+against the sidebar was never that six items is too many; it's that four of the six were *also*
+links on the first one. Home already carried a Continue Listening shelf with "See All", quick
+links to Artists/Playlists/History, and account/sync cards. A list of destinations beside a
+screen that already lists the same destinations is chrome earning nothing.
+
+So Home's quick-link tiles stop being decorative and become the navigation, which is what the
+chevrons are for. That also answers #102's first complaint directly: Home's clickable cards were
+`Button`s styled `.plain` over the same grey rectangle as the non-clickable "Skip filler tracks"
+card sitting between them, so nothing about a card said whether clicking it would do anything.
+
+**One `NavigationStack` for the window, not six.** Six existed to keep drill-down state from
+leaking between sidebar sections; with no sections there is nothing to leak between. The path is
+a typed `[Route]` (`CouchTourKit/Navigation.swift`) rather than a `NavigationPath`, because the
+breadcrumb has to read the trail back out and `NavigationPath` is type-erased. `Route` lives in
+the package for the same reason `PlayerBarDestination` does — it's a pure model with no SwiftUI
+in it, and being there is what makes it testable. The design-system views this batch also added
+are UI and stayed in the app target.
+
+Two things fell out of that consolidation that weren't the goal but are worth naming:
+
+- **Nine `navigationDestination(for:)` declarations became one.** Several declared the same type
+  from different screens.
+- **`SearchView`'s private `SearchDestination` wrapper is gone.** It existed only because SwiftUI
+  allows one destination per data type per stack, so pushing a `ShowSummary` from both `ShowsView`
+  and search required one of them to disguise it. With a single enum there is nothing to disguise.
+
+**A breadcrumb does the orientation job the sidebar's selected row used to do, and does it
+better.** A highlighted "Artists" row said the same thing whether you were looking at the artist
+list or four levels into a show; *Couch Tour › Grateful Dead › 1977* says where you actually are.
+Every crumb but the leaf truncates the path to that level, so it's a way back up as well.
+
+**Search is a persistent toolbar field, superseding D169.** D169's real argument was that a
+search hit should drill into the same destinations browse already has without disturbing browse's
+own stack — that survives, and pushing a `Route` is how. What doesn't survive is search being a
+*place you navigate to* in order to look something up, which is backwards for macOS. This also
+deletes the thing that was always a symptom: ⌘F used to set `selection = .search` and then ask
+`SearchView` to focus its field, and the focus half only worked on macOS 15 because
+`.searchFocused` has that floor while this app's deployment target is 14.0. A plain `TextField`
+with `@FocusState` has no such floor, so ⌘F focuses the field directly. Typing three characters
+pushes the results; clearing the field pops them, but only when results are the *top* of the
+path, so a search made before opening a hit doesn't yank the user back out of it.
+
+**Continue Listening and History merged into one "Listening" screen, superseding D171's
+placement.** They were two sections over the same table differing only in which rows they
+selected, and once Home grew its own Continue Listening shelf (#98) one of them was mostly a
+second copy of that shelf. D171's two substantive choices both survive: flat and newest-first
+rather than grouped or drilled into, with an artist filter over the full history. D171's *other*
+decision — that Sync belongs in a real Settings scene — is reinforced here, not reversed.
+
+**Settings stays exactly as it is, and Home's duplicate sheets are deleted (superseding D197).**
+Home carried its own Account and Sync sheets, a second copy of both forms; the ⌘, scene's tabs
+are now the only copy, and Home's Settings & status tiles open that window at the tab they name
+via `SettingsLink` plus a `settingsTab` binding on the `TabView`. A popover was considered and
+dropped. The sidebar's version string and "Check for Updates…" simply stopped being duplicated
+rather than moving anywhere — the Playback tab already showed both.
+
+**⌘1–⌘4 stay, as menu-bar items.** Invisible chrome costs nothing — the objection was to a
+*visible* list of destinations — and they cover the one real regression, which is that a
+cross-section jump now routes through Home.
+
+#### What this simplifies in D202
+
+Batch B (#112, D202) had just added `PlayerBarDestination` and a one-shot
+`pendingArtistsDestination` that set `selection = .artists` and handed that section's stack a
+value to push. With no sections and one stack that collapses into a plain path assignment.
+`PlayerBarDestination` stays (it's the right vocabulary for "what did the player bar mean", and
+it's unit-tested); the section hop, `ArtistsView`'s own `NavigationStack`/`NavigationPath`, and
+the `onAppear`-plus-`onChange` consumption dance D202 needed all go.
+
+D202's actual insight survives and gets cheaper: **replace the path, don't append to it**, so a
+player-bar click lands on exactly the destination named rather than on top of whatever the user
+had browsed to. `routes(for:)` now also synthesizes the levels *above* the destination
+(`[.artists, .artist(x), .show(y)]`), so Back walks up through them and the breadcrumb reads as
+a real path rather than a lone leaf.
+
+`SidebarSection` disappeared with the sidebar, and `FeedbackButton` took one as its
+`currentScreen`. It now takes the breadcrumb's leaf as a `String` — "1997-11-17" or
+"Grateful Dead" tells you far more about where a report came from than "Artists" ever did.
+
+#### One thing the launch caught that the build didn't
+
+Every screen set its own `.navigationTitle`, which with a breadcrumb at `.navigation` placement
+renders *beside* it and says the same thing twice — the titlebar read "Couch Tour" then "Home".
+The per-screen titles came off and the root sets `.navigationTitle("Couch Tour")` once, so the
+window still has a name for the Window menu and Mission Control while the breadcrumb carries
+the location. This is only visible in a running window; it compiles fine either way.
+
+### D204 — Shared card, header, shelf, tile, pill, and inline error, in the app target (#102)
+
+#102 asked for shared building blocks "rather than fixing each site in place", and the reason is
+worth recording: the inconsistency it catalogued — corner radii of 8 and 10, fill opacities of
+0.06 and 0.08, and three different section-header treatments inside a single screen — wasn't
+carelessness. There was nowhere to put the decision, so every shelf that re-implemented a card
+inline picked again. A per-site fix pass would have re-created the drift on the next screen.
+
+`macos/CouchTour/DesignSystem/` holds `CardMetrics` + `.cardSurface()`, `SectionHeader`, `Shelf`,
+`NavigationTile`, `StatusPill`, and `InlineErrorView`. Deliberately *not* in `CouchTourKit`,
+which is UI-free by design and stays that way.
+
+`StatusPill` is the one carrying real accessibility weight. #102 flagged two states carried by
+colour alone — sync paired (green vs. secondary tint) and the FLAC/MP3 badge (green vs. grey) —
+and both now read as glyph plus words. Colour stays; it's a real signal for anyone who can see
+it. It just isn't the *only* one any more, which is what makes the state survive Increase
+Contrast, greyscale, and VoiceOver. It also replaced two hand-rolled badges that had hardcoded
+`.font(.system(size: 9))` and `size: 10` — below a comfortable reading size and ignoring the
+text-size setting outright.
+
+`InlineErrorView` exists because `ErrorView` fills the window. That's right when the whole screen
+is the failed thing and wrong on Home, where one shelf failing shouldn't blank out the other
+five. Both make the same point, which is #102's actual complaint: "no data" and "the request
+failed" must not render identically. Four paths were swallowing errors into empty state and now
+don't — `HomeView.reloadArtists` and `reloadProgress`, `TourPickerSheet.loadTours`, and the
+Listening load. `loadTours` was the worst of them: a failed request left the tour picker looking
+like "this year has no named tours", which silently turns Save into a year-only preference.
+
+Also in this pass: `accessibilityLabel`s on every icon-only control (three transport buttons,
+mute, both sliders, the tour-picker pencil, the favourite stars, the resume buttons); a
+confirmation on the tour picker's `Clear / Default`, which was marked `role: .destructive` and
+confirmed nothing; and `@ScaledMetric` on `ArtworkView` and the two Home card widths.
+
+**On "Dynamic Type."** #102's wording asks for it. Dynamic Type is an iOS concept macOS doesn't
+have, so taking the wording literally would have meant building nothing. The actionable macOS
+version is what was built: semantic font styles instead of hardcoded point sizes, and
+`@ScaledMetric` instead of fixed frames, both of which respond to the Accessibility text-size
+setting.
+
+**Testing:**
+- macOS Swift package tests (`swift test`): 370/370, up from 364 — six for `Route`'s crumb
+  titles, `breadcrumbTrail`, `routes(for:)`, and route identity, all in `NavigationTests.swift`.
+- macOS Xcode project generation and app target build (`CouchTour`): succeeds, no new warnings.
+  (`Player.swift`'s six pre-existing warnings are untouched and unrelated.)
+- Launched the installed app and confirmed the restructure renders: no sidebar, back chevron and
+  breadcrumb in the toolbar, the persistent search field, feedback and Now Playing buttons, the
+  Continue Listening shelf, and the "Your library" section. The duplicated-title bug above was
+  found this way and fixed.
+- **The interactive half of the pass did not happen and is still owed** — ⌘F from a cold launch,
+  ⌘[ popping from a player-bar destination, the Settings tiles landing on the right tab, ⌘1–⌘4,
+  VoiceOver over the transport and tour picker, Increase Contrast in both appearances, and the
+  text-size setting at a couple of steps. Every ad-hoc reinstall invalidates the keychain ACL, so
+  the app puts up a login-keychain password prompt on launch and again on every activation; it's
+  app-modal, and clearing it needs Mike's password ("Always Allow"), which is not something to
+  automate. This is a local-signing artifact, unrelated to this batch, and it walled off GUI
+  automation for the session. Worth knowing for any future macOS batch whose verification is
+  interactive: answer that prompt once by hand before starting.
+
+## Iteration 66 — macOS: wire #67/#21/#62 into the UI, plus #115 (D206)
+
+### D206 — Wire #67/#21/#62 into the macOS UI, plus #115's context menu
+
+Phase 2's audit (`phase-2-batches.md`, 2026-08-31) found that D191/D192/D193 had each claimed
+macOS UI shipped for tags, sort, and artwork when only the `CouchTourKit` model and its tests
+had — see D208, which supersedes them on macOS only, for the full story. This batch is the
+actual wiring, plus #115 riding along in the same worktree per that plan's decision.
+
+**#21 — sort.** `ShowsView.swift` gets a toolbar `Picker` over `ShowSortOption`, not Android's
+chip row. Android's `FilterChip` row is that platform's idiom for a small, always-visible choice;
+this app's own macOS screens already reach for a menu-style `Picker` for exactly this kind of
+inline filter (`SearchView`'s artist picker, `ListeningView`'s scope and artist pickers), so a
+second visual language for the same kind of decision would read as inconsistent rather than
+native. Sort is applied to `shows` already held in view state — `load()` still only resets
+`loadState`, never re-fetches on a sort or filter change.
+
+**#67 — tags.** `ShowsView.swift` and `SearchView.swift` both build their available-tag list the
+way `MainActivity.kt:837-846`/`:1484-1502` do: the tags actually present in the current results,
+deduped case-insensitively, sorted by `priority` descending then name, "All" prefixed, and the
+picker only rendered once there's a real tag to filter by. A selected tag that drops out of the
+result set (a new search, narrowing to a different artist, a different period) falls back to
+"All" rather than rendering nothing, matching the existing accident-of-key-reuse handling
+`SearchView`'s artist picker already had. In `SearchView`, picking a real tag also empties the
+Artists and Song/Venue-slice sections rather than leaving them showing untagged, unrelated hits —
+Android's search screen does the same (`rArtist.copy(artists = emptyList(), slices = emptyList()
+...)`).
+
+**#62 — artwork.** `ArtworkView` gains two optional parameters, `artist` and `date`, threaded
+through its five call sites (`HomeView`'s Next Stop, Continue Listening, and On This Date cards;
+`MiniPlayerView`; `NowPlayingInspector`) from whatever each already had in scope — `ShowSummary`
+for the first and last, `PlaybackProgress.artist` for Continue Listening (no real date there, so
+`date` stays nil and `ShowArtworkGenerator.dateBadge` falls back to "LIVE", which reads fine for
+an in-progress card), and `player.show` for the two player surfaces. The placeholder is a
+`LinearGradient` from `palette.primaryColor` to `palette.backgroundColor` with the artist
+monogram overlaid, plus the date badge once the artwork is drawn large enough (`scaledSize >=
+60`) for a second line to read as information rather than noise — the mini player's default
+36pt skips it. This is the gradient-plus-monogram shape decided in the batch plan, not a port of
+Android's `Canvas` cassette; `ShowArtworkGenerator.palette`/`monogram`/`dateBadge` were already
+written and tested and needed no changes.
+
+**#115 — Continue Listening context menu.** `ResumeCardView` (Home) and each row in
+`ListeningView`'s list get a `.contextMenu` — Open / Mark Completed / Remove from List, matching
+Android's long-press menu (`MainActivity.kt:2377-2407`). Both call straight through to
+`ProgressStore.markFinished(key:)` and `.dismiss(key:)`, which already existed and needed no
+changes, then reload their own list state so the row's disappearance from "Continue Listening"
+(or its "completed"/"removed" status in History) is immediate.
+
+**Why CI didn't catch the original gap, and still can't catch this one.** `macos-tests.yml`
+triggers only on `macos/Packages/CouchTourKit/**`; every change in this batch is in
+`macos/CouchTour/**` (the app target), so this PR runs no macOS CI at all. The only checks that
+ran are Android's (irrelevant here) and whatever `swift test` this batch ran locally, which
+exercises the unchanged `CouchTourKit` helpers, not the views calling them. Same gap D191-D193
+fell into; still open after this batch, since closing it would mean building the app target in
+CI, which needs local ad-hoc signing this repo doesn't have configured for a CI runner.
+
+**A worktree-local landmine, unrelated to the code above but worth recording:** this worktree's
+`macos/CouchTour.xcodeproj` (gitignored, generated — D103) was found as a **symlink** into the
+original checkout's copy (`/Volumes/.../phish-in-app/macos/CouchTour.xcodeproj`, via
+`.git/info/exclude`), left over from however this worktree was provisioned. `xcodegen generate`
+happily followed it and wrote a real project file at the *original* checkout's path, so
+`xcodebuild` was compiling and linking that checkout's sources — not this worktree's edits —
+until the symlink was deleted and `xcodegen generate` re-run to produce a real, worktree-local
+project file. A build that "succeeds" against a symlinked project proves nothing about the
+worktree it was run from; worth checking `ls -la macos/CouchTour.xcodeproj` for a `->` before
+trusting any macOS build/test result in a fresh worktree.
+
+**Testing:**
+- `swift test`: 369/369 (`CouchTourKit`'s own suite, unchanged by this batch — see D204's count,
+  now 369 after `#120` removed `TrackedTourStore`'s duplicate migration).
+- `xcodegen generate` + `xcodebuild … build` (Debug): succeeds, no new warnings, from a real
+  worktree-local project (see the symlink note above).
+- `macos/scripts/install.sh` (Release): succeeds; installed to `/Applications/Couch Tour.app`,
+  confirmed via `strings` that the binary carries this batch's new UI strings.
+- **The interactive click-through this batch's own verification section calls for — sorting a
+  year's shows, filtering by tag, looking at artwork-less Relisten shows, right-clicking a
+  Continue Listening card — did not happen.** The keychain prompt this file already warned about
+  wasn't even reached: the machine's display session was locked for the whole batch, so
+  `screencapture`/`osascript` GUI scripting couldn't reach the screen either. The app is built,
+  installed, and waiting; the actual click-through is still owed and needs Mike at the machine,
+  same as D204's before it.
+
+## Iteration 65 — List Sort and Filter, Android (#91, #116, #90, D205)
+
+### D205 — Artist List Sort/Filter, Search Result Sort, and In-Playlist Search (Android only)
+
+Phase 2's Batch 2A ([phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md)): three
+Feedback-filed issues that are one shape of request — reorder or narrow a long list — landed
+together as Android-only groundwork macOS's Batch 2B will port. Every helper is a pure function
+in `Catalog.kt`, matching the file's existing `sortedByMode`/`filterByTag` pattern, so the
+sorting/filtering logic itself is unit-tested rather than only reachable by a manual pass — the
+same gap D191-D193 documented for the macOS side (see Batch 0's audit and its superseding entry).
+
+- **#116 — Artists list.** `ArtistsScreen` gained a Popular/A–Z sort (`ArtistSortMode`) and a
+  name filter (`filterByName`). Phish stays pinned outside either section — its position-1 slot
+  predates favoriting (D157) and isn't earned by being liked, so neither the new sort nor the
+  filter displaces it as long as its name still matches. `mergeArtists` was refactored to build
+  on a new `groupArtistsForBrowse` (phish / favorited / everyone-else, as a typed `ArtistGroups`
+  rather than a flattened list) so the screen can render Favorites as its own pinned section,
+  sorted and filtered independently, without duplicating the dedup logic `mergeArtists` already
+  had tests for. An empty filter result renders `No artists match "<query>".` rather than a blank
+  screen.
+- **#91 — search result sort.** `SearchResultsList` already stacks an artist chip row and a tag
+  chip row; a third `LazyRow` would be too much chrome, so the new `SearchSortMode` (Relevance /
+  Newest / Oldest / Most liked) is one compact `TextButton` + `DropdownMenu` line instead. Sort
+  applies to both the Shows and Tracks sections (not Artists/Venues/Songs/Playlists, which have
+  no date or like count to sort by). "Most liked" needed `ShowSummary` to carry phish.in's
+  `likes_count` at all — it didn't before, since the field only ever mattered per-period via
+  `POPULAR_PERIOD_ID`'s server-side query. It's now on `ShowSummary` itself (default `0`,
+  populated from `Show.likesCount` in `toShowSummary()`), which is what lets Relisten hits settle
+  after every phish.in hit under that sort with no special-cased branch: Relisten never sets it,
+  so it defaults to 0 and sorts last.
+- **#90 — search within a playlist.** Both `PlaylistScreen` (phish.in, read-only) and
+  `LocalPlaylistScreen` (local, reorderable) gained a search field over their track list. The
+  trap flagged in the batch prompt was real: the existing `TextField`s in the macOS playlist
+  views are rename inputs, not search, so Batch 2B can't reuse them as a starting point either.
+  `filterByTitleIndexed` returns matches paired with their index in the *unfiltered* list,
+  because both playback (`vm.playPlaylist`/`vm.playLocalPlaylist`) and, for the local playlist,
+  reordering (`vm.moveLocalPlaylistTrack`) key off that original position — a filtered list's own
+  position would start the wrong track or write positions computed against a subset.
+  **Reordering is disabled while a filter is active** (the up/down arrows grey out) rather than
+  clearing the filter when reorder starts — D184's drag targets already read `tracks`, the full
+  list, by index, and disabling is one boolean versus adding filter-clearing side effects to
+  every reorder callback.
+
+Three `sortedByMode` overloads now exist on `List<ShowSummary>` (`ShowSortMode`, pre-existing,
+and the new `SearchSortMode`) plus one on `List<Track>` and one on `List<ArtistRef>`. The two
+`SearchSortMode` overloads needed `@JvmName` (`sortedShowsForSearch`/`sortedTracksForSearch`) —
+same value-parameter type on two different receivers erases to the same JVM signature, the same
+reason `filterByTag`'s two overloads already carried one. `filterByTitleIndexed`'s two overloads
+(`PlaylistEntry`, `LocalPlaylistTrackEntity`) needed the same treatment for the same reason.
+
+**Testing:**
+- Android unit tests (`./gradlew testDebugUnitTest`): 473/473 passing (463 baseline + 10 new,
+  covering sort/filter/grouping correctness and the empty/no-match cases for all three features).
+- Not done: macOS (out of scope — Batch 2B) and a manual on-device pass of the new Android UI.
+
+## Iteration 67 — Multi-Level Catalog Cache, Android and macOS (#61, D207)
+
+### D207 — In-memory TTL cache for periods, shows, and show detail on both platforms (#61)
+
+O4 (`MULTI-ARTIST-PLAN.md`) deliberately cut catalog caching down to one `@Volatile`/actor-private
+artist list — "a real catalog cache stays out of scope." Everything below the artist list —
+periods (years), a period's shows, and show detail — re-fetched on every screen entry, including
+plain back-navigation. This batch revisits that scope cut, per Batch 4 of
+[phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md).
+
+**In-memory, not on-disk.** On-disk would mean a real Room migration on Android and a GRDB
+migration on macOS for a table holding nothing but re-derivable network responses — exactly the
+kind of state CLAUDE.md's Room-migration section is strict about, and unlike `progress`, catalog
+data isn't the thing the app exists to never lose. An in-memory cache meets the goal (kill the
+extra round trips on ordinary back-navigation within a session) without any of that, and it's
+trivially reversible if it turns out not to be worth keeping.
+
+**Shape:** a generic TTL-and-LRU cache — `TtlCache<K, V>` (`CatalogCache.kt`) and the actor
+`TTLCache<Key, Value>` (`CatalogCache.swift`) — shared by both `MusicSource` implementations on
+each platform. A 15-minute TTL (`CATALOG_CACHE_TTL_MS` / `catalogCacheTTL`) is long enough that
+browsing back and forth within one sitting costs no network call, short enough that a show's
+rating, popularity, or tags don't go stale for the length of a whole sitting. Past `maxEntries`
+the least-recently-used entry is evicted (`LinkedHashMap(accessOrder = true)` on Android, an
+explicit access-order list on macOS) rather than growing without bound — the memory ceiling for a
+~200-artist catalog: periods capped at 250 entries (roughly one per artist), shows at 400, show
+detail at 200, tuned generously rather than measured, since a bounded cache turning into extra
+network calls on eviction is a performance regression, not a correctness one.
+
+**Wired into every `MusicSource` implementation:**
+- `RelistenCatalogSource` (Android `Relisten.kt`, macOS `RelistenAPI.swift`) gets `periodsCache`,
+  `showsCache`, and `showDetailCache`, plus a TTL added to the existing artist-list cache — it
+  never expired before this, which was fine when its only caller was one back button but is a
+  correctness gap on its own next to caches that do expire.
+- `PhishInSource` needed the cache to live somewhere shared explicitly: on Android it's already a
+  singleton `object`, but on macOS it's a `struct` `sourceFor` recreates on every call, so its
+  cache lives on a separate actor singleton (`PhishInCatalogCache.shared`) that the struct
+  delegates to rather than on `self`.
+- `Catalog.kt`'s `loadArtistsByBackend` (the Home screen's artist list) now sums show counts off
+  `PhishInSource.periods(PHISH)` instead of a second, uncached `PhishInApi.years()` call — the
+  synthetic "Popular" period contributes 0 to that sum, so the total is unchanged, but the Home
+  screen and the period picker now share one cached years fetch instead of paying for it twice.
+
+**Cache-key correctness across backends.** phish.in periods can be a range ("1983-1987"); Relisten
+periods are year uuids. Both key off `ArtistRef.key`, which already embeds the backend
+(`"phishin:phish"` vs `"relisten:grateful-dead"`), so there's no way a same-shaped id from the two
+backends collides in one shared map even though periods/shows/show-detail all use one cache
+instance per source rather than one per backend.
+
+**Interaction with `NextStop.cacheKey`, which already invalidates on tour-preference changes
+(D190), is none, by design.** `NextStop`'s own cache is keyed on favorites/date/tour-preferences
+and still invalidates exactly as before — it calls through `MusicSource.periods`/`.shows`, which
+this batch's cache sits underneath. A tour-preference change still busts `NextStop`'s cache and
+re-derives an answer; that re-derivation can now be served from the periods/shows cache instead of
+the network, which is strictly a speed-up, not a change in what invalidates when.
+
+**Test hooks preserved.** `RelistenCatalogSource.cachedArtists` stays exactly as before (same
+type, same direct-null-assignment reset some tests already used) so no existing test broke; both
+sources also gained a one-call `resetCache()` (`PhishInCatalogCache.shared.resetCache()` on
+macOS, since the cache doesn't live on the struct) mirroring the shape `RelistenCatalogSource`'s
+`resetCache()` already had on macOS. Any test file that exercises a real `MusicSource` against a
+mock server now resets these caches in `setUp`/`tearDown` — including two files this batch didn't
+otherwise touch, `LocalPlaylistResolveTest.kt`/`LocalPlaylistTests.swift`'s
+`ResolveLocalPlaylistTracksTests`, which resolve shows through the same shared singletons and
+would otherwise silently serve one test's mock response to a later test using the same
+artist/date. The macOS instance was caught by an actual test failure during this batch's own
+verification, not by inspection — worth remembering for any future cache added to a
+process-lifetime singleton under macOS's shared `MockServer`.
+
+**Testing:**
+- Android (`./gradlew testDebugUnitTest`): 488/488 passing after merging with Batch 2A's D205 —
+  463 baseline + 10 (D205) + 15 new here (`CatalogCacheTest.kt`): `TtlCacheTest` covers hit, miss,
+  expiry at and just under the TTL boundary, `clear`, and LRU eviction against an injected clock;
+  `CatalogCacheHitTest` covers a second call being served from cache, per-artist/per-period
+  keying, and `resetCache()` forcing a real re-fetch, against both `PhishInSource` and
+  `RelistenCatalogSource`.
+- macOS (`swift test`): 384/384 passing, up from 369 (`CatalogCacheTests.swift`,
+  `TTLCacheTests`/`CatalogCacheHitTests`) — the same coverage, ported. Unaffected by D205, which
+  was Android-only.
+- macOS app target (`xcodegen generate` + `xcodebuild`): build reported success, but **this
+  worktree's `xcodebuild` resolves the local `CouchTourKit` package from the main checkout's path
+  (`/Volumes/ExtSSD160/scripts/phish-in-app`) rather than this worktree's own copy** — confirmed
+  by deliberately breaking this worktree's `CatalogCache.swift` with a syntax error and watching
+  the app build succeed anyway. Clearing `DerivedData` didn't fix it. This batch touches no
+  app-target file, so the risk is low, but the app-target build above did not actually verify
+  this diff and shouldn't be read as having done so. Worth knowing for any future batch relying on
+  an app-target build from inside a worktree rather than the primary checkout.
+- No UI changed and the `MusicSource` interface's shape is untouched, matching the batch's scope:
+  this stays invisible behind the seam that made it parallelizable with Batches 1 and 2A.
+
+## Iteration 68 — Phase 2 Audit Closeout: Correcting D191–D193's macOS Claim (#67, #21, #62, D208)
+
+### D208 — D191, D192, and D193 overstated macOS status; only the Android UI and the `CouchTourKit` model shipped (supersedes D191, D192, D193 on macOS only)
+
+A 2026-08-31 audit ahead of Phase 2 planning ([prompts/phase-2-batches.md](prompts/phase-2-batches.md))
+found that D191 (#67 tags), D192 (#21 momentum sort), and D193 (#62 procedural artwork) each state
+or imply that macOS UI shipped alongside Android. It did not, for any of the three, as of that
+audit:
+
+- **#67 (tags):** `filterShowsByTag` / `filterTracksByTag` / `filterByTag` existed and were tested
+  in `Catalog.swift`, but `grep -rn "Tag" macos/CouchTour` returned nothing — no macOS view read
+  them.
+- **#21 (momentum sort):** `ShowSortOption` and `sortShows(_:by:)` existed and were tested in
+  `Catalog.swift`, but `ShowsView.swift` was a plain unsorted `List` with no sort `@State` at all.
+- **#62 (artwork):** `ShowArtworkGenerator` (palette, monogram, date badge) existed and was tested
+  in `Artwork.swift`, but `ArtworkView.swift` still drew a bare `music.note` placeholder and never
+  called it.
+
+Android was unaffected by this correction — its chip-row sort control, tag filter, and cassette
+artwork for these three issues were real, in `MainActivity.kt`, and D191–D193's Android claims
+stand. Only the macOS half of each entry was wrong, which is why this supersedes them on macOS
+only rather than retracting them outright. The actual macOS wiring landed as D206, above this
+entry despite the later decision number — DECISIONS.md orders by when an entry merged to `main`,
+not by when the underlying work was done, and this audit was written before D206's wiring batch
+but merged after it (and after D207 too, which is why D206 isn't immediately adjacent).
+
+**Why CI never caught it — worth having on the record:** `swift test`
+(`macos/Packages/CouchTourKit`) covers the `CouchTourKit` package only. The app target
+(`macos/CouchTour`) isn't part of that package and isn't built by `macos-tests.yml`, so a tested
+pure function that no screen calls is fully green regardless. `TagTests.testShowSummarySortedByOption`
+passed at the time of the audit against a sort no macOS user could reach. **A green `swift test` is
+not evidence a macOS feature is reachable** — macOS UI work needs an install-and-click pass
+(`macos/scripts/install.sh`), same as any other platform's manual verification, and a passing
+package build should not be read as that pass having happened.
+
+**Process note.** This entry documents an audit written 2026-08-31, but its own commit was
+stranded on a detached-HEAD worktree by an orchestration misconfiguration and didn't reach `main`
+until other Phase 2 batches (D205, D206, D207) had already landed — including D206, which this
+entry supersedes and which itself refers forward to this one. Four parallel worktrees, each
+computing "next available iteration/decision number" from `main` at branch time rather than at
+merge time, is also why D205 and D206 were each independently claimed by two different batches;
+those collisions were resolved by renumbering the later-merging entry (D206→D207) rather than
+editing the content of either. Worth keeping in mind for any future sprint run as several parallel
+agents against one shared docs file: decision numbering is a shared mutable resource, and only the
+merge order — not the branch/authoring order — determines who actually gets which number.
+
+## Iteration 69 — Kanban as the primary development plane, and a UAT board (D209)
+
+### D209 — Board-owned worktrees, merge-time decision IDs, and `UAT.md` as the home for manual verification
+
+Development now runs through the Cline Kanban board (`http://127.0.0.1:3484`) rather than
+hand-made worktrees. The board creates a worktree per task under `~/.cline/worktrees/` and starts
+`claude --permission-mode auto` in it. That collided with instructions written for the old model,
+and the first sprint through it (Batches 0/1/2A/4) surfaced exactly how:
+
+- **Batch 0's work was nearly lost.** Its orchestration prompt said not to create a branch, on the
+  assumption the board's auto-PR would handle git. Nothing did, and the commit sat on a detached
+  HEAD, unreachable from any branch, until rescued in `#124`. The other three batches ignored that
+  instruction, followed CLAUDE.md's own autonomous loop, and merged fine.
+- **Two batches picked the same decision number.** Batches 1 and 4 each computed "next `Dnnn`"
+  from `main` at branch time and both landed as D206 — a real duplicate that git cannot detect,
+  since the two entries are appends to different regions of the same file (see D208).
+
+The rules that resolve this are in CLAUDE.md under "Working under the Cline Kanban board", and the
+shape of them is: **the board owns the worktree, the agent owns the branch.** Never
+`git worktree add`/`remove` under the board; always `git checkout -b` off the detached HEAD before
+committing; own git through to a merged PR rather than depending on board automation that has been
+observed to silently no-op; end with a `STATUS:` line, because the board's column tracks whether an
+agent finished, not whether anything merged. Decision IDs are allocated against `origin/main` at
+merge time, not branch time, and a collision is resolved by renumbering the later-merging entry —
+never by editing the other batch's content.
+
+**`UAT.md` and `scripts/uat-server.py`.** Manual verification kept being recorded in a DECISIONS
+entry's testing section — which is write-only in practice. D204's owed click-through went unread
+until D206's batch re-derived it, and D206 then added an identical note of its own. Meanwhile the
+gap is the single biggest correctness risk in this repo: Android's suite is Robolectric/MockWebServer
+and `swift test` covers `CouchTourKit` only, never the macOS app target, which is precisely how
+D191–D193 marked three features shipped while no macOS view called them (D208).
+
+So outstanding manual checks live in `UAT.md` — git-tracked, so it is visible to Claude and to any
+Kanban task — and `scripts/uat-server.py` serves a local three-state board (untested / works /
+needs work) that writes straight back to that file. Stdlib only, no dependencies, no build step;
+it is deliberately a flat markdown file rather than a database so the state diffs, reviews, and
+merges like everything else here. An item marked **needs work** carries a note and is treated as a
+bug report addressed to whoever next touches that feature.
+
+**Two macOS worktree build hazards are also now documented in CLAUDE.md**, both found the hard way
+during this sprint and both capable of making a green macOS build meaningless: a `.xcodeproj` that
+is a symlink into the main checkout (D206), and `xcodebuild` resolving the local `CouchTourKit`
+package from the main checkout's path rather than the worktree's own copy (D207, confirmed by
+deliberately breaking a file and watching the build still succeed).
+
+**Testing:** no application code changed. `scripts/uat-server.py`'s parse/write round-trip was
+exercised directly — status transitions in both directions, note attach/detach when leaving the
+"needs work" state, unknown-id rejection, and item-count preservation — then end-to-end over HTTP
+against all four endpoints and through the rendered page, which caught a real bug: hyphenated
+element ids (`c-pend`) never become JS globals, so the first render threw `ReferenceError` and the
+board showed zero items despite a 200 response and correct JSON.
+
+## Iteration 70 — List Sort and Filter, macOS Parity (#91, #116, #90, D210)
+
+### D210 — Porting D205's Android sort/filter helpers to macOS, plus the platform gaps that changed the port
+
+Phase 2's Batch 2B ([phase-2-batch-prompts.md](prompts/phase-2-batch-prompts.md)): the macOS half
+of D205, gated on both D205 (Android) and D206 (the macOS tag/sort/artwork wiring, since both
+touch `SearchView.swift`) having merged first. Follows D205's decisions rather than
+re-deriving them, with the same "pure helper in `CouchTourKit`, tested, called from a view" shape
+D206 established.
+
+- **#116 — Artists list.** `groupArtistsForBrowse(relistenArtists:favorites:)` ports D205's
+  `ArtistGroups` split (phish / favorited / others, no overlap), and `mergeArtists` is refactored
+  to build on it rather than duplicating the partition logic — same relationship the Kotlin
+  originals have. `ArtistSortMode` (`.popular`/`.alphabetical`) and `filterByName` are direct
+  ports. `ArtistsView` gained `.searchable` and a toolbar sort `Picker`, and — this is the one
+  real behavior change from what was there before — **the "Artists" section no longer repeats
+  favorited artists.** The pre-#116 macOS code intentionally showed favorites in both the
+  "Favorites" shortcut and the full "Artists" list ("favoriting doesn't remove an artist from the
+  full list"); D205's `ArtistGroups.others` is favorited-exclusive by construction, and matching
+  it here is what lets "favorites stay pinned regardless of sort, filter applies to both" (the
+  batch's stated rule) hold without Phish itself losing its always-first position under an
+  alphabetical sort. A favorited artist is still one screen-scroll away, just not in two places
+  on the same one.
+- **#91 — search result sort.** `SearchSortMode` (`.relevance`/`.dateDesc`/`.dateAsc`/
+  `.mostLiked`) ports D205's four-case enum, applied via a toolbar `Picker` in `SearchView`
+  (D206 already established the toolbar-over-chip-row idiom for `ShowsView`'s sort, so this reuses
+  it rather than introducing a third stacked row) to the Shows and Tracks sections only, matching
+  Android's scope. `ShowSummary` gained a `likesCount: Int` field, populated from phish.in's
+  `Show.likesCount` in `toShowSummary()` and left at the default 0 for Relisten — same mechanism
+  as D205, and what lets Relisten hits settle after every phish.in hit under `.mostLiked` with no
+  special-cased branch. This is a genuinely new field, not a rename of the existing `rating`:
+  `rating` already held `Double(likesCount)` for phish.in shows (a pre-D210 shortcut, since
+  phish.in has no separate numeric rating), but is shared with Relisten's actual 0-10
+  `avg_rating` on the same field — two different scales that "Top Rated" already sorted together
+  before this batch touched it, out of scope to fix here. `likesCount` sidesteps that by being
+  phish.in-only and correctly zero for Relisten, matching D205's `ShowSummary.likesCount` exactly.
+  The sort helper is named `sortedForSearch(by:)`, not `sorted(by:)` — `[ShowSummary]` already
+  has `sorted(by: ShowSortOption)` from D206, and `ShowSortOption` and `SearchSortMode` both
+  declare a `.dateAsc` case, so `.dateAsc` shorthand at a call site is ambiguous between the two
+  enums when both `sorted(by:)` overloads are in scope. Same shape of problem as D205 needing
+  `@JvmName` for its own two-enums-one-case-name collision on the JVM; a distinct method name is
+  Swift's equivalent fix.
+- **#90 — search within a playlist.** `filterByTitleIndexed`, added to `LocalPlaylist.swift`,
+  ports D205's shape: matches paired with their index in the *original* `rows` array, because
+  both playback and reordering key off that position rather than a filtered list's own. Applied
+  to `LocalPlaylistView` via `.searchable`. Reordering is disabled while a filter is active
+  (`reorderable = query.isEmpty`) exactly as D205 decided for Android — both the up/down chevrons
+  (`.disabled`) and drag reordering (`.moveDisabled` per row, since `.onMove`'s indices are only
+  meaningful against `rows` while nothing is filtered out). **The batch prompt's "for the
+  phish.in playlist screen, its counterpart" doesn't exist on macOS to port to** — unlike
+  Android's `PlaylistScreen` (a read-only view of phish.in's own hosted/liked playlists),
+  `PhishInAPI.swift` documents that this MVP has no playlists screen at all (D5), and nothing in
+  `macos/CouchTour` reads a phish.in playlist. #90's macOS parity is therefore local-playlist-only,
+  not a scope cut made here but the pre-existing platform gap D5 already recorded.
+
+**Two worktree-provisioning landmines, same class as D206's `.xcodeproj` symlink, worth adding to
+that running list.** This worktree's `macos/CouchTour.xcodeproj` was *again* a symlink into the
+original checkout (deleted and regenerated with `xcodegen generate`, same fix as D206). Less
+obviously, `macos/build` — the derived-data directory `macos/scripts/install.sh` builds into —
+was **also** a symlink into the original checkout's `macos/build`. Unlike the `.xcodeproj` case
+this isn't necessarily wrong on its own (it's Release WMO, which recompiles the whole module as
+one job rather than reusing per-file incremental state the way Debug does, so a shared derived-data
+cache is less likely to serve stale per-file output) — but it was worth not trusting on faith.
+Confirmed the installed binary actually reflects this worktree's source via `strings` on the
+built binary for `"Filter artists"`, `"Search this playlist"`, `"No artists match"`, `"No tracks
+match"`, `"mostLiked"`, and `"relevance"` — all present, all new or renamed in this batch, none of
+which would appear in the previously-installed build.
+
+**Testing:**
+- `swift test`: 400/400 (384 baseline + 16 new — `groupArtistsForBrowse`, `ArtistSortMode`,
+  `filterByName`, `SearchSortMode`/`sortedForSearch` on both `ShowSummary` and `Track`, and
+  `filterByTitleIndexed`).
+- `xcodegen generate` + `xcodebuild … build` (Debug): succeeds, no new warnings, from a real
+  worktree-local project (symlink removed first, per above).
+- `macos/scripts/install.sh` (Release): succeeds; installed to `/Applications/Couch Tour.app`,
+  confirmed via `strings` per above to be this batch's build.
+- **The interactive click-through this batch's verification calls for — filtering/sorting the
+  artist list, sorting search results, searching and reordering a local playlist — did not
+  happen**, same open item D206 left. This time the blocker wasn't a locked display session but
+  missing permissions for this session's automation: `screencapture` failed with "could not
+  create image from display" and `osascript`'s System Events access failed with "osascript is
+  not allowed assistive access" (-1719, an Accessibility permission neither this process nor Mike
+  can grant without him at the machine). The app is built, installed, and waiting; the actual
+  click-through is still owed and needs Mike at the machine, same as D204's and D206's before it.
+
+## Iteration 71 — Player rate sync clobber fix (#127)
+
+### D211 — Deduplicate ProgressRecorder writes and ignore redundant rate=0 events (#127)
+
+Issue #127 investigated an incident where playback of Phish 2026-07-29 on Android (YEM) was
+overwritten by an older finished track (Harpua) after Couch Tour was launched on macOS.
+
+Diagnosis of system power logs and sync records revealed:
+1. The Mac Mini had a power loss / reboot earlier in the day (`Thu Sep 3 14:22 EDT`).
+2. At 14:40:40 EDT, the Mac Mini went to sleep. Audio hardware route teardown triggered an
+   AVFoundation KVO notification on `AVQueuePlayer.rate`.
+3. `Player.swift`'s `rateObservation` treated `rate == 0` as a trigger to run
+   `saveProgress(force: true)` unconditionally, even though `self.isPlaying` was already false.
+4. `ProgressRecorder` stamped the in-memory show progress (`Harpua`, paused at 14:15) with
+   `Date.now` (`1788460842062` / 14:40:42 EDT) and saved it to the local SQLite database.
+5. Hours later, when macOS Couch Tour launched, it pushed its local progress with that 14:40:42
+   timestamp to Cloudflare D1. D1's last-write-wins logic accepted Harpua over the user's newer
+   listening on Android because Harpua's artificial timestamp was newer.
+6. The next sync pull on Android and macOS replaced YEM with Harpua.
+
+Fix:
+- Moved `ProgressRecorder` into `CouchTourKit` where its state transitions and database writes
+  can be unit-tested directly without depending on AVFoundation or UI.
+- In `ProgressRecorder.saveTick`, track `lastSavedQueueKey`, `lastSavedTrackIndex`, and
+  `lastSavedPositionMs`. If none of these values have changed since the last save, skip the
+  database write and do not re-stamp with `Date.now`, returning `false`.
+- In `ProgressRecorder.markFinished`, reset the saved position cache so replay starts fresh.
+- In `Player.swift`, guarded `rateObservation` with `guard self.isPlaying != isPlaying else { return }`
+  so redundant `rate == 0` calls during system sleep, route switches, or audio teardowns are dropped.
+- In `Player.swift`, checked the return value of `recorder.saveTick` before triggering
+  `syncSession.requestDebouncedPush(progressStore)` during `saveProgress(force:)`.
+- Added 6 unit tests in `ProgressRecorderTests.swift` covering position advancement, identical tick
+  skipping, track transitions, queue key transitions, and finished state handling. Total package
+  tests increased from 400 to 406.
+
+## Iteration 72 — Post-UAT Non-UI Fixes & Feedback Logging
+
+### D212 — Slashes in Relisten Share URLs; Record UAT Results and Non-Functional Feedback
+
+Mike completed the first manual UAT round on the v0.65 beta via the local UAT board (`http://127.0.0.1:4785`,
+backed by `UAT.md`). Out of 20 items tested across Batches 1, 2A, 4, and pre-existing checklist items:
+- 12 passed (`uat-001`, `uat-002`, `uat-004`, `uat-007`, `uat-008`, `uat-009`, `uat-010`, `uat-011`,
+  `uat-012`, `uat-014`, `uat-015`, `uat-020`).
+- 5 marked needs-work (`uat-003`, `uat-005`, `uat-006`, `uat-013`, `uat-019`).
+- 3 pending (`uat-016`, `uat-017`, `uat-018`).
+
+Per instruction ("I am about to deliver a revamped UI, so don't immediately touch anything purely-UI
+related, just log it. everything else, fix now"):
+
+1. **Non-UI fix: Relisten share URLs (`uat-019`, #19)**
+   - Symptom: Relisten show URLs shared from Android (`https://relisten.net/<artist-slug>/YYYY-MM-DD`)
+     returned a generic Next.js title page with no show or track data rather than the actual show.
+   - Root cause: Relisten's web client routes shows under `/<artist-slug>/<year>/<month>/<day>`
+     (e.g., `/grateful-dead/1977/05/08`), with forward slashes rather than ISO-8601 hyphens.
+   - Fix: `showShareUrl` in `Catalog.kt` now formats Relisten dates with `date.replace('-', '/')`.
+     Unit test assertions updated in `ShareTest.kt`.
+
+2. **Logged UI feedback for upcoming revamp:**
+   - `uat-003`: Show list tag filter — Mike asked for example shows to try, noting that clicking
+     "partial" in the show row had no effect. (In current UI, tags on rows are badges; the filter is
+     driven by the toolbar picker when tags exist).
+   - `uat-005`: Band name display — "moe." must always be displayed in lowercase with a trailing period.
+   - `uat-006`: Date badge on artwork — date format must always be YYYY-MM-DD.
+   - `uat-013`: Playlist reorder — Android playlist track reordering is implemented with up/down arrow
+     buttons rather than drag-to-reorder; the UAT description prompted for drag-to-reorder.
+
+3. **Status logged in `UAT.md`** and corresponding GitHub issues updated (#115, #116, #91, #61 closed;
+   #90, #62, #67, #19 updated with UAT notes).
+
+## Iteration 73 — project assets and design handoff organization (D213)
+
+### D213 — Organizing project assets: design handoff, branding artwork, and plans
+
+The external high-fidelity HTML design handoffs and original branding artwork previously lived
+outside the repository on an external volume. In this iteration:
+
+- **`design/handoff/`**: Moved the design handoff package containing high-fidelity HTML
+  prototypes (`Couch Tour Android.dc.html`, `Couch Tour macOS.dc.html`), design tokens and screen
+  specifications in `README.md`, `artist-abbreviations.js`, and screen capture PNGs in `screenshots/`.
+- **`design/branding/`**: Centralized original Couch Tour logos and app icon source artwork.
+- **`docs/plans/`**: Moved architectural specification plans (`DESKTOP-PARITY-PLAN.md`,
+  `MULTI-ARTIST-PLAN.md`) into `docs/plans/` while maintaining root symlinks so legacy
+  references across codebase comments and docs continue to resolve cleanly.
+
+## Iteration 74 — Ledger Design System Revamp (Android & macOS)
+
+### D214 — Ledger design system implementation across Android and macOS clients
+
+Implemented the high-fidelity design revamp from `design/handoff/` across both the Android
+(Kotlin / Jetpack Compose) and macOS (Swift / SwiftUI) Couch Tour clients.
+
+Key decisions and implementations:
+1. **Design Tokens & Theme System**:
+   - Dark theme `#161826` app background, `#12141f` elevated panels, `#1c1e2c` surface cards,
+     `#232532` dividers, `#292b31` panel borders, `#3f424d` control outlines, `#e9e9ed` primary text,
+     `#9184d9` purple accent, `#f2a93b` rating amber.
+   - Light theme `#ffffff` background, `#f7f7fb` elevated, `#f0f1f7` surface, `#e4e7f5` dividers,
+     `#20222c` primary text, `#6f62c7` / `#5d5294` accent, `#a06615` deepened rating amber.
+   - 4-stop stagelight hairline gradient (`#5B8CFF` -> `#9184D9` -> `#F06BB0` -> `#F2A93B`)
+     and procedural cover-art gradient (`#D97706` -> `#991B1B` -> `#1E1B4B`).
+2. **Android UI Refactor**:
+   - Fixed-width 44dp type badges (`LIST`, `SHOW`, `TRACK`) ensuring uniform row text alignment.
+   - Vector dual-layer `WaveformScrubber` rendering unplayed waveform and spec-gradient played portion.
+   - `MiniPlayer` docked above 4-tab `LedgerBottomBar` (Home, Search, Library, Settings) with 2px
+     spec gradient progress bar.
+   - `NowPlaying` screen with dark hero gradient fade vs plain white light background, tape FLAC
+     badge, rating, and transport order (add-to-playlist, prev, play/pause, next, like/heart).
+   - `LibraryScreen` with 4 filter chips, search bar, sort dropdown, and uniform badge rows.
+   - `SettingsScreen` with grouped uppercase sections, value rows with chevron, and live sync trigger.
+   - `ShowHeader` updated with 96dp artwork tile, rating, and action pills.
+3. **macOS 3-Pane Desktop Layout**:
+   - Left fixed sidebar (~236px) with navigation items, live favorite artist show counts, and sync status.
+   - Center flexible content pane for Home, Search, Show Detail, and Library.
+   - Right fixed player rail (392px) with artwork, tape details, rating, transport controls,
+     `WaveformScrubber`, and up-next queue.
+   - `ExpandedNowPlayingView` full-window modal with 240px artwork tile, ambient radial gradient wash,
+     tape lineage, waveform scrubber, and collapse affordance.
+4. **Shared Standards & Constraints**:
+   - Ported `artist-abbreviations.js` to Kotlin (`ArtistAbbreviations.kt`) and Swift (`ArtistAbbreviations.swift`).
+   - Strictly preserved `uat-005` ("moe." lowercase with period) and `uat-006` (YYYY-MM-DD date formatting).
+   - Verified 492 Android unit tests passing (`./gradlew testDebugUnitTest`) and 408 Swift package tests
+     passing (`swift test` in `CouchTourKit`). macOS app target builds cleanly.
+
+### D215 — Reconciling visual fidelity with design handoff across Android and macOS
+
+Systematically audited and reconciled all visual discrepancies between the implemented Android and
+macOS clients and the design handoff specifications in `/Volumes/ExtSSD160/scripts/phish-in-app/design/handoff/`
+(`Couch Tour Android.dc.html`, `Couch Tour macOS.dc.html`, and reference screenshots in `screenshots/`).
+
+Key implementations & alignments:
+1. **Android Fidelity (Screens 1A–1E)**:
+   - **Home (Screen 1A)**: Top ledger bar with date and Surprise Me shuffle action; card shelves for
+     In Progress (with top 2px progress bar overlay), Next Tour Stops (with gradient accent bar), and
+     On This Date; mini-player docked above bottom navigation with spec-gradient played scrubber bar.
+   - **Search (Screen 1B)**: Tab headers with count pills and active underline indicator; filter chips;
+     collapsible Jam Chart note cards with 1px border; fixed 44dp type badges (`LIST`, `SHOW`, `TRACK`).
+   - **Now Playing (Screen 1D)**: 240dp artwork with ambient radial wash; dark hero gradient fade vs plain
+     white light theme; tape FLAC badge and rating row; 48dp waveform scrubber; like button with counter.
+   - **Tests**: Added `LedgerLayoutTest.kt` verifying progressFraction, compactDuration, formatShowDate,
+     and layout constraints. Suite passing: 31 classes, 497 tests.
+2. **macOS Fidelity (Screens 2A–2E)**:
+   - **Formatters & Tests**: Tested in `FormatTests.swift` (added tests for `progressFraction`, `formatCompactDuration`,
+     `formatRemainingTime`, `formatShowDate`). 412 package tests passing with 0 failures in `swift test`.
+   - **Design Components**: Added `ProgressBarOverlay`, `JamChartNoteCard`, `TrafficLights`, and `ConicGlowArtwork`
+     with conic gradient stagelight blur.
+   - **Sidebar (Screen 2A)**: Traffic lights window chrome, 34px nav items with active `#d2cefd` highlight,
+     `FAVORITE ARTISTS` with `GradientHairline` and formatted show counts, footer sync status with glowing purple indicator dot.
+   - **Player Rail (Screen 2A)**: 3-radial ambient wash, 344×344 artwork with conic glow, TAPE and SHOW RATING row,
+     track title and Jam Chart note card, 64px waveform scrubber, 72×72 filled circle play button, like button with counter.
+   - **Expanded Now Playing (Screen 2D)**: Full 1440×900 layout with traffic lights, 440×440 artwork tile,
+     TAPE/RATING/SET row, 44px track title with FLAC badge, 110px scrubber, 82×82 play button.
+   - **Search (Screen 2B)**: Query header, stagelight hairline, tabs with counts and underline, filter chips,
+     table column headers, fixed-width badge rows with collapsible jam chart note card.
+   - **Show Detail (Screen 2C)**: Breadcrumb header (`Artist / Year / Date`), 160×160 artwork with conic glow blur,
+     stats row (rating, sets · tracks · duration, tour name, tape/source picker), action pills (Resume with remaining time,
+     Saved bookmark, Add to playlist), 2-column setlist layout with compact durations and set hairlines, active track highlight bar.
+   - **Library (Screen 2E)**: `YOUR LIBRARY` header, search bar, sort chips ("Recently added ▾", "Artist ▾"),
+     category filter tabs with counts, table column headers (`TYPE`, `NAME`, `ARTIST`, `RATING`, `LENGTH`, `ADDED`, play, dots menu),
+     fixed `TypeBadge` rows with playlists, shows, and tracks.
+3. **Verification**:
+   - Xcode project generated with `xcodegen generate` and built clean with `xcodebuild` (0 errors).
+   - SwiftPM tests pass (412 tests). Android Robolectric & MockWebServer tests pass (497 tests).
+
+## Iteration 74 — Light / Dark / Auto mode theme settings (D216)
+
+### D216 — Persistent Light, Dark, and Auto theme settings across Android and macOS
+
+Added user-selectable theme modes (**Auto / System Default**, **Light**, **Dark**) with persistent storage
+and reactive runtime updates on both Android and macOS.
+
+1. **Android**:
+   - `ThemeSettings.kt`: `ThemeMode` enum (`AUTO`, `LIGHT`, `DARK`) backed by `SharedPreferences` (`"theme_settings"`),
+     exposing `themeMode: StateFlow<ThemeMode>` and initialized in `CouchTourApp.kt`.
+   - `Theme.kt`: `CouchTourTheme` observes `ThemeSettings.themeMode`, resolves dark/light appearance dynamically
+     (evaluating `isSystemInDarkTheme()` when in `AUTO` mode), and synchronizes window status/navigation bar appearance
+     via `WindowCompat.getInsetsController`.
+   - UI: Added `APPEARANCE` section in `SettingsScreen.kt` and `HomeScreen` with current mode value row and `ThemePickerDialog`
+     providing radio options for Auto (system default), Light, and Dark.
+   - Tests: Added `ThemeSettingsTest.kt` covering defaults, persistence across re-init, and storage value mappings.
+     Android unit test count increased from 497 to 500 tests.
+
+2. **macOS**:
+   - `CouchTourKit`: Added `ThemeSettings.swift` with `ThemeMode` enum (`auto`, `light`, `dark`) providing computed
+     `colorScheme: ColorScheme?` and `ThemeSettings: ObservableObject` backed by `UserDefaults` (`"app_theme_mode"`).
+   - `AppModel.swift`: Added `themeSettings` and wired change forwarding via Combine into `AppModel`'s `objectWillChange`.
+   - `CouchTourApp.swift`: Applied `.preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)` to `WindowGroup`
+     content and `Settings` scene.
+   - UI: Added `Appearance` section in `PlaybackSettingsView.swift` with a segmented `Picker("Theme", selection: $themeSettings.themeMode)`.
+   - Tests: Added `ThemeSettingsTests.swift` covering default value, persistence, and properties.
+     macOS package test count increased from 412 to 415 tests.
+
+## Iteration 75 — macOS Home Screen markup feedback fixes (D217)
+
+### D217 — Address macOS Home Screen Markup Feedback (Points 1–5)
+
+Resolved 5 visual markup points identified during manual review of the macOS Home screen:
+
+1. **Point 1: Alphabetize Favorite Artists in Left Sidebar**
+   - In `SidebarView.swift`, `ThreePaneRootView.swift`, and `HomeView.swift`, sorted favorite artists alphabetically by name (`localizedCaseInsensitiveCompare`).
+   - Added fallback list of favorite artists in alphabetical order (`Goose`, `Grateful Dead`, `pgroove`, `Phish`, `TAB`, `WSP`) with valid `ArtistRef(backend:id:name:showCount:)` so the sidebar never renders as empty blank space.
+   - Updated HTML design handoff mockup across all screens (2A, 2B, 2C, 2D, 2E, 2F, 2G) to list favorite artists in alphabetical order.
+
+2. **Point 2: Show Elapsed Time (Not Remaining) on In-Progress Cards**
+   - In `HomeView.swift`, updated `inProgressCard` to compute and render elapsed listening time (`\(fmt(posMs)) elapsed`) instead of remaining/duration time.
+   - Updated preview cards and sample cards to show elapsed formats (`5:14 elapsed`, `12:50 elapsed`, `0:32 elapsed`).
+   - Updated HTML design handoff mockup across dark (2A) and light (2B) modes, as well as the Show Detail Resume buttons.
+
+3. **Point 3: Interactive Play Button on "On This Date" Cards**
+   - In `HomeView.swift`, added interactive play buttons inside the play badge circle for each "On This Date" card (replacing the empty circle outline).
+   - Wired the button to an async `tapPlayShow(_ show: ShowSummary)` handler that loads the show's tracks and initiates playback directly through `AppModel.play(track:in:)`.
+
+4. **Point 4: Missing "Shuffle" Icon on Top Ledger Bar**
+   - In `HomeView.swift`, added `Image(systemName: "shuffle")` with explicit 16×16 framing, `.fixedSize()`, and `.layoutPriority(1)` on the "Surprise me" button.
+   - Applied `.fixedSize(horizontal: true, vertical: false)` and `.lineLimit(1)` to the "In progress" title header so it cannot wrap to two lines and cause the ledger controls to truncate.
+
+5. **Point 5: Missing Dropdown Icon on Filter Pills**
+   - In `HomeView.swift`, added `Image(systemName: "chevron.down")` with explicit 10×10 framing, `.fixedSize()`, and `.layoutPriority(1)` to the "Recently played" and "All artists" dropdown filter pills.
+   - Applied `.lineLimit(1)` and `.fixedSize()` so pills never clip down to truncated ellipses.
+
+## Iteration 76 — UI wiring, navigation routing, and mock data audit across Android and macOS (#139–#149)
+
+### D218 — Comprehensive audit and resolution of UI wiring, navigation routes, and mock data across Android and macOS clients (#139–#149)
+
+Comprehensive code audit of the newly introduced Ledger UI components across Android and macOS identified
+and resolved multiple instances of unwired buttons, mock/hardcoded values, and missing navigation routes:
+
+1. **#139: Android Search Filter Tabs Wiring** (`SearchScreen.kt`):
+   - Wired category filter pills (`All`, `Artists`, `Shows`, `Songs`, `Venues`) to actual active filter state
+     (`SearchFilter.ALL`, `SearchFilter.ARTISTS`, etc.) with dynamic result counts per category.
+   - Filter chips now correctly filter search results displayed in the unified search screen.
+
+2. **#140: Android Library Sort Dropdown Menu** (`LibraryScreen.kt`):
+   - Replaced static sort pill with an interactive dropdown menu offering sorting options (`Recently added`, `Title / Date`, `Artist`).
+   - Wired active sorting directly into the combined library item query flow.
+
+3. **#141: Android Settings "Clear Offline Storage" Action** (`SettingsScreen.kt`):
+   - Replaced dead button and hardcoded storage text (`"0.0 GB"`) with live calculation of cache size (`context.cacheDir`).
+   - Tapping invokes cache clear with responsive confirmation UI (`"Storage cleared"`).
+
+4. **#142: Android Now Playing Queue "Save as Playlist" Action** (`NowPlaying.kt`):
+   - Replaced no-op button with a functional "Save queue as playlist" dialog allowing users to save the currently playing queue as a local playlist.
+   - Saves track references directly into the database via `LocalPlaylistRepository`.
+
+5. **#143: Android Home Screen "Next Couch Tour Stop" Tap Target** (`DesignComponents.kt`):
+   - Made the entire next tour stop card clickable (`Modifier.clickable`), routing to the show detail screen for the upcoming unplayed show.
+   - Added an interactive circular play button that directly starts playback of the show.
+
+6. **#144: Android Library Item Context Menu ("...") Actions** (`LibraryScreen.kt`):
+   - Replaced no-op `IconButton` with a functional `DropdownMenu` containing context actions: `Play`, `Add to playlist`, `Share`, and `Remove from library`.
+
+7. **#145: macOS Search Filter Tabs Wiring** (`SearchView.swift`):
+   - Wired the search category filter pills (`All`, `Shows`, `Tracks`, `Venues`, `Artists`) to `searchCategory` filtering state with live item counts.
+
+8. **#146: macOS Player Rail Up-Next Queue Actions** (`PlayerRailView.swift`):
+   - Wired "Clear queue" button to `player.clearQueue()` (preserving the currently playing track).
+   - Added a "Save as playlist..." dialog to save the remaining up-next queue as a new local mixtape playlist.
+
+9. **#147: macOS Expanded Now Playing "Add to Playlist" Action** (`ExpandedNowPlayingView.swift`):
+   - Replaced disabled/no-op action button with an active playlist picker sheet (`AddToPlaylistSheet`) allowing the playing track to be added to any local or phish.in playlist.
+
+10. **#148: macOS Desktop Library Table Context Menu Actions** (`LocalPlaylistsView.swift`):
+    - Replaced no-op dots menu (`Image(systemName: "ellipsis")`) with an interactive SwiftUI `Menu` providing actions: `Play`, `Add to Queue`, `Add to Playlist`, `Share`, and `Delete / Remove`.
+
+11. **#149: macOS Show Detail Action Pills Wiring & Dynamic Card Ratings** (`ShowDetailView.swift`, `HomeView.swift`):
+    - Wired `Add to Playlist` button on the show detail view to show a picker sheet for adding all tracks in the show to a local playlist.
+    - Replaced hardcoded `★ 4.2` and `★ 4.4` ratings on tour stop and anniversary show cards in `HomeView.swift` with dynamic `show.rating > 0` checks.
+
+## Iteration 77 — Design docs comparison audit & wiring across Android and macOS (D219)
+
+### D219 — Design docs comparison audit, light mode contrast restoration, and interactive pill controls across Android and macOS
+
+Comprehensive comparison between the running app and the design docs (`design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html`) resolved 10 discrepancies across macOS and Android:
+
+1. **macOS Expanded Now Playing Light Mode Contrast & Dynamic Tape Lineage** (`ExpandedNowPlayingView.swift`, `Player.swift`):
+   - Restored adaptive theme contrast colors (`colors.textPrimary`, `colors.textSecondary`, `colors.surfaceElevated`, `colors.panelBorder`) across the entire modal sheet, eliminating washed-out low contrast text in light mode.
+   - Replaced hardcoded `"SBD · Charlie Miller · 24/48 FLAC"` with dynamic `tapeLabel` derived from `player.recording` metadata (`rec.sourceType`, `rec.taper`, `rec.format`), matching Player Rail.
+   - Eliminated hardcoded idle fallback text (`"Split Open and Melt"`, `"1994-12-31"`) in favor of dynamic fallback state (`"No track playing"`).
+
+2. **macOS Player Rail Light Mode Contrast & Dynamic Tape Lineage** (`PlayerRailView.swift`):
+   - Replaced hardcoded `Color.white` and `.white.opacity(...)` with adaptive `colors.textPrimary` and `colors.textSecondary` so text and controls render crisply in both light and dark themes.
+   - Made tape lineage tag reactive to the current `player.recording` rather than a static label.
+
+3. **macOS Home Screen "Next Tour Stop" Action Inversion** (`HomeView.swift`):
+   - Corrected inverted click handlers: tapping the tour stop card body navigates to the show detail view (`show`), while clicking the circular play button directly plays the show via `tapPlayShow(show)`.
+
+4. **macOS Search Filter Chips & Track Row Artist Label** (`SearchView.swift`):
+   - Wired interactive search filter chips below the search bar: Sort dropdown menu (`Relevance`, `Show Date (Newest)`, `Show Date (Oldest)`, `Rating (High to Low)`), Artist filter menu derived from `hits.artistsPresent`, and toggles for Soundboard (SBD) and Jam Chart.
+   - Fixed track hit artist label to display proper artist abbreviation (`ArtistAbbreviations.label(for: "Phish")`) rather than generic hardcoded strings.
+
+5. **macOS Library Search Field & Sort Pill** (`LocalPlaylistsView.swift`):
+   - Fixed search field styling to use proper `colors.surface` and `colors.panelBorder` backgrounds with 12pt font.
+   - Replaced static sort pill with an interactive SwiftUI `Menu` offering `Recently Added`, `Title`, and `Artist` sorting, with active sorting applied to library items.
+
+6. **Android Next Tour Stop Card Navigation** (`MainActivity.kt`):
+   - Wired `.clickable` modifier on the show info card content to route to `show/${show.date}` or `recording/${show.date}/${show.recordingId}`, allowing users to inspect the upcoming stop without immediately starting playback.
+
+7. **Android Show Screen Action Pills & Show Add-to-Playlist Dialog** (`MainActivity.kt`):
+   - Wired all three 36dp header action pills on `ShowHeader`: "Resume" starts playback of the current track, "Saved" toggles bookmark/like status with filled star/heart, and "Add" opens a bottom sheet allowing the entire show's tracks to be added to a local playlist.
+   - Added `AddTracksToPlaylistDialog` modal bottom sheet.
+   - Replaced hardcoded `"★ 4.6"` and `"SBD · Paluska · FLAC"` with dynamic show rating / likes count and tape lineage details.
+
+8. **Android Recording Detail Screen Header Alignment** (`MainActivity.kt`):
+   - Refactored `RecordingHeader` to match Ledger Screen 1C specification with 96dp right-aligned artwork tile, venue/city/date hierarchy, dynamic rating and taper/lineage metadata, and wired 36dp action pills.
+
+9. **Unit Testing & Documentation Updates** (`FormatTest.kt`, `README.md`, `UAT.md`):
+   - Added unit tests for compact duration formatting in `FormatTest.kt` (501 Android unit tests total).
+   - Added UAT test items `uat-034` (macOS light mode player contrast and search filters) and `uat-035` (Android show action pills & tour stop navigation).
+
+## Iteration 78 — Design Docs Comparison Audit Round 2 (D220)
+
+### D220 — Show bookmarking parity, player transport light-mode contrast, dynamic tape metadata, and library row alignment
+
+A second exhaustive screen-by-screen audit against `design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html` addressed 7 remaining discrepancies and wiring bugs across macOS and Android:
+
+1. **macOS Show Detail "Saved" Button Logic Inversion Fixed** (`Browse/ShowDetailView.swift`, `SavedShows.swift`, `AppModel.swift`):
+   - Resolved bug where the "Saved" pill on Show Detail called `appModel.favorites.toggle(show.artist.key)`, which toggled the *favorite artist* rather than bookmarking the *show*.
+   - Introduced `SavedShows` in `CouchTourKit` (`UserDefaults`-backed `Set<String>`, mirroring `Favorites` and `LikedTracks`), added `savedShows` to `AppModel`, and updated `ShowDetailView` to toggle `appModel.savedShows.toggle(show.date)`.
+
+2. **macOS Home Screen "On This Date" Conditional Bookmark & Likes Fallback** (`HomeView.swift`):
+   - Corrected `onThisDateCard` to conditionally render `Image(systemName: "bookmark.fill")` only when the show is in the user's library (`appModel.savedShows.contains(show.date)`), rather than unconditionally on every card.
+   - Fall back to `♥ \(show.likesCount)` when `show.rating <= 0`.
+
+3. **macOS Player Transport Controls Contrast in Light Mode** (`PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - Replaced hardcoded `#E9E9ED` skip button colors and `#F3F5FE` play circle fills with adaptive theme colors (`colors.textPrimary` for skip buttons, high-contrast dark circle `#20222C` with white icon in light mode, off-white circle `#F3F5FE` with dark icon in dark mode).
+
+4. **Android Now Playing Tape Header Show Rating & Dynamic Lineage** (`NowPlaying.kt`, `PlayerViewModel.kt`, `MediaItems.kt`, `PlaybackService.kt`):
+   - Added `SHOW_RATING` and `TAPE_LINEAGE` keys to `PlaybackService.Keys` and attached rating and tape lineage in `MediaItems.kt` (`showTrackItems` and `recordingTrackItems`).
+   - Exposed `showRating: Double` and `tapeLineage: String?` in `PlayerState` and populated them in `PlayerViewModel`.
+   - In `NowPlaying.kt`, rendered the `SHOW RATING ★ 4.6` column in the tape header row when `state.showRating > 0.0`, and displayed dynamic tape lineage rather than static placeholder text.
+
+5. **Android Show Detail & Recording Detail Header Action Pills** (`MainActivity.kt`, `SavedShows.kt`, `CouchTourApp.kt`):
+   - Created `SavedShows.kt` (`SharedPreferences`-backed `Set<String>`) and initialized it on application launch.
+   - Updated `ShowHeader` and `RecordingHeader` action pills: dynamically labeled "Play" vs "Resume" based on whether progress exists (`hasProgress`), wired the "Save" / "Saved" pill with reactive `Icons.Default.Bookmark` / `BookmarkBorder` and highlight border, and removed duplicate trailing `LikeButton` on `ShowHeader`.
+
+6. **Android Home Screen "On This Date" Row Likes Fallback & Bottom Divider** (`MainActivity.kt`):
+   - In `OnThisDateLedgerRow`, displayed `♥ ${show.likesCount}` when `show.rating <= 0.0` and `show.likesCount > 0`.
+   - Added a 1px `HorizontalDivider(color = ledger.listDivider)` below each row to match design spec.
+
+7. **Android Library Screen SHOW Row Trailing Rating/Elapsed Alignment** (`LibraryScreen.kt`):
+   - Replaced circular play button in `SHOW` rows with trailing elapsed/duration text (`trailingText`), aligning with the design specification (circular play buttons reserved for `LIST` rows).
+
+8. **Automated Unit Testing & UAT Updates** (`SavedShowsTest.kt`, `SavedShowsTests.swift`, `README.md`, `UAT.md`):
+   - Added unit test suites for `SavedShows` on both Android (`SavedShowsTest.kt`, 503 passing tests total) and macOS (`SavedShowsTests.swift`, 418 passing tests total).
+   - Added `uat-036` (Saved Shows & Library Bookmark Parity) and `uat-037` (Now Playing Tape Lineage & Show Rating) to `UAT.md`.
+
+## Iteration 79 — Design Docs Comparison Audit Round 3 (D221)
+
+### D221 — Set/track eyebrow parity, waveform scrubber playhead needle, macOS height scaling, and Relisten set headers
+
+A third exhaustive screen-by-screen audit against `design/handoff/README.md`, `Couch Tour Android.dc.html`, and `Couch Tour macOS.dc.html` addressed remaining discrepancies and wiring details across macOS and Android:
+
+1. **Android Now Playing FLAC Badge & Set/Track Eyebrow** (`NowPlaying.kt`, `PlayerViewModel.kt`, `MediaItems.kt`, `PlaybackService.kt`):
+   - Guarded the FLAC pill in `NowPlaying.kt` with `if (state.isFlac)` so it only renders when the active stream is genuine FLAC audio.
+   - Added `SET_NAME` and `TRACK_POSITION` to `PlaybackService.Keys` and `Keys.ALL`.
+   - Wired `setName` and `trackPosition` through `mediaItem(...)` and `recordingMediaItem(...)` in `MediaItems.kt`.
+   - Exposed `setName: String` and `trackPosition: Int` in `PlayerState` and populated them in `PlayerViewModel.refresh()`.
+   - Formatted track eyebrow as `SET <I/II/ENCORE> · TRACK <N>` (e.g. `SET II · TRACK 4` matching spec line 355/430), falling back to `TRACK <N>` when set information is not present.
+
+2. **Android Waveform Scrubber Needle Cursor** (`DesignComponents.kt`):
+   - Added a 2px rounded playhead cursor needle in `#F3F5FE` at `playedWidth` with vertical extension matching the design spec (`position:absolute;left:34%;top:-4px;bottom:-4px;width:2px;background:#f3f5fe;border-radius:2px;box-shadow:0 0 12px rgba(240,107,176,.9)`).
+
+3. **Android RecordingScreen Set Headers Duration & Hairlines** (`MainActivity.kt`):
+   - Upgraded `groupedBySet` for `PlayableTrack` to calculate set durations and render `SetHeader(setName, durationMs)` with `GradientHairline`, matching `ShowScreen` and the design docs.
+
+4. **macOS WaveformScrubber Height Constraint Removal** (`WaveformScrubber.swift`):
+   - Removed hardcoded `.frame(height: 38)` on inner geometry so `WaveformScrubber` adopts the height provided by its caller (`.frame(height: 64)` in `PlayerRailView`, `.frame(height: 110)` in `ExpandedNowPlayingView`), matching design doc spec lines 363 & 1837.
+
+5. **macOS Now Playing Set & Track Eyebrows and Column Layout** (`Catalog.swift`, `PhishInAPI.swift`, `RelistenAPI.swift`, `Format.swift`, `PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - Added `position: Int = 0` to `PlayableTrack` in `CouchTourKit` and mapped track position from `Track` and `RelistenSourceTrack`.
+   - Added `formatSetRoman`, `formatSetAndTrackEyebrow`, and `formatSetColumn` helpers to `Format.swift`.
+   - In `PlayerRailView.swift`, updated eyebrow to `SET II · TRACK 4`.
+   - In `ExpandedNowPlayingView.swift`, updated column 3 of the metadata row to `SET` / `II · Track 4` and added `SET II · TRACK 4` eyebrow above the track title.
+
+6. **macOS Sidebar Sync Status Dot State** (`SidebarView.swift`):
+   - Conditioned the glowing purple sync dot on `appModel.syncSession.paired`, rendering dimmed/subtle when unpaired.
+
+7. **Automated Unit Testing & Documentation Updates** (`MediaItemsTest.kt`, `FormatTests.swift`, `README.md`, `UAT.md`):
+   - Added unit tests for `SET_NAME` and `TRACK_POSITION` extras in `MediaItemsTest.kt` (504 Android unit tests total).
+   - Added unit tests for `formatSetRoman`, `formatSetAndTrackEyebrow`, and `formatSetColumn` in `FormatTests.swift` (421 macOS package tests total).
+   - Added UAT items `uat-038` and `uat-039` to `UAT.md`.
+
+## Iteration 80 — Procedural Artwork Styling for moe. (D222)
+
+### D222 — Procedural artwork styling for moe. (uat-005)
+
+Under `uat-005`, the universal styling convention for the artist "moe." requires lowercase rendering with a trailing period (`moe.`) across all screens, labels, abbreviations, and artwork. While `ArtistAbbreviations.kt` and `ArtistAbbreviations.swift` previously enforced this rule for table rows and labels, procedural artwork monogram generation still fell back to uppercase abbreviations (`MOE` or `MO`).
+
+1. **macOS Procedural Monogram Generation** (`Artwork.swift`):
+   - In `ShowArtworkGenerator.monogram(for artist: String?)`, added explicit case handling for `"moe."` / `"moe"`, returning `"moe."` directly instead of falling through to letter truncation and `.uppercased()`.
+   - Verified via unit test assertions in `ArtworkTests.swift` for `"moe."`, `"Moe"`, and `"MOE."` (421 tests passing).
+
+2. **Android Procedural Monogram and Label Overlays** (`Artwork.kt`):
+   - In `deriveArtistMonogram(artistName: String?)`, added case handling for `"moe."` / `"moe"` to return `"moe."` rather than the default two-character uppercase slice `"MO"`.
+   - In `LargeArtworkOverlay`, preserved `"moe."` when formatting the artist header text instead of unconditionally calling `artistName.uppercase()`.
+   - In `MediumArtworkOverlay`, routed `artistName` through `ArtistAbbreviations.artistLabel(...)` to ensure standard lowercase period formatting.
+   - Updated unit tests in `ArtworkTest.kt` verifying `deriveArtistMonogram` outputs `"moe."` across casing variations (505 tests passing).
+
+## Iteration 81 — Light Mode Readability & Sidebar Settings on macOS (D223)
+
+### D223 — Light mode secondary text color readability and sidebar settings button (#154, #155)
+
+Addresses two macOS client issues logged under #154 (poor text contrast in light mode) and #155 (sidebar settings button not opening settings).
+
+1. **Adaptive Color System for Secondary & Subtle Text** (`LedgerDesign.swift`):
+   - In light mode, secondary text hardcoded to dark-mode values like `#75798C` or `#B2B6CA` resulted in low contrast ratios against white or light backgrounds.
+   - Introduced dynamic Ledger tokens via `NSColor(name:dynamicProvider:)`:
+     - `LedgerColors.textSubtle`: `#5A5E70` in light mode, `#75798C` in dark mode.
+     - `LedgerColors.textSecondary`: `#3F424D` in light mode, `#B2B6CA` in dark mode.
+     - `LedgerColors.accentIcon`: `#5845C2` in light mode, `#B5ABFC` in dark mode.
+     - `LedgerColors.accentTintText`: `#5845C2` in light mode, `#D2CEFD` in dark mode.
+     - `LedgerColors.controlOutline`: `Color.black.opacity(0.12)` in light mode, `Color.white.opacity(0.10)` in dark mode.
+   - Replaced hardcoded dark mode colors across macOS views:
+     - `HomeView.swift`: Section headers, card subtitles, dates, venue metadata, and recent track subtext.
+     - `LocalPlaylistsView.swift`: Playlist subtitle counts and track count labels.
+     - `SearchView.swift`: Search results track subtitle, venue, and date metadata.
+     - `PlayerRailView.swift`: Now playing artist/venue labels, duration indicators, waveform timestamp counter.
+     - `ShowDetailView.swift`: Breadcrumb trail, venue/city/duration subheaders, set track number and duration columns.
+     - `ExpandedNowPlayingView.swift`: Eyebrow labels, set/track indicators, tape metadata column labels and values.
+
+2. **Sidebar Settings Button Action** (`SidebarView.swift`):
+   - The settings gear button in `SidebarView` previously attempted to trigger settings via `NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)`, which fails or is ignored in SwiftUI scenes without standard legacy menu hookups.
+   - Replaced with the standard SwiftUI `@Environment(\.openSettings) private var openSettings` action, cleanly opening the macOS Settings window when clicked.
+   - Also updated the sidebar bottom section labels, sync status text, and icon colors to use the new adaptive `LedgerColors` tokens.
+
+**Testing:**
+- Package tests: `cd macos/Packages/CouchTourKit && swift test` (421 tests passed).
+- macOS app build: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
+- Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (505 tests passed).
+- Added `uat-040` to `UAT.md`.
+
+## Iteration 82 — Dynamic Waveform Visualization (D224)
+
+### D224 — Dynamic waveform visualization from phish.in and archive.org (Relisten)
+
+Replaced static, hardcoded waveform visualization (which previously rendered an invariant diamond-shaped 95-point peak profile across all tracks) with dynamic track waveform peak extraction from both phish.in and archive.org across macOS and Android Couch Tour clients.
+
+1. **Archive.org Waveform Derivation**:
+   - Audio tracks on Relisten are hosted on archive.org (`https://archive.org/download/{id}/{track}.mp3`). Archive.org automatically creates derivative 800×200 waveform PNGs with an identical file stem (`{track}.png`).
+   - Added `WaveformLoader.archiveOrgWaveformURL(from:)` in `CouchTourKit` and populated `waveformURL` in `RelistenSourceTrack.toPlayableTrack(...)` across both Swift (`RelistenAPI.swift`) and Kotlin (`Relisten.kt`).
+
+2. **Polarity Auto-Detection & Normalized Peak Extraction**:
+   - phish.in waveform PNGs (1100×70) feature an opaque signal (`alpha > 0.5`) on a transparent background (`alpha == 0`).
+   - archive.org waveform PNGs (800×200) feature an inverted silhouette: an opaque black background (`alpha > 0.5`) with a transparent cutout signal (`alpha == 0`).
+   - `WaveformLoader` (macOS `CouchTourKit`) and `WaveformExtractor` (Android `Waveform.kt`) auto-detect polarity by sampling the corner pixel: if opaque, the signal is `alpha < 0.5`; if transparent, `alpha > 0.5`.
+   - Amplitudes are extracted across slices matching the bar pitch and normalized so peaks scale to `[0.08, 0.95]`, preserving track dynamics while comfortably fitting player bounds.
+
+3. **macOS Scrubber Integration** (`WaveformScrubber.swift`, `PlayerRailView.swift`, `ExpandedNowPlayingView.swift`):
+   - `WaveformScrubber` accepts `waveformURL: String? = nil` and loads dynamic peak heights asynchronously in `.task(id: waveformURL)` via `WaveformLoader.shared.loadWaveform(...)`.
+   - In-memory caching ensures instantaneous rendering on subsequent visits or seeks.
+   - Connected `player.currentTrack?.waveformURL` in both `PlayerRailView` and `ExpandedNowPlayingView`.
+
+4. **Android Scrubber Integration** (`DesignComponents.kt`, `NowPlaying.kt`, `Waveform.kt`):
+   - Created `WaveformHeights(val top: FloatArray, val bottom: FloatArray)` and `WaveformExtractor` caching decoded peak profiles with an LRU cache.
+   - Updated `WaveformScrubber` in `DesignComponents.kt` to load dynamic bar heights via `LaunchedEffect(waveformUrl)` and render the Ledger spec-gradient vector bars with the track's real waveform peaks.
+   - Connected `state.waveformUrl` in `NowPlaying.kt`.
+
+**Testing & Validation:**
+- macOS package tests: `cd macos/Packages/CouchTourKit && swift test` (425 tests passed). Added `WaveformLoaderTests.swift` covering archive.org derivation, phish.in extraction, archive.org extraction, and playable track mapping.
+- macOS app target: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
+- Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (508 tests passed). Added `WaveformExtractorTest.kt` and `CatalogTest` relisten waveform derivation test.
+- Added `uat-041` in `UAT.md`.
+
+## Iteration 83 — Smooth Continuous Waveform Visualization (D225)
+
+### D225 — Continuous solid silhouette waveform rendering across Android and macOS (Option 1)
+
+Follow-up to D224 based on user visual feedback and review of reference web players on phish.in and relisten.net. While D224 successfully made waveform heights dynamic to each track, discrete vertical bars appeared stark and coarse compared to the smooth, organic silhouette waveforms on the web players.
+
+An interactive visual prototype (`waveform_smoothing_mockup.html`) was provided with 4 design options: Option 1 (Continuous Solid Silhouette / Web Parity), Option 2 (High-Density Micro-Bars with Gaussian Smoothing), Option 3 (Hybrid Silhouette + Needles), and Option 4 (Previous 95 Coarse Bars). The user selected **Option 1**.
+
+1. **Envelope Extraction & Backwards Compatibility** (`WaveformLoader.swift` on macOS, `Waveform.kt` on Android):
+   - Defined `WaveformEnvelope` on macOS (with `top: [CGFloat]` and `bottom: [CGFloat]`) and updated `WaveformHeights` on Android.
+   - Enhanced `WaveformLoader` with `loadEnvelope(from:sampleCount:)` and `extractEnvelope(from:sampleCount:)` (sampling 400 points across the track width) while preserving `extractHeights(...)` for backward compatibility.
+   - Added `testExtractEnvelopeFromPhishInFixture` and `testExtractEnvelopeFromArchiveOrgFixture` in `WaveformLoaderTests.swift`.
+
+2. **macOS Continuous Waveform Shape & Vector Path** (`WaveformScrubber.swift`):
+   - Replaced discrete bar rendering (`WaveformBarsShape`) with a custom SwiftUI `ContinuousWaveformShape` conformant to `Shape`.
+   - Constructs a closed continuous 2D `Path`:
+     - Starts at `(0, centerY - top[0] * maxAmplitude)`.
+     - Traces line segments across all sample points on the upper contour `(x_i, centerY - top[i] * maxAmplitude)`.
+     - Extends to `(width, centerY)`.
+     - Traces line segments in reverse along the lower contour `(x_i, centerY + bottom[i] * maxAmplitude)`.
+     - Closes back to the starting point.
+   - Renders the full unplayed silhouette with subtle opacity (`textPrimary.opacity(0.18)`), an unplayed 1.5px center hairline for track continuity across quiet passages, played audio masked to `activeFraction` with `LedgerTheme.specGradient` and a 2px played hairline, and a 2px playhead needle cursor (`Color(red: 0.95, green: 0.96, blue: 0.99)`).
+
+3. **Android Continuous Silhouette Path** (`DesignComponents.kt`, `Waveform.kt`):
+   - Updated `WaveformExtractor.extractHeights` to sample 400 points and normalize amplitude bounds to `[0.04f, 0.96f]`.
+   - Updated `WaveformScrubber` in `DesignComponents.kt` using Jetpack Compose `Path`:
+     - Traces top contour `0 until count` with `moveTo` and `lineTo`.
+     - Connects to `(width, centerY)`.
+     - Traces bottom contour `(count - 1) downTo 0` with `lineTo`.
+     - Closes the path cleanly.
+   - Draws unplayed `drawPath` and 1.5dp hairline, played audio with `clipRect(right = playedWidth)` using `specBrush` and 2dp hairline, and the 2dp playhead needle cursor.
+
+**Testing & Validation:**
+- macOS package tests: `cd macos/Packages/CouchTourKit && swift test` (427 tests passed, 0 failures).
+- macOS app target: `cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build` (BUILD SUCCEEDED).
+- Android unit tests: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest` (508 tests passed, 0 failures).
+- Added `uat-042` in `UAT.md`.
+
+## Iteration 74 — Feedback Restoration across all Screens, In-Progress Item Long-Press Menu, and Year-Based Tour Selection (D226)
+
+### D226 — Restore Feedback Button across Android Root Screens, In-Progress Long-Press Actions Menu, and Year-Based Tour Selection
+
+**Context:**
+Following recent Ledger redesign updates:
+1. The global feedback launcher button was inadvertently dropped from the top-level screens (`HomeScreen`, `LibraryScreen`, and `SettingsScreen`). While drilled-down screens with `Header` and the `NowPlaying` screen retained it, users on top-level screens had no direct feedback affordance.
+2. The "IN PROGRESS" shelf on the Home screen and in-progress items in the Library lacked an interactive options menu to manage listening state (resume, open show/playlist, mark completed, remove from in-progress, or delete from history).
+3. The Next Tour Stop dialog required typing tour names blindly into a text field rather than browsing by artist tour years and choosing from that year's list of tours.
+
+**Decisions:**
+1. **Restore Feedback Button across Android Root Screens**:
+   - Added `FeedbackButton(nav, modifier = Modifier.size(36.dp), iconSize = 20.dp, tint = ledger.textMuted)` to:
+     - `HomeScreen`: in the top date header row alongside the "Surprise me" chip.
+     - `LibraryScreen`: in the top header row opposite the "YOUR LIBRARY" headline.
+     - `SettingsScreen`: in the top header row alongside the "Settings" title.
+   - Combined with existing headers and `NowPlaying`, every screen across the Android client now has the feedback button restored.
+2. **Long-Press Context Menu for In-Progress Items**:
+   - Configured `Modifier.combinedClickable` on `InProgressLedgerRow` (Home) and `LibraryRowItem` (Library) with an interactive `DropdownMenu`:
+     - **Resume playback**: calls `vm.resume(progress)`.
+     - **Open show / playlist**: calls `openQueue(progress, nav)` or `openQueueKey(item.queueKey, nav)`.
+     - **Mark completed**: calls `vm.markCompleted(progress)`.
+     - **Remove from In Progress**: calls `vm.dismiss(progress)` to hide from in-progress while preserving history.
+     - **Delete from history**: calls `vm.forget(progress)` to remove the item completely.
+3. **Year-Based Tour Selection in Next Tour Stop Dialog** (`TourPickerDialog`):
+   - Redesigned `TourPickerDialog` to guide the user into a two-step flow:
+     - Select a year from the artist's historical years.
+     - Fetch that year's shows and display a selectable list of that year's distinct tours (filtering out sentinel values such as `Not Part of a Tour`), plus an option to track "All shows in [Year]".
+     - Shows checkmarks next to selected year and tour, with a "Change year" affordance to switch years easily.
+4. **Testing & Validation**:
+   - Added tests in `NextStopTest.kt` verifying tour and year preference resolution.
+   - All 510 Android unit tests pass cleanly: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest`.
+   - Updated test count in `README.md` and added manual verification checklist items `uat-043`, `uat-044`, and `uat-045` in `UAT.md`.
+
+
+### D227 — Delete fabricated sample shows from macOS Home (#144)
+
+The Spec 2A sample data that D215's fidelity work carried over into HomeView shipped as
+production UI: three invented in-progress cards (Phish 1997-11-17 "Bathtub Gin", Grateful Dead
+1977-05-08, pgroove 2005-04-16), three invented 2026 tour stops, five invented On-This-Date
+shows, a hardcoded ★ 4.2 on every tour-stop row and ★ 4.4 on every On-This-Date card, and a
+fake "7 shows" header count when the shelf was empty. All deleted. Each shelf now shows the
+standard ContentUnavailableView empty state instead of going quiet or showing fiction — On This
+Date with no matches is a common real state (most dates have no shows), so the shelf stays
+visible. Real rows render ShowSummary.rating only when a backend actually reports one (blank
+otherwise; the On This Date card falls back to a likes count when there is no average): a
+blank reads as "not rated" where a hardcoded number reads as fabricated. Visual verification
+is UAT (uat-046), on a fresh/empty-history launch.
+
+
+## Iteration 55 — Settings: Audio Quality, Gapless & Account (#141, D228)
+
+### D228 — Audio quality is a preference over capability; gapless is preload-configuration; dead rows removed (#141)
+
+Per Issue #141, the Settings screen advertised features that don't exist and a preference
+that did nothing.
+
+**Audio quality (#141, D187/D189 follow-up):**
+- The "Audio quality" row becomes a real persisted preference (`PlaybackSettings.AudioQuality`:
+  `LOSSLESS` default / `COMPRESSED`), stored in the same `playback_settings` SharedPreferences
+  file as `skipFiller` — one mechanism for playback prefs, not two.
+- The choice is honoured in `MediaItems.coreMediaItem` at queue-build time: FLAC is used only
+  when the quality is `LOSSLESS` (or the track has no MP3 url at all — a preference must never
+  make a tape unplayable). Under `COMPRESSED`, `Keys.FLAC_URL` is dropped from the extras
+  along with the URI, because Cast's hand-back (`CastItemConverter.toMediaItem`) and the Now
+  Playing quality badge both read that key; leaving it behind would silently restore lossless
+  audio when playback returned from the TV and badge FLAC while MP3 played.
+- Applies to the next queue started (same as skipFiller); phish.in shows remain MP3-only — the
+  preference is "prefer lossless", not a guarantee, which the picker copy states.
+
+**Gapless (#141):**
+- The dead `gaplessEnabled` toggle (a `remember{}` nothing read) becomes a persisted
+  `PlaybackSettings.gapless` (default on), applied by `PlaybackService` to the local player as
+  `ExoPlayer.setPreloadConfiguration` (10s read-ahead of the next queue item) plus an explicit
+  `setPauseAtEndOfMediaItems(false)`, collected live so the toggle applies to a running queue.
+- Stated honestly: Media3's decoded playback has no sample-exact seam between separate items
+  (that exists only in audio-offload, which not every device/codec negotiates). What the
+  toggle controls is the two audible, controllable gaps — the buffering stall at the
+  transition (preload) and pause-at-end-of-items (never wanted mid-set). MP3 LAME
+  encoder-delay/padding trimming is already applied by the extractor where metadata exists.
+
+**Removed rather than built:** the Crossfade row and the entire DOWNLOADS & STORAGE section
+("Downloaded shows", "Wi-Fi only downloads" and its dead state) are deleted per the
+2026-09-05 product decision — no Settings row may advertise a feature that isn't coming.
+
+**Sign-out:** already wired by the earlier audit round (confirmation dialog →
+`Session.logout()`); verified surviving this change rather than rebuilt.
+
+**Testing:** new `PlaybackSettingsTest` (defaults, persistence, storage fallback) and
+`MediaItemsTest` quality cases (MP3 preferred → mp3 uri with no FLAC extra; MP3 with no mp3
+url → FLAC fallback); 516 Android unit tests pass. Manual verification is UAT
+(uat-047, uat-048, uat-049).
+
+
+## Iteration 56 — Show Detail: Save→Like Replacement (#148, D229)
+
+### D229 — The Save/bookmark concept is gone from macOS; the header's actions are a phish.in show Like and a whole-show Add (#148)
+
+Per Issue #148 and the ROADMAP decision "Two Ways to Mark a Show, Not Three" (2026-09-05), the
+Save/bookmark pill — a third, redundant way to mark a show with no meaning elsewhere in the
+product — is deleted from macOS rather than kept working.
+
+- **Removed:** the Save/Saved pill and `isSaved` on `ShowDetailView`; the `SavedShows` store
+  (package source + `SavedShowsTests`) and its `AppModel` property; the bookmark icon on
+  Home's On-This-Date cards. Nothing else referenced any of it, and `savedShows` was never
+  `.environmentObject`-injected, so removal is clean. **Android's own bookmark store is
+  deliberately untouched** — #148 is macOS-scoped; Android's removal is a separate change.
+- **Like:** the header gains a `ShowLikeButton` — a phish.in server-side show like, the same
+  POST a track row makes with `.track` (`Likable.show` existed in the API layer, unused until
+  now). Optimistic toggle with rollback on failure, signed-out gate matching
+  `TrackLikeButton`, hidden for Relisten tapes. Enabler: `ShowSummary` gains `id` and
+  `likedByUser` (defaulted, so Relisten/search constructors are untouched) — both were
+  already decoded on macOS's `Show` DTO and exist on Android's `Show` model; the shared
+  summary was simply dropping them. Artist-favorite was explicitly rejected as the
+  replacement — mis-toggling the artist favorite was D220's original bug.
+- **Add to Playlist:** the header's pill now adds the **whole show** — it used to insert only
+  `detail.tracks.first`, a plain bug. Mechanically: `AddToPlaylistButton`'s closure returns
+  `[LocalPlaylistTrack]` (per-track surfaces pass one-element arrays), and a new
+  `LocalPlaylistStore.addTracks` inserts them in a single transaction so a failure can't
+  strand a half-show playlist — mirroring Android's whole-show `AddTracksToPlaylistDialog`.
+- **Unlabeled sources render unlabeled:** the source pill's fallback
+  `"SBD · Paluska · FLAC"` — a real taper's credit stamped onto sources that never carried
+  it — is replaced with `"Unlabeled source"`.
+- **Player-bar parity confirmed, not assumed:** macOS's player rail already had
+  `TrackLikeButton` + `AddToPlaylistButton`; Android's Now Playing likewise has both, and
+  Android's MiniPlayer is transport-only — no regression to make on either side.
+
+**Testing:** package suite at 427 tests, 0 failures (3 `SavedShowsTests` deleted, 3 added:
+show-like `likable_type: "Show"` POST shape; `addTracks` order/continuation/no-op). App target
+builds clean after `xcodegen` (new file). Manual verification is UAT (uat-050); uat-036
+narrows to Android.
+
+
+## Iteration 57 — Home Screen Unwired Elements Removed (#144, D230)
+
+### D230 — Remove unwired filter pills and static carousel buttons from macOS Home (#144)
+
+Completes the resolution of Issue #144 (following D227, which removed the fake mock show cards
+and replaced them with honest empty states).
+
+- **Removed unwired filter pills:** In `HomeView.swift`, the static "Recently played" and
+  "All artists" pills in the top ledger bar were static `HStack` mockups without actions,
+  menus, or bindings. They have been removed. The in-progress shelf represents active playback
+  and already links directly to `ListeningView` (which houses complete scope toggling and
+  artist filtering). Removing them creates an uncluttered header and prevents wrapping on narrow
+  window widths.
+- **Removed non-functional carousel arrows:** Static chevron circle buttons in `topLedgerBar`
+  and in the `onThisDateShelf` header have been removed. Horizontal shelf navigation on macOS
+  uses standard native trackpad two-finger swipes, Shift+Scroll, or Magic Mouse gestures.
+- **Verification:** `HomeView.swift` compiles cleanly in the app target, CouchTourKit package
+  tests pass (427 tests, 0 failures), and `uat-046` is updated in `UAT.md`.
+
+
+## Iteration 58 — Procedural Artwork Date Badge: Actually Strict YYYY-MM-DD (#62, D231)
+
+### D231 — Fix the procedural artwork date badge to render literal YYYY-MM-DD (#62)
+
+Issue #62 asked to verify that procedural artwork correctly shows `moe.` casing and strict
+`YYYY-MM-DD` date formatting before closing it. `moe.` casing checked out (D222). The date
+badge did not: despite `DECISIONS.md`/`ROADMAP.md` already crediting D214/D222 with "strict
+YYYY-MM-DD formatting" and `uat-006` being logged as addressed, the actual date badge drawn on
+procedural artwork was still a stylized, platform-inconsistent string —
+`ShowArtworkGenerator.dateBadge(from:)` on macOS returned `"1977 · 05/08"` and Android's
+`ArtworkDateComponents.fullBadge` (used by `LargeArtworkOverlay`, the Now Playing inspector
+badge `uat-006` calls out) returned `"1977 · MAY 08"`. Neither is `YYYY-MM-DD`; `formatShowDate`
+in `Format.kt`/`Format.swift` (general show date text elsewhere in the UI) was strict, but the
+artwork badge specifically — the one thing `uat-006`'s feedback was actually about — was not.
+
+- **macOS** (`Artwork.swift`): `dateBadge(from:)` now returns `"\(yr)-\(month)-\(day)"` when a
+  full date is present, falling back to just the year or the raw string otherwise. `year(from:)`
+  and `monthDay(from:)` are unchanged (still used internally and by other tests) — only the
+  composed badge string changed. Updated `ArtworkTests.swift` assertions from `"1977 · 05/08"` to
+  `"1977-05-08"`.
+- **Android** (`Artwork.kt`): `parseArtworkDateComponents`'s `fullBadge` (the field
+  `LargeArtworkOverlay` — the Now Playing screen's large artwork badge — renders) now returns the
+  trimmed input date verbatim (`"1977-05-08"`) instead of `"$y · $monthStr $d"`. `year` and
+  `monthDay` are unchanged, since `MediumArtworkOverlay` still uses them separately for its own
+  two-line year/month-day layout (a distinct design, not the single "date badge" `uat-006`
+  described). Updated `ArtworkTest.kt` accordingly.
+- **Verification:** 427 Swift package tests pass; Android `testDebugUnitTest` passes.
+  `uat-006` in `UAT.md` is updated to reflect the fix.
+
+
+## Iteration 59 — Local Storage & Sandbox Permissions Audit (#192, D232)
+
+### D232 — Local storage security audit: plaintext SQLite is acceptable; macOS backup exclusion added (#192)
+
+Full audit of local storage and sandbox permissions on both platforms (part of #175).
+
+**Android — verified, no code changes needed:**
+- `android:allowBackup="false"` confirmed in `AndroidManifest.xml` (line 19) — all app data,
+  including `EncryptedSharedPreferences`, is excluded from cloud backup.
+- Room database (`PhishInDb`): entities are `Progress`, `LocalPlaylistEntity`,
+  `LocalPlaylistTrackEntity`, `ArtistTourPreferenceEntity` — listening history, queue
+  positions, local playlists, and artist tour prefs. No credentials or tokens are stored.
+- Auth token (phish.in JWT, username): `EncryptedSharedPreferences` with `AES256_SIV` key
+  encryption and `AES256_GCM` value encryption, backed by Android Keystore (`Auth.kt:54-59`).
+  Falls back to in-memory-only when the keystore is unavailable — never writes plaintext.
+- Sync token (device token, device ID): `EncryptedSharedPreferences` with the same AES256
+  scheme (`Sync.kt:242-247`). Cursors (`lastSeq`, `lastPushWatermark`, `lastSyncedAt`) are
+  non-sensitive integers in the same encrypted store.
+- Plain `SharedPreferences`: `Favorites`, `LikedTracks`, `ThemeSettings`, `PlaybackSettings`,
+  `SavedShows` — all store non-sensitive display/preference data (show IDs, enum values,
+  volume, theme mode). None contain credentials.
+- Password: used once in `Session.login()` (Auth.kt:101), passed directly to the API call
+  and never persisted. The Compose `mutableStateOf` holding it (MainActivity.kt:2619) is
+  UI-layer only; `rememberSaveable` survives config changes but not process death, and the
+  password is never written to `SharedPreferences` or the database.
+
+**macOS — one code change, rest verified:**
+- **Added**: `ProgressStore.defaultURL()` now sets `isExcludedFromBackup = true` on the
+  `~/Library/Application Support/dev.mike.couchtour/` directory. This covers `phishin.db` and
+  its WAL/SHM sidecars. Same reasoning as Android's `allowBackup=false`: the listening history
+  can be rebuilt from sync; restoring stale progress from a Time Machine backup risks
+  conflicting with the sync server's state.
+- GRDB database: `progress` and `artist_tour_preferences` tables — listening history, queue
+  positions, and tour prefs. No credentials or tokens.
+- Keychain: `SystemKeychain` uses `kSecAttrAccessibleAfterFirstUnlock` (Keychain.swift:42) and
+  `kSecAttrSynchronizable = false` (Keychain.swift:43). Phish.in JWT and sync device token are
+  both stored via this path (PhishInAuth.swift:19, Sync.swift:279-286). `kSecAttrSynchronizable
+  = false` prevents iCloud Keychain from silently sharing device identity across Macs — pairing
+  is an explicit per-device act.
+- `UserDefaults`: sync cursors (`lastSeq`, `lastPushWatermark`, `lastSyncedAt` — plain
+  integers), volume level, favorites (show IDs), liked tracks (track IDs), theme mode.
+  None contain credentials.
+- Password: used once in `PhishInSession.login()` (PhishInAuth.swift:72), passed to the API
+  and never stored. `AccountView.swift:61` clears the `@State` `password` property immediately
+  after a successful login.
+
+**Rationale for plaintext SQLite (applies to both platforms):**
+Neither database is encrypted with SQLCipher or equivalent, and this is acceptable:
+- Both databases store only non-sensitive listening history and preference data — never
+  credentials, tokens, or PII beyond what the user typed (show titles, artist names).
+- **Android 9+** (minSdk 26, file-based encryption enabled by default on 9+): app-private
+  files in `/data/data/<package>/` are encrypted at rest by the OS; `allowBackup=false` blocks
+  cloud extraction. On pre-9 devices without FBE, the tradeoff is that a rooted device could
+  read "mike listened to 1997-11-17" — the same information visible on his phish.in profile.
+- **macOS**: FileVault full-disk encryption (enabled by default since macOS Ventura on Apple
+  Silicon) protects data at rest. Without App Sandbox (disabled — `project.yml:56`), the app
+  relies on macOS file permissions rather than sandbox isolation; enabling the sandbox would
+  break the network-client-without-prompts flow the app depends on for streaming. A local
+  attacker with user-level access could already read UserDefaults and Keychain via
+  `security find-generic-password`, so encrypting just the SQLite file would add deployment
+  complexity (SQLCipher dependency, key management) without materially raising the bar.
+- The sync tokens that would be high-value targets are already in `EncryptedSharedPreferences`
+  (Android) and Keychain (macOS), never in the database.
+- Adding SQLCipher later is a forward-compatible change — it encrypts the existing file
+  in-place on first open and doesn't require a schema migration.
+
+**Verification:** 428 Swift package tests pass (including the new
+`testDefaultURLDirectoryIsExcludedFromBackup`); Android `testDebugUnitTest` passes.
+`uat-051` added for runtime verification of the macOS backup exclusion.
+
+## Iteration 60 — Google TV App Foundation (#182, D233)
+
+### D233 — Google TV foundation is a second Activity in the existing `:app` module, not a new Gradle module
+
+#182 (Part 1 of #9) asked for a TV app entry point, Leanback support, and the existing
+`Catalog`/`PlaybackService` reachable from it. The repo has one Gradle module (`:app`); there
+was no existing precedent (module, flavor, or product-flavor split) for a "TV variant" to slot
+into.
+
+**Chose: a second `ComponentActivity` (`TvMainActivity`) in the same module, same package,
+alongside `MainActivity`, rather than a new `:tv` Gradle module or a build-variant split.**
+`Catalog.kt`'s `MusicSource`s and `loadArtistsByBackend()` are free functions/objects, and
+`PlayerViewModel` is a plain `AndroidViewModel` that connects to `PlaybackService` over a
+media3 `MediaController`/`SessionToken` — none of that is gated behind `MainActivity` or any
+phone-specific wiring, so "shared module or dependency injection" from the issue's Done-when
+list is satisfied for free by same-module visibility. A new module would have meant either
+duplicating those types behind an `:app`-owned interface or extracting a `:core` module neither
+platform currently needs — real work Part 1 doesn't require and Parts 2/3 don't obviously need
+either, since TV browse/playback screens can keep reading the same `Catalog`/`PlayerViewModel`
+directly.
+
+- **Manifest**: `android.software.leanback` and `android.hardware.touchscreen` are declared
+  `android:required="false"` — this is one APK installed on phones, tablets, and TVs alike (no
+  separate TV APK/flavor), so a `required="true"` leanback feature would make Play Store and
+  sideloading refuse the app everywhere else. `TvMainActivity` carries its own
+  `LEANBACK_LAUNCHER` intent-filter (`MainActivity` keeps the phone `LAUNCHER` one) and an
+  `android:banner` — required for the entry to render as more than a bare icon in a TV
+  launcher row; reused `@mipmap/${appIcon}` rather than commissioning TV-specific 320×180 art
+  for a placeholder screen Part 2 will visually replace anyway.
+- **UI**: Compose for TV (`androidx.tv:tv-foundation:1.0.0`, `androidx.tv:tv-material:1.1.0` —
+  both current stable, not alpha) over legacy Leanback fragments/rows, per the issue's stated
+  preference since the rest of the app is already Compose. `TvBrowseScreen` is intentionally
+  thin: it calls `loadArtistsByBackend()` and reads `PlayerViewModel.state` and renders the
+  result as plain text (an artist count, a "playback connected" flag once the
+  `MediaController` attaches) rather than building real rows — that's explicitly Part 2's job
+  (issue's "Out of scope"), and the point of Part 1 is proving both are reachable from the TV
+  process, not rendering them.
+- No new unit tests: the repo has no existing `MainActivity`/Activity-level Robolectric tests
+  to extend the pattern from, and the Done-when checklist here is manifest/build-shaped
+  (verified by `assembleDebug` and inspecting the merged manifest for the `LEANBACK_LAUNCHER`
+  intent-filter and feature declarations) rather than logic that unit tests would exercise.
+  The one item genuinely unverifiable without hardware — the app appearing as a launchable
+  Leanback entry on a physical Android TV / Google TV home screen — is `uat-053`.
+
+**Verification:** Android `testDebugUnitTest` and `assembleDebug` pass; merged manifest
+inspected directly for the `LEANBACK_LAUNCHER` intent-filter and `leanback`/`touchscreen`
+feature declarations. `swift test --package-path macos/Packages/CouchTourKit` could not run in
+this worktree — `xcodebuild` fails with "You have not agreed to the Xcode license agreements,"
+an environment issue predating this change (this branch touches no macOS files; `git diff
+origin/main -- macos/` is empty) that needs an interactive `sudo xcodebuild -license accept` on
+this machine, not something fixable from an unattended session.
+### D234: `sync/` staging Worker, smoke-test gate, and auto-promote to prod
+
+Added a GitHub Actions workflow (`.github/workflows/sync-deploy.yml`) to deploy the Cloudflare Worker backend and D1 database through a staging environment before hitting production.
+
+- **Staging environment**: Added `[env.staging]` to `sync/wrangler.toml` pointing at a separate `couch-tour-sync-staging` D1 database and rate limiter. This ensures that any broken deploy breaks a throwaway database instead of the production one that real devices sync through.
+- **Health check**: Added an unauthenticated `GET /health` endpoint that runs a real `SELECT 1` query against the database. This catches cases where the Worker boots fine but its D1 binding is broken.
+- **Merge-gate pipeline**: The workflow triggers on any push to `main` touching `sync/**`. It deploys to staging first (`wrangler deploy --env staging`), runs the `/health` check, and then runs a full `/pair/start` -> `/pair/claim` round trip against the staging deployment. Only if this smoke test passes does it promote the exact same commit to production. A red smoke test fails the pipeline and blocks the prod deploy.
+- **Documentation**: Updated `CLAUDE.md` to reflect that `sync/` backend deploys now happen through this automated pipeline instead of manual `npm run deploy` commands.
+
+*Verification:*
+- Staging smoke test passes live end-to-end (`/health` 200, `/pair/start` → `/pair/claim` round trip).
+- Unit tests (`testDebugUnitTest`) pass.
+- `swift test` fails purely due to an interactive Xcode license agreement blocker on the machine ("You have not agreed to the Xcode license agreements"), which predates this worktree. This branch touches no macOS files. (This caveat was established in D233's precedent.)
+
+### D235 — Scripts audit: no subshell injection found; hardened install.sh's JSON parsing (#221)
+
+Audit of `scripts/` and `macos/scripts/` for subshell execution vulnerabilities (part of #196,
+sibling to D232's storage audit).
+
+**Verified, no changes needed:**
+- `scripts/ci-wait.sh`, `scripts/cut-beta.sh`, `scripts/promote-beta.sh`,
+  `macos/scripts/install-beta.sh`, `macos/scripts/check-fixtures.sh`, and the `.command`
+  wrappers: all `set -euo pipefail`, all variables quoted, all user/CLI input passed as
+  discrete arguments to `gh`/`git`/`xcodebuild` (e.g. `-f release_notes="$notes"`) rather than
+  interpolated into a command string. No `eval`, no backticks, no `os.system`/`subprocess.run`
+  anywhere in `scripts/` (`uat-server.py` only calls `webbrowser.open()` on a URL built from an
+  `int`-typed `--port`).
+- `scripts/uat-server.py` has no subprocess surface at all — confirmed the issue's own
+  pre-audit note.
+
+**Changed — `macos/scripts/install.sh`:** the `curl … | grep '"tag_name":' | cut -d '"' -f 4`
+line parsed GitHub's release JSON positionally, which happens to work today but breaks
+silently the moment the API response's field order or whitespace shifts, rather than failing
+loudly. Now prefers `jq -r '.tag_name // empty'` when `jq` is installed (matching the issue's
+suggested fix), falling back to the old grep/cut on machines without `jq` so behavior is
+unchanged there. Also swapped the second fallback, `gh release list | awk '{print $1}'`
+(silently wrong if a release title contains a space, since TITLE is column 1) for
+`gh release list --json tagName -q '.[0].tagName'`, consistent with how `ci-wait.sh` and
+`cut-beta.sh` already use `gh`'s built-in `-q` instead of hand-rolled text parsing. Neither was
+an injection path — both only ever fed a `MARKETING_VERSION` build setting — but both were
+fragile parsing, which is what the issue asked to harden.
+
+**Verification:** `bash -n` on all eight scripts (`scripts/*.sh`,
+`macos/scripts/{install,install-beta,check-fixtures}.sh`, `macos/scripts/*.command`) passes.
+Android `testDebugUnitTest` passes. `swift test` hits the same pre-existing, environment-level
+Xcode license blocker as D233/D234 — this change touches only `macos/scripts/install.sh`, not
+`CouchTourKit` or the Swift app target.
+
+
+## Iteration 61 — Volume leveling strategy (#18, D237)
+
+### D237 — Volume leveling measures loudness on the device, per source, with one static gain (#18)
+
+Supersedes the "deferred until there's a loudness source" status that ROADMAP.md, the README,
+and `prompts/phase-2-batches.md` gave #18 (2026-08-31, restated 2026-09-05/09-11). Mike picked
+option (a) on the issue: **client-side decode-ahead loudness measurement, cached per
+source**. The other options were a manual per-source trim knob, and waiting for an upstream
+ReplayGain/R128 source. None exists today: the phish.in and Relisten payloads carry only
+URLs and durations.
+
+**What the strategy is:**
+- **Granularity is the source.** The unit is a phish.in show (a single mix, key `show:<date>`)
+  or a Relisten tape (`relisten:<artist>/<date>/<sourceId>`). This is the issue's own framing,
+  and it's why this isn't per-track normalization: a quiet ballad stays quiet next to a loud
+  jam on the same tape. The key has to be derivable per *track*, not just per queue, because
+  playlists mix sources.
+- **Measure a sample, not the whole show.** BS.1770-4 gated integrated loudness plus sample
+  peak, over 30 s from the middle of up to 3 tracks, fetched with HTTP Range from the MP3 URL
+  and decoded in the background. That's roughly 1.5 MB of transfer per source, and about a
+  second of decode on a phone. Measuring whole shows would cost hundreds of MB per source,
+  and that's the mobile battery and data cost that made this look infeasible before. A 90 s
+  sample is enough to separate an AUD tape from an SBD tape, which is the problem the issue
+  describes; the goal isn't mastering-grade accuracy.
+- **One static gain per source:** `clamp(-18 LUFS - measured, ±12 dB)`, capped so the sample
+  peak stays under -1 dBFS. There's no compressor or limiter, so dynamic range is preserved.
+  That requirement is also why Android's `LoudnessEnhancer`/`DynamicsProcessing` stay
+  rejected, and AVFoundation has no equivalent anyway. The ReplayGain-style peak cap means a
+  hot-peaked quiet tape may get less boost than it "should". That's the accepted price of
+  never clipping without a limiter.
+- **Gain has to be a real DSP stage.** `player.volume` (Android) and `AVPlayer.volume` (macOS)
+  both cap at 1.0, so they can only attenuate, and the quiet AUD tapes are exactly the ones
+  that need a boost. Android gets a Media3 `AudioProcessor`, and macOS gets an
+  `MTAudioProcessingTap` on each item's `AVAudioMix`.
+- **The cache is local, versioned, and never synced.** A new `source_loudness` table (Room
+  v10, GRDB v10) holds derived data that can always be re-measured. An `algorithmVersion`
+  column makes a meter change invalidate old rows instead of leaving them wrong. Keeping it
+  out of `sync/` avoids growing the wire format for something each device can recompute.
+- **No leveling while casting.** The Cast receiver decodes the audio, so the app has no stage
+  to apply gain in. The Settings help text says so.
+- **Off by default for the first beta**, so Mike can A/B it on real tapes. Whether it's on by
+  default is a UAT decision (#269), not something to decide now.
+
+**Split** into #265 (meter, gain rule, and per-track key; pure, both platforms), #266 (cache
+table and migrations), #267 (Android measurement, gain, and toggle), #268 (macOS
+measurement, gain, and toggle), and #269 (post-UAT defaults, a clear-cache action, and docs).
+#265 and #266 are independent. #267 and #268 each depend on both but not on each other. The
+shared design is repeated in every issue body, so each one can be handed to a worktree as its
+own prompt.
+
+**Verification:** docs and issue split only. No code changed. Android `testDebugUnitTest`
+passes. `swift test` hits the same pre-existing Xcode license blocker as D233-D235, and this
+change touches no Swift.
+
+### D238 — Sync backend DB query efficiency (#241, part of #200)
+
+Added covering indices to `devices` (`devices_group_revoked`) and `progress` (`progress_deletedAt_seq`) to eliminate full table scans on the devices list and the tombstone purge job. The purge job's cost now scales with the number of old tombstones, not total history.
+Also eliminated the redundant second `seq` lookup in `handleSync` by deriving the post-push sequence number from the pre-read cursor and the applied-rows count.
+
+### D239 — macOS DB query efficiency (#240, part of #200)
+
+Added additive `CREATE INDEX IF NOT EXISTS` migrations (`v10_progressIndexes` and `v10_localPlaylistIndexes`) in GRDB.
+Added covering index for artists, indices for live progress and continue-listening lists, and for the sync queue.
+Modified `ProgressStore.changedSince` to return rows ordered by `updatedAt` ascending natively, removing the in-memory `.sorted` step in `SyncSession.syncOnce`.
+Test coverage asserts that the `EXPLAIN QUERY PLAN` output for these hot paths utilizes the indexes, avoids `USE TEMP B-TREE FOR ORDER BY`, and prevents full table scans.
+
+### D240 — macOS Security & Surface Area Audit (#248)
+
+- **Entitlements**: `ENABLE_HARDENED_RUNTIME` was set to `YES` and `com.apple.security.app-sandbox` set to `true` in `macos/project.yml` for tightened security, aligning with Apple platform best practices without losing access to necessary directories (GRDB SQLite storage continues functioning correctly in its App Sandbox container). `com.apple.security.cs.disable-library-validation` remains true as it is often required for linking non-framework third-party dependencies natively via XcodeGen without a strict matching team ID.
+- **Dependencies**: Bumping GRDB.swift to 6.29.3 and Sparkle to 2.10.0 to incorporate the latest patches and mitigate potential known older-version vulnerabilities.
+- **Credential Leaks**: Scanned `macos/` for `.env` files and hardcoded API tokens/passwords. None were found. Keychain is appropriately used for persisting JWT and Sync Device tokens (`SyncTokenStore.swift` and `PhishInTokenStore.swift`), and passwords are not stored in memory post-login.
+- **URL Pooling**: Scanned for unpooled `URLSession` usage. The app relies exclusively on `URLSession.shared`, pooling connections safely across network boundaries.
+- **Subshell Executions**: Scanned `macos/` for `Process()`, `NSTask()`, `system()`, and `popen()`. None exist.
+
+### D241 — Marking a UAT item [!] files its GitHub bug automatically (#258)
+
+`scripts/uat-server.py` no longer just edits `UAT.md` when an item is marked `[!]` with a
+note — it also files a `type:bug p1` issue on this repo via the local `gh` CLI, in the
+shape contract written down in mkny13/mahler#292 (title `UAT fail: <item title> (<id>)`,
+body with the item id, area, source link, and the note verbatim). Groundwork's phase-2
+implementation (mkny13/groundwork#125) files the same shape from its in-app panel, so
+Mahler's `sync` ingests both without changes.
+
+Why these choices:
+
+- **The local `gh` CLI, not a new token.** Unlike groundwork's hosted case, this script
+  only ever runs on Mike's machine, where `gh` is already authenticated — no credential
+  to create, store, or scope (mahler#292's decision: each app files through its own
+  existing write path and credentials).
+- **The issue number lives in `UAT.md` itself**, as a trailing `(→ #N)` marker on the
+  note line. UAT.md is the single source of truth the server is built on; a side-car
+  database would be a second thing to keep in sync. The marker survives a later pass as
+  a marker-only note line, so a re-fail finds its old issue even after the note was
+  cleared — closing that gap is the whole point of the dedup rule.
+- **Dedup per the contract:** a re-mark comments on the still-open linked issue; a
+  re-mark after the issue was closed opens a fresh issue (a regression is a new report,
+  not the same one). A re-mark with an unchanged note files nothing — the note textarea
+  saves on blur, and without that guard every edit would spam the issue with comments.
+- **A pass or clear never touches the filed issue.** Closing bugs stays a human/Mahler
+  decision through the normal pipeline, same as everywhere else.
+- **gh failures degrade to a warning**, surfaced in the board's toast. The `UAT.md`
+  write is the source of truth for the UAT record and must succeed regardless; the next
+  note edit retries the filing. (Found during live verification: `gh issue view --json
+  state` reports `"OPEN"` uppercase — the comparison is case-insensitive.)
+
+Tests: `scripts/test_uat_server.py` (stdlib unittest, no new dependencies — there was no
+existing Python test pattern under `scripts/` to follow), 16 tests covering the shape,
+dedup, regression, marker persistence, and gh-failure paths, plus one live end-to-end run
+against a throwaway item id (issues #285/#286, created and closed as evidence).
+
+### D243 — Part 3 of #199: execution-time creep — one wall-clock sleep found and made deterministic; parallel forks measured and rejected (#213)
+
+Profiled both suites end to end. Android: 535 tests in ~13s wall (`--rerun`, warm daemon),
+summed per-class JVM time 9.6s; the two outliers (CastTest 2.9s, DiscoveryCatalogE2ETest
+2.7s) are not per-test creep — they are the one-time Robolectric framework + SQLite native
+bootstrap attributed to whichever class runs first, unavoidable per JVM run. A full sweep
+found **zero** sleeps or polling waits left in Android tests — Part 2.1 already moved the
+debounce test onto `runTest`'s virtual clock, and the only timed MockWebServer calls are
+failure-diagnostics, not timing coordination.
+
+Changes:
+
+- **macOS: the debounce test's 300ms wall-clock sleep is gone.**
+  `SyncSessionTests.testRequestDebouncedPushCoalesces…` used to sleep 300ms to out-wait a
+  50ms debounce — real time on every run, and still racy under scheduler pressure. Mirroring
+  Android's internal `debounceScope` seam, `SyncSession` now exposes an injectable
+  `sleepForDebounce` and an internal `pushTask`. The test parks every scheduled window in a
+  cancellation-safe `DebounceGate` (an `AsyncStream` finishes when its reading task is
+  cancelled, so superseded windows unwind into the existing `Task.isCancelled` guard), opens
+  the gate, and awaits `pushTask` directly: 300ms → 3ms, and "coalesces" is now asserted
+  after the push has actually landed rather than after a guessed delay. Suite execution
+  1.167s → 0.809s; the production default (`Task.sleep`) is untouched.
+- **Android: `maxParallelForks` measured and rejected.** 4 forks: 20.4s wall; 2 forks:
+  13.7s; single JVM: ~12.5-13s. Each fork pays its own Robolectric bootstrap (and its
+  framework-cache extraction contends for I/O on this machine's external SSD), so forks
+  *added* time. The single-JVM suite is already "well under a minute"; left as-is.
+- **Gradle configuration cache also rejected:** it can't engage — `gitVersionName()` shells
+  out to `gh release view` (a live network call) at configuration time, and making that
+  configuration-cache-compatible would change versionName sourcing for non-release CI
+  builds, which is outside this issue's "localized to test configuration" scope. Recorded
+  here because it is the next real lever if test-suite wall time ever creeps again.
+
+Verified: `testDebugUnitTest` (535 tests) and `swift test` (381 tests) green on the final
+state. Test counts unchanged, so the README's counts still hold. Nothing in the change is
+human-visible; no UAT items added (issue's "needs a human" list is empty).
+
+### D245 — Part 1 of #200: Prune prompt context bloat in recipes and rules (#208)
+
+Audited `CLAUDE.md` and files under `prompts/` to reduce prompt context bloat and improve agent token economy:
+- **`CLAUDE.md`**: Condensed from 254 lines (14.5 KB) to 85 lines (5.5 KB), a ~70% reduction. Pruned historical narratives, conversational phrasing, and obsolete references while retaining 100% of operational constraints: Android Studio JDK requirement, local test instructions, beta release workflow (`scripts/cut-beta.sh`), production promote restrictions (`scripts/promote-beta.sh`), macOS package test and app target build/install instructions, sync backend dev/migration commands and merge-gate deploy workflow, load-bearing database and class naming rules, Room migration constraints, project conventions (DECISIONS/ROADMAP/UAT), Mahler worktree lifecycle rules and status lines, local.properties setup, macOS build hazards, and publishing constraints.
+- **`prompts/`**: Audited `prompts/macos-ux-polish-batches.md`, `prompts/phase-2-batch-prompts.md`, `prompts/phase-2-batches.md`, and `prompts/phase-2-plan.md`. All referenced batches and plans (Phase 2 and macOS UX Polish) have merged. Replaced 977 lines (62 KB) of dead recipes with concise ~6-9 line archived summaries retaining issue mappings and cross-references.
+- **Impact**: Reduced rules and prompt recipes from 1,231 lines (76.5 KB / ~19k tokens) to 114 lines (7.1 KB / ~1.8k tokens), a 91% reduction in prompt context bloat.
+
+### D246 — Test suite health & verification across Android and macOS (#189, Part of #176)
+
+Completed the final verification leg of the #176 refactoring and codebase health pass:
+- **Android unit test suite**: Verified all 535 tests across 38 test suites pass cleanly with 0 failures, 0 ignored, and ~9s execution time via `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest`. Clean runs and repeat executions confirm no test flakiness or regressions from refactoring work.
+- **macOS package test suite**: Verified all 381 tests across 30 test suites pass cleanly with 0 failures, 0 unexpected, and ~0.8s execution time via `swift test --package-path macos/Packages/CouchTourKit`. Repeat executions confirm test stability and deterministic timing.
+- **Combined verification command**: Verified `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest && swift test --package-path macos/Packages/CouchTourKit` executes cleanly and passes end-to-end.
+- **macOS app target**: Verified XcodeGen project generation (`xcodegen generate`) and app compilation (`xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build`) succeed without errors.
+- **Suite health**: No flaky tests, timing leaks, or regressions identified. Test counts remain 535 Android and 381 macOS, matching `README.md`.
+
+### D247 — Codebase Health: Fix unclosed resource leaks (#217)
+
+Audited and eliminated unclosed resource leaks (DB connections, cursors, file streams, network responses, event observers, and sockets) across Android, macOS, sync backend, and test scripts:
+- **Android SQLite database & cursor leaks**:
+  - `MigrationTest.kt`: Fixed `createV9DatabaseWithRows()` and `createV10DatabaseWithRows()` which bypassed the test suite's tracked `openRawDb()` helper by calling `SQLiteDatabase.openOrCreateDatabase` directly without failure-safe tracking. Standardized `createV1DatabaseWithRows()` through `createV10DatabaseWithRows()` to use `openRawDb().use { db -> ... }` for immediate, scoped cleanup.
+  - `DiscoveryCatalogE2ETest.kt`: Wrapped all 7 raw queries in `.use { cursor -> ... }` and wrapped database instances in `openDb().use { db -> ... }` across F3 and scenario tests to ensure cursors and database handles are closed immediately even if assertions throw.
+- **Android fixture stream leaks**:
+  - Closed unclosed resource streams when reading test fixtures via `getResourceAsStream(...).bufferedReader().use { it.readText() }` across `ApiParsingTest.kt`, `CatalogTest.kt`, `RelistenParsingTest.kt`, and `RelistenPopularityTest.kt`.
+- **macOS AVFoundation periodic time observer leak**:
+  - `Player.swift`: Added `queuePlayer.removeTimeObserver(timeObserverToken)` in `deinit` to properly balance `addPeriodicTimeObserver`, releasing the observation block retained by `AVQueuePlayer`.
+- **Script test socket & HTTP response leaks**:
+  - `scripts/test_uat_server.py`: Added `server.server_close` cleanup on `HTTPServer` instances and explicitly closed `HTTPError` responses (`cm.exception.close()`), eliminating Python `ResourceWarning: unclosed <socket.socket>` and `Implicitly cleaning up <HTTPError>` warnings during test runs.
+- **Audited and confirmed clean**:
+  - Android OkHttp requests all consume response bodies within `.use { resp -> ... }`.
+  - Android `PlaybackService` cleans up both cast/local players, media session, audio focus, and cancels coroutine scope in `onDestroy()`.
+  - Android `PlayerViewModel` releases media controller in `onCleared()`.
+  - macOS GRDB `DatabaseQueue` instances manage underlying SQLite connections safely with automatic pool/deinit cleanup.
+  - Sync backend D1 bindings and worker fetch handlers operate statelessly without dangling sockets or cursors.
+
+### D251 — Artist→YouTube-channel resolution is a hand-curated map in the app target (#230)
+
+Part 1 (#229) left the artist→channel mapping as an explicit seam ("resolved in Part 2"); this closes it:
+- **Curated map, not derived:** `YouTubeChannels` (macOS app target) maps `backend:artistId` to a channel ID, seeded with Phish's official channel (`UCDEPOd0RCvw8iSTqFpSBZLA`, resolved from youtube.com/@phish's channel metadata). There is no catalog API for channel ownership, YouTube IDs are opaque, and only the owner knows which channel is authoritative for a given tape source — so nothing is guessed. Artists absent from the map get no YouTube section at all.
+- **App target, not CouchTourKit:** the map is app-level configuration the same way the API key is, not a catalog model; keeping it out of the package keeps `swift test` coverage meaningful (there is nothing to test beyond a dictionary lookup) and the package neutral of per-install credentials.
+- **API key (D44 precedent):** `YouTubeAPI.apiKey` is owner-supplied, read at app startup from `UserDefaults` key `youtubeAPIKey` (`defaults write dev.mike.couchtour.mac youtubeAPIKey <key>`). The YouTube section hides entirely when the key is unset — a section that could only ever show an error would be noise, and the error/retry states are reserved for real fetch failures (network, quota).
+
+### D253 — Android YouTube: Data API v3 for browse, NewPipeExtractor for streams, behind one interface (#232)
+
+The Android half mirrors macOS #229 for browse and adds the stream-resolution step #234's audio/video toggle needs (per the #232 planning note):
+- **Browse = YouTube Data API v3, same as macOS:** `YouTubeApi` (app module) follows the house style — stateless `object`, test-overridable `internal var baseUrl`, OkHttp, kotlinx.serialization DTOs with safe defaults so a trimmed payload never throws. Only `search.list` (50 newest, `order=date`); pagination deliberately left off — an artist-page section doesn't need it and every page burns the key's quota. The key is owner-supplied (D44/D251 precedent), sent as `?key=` only when set.
+- **Streams = NewPipeExtractor, not the Data API:** the Data API never returns playable URLs, and background audio-only playback (#234) needs a direct audio stream URL plus a muxed video URL. NewPipeExtractor v0.26.5 resolves both with no API key. Added on JitPack (repo scoped to `com.github.TeamNewPipe`); its transitive okhttp is excluded so the app's audited 4.12.0 stays the only copy on the classpath — NewPipe makes all its network calls through an injected `Downloader`, so our own `YouTubeDownloader` feeds it our OkHttp.
+- **Resolution behind one small interface:** `YouTubeStreamResolver` exists precisely so unit tests can use a fake — real resolution talks to YouTube and breaks whenever YouTube changes internals. `NewPipeStreamResolver` picks the highest-bitrate audio and highest-resolution muxed video stream; failures surface as `StreamResolutionException` (on-device check: UAT `uat-056`).
+- **Model:** `YouTubeVideo` mirrors the macOS model field-for-field; `audioStreamUrl`/`videoStreamUrl`/`durationMs` start null from `search.list` and are filled by `withStreams(ResolvedStreams)` on the way to playback. Progress keys use the `youtube:<videoId>` prefix per the planning note — the same prefix on both platforms, distinct from the date-keyed show rows the `progress` table already stores.
+
+### D259 — macOS volume leveling: MTAudioProcessingTap gain in Player, decode-ahead measurement stays in CouchTourKit (#268)
+
+Completes the macOS half of #268 (the measurer + `SourceLoudness` cache shipped earlier on this branch; 14 tests, suite at 438):
+- **Playback gain = constant-gain `MTAudioProcessingTap`, not volume scaling:** `Player` attaches a tap (created post-effects) to each live queue item's audio track via `AVMutableAudioMix` once the asset's tracks resolve (`loadTracks`). The tap's mutable state lives in a small `GainTapStorage` class shared by the main actor (writes) and the realtime callback (reads) — a non-atomic Float read is deliberate (one word, no torn read, one-stale-callback inaudible). `queuePlayer.volume` stays untouched so the user's volume control and leveling are orthogonal. The tap multiplies every sample in the buffer list; scalar gain is interleaving-agnostic.
+- **Measurement is Player-driven, cache-backed:** on `startQueue` (and on toggling the setting on), `Player` schedules `LoudnessMeasurer.measure(key:tracks:)` in a background `Task` keyed by the source's `levelingKey`; the result goes through the shared `levelingGainDb(lufs:peakDbfs:)` rule (target/clamp/peak-cap semantics shared with Android's `Loudness.kt`) and is applied in place to all tap storages — mid-track, no seek, no queue rebuild. A queue teardown or source switch cancels/abandons the stale task (identity-checked before applying); a completed measurement whose source changed is discarded for playback but its cached `SourceLoudness` still benefits the next play. `measure` returning nil (unfetchable segments/decode failure) means stay at 0 dB rather than guess.
+- **Cast excluded:** `connectCast` cancels the in-flight measurement and taps are not scheduled while casting — the receiver decodes the audio, so a local tap gain is meaningless there; `disconnectCast` re-runs `startQueue`, which re-schedules leveling.
+- **Settings toggle:** "Level volume across sources" (`PlaybackSettings.levelVolume`, @Published) is observed with Combine; toggling off resets all taps to unity immediately (no stall) and re-enabling reuses taps + cache. Cast sessions ignore the toggle change (verified live: UAT `uat-060`/`uat-061`).
+
+### D262 — Android artist page YouTube section rides the shared catalog seam as a third Backend (#233)
+
+Part 2 of #177 (Android half). Two shapes were possible: a parallel, YouTube-specific code path in the artist page, or folding YouTube into the existing `Backend`/`MusicSource` plumbing that the phish.in/Relisten halves already share. Chose the latter:
+
+- **`Backend.YOUTUBE` as a real enum member:** every `when (backend)` becomes compiler-checked. YouTube is not a tape catalog — `YouTubeCatalogSource` answers empty for artists/periods/shows/search — but the empty answers are honest ones (an artist id in a nav argument resolving through `sourceFor` must not crash), and exhaustive `when`s turn "did we remember YouTube here?" into a compile error. Artists can't be favorited and never appear in any artist list (its `artists()` is empty), so the tape-only branches (Surprise Me, On This Date, Next Stop) carry `Unit` branches that are unreachable by construction.
+- **The channel map stays curated, like macOS D251:** `YouTubeChannels` in `YouTubeCatalog.kt` maps `ArtistRef.key` → channel id (`phishin:phish` → Phish's official channel). There is no catalog API for this; only the owner knows which channel is authoritative per tape artist. `youtubeSectionChannel()` returns null — hiding the section entirely — when the artist is unmapped *or* the install has no API key (D44/D251: owner-supplied key; a section that can only ever fail is noise). Distinct inline error state for real fetch failures (network/quota), unlike an empty channel's "No videos." note.
+- **`MusicSource.youtubeContent(artist)`** with an empty default: non-YouTube sources contribute nothing (no capability flag — same reasoning as OnThisDate's showsFor), YouTube's source fronts `YouTubeApi.search`. UI: the artist page's `LazyColumn` appends a YouTube section below the period list (macOS layout, D251); rows are 16:9 thumbnail + title + relative date, tapping navigates to a final-shaped `youtube/{videoId}` route whose screen is a stub until #234 (Part 3) fills in playback.
+- **Tests:** `YouTubeCatalogTest` (MockWebServer, channel-resolution/hide rules, source wiring) and `ArtistScreenTest` — the app's first Robolectric Compose UI tests, which pull in `ui-test-junit4`/`ui-test-manifest` (BOM-versioned). Section states verified: rendered rows, tap→video id, hidden (no channel / no key), inline error on HTTP failure, "No videos." on an empty channel. 20 new tests; Android suite at 590, macOS unchanged at 438.
+
+### D266 — Google TV artist/year browse: tv-material3 widgets over plain Compose Foundation lazy containers, not `TvLazyColumn`/`TvLazyRow`/`TvLazyVerticalGrid` (#225)
+
+Part 2.1 of #9 (depends on #182's TV entry point). The issue's own "Done when" names Compose for TV over Leanback Views, which still holds, but the TV-prefixed lazy container APIs referenced in earlier planning don't exist in the artifact this repo pins:
+
+- **`androidx.tv:tv-foundation:1.0.0` (the catalog-pinned stable release) ships no lazy list/grid code at all** — `TvLazyColumn`/`TvLazyRow`/`TvLazyVerticalGrid`/`TvGridCells` lived only in that artifact's pre-1.0.0 alphas and were dropped before the stable release (confirmed by inspecting the resolved `.aar`'s `classes.jar`: only `ExperimentalTvFoundationApi` and the IME-options helpers remain under `androidx.tv.foundation`). Two prior agent runs on this branch stalled on the resulting unresolved-reference errors without diagnosing why.
+- **Fix: plain `androidx.compose.foundation.lazy.{LazyColumn,LazyRow}` and `androidx.compose.foundation.lazy.grid.LazyVerticalGrid`/`GridCells`**, laid out inside `androidx.tv.material3` widgets (`Card`, `Button`, `Text`, `MaterialTheme`) — those *do* ship fully in `tv-material:1.1.0`. D-pad focus/scale behavior comes from `CardDefaults.scale`, not from a TV-specific scroll container; standard Compose Foundation lazy containers already forward focus correctly under `initialFocusRestorer`/`focusable` semantics, which is what current Compose-for-TV samples use post-alpha.
+- **Scope:** `TvBrowseScreen` (`TvBrowse.kt`) implements both hierarchy levels — artist sections (Phish / Favorites / All artists, mirroring Android Auto's `groupArtistsForBrowse` grouping) and an artist's years (`MusicSource.periods`, newest-first, same string-sort convention as `PlaybackService.artistPeriodsChildren`). No nav library: two levels is a `remember`ed `ArtistRef?` plus `BackHandler`, not a graph. Show/track drill-down (Part 2.2) and playback (Part 3) are untouched stubs. 7 new tests (pure section/year-mapping logic; the composables themselves need a TV device/emulator — tracked in UAT); Android suite at 611.

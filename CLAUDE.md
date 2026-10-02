@@ -56,7 +56,7 @@ The `progress` table stores listening history. Destructive migrations are never 
 
 ## Project conventions
 
-- **DECISIONS.md:** Log decisions sequentially with `Dnnn` IDs. When reversing a decision, append a new entry marking the prior one superseded rather than rewriting history.
+- **DECISIONS.md:** Recent entries only; older ones (up to ~D266) live in `docs/decisions/DECISIONS-ARCHIVE.md`, so grep both. Log decisions sequentially with `Dnnn` IDs. When reversing a decision, append a new entry marking the prior one superseded rather than rewriting history.
 - **ROADMAP.md:** Track backlog features and open questions.
 - **Comments:** Explain *why*, not *what*.
 - **README.md:** Update test counts when adding or removing tests.

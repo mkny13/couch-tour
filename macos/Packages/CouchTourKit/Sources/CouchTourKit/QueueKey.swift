@@ -8,7 +8,7 @@ public enum QueueKind: Equatable {
     case recording
     /// A device-local playlist (#59) — namespaced separately from `.playlist` (a phish.in
     /// server playlist slug) specifically so a local id never round-trips through
-    /// `PhishInApi.playlist(id)`, matching Android's `Queue.kt` (D161 in DECISIONS.md).
+    /// `PhishInApi.playlist(id)`, matching Android's `Queue.kt` (D161 in docs/decisions/DECISIONS-ARCHIVE.md).
     case localPlaylist
     /// A YouTube video played through the official IFrame embed (D256, #231). The id is
     /// the YouTube video id, not a show date — an Android client that does not yet

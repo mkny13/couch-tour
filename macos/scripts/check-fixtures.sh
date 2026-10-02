@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Guards against the macOS and Android test fixtures drifting apart. Both clients parse the
-# same trimmed real API responses (see DECISIONS.md D35 and the plan's M1 notes), so a
+# same trimmed real API responses (see docs/decisions/DECISIONS-ARCHIVE.md D35 and the plan's M1 notes), so a
 # fixture that changes on one side without the other would let the two clients silently start
 # testing against different data.
 set -euo pipefail

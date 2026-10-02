@@ -2,7 +2,7 @@
 
 Working document for branch `claude/desktop-android-parity-d41f72` (now merged and shipped). Covers issues #56–#59, the personal-library/account cluster that was out of scope for the desktop MVP.
 
-Archived decision log entries are in [DECISIONS.md](../../DECISIONS.md) (D179–D180 / Iteration 44) and tracked in [ROADMAP.md](../../ROADMAP.md).
+Archived decision log entries are in [DECISIONS-ARCHIVE.md](../decisions/DECISIONS-ARCHIVE.md) (D179–D180 / Iteration 44) and tracked in [ROADMAP.md](../../ROADMAP.md).
 
 ## Scope & Status
 
