@@ -138,4 +138,48 @@ final class PhishInParsingTests: XCTestCase {
         XCTAssertTrue(empty.tracks.isEmpty)
         XCTAssertTrue(empty.toSearchHits().isEmpty)
     }
+
+    // -------------------------------------------------------------- playlists
+
+    func testDecodesPublicPlaylistWithNestedTrackEntries() throws {
+        let playlist = try decoder.decode(PublicPlaylist.self, from: try fixture("playlist.json"))
+
+        XCTAssertEqual(playlist.name, "Phish.net Key Jams Pt 1")
+        XCTAssertEqual(playlist.summary.author, "mfhgreyboy")
+        XCTAssertEqual(playlist.summary.durationMs, 93_221_960)
+        XCTAssertEqual(playlist.summary.tracksCount, 99)
+        XCTAssertEqual(playlist.summary.likesCount, 41)
+        XCTAssertFalse(playlist.summary.likedByUser)
+        XCTAssertEqual(playlist.entries.map(\.track.title), ["The Curtain With", "Jesus Just Left Chicago"])
+        XCTAssertEqual(playlist.entries[0].duration, 865_097)
+        XCTAssertNil(playlist.entries[0].startsAtSecond)
+
+        let detail = playlist.toShowDetail()
+        XCTAssertEqual(detail.queueKey, "playlist:phishnet-key-jams-pt-1")
+        XCTAssertEqual(detail.tracks.count, 2)
+        XCTAssertEqual(detail.tracks[0].showDate, "1988-05-24")
+        XCTAssertEqual(detail.tracks[0].durationMs, 865_097)
+    }
+
+    func testPublicPlaylistExcerptCarriesClipBoundsToPlayableTrack() throws {
+        let base = try decoder.decode(PublicPlaylist.self, from: try fixture("playlist.json"))
+        let t = base.entries[0].track
+        let excerpt = PublicPlaylistEntry(track: t, position: 1, duration: 60_000, startsAtSecond: 30, endsAtSecond: 90)
+        let whole = PublicPlaylistEntry(track: t, position: 2, duration: 0)
+        let detail = PublicPlaylist(summary: base.summary, entries: [excerpt, whole]).toShowDetail()
+
+        XCTAssertEqual(detail.tracks[0].clipStartMs, 30_000)
+        XCTAssertEqual(detail.tracks[0].clipEndMs, 90_000)
+        XCTAssertEqual(detail.tracks[0].durationMs, 60_000)
+        XCTAssertEqual(detail.tracks[1].clipStartMs, 0)
+        XCTAssertNil(detail.tracks[1].clipEndMs)
+    }
+
+    func testDecodesPublicPlaylistListRowAuthorAndDuration() throws {
+        let page = try decoder.decode(
+            PublicPlaylistsPage.self,
+            from: Data(#"{"playlists":[{"id":1,"name":"N","slug":"n","username":"bob","duration":4200,"tracks_count":3}]}"#.utf8))
+        XCTAssertEqual(page.playlists[0].author, "bob")
+        XCTAssertEqual(page.playlists[0].durationMs, 4200)
+    }
 }

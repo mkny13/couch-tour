@@ -197,6 +197,16 @@ struct LocalPlaylistsView: View {
             Spacer()
 
             Button {
+                appModel.path.append(.publicPlaylists)
+            } label: {
+                Text("Browse public playlists")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(colors.accentTintText)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 12)
+
+            Button {
                 showNewPlaylistField = true
             } label: {
                 HStack(spacing: 5) {

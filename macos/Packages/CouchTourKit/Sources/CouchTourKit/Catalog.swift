@@ -542,6 +542,10 @@ public struct PlayableTrack: Equatable, Sendable {
     /// Non-nil for Relisten tracks — carries the source identity needed for queue keys
     /// and the loudness-leveling cache key (#265).
     public let recordingId: RecordingId?
+    /// A playlist entry can excerpt its track (D30): playback seeks to `clipStartMs` and stops at
+    /// `clipEndMs` (nil = play to the file's end). `durationMs` is already the clipped span.
+    public let clipStartMs: Int64
+    public let clipEndMs: Int64?
 
     public init(
         id: String,
@@ -560,8 +564,12 @@ public struct PlayableTrack: Equatable, Sendable {
         likedByUser: Bool = false,
         tags: [Tag] = [],
         popularity: RelistenPopularity? = nil,
-        recordingId: RecordingId? = nil
+        recordingId: RecordingId? = nil,
+        clipStartMs: Int64 = 0,
+        clipEndMs: Int64? = nil
     ) {
+        self.clipStartMs = clipStartMs
+        self.clipEndMs = clipEndMs
         self.id = id
         self.slug = slug
         self.title = title
@@ -957,6 +965,16 @@ extension Show {
         // means (D12) — they both read this list rather than filtering separately.
         let playableTracks = tracks.filter { $0.playable }.map { $0.toPlayableTrack(showArt: summary.artURL) }
         return ShowDetail(summary: summary, tracks: playableTracks, tags: tags)
+    }
+}
+
+extension PlayableTrack {
+    public func clipped(startMs: Int64, endMs: Int64?) -> PlayableTrack {
+        PlayableTrack(
+            id: id, slug: slug, title: title, setName: setName, position: position, durationMs: durationMs,
+            url: url, waveformURL: waveformURL, showDate: showDate, venueName: venueName, artURL: artURL,
+            flacUrl: flacUrl, likesCount: likesCount, likedByUser: likedByUser, tags: tags,
+            popularity: popularity, recordingId: recordingId, clipStartMs: startMs, clipEndMs: endMs)
     }
 }
 

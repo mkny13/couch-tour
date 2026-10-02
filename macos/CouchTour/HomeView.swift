@@ -69,6 +69,9 @@ struct HomeView: View {
                 onThisDateShelf
                     .padding(.bottom, 24)
                     .accessibilityIdentifier(AXIdentifiers.homeOnThisDate)
+
+                browsePlaylistsRow
+                    .padding(.bottom, 24)
             }
         }
         .background(colors.background)
@@ -101,6 +104,41 @@ struct HomeView: View {
             actions: { Button("OK") { alertMessage = nil } },
             message: { Text(alertMessage ?? "") }
         )
+    }
+
+    // MARK: - Browse Playlists (#428)
+
+    private var browsePlaylistsRow: some View {
+        Button {
+            appModel.path.append(.publicPlaylists)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "music.note.list")
+                    .font(.system(size: 16))
+                    .foregroundStyle(colors.accentIcon)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Browse playlists")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Public playlists on phish.in")
+                        .font(.system(size: 12))
+                        .foregroundStyle(colors.textMuted)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(colors.textMuted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(colors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(colors.panelBorder, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
+        .accessibilityIdentifier(AXIdentifiers.homeBrowsePlaylists)
     }
 
     // MARK: - Top Ledger Bar
@@ -633,6 +671,7 @@ struct HomeView: View {
             switch try await resolveNavigationTarget(for: row, localPlaylistStore: appModel.localPlaylistStore) {
             case .show(let show): appModel.path.append(.show(show))
             case .localPlaylist(let playlist): appModel.path.append(.localPlaylist(playlist))
+            case .publicPlaylist(let playlist): appModel.path.append(.publicPlaylist(playlist))
             }
         } catch {
             alertMessage = "Couldn't open \(row.title): \(error.localizedDescription)"

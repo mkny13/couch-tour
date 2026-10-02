@@ -111,6 +111,10 @@ struct ThreePaneRootView: View {
                 ListeningView()
             case .playlists:
                 LocalPlaylistsView()
+            case .publicPlaylists:
+                PublicPlaylistsView()
+            case .publicPlaylist(let playlist):
+                PublicPlaylistView(summary: playlist)
             case .search:
                 SearchView()
             case .artist(let artist):

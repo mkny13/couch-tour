@@ -107,14 +107,19 @@ public enum CastItemConverter {
             customData[CastKeys.liked] = true
         }
 
-        return [
+        var mediaInfo: [String: Any] = [
             "contentId": streamUrl,
             "streamType": "BUFFERED",
             "contentType": "audio/mp3",
-            "duration": Double(track.durationMs) / 1000.0,
             "metadata": metadata,
             "customData": customData
         ]
+        // A playlist entry's duration is its excerpt length, not the duration of the MP3
+        // delivered to Cast. Let the receiver determine the file length for excerpts.
+        if track.clipStartMs == 0 && track.clipEndMs == nil {
+            mediaInfo["duration"] = Double(track.durationMs) / 1000.0
+        }
+        return mediaInfo
     }
 
     /// Converts a list of playable tracks and show summary into an array of Cast `MediaQueueItem` dictionaries.

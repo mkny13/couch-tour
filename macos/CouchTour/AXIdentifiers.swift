@@ -16,6 +16,11 @@ public enum AXIdentifiers {
     public static let homeNextTourStops = "home.next_tour_stops"
     public static let homeOnThisDate = "home.on_this_date"
     public static let homeTrackTour = "home.track_tour"
+    public static let homeBrowsePlaylists = "home.browse_playlists"
+
+    // Public playlists (#428)
+    public static let publicPlaylistsList = "public_playlists.list"
+    public static let publicPlaylistTracks = "public_playlist.tracks"
 
 
     // Search

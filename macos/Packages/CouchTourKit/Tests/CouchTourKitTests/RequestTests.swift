@@ -66,6 +66,18 @@ final class RequestTests: XCTestCase {
         XCTAssertEqual("date:asc", server.takeRequest()!.queryValue("sort"))
     }
 
+    func testPublicPlaylistsListAndDetail() async throws {
+        server.enqueue(#"{"playlists":[{"id":7,"name":"Top","slug":"top","duration":1000,"tracks_count":2,"likes_count":5,"username":"a"}]}"#)
+        let list = try await PhishInAPI.publicPlaylists()
+        XCTAssertEqual(["api", "v2", "playlists"], server.takeRequest()!.pathSegments)
+        XCTAssertEqual(list, [PublicPlaylistSummary(id: 7, name: "Top", slug: "top", durationMs: 1000, tracksCount: 2, likesCount: 5, author: "a")])
+
+        server.enqueue(String(decoding: try fixtureData("playlist.json"), as: UTF8.self))
+        let playlist = try await PhishInAPI.publicPlaylist("phishnet-key-jams-pt-1")
+        XCTAssertEqual(["api", "v2", "playlists", "phishnet-key-jams-pt-1"], server.takeRequest()!.pathSegments)
+        XCTAssertEqual(playlist.entries.count, 2)
+    }
+
     func testPutsTheShowDateInThePath() async throws {
         server.enqueue(#"{"date":"1997-02-13"}"#)
 

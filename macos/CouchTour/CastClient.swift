@@ -22,12 +22,14 @@ public final class CastClient: ObservableObject {
     private var connection: NWConnection?
     private let stateMachine = CastPlaybackStateMachine()
     private var heartbeatTimer: Task<Void, Never>?
+    private var clipStatusTimer: Task<Void, Never>?
     private var pendingLoadTrack: (track: PlayableTrack, show: ShowSummary?, queueKey: String?, resumeMs: Int64)?
 
     public init() {}
 
     deinit {
         heartbeatTimer?.cancel()
+        clipStatusTimer?.cancel()
         connection?.cancel()
     }
 
@@ -64,6 +66,9 @@ public final class CastClient: ObservableObject {
     public func disconnect() {
         heartbeatTimer?.cancel()
         heartbeatTimer = nil
+        clipStatusTimer?.cancel()
+        clipStatusTimer = nil
+        pendingLoadTrack = nil
 
         if isConnected {
             let disconnectPacket = stateMachine.createDisconnectPacket()
@@ -198,8 +203,21 @@ public final class CastClient: ObservableObject {
                 }
 
             case .mediaFinished:
+                clipStatusTimer?.cancel()
+                clipStatusTimer = nil
                 self.isPlaying = false
                 onPlaybackStateChanged?(false)
+                onTrackFinished?()
+
+            case .clipFinished:
+                clipStatusTimer?.cancel()
+                clipStatusTimer = nil
+                self.positionMs = stateMachine.positionMs
+                self.isPlaying = false
+                if let pausePacket = stateMachine.createPausePacket() {
+                    sendPacket(pausePacket)
+                }
+                onPositionTick?(self.positionMs)
                 onTrackFinished?()
 
             case .receiverDisconnected:
@@ -242,6 +260,8 @@ public final class CastClient: ObservableObject {
             return
         }
 
+        clipStatusTimer?.cancel()
+        clipStatusTimer = nil
         let seconds = Double(resumePositionMs) / 1000.0
         if let loadPacket = stateMachine.createLoadMediaPacket(
             track: track,
@@ -250,6 +270,21 @@ public final class CastClient: ObservableObject {
             currentTimeSeconds: seconds
         ) {
             sendPacket(loadPacket)
+            positionMs = resumePositionMs
+            durationMs = track.durationMs
+            isPlaying = false
+            if track.clipEndMs != nil {
+                clipStatusTimer = Task { [weak self] in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .milliseconds(500))
+                        guard !Task.isCancelled, let self, self.isConnected else { break }
+                        if self.stateMachine.isPlaying,
+                           let statusPacket = self.stateMachine.createGetMediaStatusPacket() {
+                            self.sendPacket(statusPacket)
+                        }
+                    }
+                }
+            }
         } else {
             pendingLoadTrack = (track, show, queueKey, resumePositionMs)
         }

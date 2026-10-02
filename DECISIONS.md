@@ -5223,3 +5223,7 @@ and `sharp` to `^0.35.4`; audit is clean and all 18 tests plus typecheck pass.
 Remove the overrides once vitest-pool-workers ships a release whose nested miniflare no longer
 needs them (re-check at the next security audit); if they ever break the test pool, revert and
 record the advisories as accepted instead.
+
+## D325 — macOS sender enforces public playlist excerpts while casting (#428)
+
+D66 recorded that a receiver cannot apply Media3's `ClippingConfiguration`; the macOS sender now handles public playlist excerpts without a custom receiver. Cast `LOAD` and `SEEK` use file time (`clipStartMs` plus the entry-relative position). The sender converts receiver status back to entry-relative progress and polls status every 500 ms while an excerpt plays. At `clipEndMs` it pauses the receiver and advances the playlist. Polling stops when the entry finishes, changes, or Cast disconnects. The Cast media payload omits the excerpt's duration because it is not the MP3's full duration. This supersedes D66 for macOS; Android's Cast behavior remains as recorded there. Local AVPlayerItems seek to their excerpt start only after reaching `readyToPlay`, and playback waits for that seek, including normal track taps and resume. A sender-driven Cast boundary depends on the Mac remaining connected and may be late by a status round trip, so physical playback remains a UAT check.
