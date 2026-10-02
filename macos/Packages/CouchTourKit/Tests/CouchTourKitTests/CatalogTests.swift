@@ -223,6 +223,23 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual(results.tracks, hits.tracks)
     }
 
+    func testSearchHitsPlaylistsCombineAndCountAsHits() {
+        let pl = PublicPlaylistSummary(name: "Middle Class", slug: "middle-class")
+        let hits = SearchHits(playlists: [pl])
+        XCTAssertFalse(hits.isEmpty)
+        XCTAssertEqual([pl, pl], (hits + hits).playlists)
+        XCTAssertEqual([PHISH], hits.artistsPresent)
+    }
+
+    func testSearchHitsPlaylistsAreDroppedForOtherArtists() {
+        let pl = PublicPlaylistSummary(name: "Middle Class", slug: "middle-class")
+        let hits = SearchHits(playlists: [pl])
+        XCTAssertEqual([pl], hits.filteredTo(PHISH).playlists)
+        XCTAssertEqual([pl], hits.filteredTo(nil).playlists)
+        let other = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
+        XCTAssertTrue(hits.filteredTo(other).playlists.isEmpty)
+    }
+
     func testPlusMergesEveryFieldAndUnionsTheFailedSet() {
         let a = SearchHits(artists: [dead], failed: [.relisten])
         let b = SearchHits(artists: [wsp])

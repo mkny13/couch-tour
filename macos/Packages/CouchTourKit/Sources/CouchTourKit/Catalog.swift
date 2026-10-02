@@ -673,9 +673,6 @@ public struct SliceHit: Hashable, Sendable {
 /// The merged result of searching every backend. Kept flat (not grouped by artist) so the UI
 /// can render one section per type; `artistsPresent` and `filteredTo` are what let it narrow
 /// to one artist without a second fetch.
-///
-/// No `playlists` bucket, unlike the Android original — the desktop MVP has no login/likes/
-/// playlists (D5), so there is no playlists screen for a hit to land on.
 public struct SearchHits: Equatable, Sendable {
     public let artists: [ArtistRef]
     public let shows: [ShowSummary]
@@ -683,23 +680,26 @@ public struct SearchHits: Equatable, Sendable {
     /// phish.in only, raw DTOs on purpose: opening a hit navigates to its show
     /// (`ShowDetailView`), an account feature Relisten has no analogue for.
     public let tracks: [Track]
+    /// phish.in's public community playlists (#427); opening one lands on `PublicPlaylistView`.
+    public let playlists: [PublicPlaylistSummary]
     /// Backends whose search failed, so partial results can say so instead of reading as
     /// "nothing matched".
     public let failed: Set<Backend>
 
     public init(
         artists: [ArtistRef] = [], shows: [ShowSummary] = [], slices: [SliceHit] = [],
-        tracks: [Track] = [], failed: Set<Backend> = []
+        tracks: [Track] = [], playlists: [PublicPlaylistSummary] = [], failed: Set<Backend> = []
     ) {
         self.artists = artists
         self.shows = shows
         self.slices = slices
         self.tracks = tracks
+        self.playlists = playlists
         self.failed = failed
     }
 
     public var isEmpty: Bool {
-        artists.isEmpty && shows.isEmpty && slices.isEmpty && tracks.isEmpty
+        artists.isEmpty && shows.isEmpty && slices.isEmpty && tracks.isEmpty && playlists.isEmpty
     }
 
     public static func + (lhs: SearchHits, rhs: SearchHits) -> SearchHits {
@@ -708,6 +708,7 @@ public struct SearchHits: Equatable, Sendable {
             shows: lhs.shows + rhs.shows,
             slices: lhs.slices + rhs.slices,
             tracks: lhs.tracks + rhs.tracks,
+            playlists: lhs.playlists + rhs.playlists,
             failed: lhs.failed.union(rhs.failed)
         )
     }
@@ -716,7 +717,7 @@ public struct SearchHits: Equatable, Sendable {
     public var artistsPresent: [ArtistRef] {
         var seen = Set<String>()
         var result: [ArtistRef] = []
-        for artist in artists + shows.map(\.artist) + slices.map(\.artist) + tracks.map({ _ in PHISH }) {
+        for artist in artists + shows.map(\.artist) + slices.map(\.artist) + tracks.map({ _ in PHISH }) + playlists.map({ _ in PHISH }) {
             let key = "\(artist.backend.rawValue)/\(artist.id)"
             if seen.insert(key).inserted { result.append(artist) }
         }
@@ -732,6 +733,7 @@ public struct SearchHits: Equatable, Sendable {
             shows: shows.filter { $0.artist.backend == key.backend && $0.artist.id == key.id },
             slices: slices.filter { $0.artist.backend == key.backend && $0.artist.id == key.id },
             tracks: (key.backend == .phishin && key.id == PHISH.id) ? tracks : [],
+            playlists: (key.backend == .phishin && key.id == PHISH.id) ? playlists : [],
             failed: failed
         )
     }

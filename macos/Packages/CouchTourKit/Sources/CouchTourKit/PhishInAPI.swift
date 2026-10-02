@@ -220,24 +220,30 @@ public struct Track: Codable, Equatable, Sendable {
 // -------------------------------------------------------------------- search
 
 /// Port of Api.kt's `SearchResults`. phish.in's search response also carries `songs`/
-/// `venues`/`tags`/`playlists` — Android ignores all four (no song/venue browse endpoint on
-/// this backend, and this MVP has no playlists screen, D5) and so does this: they're simply
-/// omitted from `CodingKeys`, and Swift ignores unknown keys by default.
+/// `venues`/`tags` — ignored (no song/venue browse endpoint on this backend): they're simply
+/// omitted from `CodingKeys`, and Swift ignores unknown keys by default. `playlists` are kept
+/// (#427) since public playlists have a screen to land on (#428).
 public struct SearchResults: Decodable, Equatable {
     public let exactShow: Show?
     public let otherShows: [Show]
     public let tracks: [Track]
+    public let playlists: [PublicPlaylistSummary]
 
     enum CodingKeys: String, CodingKey {
         case exactShow = "exact_show"
         case otherShows = "other_shows"
         case tracks
+        case playlists
     }
 
-    public init(exactShow: Show? = nil, otherShows: [Show] = [], tracks: [Track] = []) {
+    public init(
+        exactShow: Show? = nil, otherShows: [Show] = [], tracks: [Track] = [],
+        playlists: [PublicPlaylistSummary] = []
+    ) {
         self.exactShow = exactShow
         self.otherShows = otherShows
         self.tracks = tracks
+        self.playlists = playlists
     }
 
     public init(from decoder: Decoder) throws {
@@ -245,6 +251,7 @@ public struct SearchResults: Decodable, Equatable {
         exactShow = try c.decodeIfPresent(Show.self, forKey: .exactShow)
         otherShows = try c.decodeIfPresent([Show].self, forKey: .otherShows) ?? []
         tracks = try c.decodeIfPresent([Track].self, forKey: .tracks) ?? []
+        playlists = try c.decodeIfPresent([PublicPlaylistSummary].self, forKey: .playlists) ?? []
     }
 
     public var shows: [Show] { [exactShow].compactMap { $0 } + otherShows }
@@ -252,7 +259,7 @@ public struct SearchResults: Decodable, Equatable {
 
 extension SearchResults {
     public func toSearchHits() -> SearchHits {
-        SearchHits(shows: shows.map { $0.toShowSummary() }, tracks: tracks)
+        SearchHits(shows: shows.map { $0.toShowSummary() }, tracks: tracks, playlists: playlists)
     }
 }
 

@@ -23,6 +23,7 @@ struct SearchView: View {
         case shows = "Shows"
         case songs = "Songs"
         case venues = "Venues"
+        case playlists = "Playlists"
     }
 
     private var term: String { appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -57,6 +58,7 @@ struct SearchView: View {
             shows: shows,
             slices: slices,
             tracks: tracks,
+            playlists: h.playlists,
             failed: h.failed
         )
     }
@@ -120,7 +122,8 @@ struct SearchView: View {
                 let venueSlices = activeHits?.slices.filter { $0.kind == .venue } ?? []
                 let songCount = songSlices.count
                 let venueCount = venueSlices.count
-                let allCount = artistCount + trackCount + showCount + songCount + venueCount
+                let playlistCount = activeHits?.playlists.count ?? 0
+                let allCount = artistCount + trackCount + showCount + songCount + venueCount + playlistCount
 
                 searchTabItem(title: "All", count: allCount, tab: .all, identifier: AXIdentifiers.searchTabAll)
                 searchTabItem(title: "Artists", count: artistCount, tab: .artists, identifier: AXIdentifiers.searchTabArtists)
@@ -128,6 +131,7 @@ struct SearchView: View {
                 searchTabItem(title: "Shows", count: showCount, tab: .shows, identifier: AXIdentifiers.searchTabShows)
                 searchTabItem(title: "Songs", count: songCount, tab: .songs, identifier: AXIdentifiers.searchTabSongs)
                 searchTabItem(title: "Venues", count: venueCount, tab: .venues, identifier: AXIdentifiers.searchTabVenues)
+                searchTabItem(title: "Playlists", count: playlistCount, tab: .playlists, identifier: AXIdentifiers.searchTabPlaylists)
 
                 Spacer()
             }
@@ -233,7 +237,7 @@ struct SearchView: View {
                     } else if let activeHits {
                         let songSlices = activeHits.slices.filter { $0.kind == .song }
                         let venueSlices = activeHits.slices.filter { $0.kind == .venue }
-                        let totalHits = activeHits.artists.count + activeHits.tracks.count + activeHits.shows.count + activeHits.slices.count
+                        let totalHits = activeHits.artists.count + activeHits.tracks.count + activeHits.shows.count + activeHits.slices.count + activeHits.playlists.count
                         if totalHits == 0 {
                             VStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
@@ -263,6 +267,9 @@ struct SearchView: View {
                                 ForEach(venueSlices, id: \.self) { slice in
                                     searchSliceRow(slice: slice)
                                 }
+                                ForEach(activeHits.playlists, id: \.self) { playlist in
+                                    searchPlaylistRow(playlist: playlist)
+                                }
                             case .artists:
                                 ForEach(activeHits.artists, id: \.self) { artist in
                                     searchArtistRow(artist: artist)
@@ -282,6 +289,10 @@ struct SearchView: View {
                             case .venues:
                                 ForEach(venueSlices, id: \.self) { slice in
                                     searchSliceRow(slice: slice)
+                                }
+                            case .playlists:
+                                ForEach(activeHits.playlists, id: \.self) { playlist in
+                                    searchPlaylistRow(playlist: playlist)
                                 }
                             }
                         }
@@ -545,6 +556,55 @@ struct SearchView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             appModel.path.append(.artist(artist))
+        }
+        .padding(.vertical, 10)
+        .border(width: 1, edges: [.bottom], color: colors.divider)
+    }
+
+    private func playlistSubtitle(_ p: PublicPlaylistSummary) -> String {
+        var parts = ["\(p.tracksCount) \(plural(p.tracksCount, "track"))", formatCompactDuration(ms: p.durationMs)]
+        if let author = p.author, !author.isEmpty { parts.append("by \(author)") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func searchPlaylistRow(playlist: PublicPlaylistSummary) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(playlist.name)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                Text(playlistSubtitle(playlist))
+                    .font(.system(size: 13))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button {
+                Task {
+                    do {
+                        let full = try await PhishInAPI.publicPlaylist(playlist.slug)
+                        guard !full.playableEntries.isEmpty else { return }
+                        player.play(detail: full.toShowDetail(), startIndex: 0)
+                        appModel.showNowPlaying = true
+                    } catch {}
+                }
+            } label: {
+                Circle()
+                    .stroke(colors.accentIcon, lineWidth: 1)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colors.accentTintText)
+                    )
+            }
+            .buttonStyle(.plain)
+            .frame(width: 34, alignment: .trailing)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            appModel.path.append(.publicPlaylist(playlist))
         }
         .padding(.vertical, 10)
         .border(width: 1, edges: [.bottom], color: colors.divider)

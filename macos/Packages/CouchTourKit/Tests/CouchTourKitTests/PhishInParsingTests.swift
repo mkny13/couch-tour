@@ -117,6 +117,17 @@ final class PhishInParsingTests: XCTestCase {
         XCTAssertEqual(2, results.tracks.count)
     }
 
+    func testParsesSearchResultPlaylists() throws {
+        let results = try decoder.decode(SearchResults.self, from: try fixture("search.json"))
+        XCTAssertFalse(results.playlists.isEmpty)
+        let first = results.playlists.first!
+        XCTAssertEqual("2024's Middle Class", first.name)
+        XCTAssertEqual("2024s-middle-class", first.slug)
+        XCTAssertEqual(78, first.tracksCount)
+        XCTAssertEqual("maxhog", first.author)
+        XCTAssertEqual(results.playlists, results.toSearchHits().playlists)
+    }
+
     func testSearchTracksCarryTheShowTheyCameFrom() throws {
         let track = try decoder.decode(SearchResults.self, from: try fixture("search.json")).tracks.first!
         // Without show_date a search hit can't be opened inside its show.

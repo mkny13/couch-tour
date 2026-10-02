@@ -276,3 +276,7 @@ Long-standing items that predate this sprint.
 ## Public phish.in playlists on macOS (#428)
 
 - [ ] `uat-085` **Browse, play, resume, and cast a public playlist** (macOS) — From Home, open "Browse playlists", select "Phish.net Key Jams Pt 1", and confirm the author, duration, track list, search filter, and like control render. Play a track and verify audio and the playlist title in Now Playing; leave and resume it from Continue Listening. For an entry with `starts_at_second=30` and `ends_at_second=90`, verify local playback begins at 30 seconds and advances at 90 seconds. Connect to a Cast receiver before selecting that entry, then repeat; also seek within the excerpt, pause/resume, and switch playback from Mac to Cast and back. Confirm the displayed progress stays within the 60-second excerpt and the receiver advances at its end.
+
+## Playlists in macOS search (#427)
+
+- [ ] `uat-086` **Search finds public playlists** (macOS) — Search "middle class". Confirm a Playlists tab with a count appears and "2024's Middle Class" is listed under All and Playlists. Click it and confirm the playlist opens and plays. Filter to a non-Phish artist and confirm playlists disappear.
