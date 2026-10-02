@@ -1,0 +1,101 @@
+[
+  {
+    "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+    "avg_duration": 1031.0,
+    "avg_rating": 7.042,
+    "created_at": "2026-08-19T14:26:53Z",
+    "duration": 1031,
+    "popularity": {
+      "momentum_score": 0.2211,
+      "trend_ratio": 0.745,
+      "windows": {
+        "30d": {
+          "hot_score": 8.1854,
+          "hours": 9.8419,
+          "plays": 67
+        },
+        "48h": {
+          "hot_score": 2.2361,
+          "hours": 0.7042,
+          "plays": 5
+        },
+        "7d": {
+          "hot_score": 3.6056,
+          "hours": 1.8969,
+          "plays": 13
+        }
+      }
+    },
+    "show_count": 1,
+    "source_count": 1,
+    "updated_at": "2026-09-19T19:59:45Z",
+    "uuid": "49d24530-f12d-49cd-3bbc-6787134a6f26",
+    "year": "1983"
+  },
+  {
+    "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+    "avg_duration": 4965.0,
+    "avg_rating": 6.6099997,
+    "created_at": "2026-08-19T14:26:53Z",
+    "duration": 9930,
+    "popularity": {
+      "momentum_score": 0.6211,
+      "trend_ratio": 3.7745,
+      "windows": {
+        "30d": {
+          "hot_score": 16.9115,
+          "hours": 39.8144,
+          "plays": 286
+        },
+        "48h": {
+          "hot_score": 9.4868,
+          "hours": 12.4022,
+          "plays": 90
+        },
+        "7d": {
+          "hot_score": 12.2066,
+          "hours": 20.4978,
+          "plays": 149
+        }
+      }
+    },
+    "show_count": 2,
+    "source_count": 2,
+    "updated_at": "2026-09-25T01:47:27Z",
+    "uuid": "b9647e98-daed-9d5d-ac55-1dc1f80abb26",
+    "year": "1984"
+  },
+  {
+    "artist_uuid": "ca53d281-0041-ae33-a050-c87702d93b0c",
+    "avg_duration": 3336.3333,
+    "avg_rating": 6.719333,
+    "created_at": "2026-08-19T14:26:53Z",
+    "duration": 20018,
+    "popularity": {
+      "momentum_score": 0.5684,
+      "trend_ratio": 1.6995,
+      "windows": {
+        "30d": {
+          "hot_score": 16.3707,
+          "hours": 42.2514,
+          "plays": 268
+        },
+        "48h": {
+          "hot_score": 6.7823,
+          "hours": 7.5986,
+          "plays": 46
+        },
+        "7d": {
+          "hot_score": 3.873,
+          "hours": 2.6619,
+          "plays": 15
+        }
+      }
+    },
+    "show_count": 6,
+    "source_count": 6,
+    "updated_at": "2026-09-25T01:54:17Z",
+    "uuid": "e0a9bdc8-c68e-72d8-2365-a06bcab45d99",
+    "year": "1985"
+  }
+]
