@@ -185,36 +185,7 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         Favorites.init(this)
 
-        // The leveling processor has to be in the sink's processor chain, which means
-        // building the sink ourselves through a custom renderers factory. Everything else
-        // about the factory stays default — this only reroutes buildAudioSink.
-        val renderersFactory = object : DefaultRenderersFactory(this) {
-            override fun buildAudioSink(
-                context: android.content.Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParameters: Boolean,
-            ): AudioSink = DefaultAudioSink.Builder(context)
-                .setAudioProcessors(arrayOf<AudioProcessor>(levelingProcessor))
-                .build()
-        }
-
-        val player = ExoPlayer.Builder(this, renderersFactory)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                // Handled by hand below instead: Media3's own AudioFocusManager marks
-                // MUSIC-content requests as willPauseWhenDucked = false, which tells the
-                // platform it may duck us silently at the mixer on API 26+ — and having
-                // said that, the platform never delivers AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
-                // to us at all, so ExoPlayer's own duck-to-20% code path never runs. Mixer
-                // ducking is real but device/OEM-dependent and was inaudible on at least one
-                // device (#23); requesting focus ourselves makes the duck deterministic.
-                /* handleAudioFocus = */ false
-            )
-            .setHandleAudioBecomingNoisy(true)
-            .build()
+        val player = buildLocalPlayer()
         localPlayer = player
 
         // Gapless (#141). Media3's decoded playback has no sample-exact seam between
@@ -282,6 +253,49 @@ class PlaybackService : MediaLibraryService() {
         // player too, so casting scrobbles and records progress exactly like local playback.
         player.addListener(playerListener)
 
+        startProgressSaver()
+
+        // Cast initialises off the main thread and may never arrive at all, so the player
+        // is attached whenever it turns up rather than waited for.
+        scope.launch {
+            Casting.castContext.filterNotNull().first()
+            attachCast()
+        }
+    }
+
+    private fun buildLocalPlayer(): ExoPlayer {
+        // The leveling processor has to be in the sink's processor chain, which means
+        // building the sink ourselves through a custom renderers factory. Everything else
+        // about the factory stays default — this only reroutes buildAudioSink.
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParameters: Boolean,
+            ): AudioSink = DefaultAudioSink.Builder(context)
+                .setAudioProcessors(arrayOf<AudioProcessor>(levelingProcessor))
+                .build()
+        }
+        return ExoPlayer.Builder(this, renderersFactory)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                // Handled by hand below instead: Media3's own AudioFocusManager marks
+                // MUSIC-content requests as willPauseWhenDucked = false, which tells the
+                // platform it may duck us silently at the mixer on API 26+ — and having
+                // said that, the platform never delivers AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
+                // to us at all, so ExoPlayer's own duck-to-20% code path never runs. Mixer
+                // ducking is real but device/OEM-dependent and was inaudible on at least one
+                // device (#23); requesting focus ourselves makes the duck deterministic.
+                /* handleAudioFocus = */ false
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+    }
+
+    private fun startProgressSaver() {
         // ...and on a slow tick while playing, so a crash or swipe-away loses at most 5s.
         scope.launch {
             while (true) {
@@ -291,13 +305,6 @@ class PlaybackService : MediaLibraryService() {
                     saveNow()
                 }
             }
-        }
-
-        // Cast initialises off the main thread and may never arrive at all, so the player
-        // is attached whenever it turns up rather than waited for.
-        scope.launch {
-            Casting.castContext.filterNotNull().first()
-            attachCast()
         }
     }
 
