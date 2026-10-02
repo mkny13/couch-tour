@@ -436,3 +436,66 @@ describe("applyIncomingChanges", () => {
     expect(stored?.seq).toBe(1);
   });
 });
+
+describe("security audit #475: request-size and field caps", () => {
+  const freshIp = () => ({ "CF-Connecting-IP": crypto.randomUUID() });
+
+  test("/pair/start rejects an oversized body with 413 before touching D1", async () => {
+    const before = await env.DB.prepare("SELECT COUNT(*) AS n FROM groups").first<{ n: number }>();
+    const res = await call(
+      req("/pair/start", {
+        method: "POST",
+        headers: freshIp(),
+        body: JSON.stringify({ deviceName: "x".repeat(100_000), platform: "test" }),
+      })
+    );
+    expect(res.status).toBe(413);
+    const after = await env.DB.prepare("SELECT COUNT(*) AS n FROM groups").first<{ n: number }>();
+    expect(after!.n).toBe(before!.n);
+  });
+
+  test("/pair/start rejects an over-long deviceName with 400 and creates no group", async () => {
+    const before = await env.DB.prepare("SELECT COUNT(*) AS n FROM groups").first<{ n: number }>();
+    const res = await call(
+      req("/pair/start", {
+        method: "POST",
+        headers: freshIp(),
+        body: JSON.stringify({ deviceName: "x".repeat(129), platform: "test" }),
+      })
+    );
+    expect(res.status).toBe(400);
+    const after = await env.DB.prepare("SELECT COUNT(*) AS n FROM groups").first<{ n: number }>();
+    expect(after!.n).toBe(before!.n);
+  });
+
+  test("/pair/claim rejects an over-long platform with 400", async () => {
+    const { code } = await pairStart();
+    const res = await call(
+      req("/pair/claim", {
+        method: "POST",
+        body: JSON.stringify({ code, deviceName: "b", platform: "p".repeat(33) }),
+      })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("/sync enforces the body cap on a chunked upload with no Content-Length", async () => {
+    const { deviceToken } = await pairStart();
+    const big = JSON.stringify({ since: 0, changes: [], pad: "x".repeat(2 * 1024 * 1024 + 10) });
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(big));
+        controller.close();
+      },
+    });
+    const res = await call(
+      new Request("https://sync.test/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${deviceToken}` },
+        body: stream,
+        duplex: "half",
+      } as RequestInit)
+    );
+    expect(res.status).toBe(413);
+  });
+});

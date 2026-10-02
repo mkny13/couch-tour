@@ -25,6 +25,9 @@ macos/.DS_Store
 sync/node_modules/
 sync/.wrangler/
 sync/.dev.vars
+sync/.dev.vars.*
+sync/.env
+sync/.env.*
 
 # Local agent scratch & WIP
 .agents/
