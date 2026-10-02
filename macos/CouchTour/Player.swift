@@ -208,6 +208,15 @@ final class Player: NSObject, ObservableObject {
 
         castClient.onPlaybackStateChanged = { [weak self] playing in
             guard let self, self.isCasting else { return }
+            // The local rate observer is gated off while casting, so emit the same
+            // start/stop diagnostics from the receiver's state transitions.
+            if self.isPlaying != playing {
+                if playing {
+                    Diagnostics.playbackStart(show: self.show?.date, trackIndex: self.currentIndex)
+                } else {
+                    Diagnostics.playbackStop(show: self.show?.date, trackIndex: self.currentIndex, positionMs: self.positionMs)
+                }
+            }
             self.isPlaying = playing
             self.updateNowPlayingElapsedTime()
             self.claimNowPlaying(playing: playing)
@@ -247,6 +256,9 @@ final class Player: NSObject, ObservableObject {
         let currentPos = positionMs
         let wasPlaying = isPlaying
 
+        if wasPlaying {
+            Diagnostics.playbackStop(show: show?.date, trackIndex: currentIndex, positionMs: currentPos)
+        }
         castClient.disconnect()
         isCasting = false
         castDeviceName = nil
