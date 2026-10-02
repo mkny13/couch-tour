@@ -22,12 +22,16 @@ final class LoudnessMeasurerTests: XCTestCase {
         nonisolated(unsafe) static var routes: [String: Route] = [:]
         nonisolated(unsafe) static var rangeHeaders: [String] = []
         nonisolated(unsafe) static var requestCount = 0
+        /// Signalled on every request; lets a test wait for the measurer to be mid-fetch
+        /// instead of sleeping and hoping.
+        nonisolated(unsafe) static var requestSeen = DispatchSemaphore(value: 0)
 
         static func reset() {
             lock.lock(); defer { lock.unlock() }
             routes = [:]
             rangeHeaders = []
             requestCount = 0
+            requestSeen = DispatchSemaphore(value: 0)
         }
 
         override class func canInit(with request: URLRequest) -> Bool { true }
@@ -36,6 +40,7 @@ final class LoudnessMeasurerTests: XCTestCase {
         override func startLoading() {
             Self.lock.lock(); defer { Self.lock.unlock() }
             Self.requestCount += 1
+            defer { Self.requestSeen.signal() }
             let url = request.url!
             let route = Self.routes[url.absoluteString] ?? Route()
 
@@ -73,18 +78,6 @@ final class LoudnessMeasurerTests: XCTestCase {
         }
     }
 
-    private struct SlowFixtureDecoder: SegmentDecoder {
-        var pcm: DecodedPCM
-        var delaySeconds: TimeInterval
-
-        func decode(fileURL: URL) throws -> DecodedPCM {
-            try Task.checkCancellation()
-            Thread.sleep(forTimeInterval: delaySeconds)
-            try Task.checkCancellation()
-            return pcm
-        }
-    }
-
     private final class MemoryLoudnessCache: SourceLoudnessCache {
         var rows: [String: SourceLoudness] = [:]
         func current(key: String) throws -> SourceLoudness? { rows[key] }
@@ -99,7 +92,7 @@ final class LoudnessMeasurerTests: XCTestCase {
     private func fixturePCM(dbfs: Double = -20) -> DecodedPCM {
         let sampleRate = 48_000
         let amplitude = pow(10.0, dbfs / 20.0)
-        let frames = sampleRate * 3
+        let frames = sampleRate * 1
         var samples = [Float](repeating: 0, count: frames * 2)
         for i in 0..<frames {
             let v = Float(amplitude * sin(2.0 * .pi * 997.0 * Double(i) / Double(sampleRate)))
@@ -131,9 +124,11 @@ final class LoudnessMeasurerTests: XCTestCase {
 
     private var session: URLSession!
     private var cache: MemoryLoudnessCache!
+    private var tempDir: URL!
 
     override func setUp() {
         super.setUp()
+        tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("leveling-\(UUID().uuidString)")
         RangeStubURLProtocol.reset()
         session = stubbedSession()
         cache = MemoryLoudnessCache()
@@ -141,11 +136,12 @@ final class LoudnessMeasurerTests: XCTestCase {
 
     override func tearDown() {
         session.finishTasksAndInvalidate()
+        try? FileManager.default.removeItem(at: tempDir)
         super.tearDown()
     }
 
     private func makeMeasurer(decoder: SegmentDecoder) -> LoudnessMeasurer {
-        LoudnessMeasurer(session: session, decoder: decoder, cache: cache)
+        LoudnessMeasurer(session: session, decoder: decoder, cache: cache, tempDirectory: tempDir)
     }
 
     // MARK: - Track sampling
@@ -352,18 +348,16 @@ final class LoudnessMeasurerTests: XCTestCase {
         XCTAssertNotNil(try cache.current(key: "show:1998-07-15"))
 
         for i in 1...3 { stub(track: "t\(i)") }
-        let slowDecoder = SlowFixtureDecoder(pcm: fixturePCM(), delaySeconds: 0.5)
-        let measurer = makeMeasurer(decoder: slowDecoder)
+        let measurer = makeMeasurer(decoder: FixtureDecoder(pcm: fixturePCM()))
         let tracks = (1...3).map { track("t\($0)") }
 
         let task = Task {
             await measurer.measure(key: "show:1999-12-31", tracks: tracks)
         }
 
-        // Allow background measurement task to start
-        try await Task.sleep(nanoseconds: 50_000_000)
-
-        // Clear all measurements
+        // The first network request means the measurement is genuinely in flight.
+        let seen = RangeStubURLProtocol.requestSeen
+        await Task.detached { seen.wait() }.value
         try await measurer.clearAll()
 
         let result = await task.value
