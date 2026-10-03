@@ -93,6 +93,69 @@ final class DiagnosticsInstrumentationTests: XCTestCase {
         XCTAssertFalse(text().contains("sync.end"))
     }
 
+    private func row(_ key: String, updatedAt: Int64) -> PlaybackProgress {
+        PlaybackProgress(queueKey: key, title: "t", subtitle: "s", trackIndex: 0, positionMs: 0,
+                         trackTitle: "Track", updatedAt: updatedAt, artist: "Phish")
+    }
+
+    private func wireChange(_ key: String) -> String {
+        #"{"queueKey":"\#(key)","title":"t","subtitle":"s","trackIndex":0,"positionMs":0,"trackTitle":"Track","updatedAt":9000,"finished":false,"dismissed":false,"artist":"Phish","deletedAt":null}"#
+    }
+
+    /// Deterministic overlap: call A parks mid-round-trip behind a gated response while call B
+    /// runs to completion, then A is released. Distinct stores give the calls distinct pushes.
+    func testOverlappingSyncsLogTheirOwnCounts() async throws {
+        let session = try await pairedSession()
+        let storeA = try ProgressStore.inMemory()
+        try storeA.put(row("show:a1", updatedAt: 100))
+        let storeB = try ProgressStore.inMemory()
+        try storeB.put(row("show:b1", updatedAt: 100))
+        try storeB.put(row("show:b2", updatedAt: 200))
+        let pullA = (1...2).map { wireChange("show:pa\($0)") }.joined(separator: ",")
+        let pullB = (1...3).map { wireChange("show:pb\($0)") }.joined(separator: ",")
+        server.enqueue(#"{"seq":1,"changes":[\#(pullA)]}"#, gated: true)
+
+        let callA = Task { try await session.sync(storeA) }
+        let parked = await server.waitUntilParked(1)
+        XCTAssertTrue(parked)
+
+        server.enqueue(#"{"seq":2,"changes":[\#(pullB)]}"#)
+        try await session.sync(storeB)
+        XCTAssertTrue(session.isSyncing, "A is still in flight, so isSyncing must stay true")
+
+        server.releaseGatedResponses()
+        try await callA.value
+        XCTAssertFalse(session.isSyncing)
+
+        let ends = text().split(separator: "\n").filter { $0.contains("sync.end") }
+        XCTAssertEqual(ends.count, 2)
+        // B finished first, then A.
+        XCTAssertTrue(ends[0].contains("pulled=3 pushed=2"), "\(ends[0])")
+        XCTAssertTrue(ends[1].contains("pulled=2 pushed=1"), "\(ends[1])")
+    }
+
+    func testOverlappingUnauthorizedDoesNotMarkAnotherCallsSyncFailed() async throws {
+        let session = try await pairedSession()
+        server.enqueue(#"{"seq":1,"changes":[]}"#, gated: true)
+
+        let callA = Task { try await session.sync(try ProgressStore.inMemory()) }
+        let parked = await server.waitUntilParked(1)
+        XCTAssertTrue(parked)
+
+        server.enqueue(#"{"error":"revoked"}"#, code: 401)
+        try await session.sync(try ProgressStore.inMemory())
+
+        server.releaseGatedResponses()
+        try await callA.value
+
+        let out = text()
+        XCTAssertEqual(out.components(separatedBy: "sync.error\tcode=unauthorized").count - 1, 1)
+        XCTAssertEqual(out.components(separatedBy: "sync.end").count - 1, 1)
+        // A finished last, so its mark is the one on record.
+        XCTAssertTrue(log.summaryLines().contains(" ok"))
+        XCTAssertFalse(log.summaryLines().contains("unauthorized"))
+    }
+
     func testPlaybackEventsAndMark() {
         Diagnostics.playbackStart(show: "1997-11-17", trackIndex: 2)
         Diagnostics.playbackStop(show: "1997-11-17", trackIndex: 2, positionMs: 1234)

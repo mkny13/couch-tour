@@ -408,6 +408,7 @@ public final class SyncSession: ObservableObject {
     /// so instead of just quietly not doing anything (D172's Continue Listening bug turned out
     /// to be one symptom of exactly this: a device whose token had gone bad kept reporting
     /// nothing was wrong).
+    /// Last writer wins when sync calls overlap; the error policy is deliberately not per-call.
     @Published public private(set) var lastError: String?
 
     public init(store: SyncTokenStore = SyncTokenStore()) {
@@ -481,21 +482,19 @@ public final class SyncSession: ObservableObject {
     public func sync(_ progressStore: ProgressStore) async throws {
         guard store.deviceToken != nil else { return }
         let began = Date()
-        pulledCount = 0
-        pushedCount = 0
+        let diagnostics = SyncCallDiagnostics()
         Diagnostics.event(.info, "sync.start")
-        handledFailure = nil
         do {
-            try await performSync(progressStore)
+            try await performSync(progressStore, diagnostics: diagnostics)
             let ms = Int(Date().timeIntervalSince(began) * 1000)
             let stamp = ISO8601DateFormatter().string(from: Date())
             // An unauthorized sync unlinks and returns normally; it is still a failure.
-            if let handledFailure {
-                Diagnostics.event(.error, "sync.error", [("code", handledFailure), ("ms", String(ms))])
-                Diagnostics.mark("Last sync", "\(stamp) \(handledFailure)")
+            if let failureCode = diagnostics.failureCode {
+                Diagnostics.event(.error, "sync.error", [("code", failureCode), ("ms", String(ms))])
+                Diagnostics.mark("Last sync", "\(stamp) \(failureCode)")
                 return
             }
-            Diagnostics.event(.info, "sync.end", [("pulled", String(pulledCount)), ("pushed", String(pushedCount)), ("ms", String(ms))])
+            Diagnostics.event(.info, "sync.end", [("pulled", String(diagnostics.pulled)), ("pushed", String(diagnostics.pushed)), ("ms", String(ms))])
             Diagnostics.mark("Last sync", "\(stamp) ok")
         } catch is CancellationError {
             throw CancellationError()
@@ -508,17 +507,43 @@ public final class SyncSession: ObservableObject {
         }
     }
 
-    private var pulledCount = 0
-    private var handledFailure: String?
-    private var pushedCount = 0
+    /// Counts and failure code for one `sync(_:)` call. A reference box owned by that call and
+    /// passed down, never instance state: sync calls can overlap (manual button, timer, debounced
+    /// push), and shared counters let one call reset or stamp another's `sync.*` events.
+    private final class SyncCallDiagnostics: @unchecked Sendable {
+        var pulled = 0
+        var pushed = 0
+        var failureCode: String?
+    }
 
-    private func performSync(_ progressStore: ProgressStore) async throws {
+    /// Calls currently inside `performSync`. A depth count so one overlapping call finishing
+    /// doesn't clear `isSyncing` while another is still running.
+    /// Guarded by `syncInFlightLock`: calls enter on separate tasks, so an unsynchronized
+    /// read-modify-write would lose increments.
+    private var syncInFlight = 0
+    private let syncInFlightLock = NSLock()
+
+    private func beginSyncCall() {
+        syncInFlightLock.lock()
+        defer { syncInFlightLock.unlock() }
+        syncInFlight += 1
+        isSyncing = true
+    }
+
+    private func endSyncCall() {
+        syncInFlightLock.lock()
+        defer { syncInFlightLock.unlock() }
+        syncInFlight -= 1
+        isSyncing = syncInFlight > 0
+    }
+
+    private func performSync(_ progressStore: ProgressStore, diagnostics: SyncCallDiagnostics) async throws {
         guard let token = store.deviceToken else { return }
 
-        isSyncing = true
-        defer { isSyncing = false }
+        beginSyncCall()
+        defer { endSyncCall() }
         do {
-            while try await syncOnce(token: token, progressStore) {}
+            while try await syncOnce(token: token, progressStore, diagnostics: diagnostics) {}
             lastError = nil
         } catch let error as SyncException {
             if error.unauthorized {
@@ -526,7 +551,7 @@ public final class SyncSession: ObservableObject {
                 // until the user re-pairs, rather than retrying a request that can't succeed.
                 // This used to be silent — the device would just stop syncing forever with
                 // nothing on screen to explain why, which is exactly what happened live (D172).
-                handledFailure = "unauthorized"
+                diagnostics.failureCode = "unauthorized"
                 unlink()
                 lastError = "This device was unlinked — its pairing was revoked or expired. " +
                     "Re-pair to resume syncing."
@@ -534,7 +559,7 @@ public final class SyncSession: ObservableObject {
                 // Cursor predates the tombstone retention floor: start over from scratch.
                 // since = 0 never 410s (D126), so this terminates in one extra round trip.
                 store.lastSeq = 0
-                try await performSync(progressStore)
+                try await performSync(progressStore, diagnostics: diagnostics)
             } else {
                 lastError = error.message
                 throw error
@@ -556,7 +581,7 @@ public final class SyncSession: ObservableObject {
 
     /// One push-then-pull round trip. Returns true when the push hit `maxPushBatch` and more
     /// local rows are still waiting, so `sync` knows to come back for them.
-    private func syncOnce(token: String, _ progressStore: ProgressStore) async throws -> Bool {
+    private func syncOnce(token: String, _ progressStore: ProgressStore, diagnostics: SyncCallDiagnostics) async throws -> Bool {
         let pending = try progressStore.changedSince(store.lastPushWatermark)
         let chunk = Self.chunkToPush(pending)
         let toPush = chunk.map { $0.toWire() }
@@ -568,8 +593,8 @@ public final class SyncSession: ObservableObject {
         }
 
         for change in response.changes { try progressStore.put(change.toEntity()) }
-        pulledCount += response.changes.count
-        pushedCount += toPush.count
+        diagnostics.pulled += response.changes.count
+        diagnostics.pushed += toPush.count
         store.lastSeq = response.seq
         if let maxUpdatedAt = toPush.map({ $0.updatedAt }).max() {
             store.lastPushWatermark = maxUpdatedAt
