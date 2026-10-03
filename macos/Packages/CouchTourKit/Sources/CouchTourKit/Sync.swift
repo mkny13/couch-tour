@@ -518,17 +518,30 @@ public final class SyncSession: ObservableObject {
 
     /// Calls currently inside `performSync`. A depth count so one overlapping call finishing
     /// doesn't clear `isSyncing` while another is still running.
+    /// Guarded by `syncInFlightLock`: calls enter on separate tasks, so an unsynchronized
+    /// read-modify-write would lose increments.
     private var syncInFlight = 0
+    private let syncInFlightLock = NSLock()
+
+    private func beginSyncCall() {
+        syncInFlightLock.lock()
+        defer { syncInFlightLock.unlock() }
+        syncInFlight += 1
+        isSyncing = true
+    }
+
+    private func endSyncCall() {
+        syncInFlightLock.lock()
+        defer { syncInFlightLock.unlock() }
+        syncInFlight -= 1
+        isSyncing = syncInFlight > 0
+    }
 
     private func performSync(_ progressStore: ProgressStore, diagnostics: SyncCallDiagnostics) async throws {
         guard let token = store.deviceToken else { return }
 
-        syncInFlight += 1
-        isSyncing = true
-        defer {
-            syncInFlight -= 1
-            isSyncing = syncInFlight > 0
-        }
+        beginSyncCall()
+        defer { endSyncCall() }
         do {
             while try await syncOnce(token: token, progressStore, diagnostics: diagnostics) {}
             lastError = nil
