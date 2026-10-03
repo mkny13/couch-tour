@@ -12,10 +12,11 @@ struct FeedbackButton: View {
     /// away with the sidebar (D203) — no loss: "1997-11-17" or "Grateful Dead" tells you far
     /// more about where a report came from than "Artists" ever did.
     let currentScreen: String
+    @EnvironmentObject private var appModel: AppModel
 
     var body: some View {
         Button {
-            NSWorkspace.shared.open(feedbackURL)
+            NSWorkspace.shared.open(feedbackURL(diagnostics: sendDiagnostics()))
         } label: {
             Image(systemName: "questionmark.bubble")
         }
@@ -23,7 +24,20 @@ struct FeedbackButton: View {
         .help("Send Feedback")
     }
 
-    private var feedbackURL: URL {
+    /// With "Include diagnostics" on (#436): copies the last 200 log lines to the clipboard and
+    /// returns the summary for the issue body. Off: clipboard untouched, nothing returned.
+    private func sendDiagnostics() -> String? {
+        guard appModel.playbackSettings.includeDiagnostics, let log = Diagnostics.log else { return nil }
+        log.flush()
+        let tail = log.tailLines(200).joined(separator: "\n")
+        if !tail.isEmpty {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(tail, forType: .string)
+        }
+        return log.summaryLines()
+    }
+
+    private func feedbackURL(diagnostics: String?) -> URL {
         let context = FeedbackContext(
             appVersion: Bundle.main.appMarketingVersion,
             screen: currentScreen,
@@ -34,7 +48,7 @@ struct FeedbackButton: View {
         // feedbackIssueURL only returns nil if the base GitHub URL itself fails to parse, which
         // it can't — it's a fixed literal — so falling back to that same literal is unreachable
         // in practice, not a real error path worth surfacing to the user.
-        return feedbackIssueURL(context: context)
+        return feedbackIssueURL(context: context, diagnosticsSummary: diagnostics)
             ?? URL(string: "https://github.com/mkny13/couch-tour/issues/new?template=bug_report.md")!
     }
 
