@@ -911,7 +911,7 @@ internal fun LikeButton(
 
 
 @Composable
-private fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
+internal fun MiniPlayer(state: PlayerState, vm: PlayerViewModel, nav: NavHostController) {
     val ledger = LocalLedgerColors.current
     Column(
         Modifier
