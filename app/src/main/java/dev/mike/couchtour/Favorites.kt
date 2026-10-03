@@ -53,10 +53,10 @@ object Favorites {
     }
 
     fun toggle(key: String) {
-        val now = System.currentTimeMillis()
         val on: Boolean
         synchronized(lock) {
             val existing = rows[key]
+            val now = maxOf(System.currentTimeMillis(), (existing?.updatedAt ?: 0L) + 1L)
             on = existing?.deletedAt != null || existing == null
             rows[key] = if (on) {
                 FavoriteArtistSyncRow(artistKey = key, updatedAt = now, deletedAt = null)

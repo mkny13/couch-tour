@@ -37,7 +37,7 @@ public final class Favorites: ObservableObject {
     }
 
     public func toggle(_ key: String) {
-        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let now = max(Int64(Date().timeIntervalSince1970 * 1000), (rows[key]?.updatedAt ?? 0) + 1)
         if keys.contains(key) {
             rows[key] = FavoriteArtistSyncRow(artistKey: key, updatedAt: now, deletedAt: now)
             keys.remove(key)
