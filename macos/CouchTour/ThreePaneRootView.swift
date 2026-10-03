@@ -110,16 +110,20 @@ struct ThreePaneRootView: View {
             switch route {
             case .artists:
                 ArtistsView()
+                    .accessibilityIdentifier(AXIdentifiers.artistsScreen)
             case .listening:
                 ListeningView()
+                    .accessibilityIdentifier(AXIdentifiers.historyScreen)
             case .playlists:
                 LocalPlaylistsView()
+                    .accessibilityIdentifier(AXIdentifiers.libraryScreen)
             case .publicPlaylists:
                 PublicPlaylistsView()
             case .publicPlaylist(let playlist):
                 PublicPlaylistView(summary: playlist)
             case .search:
                 SearchView()
+                    .accessibilityIdentifier(AXIdentifiers.searchScreen)
             case .artist(let artist):
                 PeriodsView(artist: artist)
             case .period(let artist, let period):

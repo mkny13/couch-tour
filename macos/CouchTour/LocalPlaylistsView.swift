@@ -306,6 +306,7 @@ struct LocalPlaylistsView: View {
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(colors.textPrimary)
                         .lineLimit(1)
+                        .accessibilityIdentifier("\(AXIdentifiers.libraryRow).\(item.id)")
 
                     if !item.subtitle.isEmpty {
                         Text(item.subtitle)

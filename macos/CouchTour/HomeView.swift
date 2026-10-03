@@ -75,6 +75,7 @@ struct HomeView: View {
             }
         }
         .background(colors.background)
+        .accessibilityIdentifier(AXIdentifiers.homeScreen)
         .sheet(item: $tourPickerArtist, onDismiss: {
             Task {
                 await reloadProgress()
@@ -224,6 +225,7 @@ struct HomeView: View {
                 HStack(spacing: 14) {
                     ForEach(recent, id: \.queueKey) { item in
                         inProgressCard(item)
+                            .accessibilityIdentifier("\(AXIdentifiers.homeInProgressCard).\(item.queueKey)")
                     }
                 }
                 .padding(.horizontal, 24)
@@ -428,6 +430,7 @@ struct HomeView: View {
                         .foregroundStyle(colors.textPrimary)
                         .frame(width: 140, alignment: .leading)
                         .lineLimit(1)
+                        .accessibilityIdentifier("\(AXIdentifiers.homeNextStopChip).\(show.artist.backend.rawValue).\(show.artist.id)")
 
                     Text(formatShowDate(show.date))
                         .font(.system(size: 15))
