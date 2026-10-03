@@ -9,7 +9,6 @@ options:
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
-  projectFormat: xcode15_0
 
 packages:
   CouchTourKit:

@@ -8,6 +8,7 @@ struct SidebarView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
     @Environment(\.ledgerColors) private var colors
+    @Environment(\.openSettings) private var openSettings
 
     let favoritedArtists: [ArtistRef]
     let isFavoritesLoaded: Bool
@@ -80,7 +81,7 @@ struct SidebarView: View {
                     isSelected: false,
                     identifier: AXIdentifiers.sidebarNavSettings
                 ) {
-                    openSettingsWindow()
+                    openSettings()
                 }
             }
             .padding(.horizontal, 8)
@@ -148,7 +149,7 @@ struct SidebarView: View {
 
             Button {
                 appModel.settingsTab = .sync
-                openSettingsWindow()
+                openSettings()
             } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -224,10 +225,4 @@ private struct SidebarNavItem: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
     }
-}
-
-/// `@Environment(\.openSettings)` needs the Xcode 16 SDK; CI builds with Xcode 15.4, so use the
-/// responder-chain selector that macOS 14 exposes for the Settings scene.
-private func openSettingsWindow() {
-    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
 }

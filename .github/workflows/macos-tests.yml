@@ -1,14 +1,15 @@
-name: macOS tests
+name: macOS unit tests
 
-# Runs both the shared package suite and a small deterministic XCUITest suite for the
-# macOS app target, so UI regressions in sort/tag/context-menu/artwork chrome are caught on PRs.
+# Runs CouchTourKit's plain SwiftPM test suite alongside an unsigned Debug build of the
+# macOS app target (macos/CouchTour) and a small deterministic XCUITest suite
+# (macos/CouchTourUITests) on a GitHub-hosted macOS runner. This ensures that neither
+# changes to shared core logic (API clients, catalog model, queue-key grammar, progress
+# storage) nor UI/app-layer changes silently break compilation, tests, or the UI chrome
+# covered by the harness (sort, tag filter, context menu, artwork badge).
 on:
   pull_request:
     paths:
-      - "macos/CouchTour/**"
-      - "macos/CouchTourUITests/**"
-      - "macos/Packages/CouchTourKit/**"
-      - "macos/project.yml"
+      - "macos/**"
       - ".github/workflows/macos-tests.yml"
   workflow_dispatch:
 
@@ -33,13 +34,28 @@ jobs:
         working-directory: macos/Packages/CouchTourKit
         run: swift test
 
-      - name: Install XcodeGen
+  macos-build:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
         run: brew install xcodegen
+
+      - name: Select Xcode 16.2
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Generate Xcode project
         working-directory: macos
         run: xcodegen generate
 
+      - name: Build macOS app (Debug, unsigned)
+        working-directory: macos
+        run: xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
+
+      # Ad-hoc signed ("Sign to Run Locally") because XCUITest's runner app must be signed
+      # to launch; the unsigned build above stays as the plain compile gate.
       - name: Run macOS XCUITests
         working-directory: macos
-        run: xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -destination 'platform=macOS' test -only-testing:CouchTourUITests
+        run: xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' test -only-testing:CouchTourUITests CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=

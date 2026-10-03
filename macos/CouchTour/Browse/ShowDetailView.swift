@@ -531,7 +531,7 @@ private struct SourceRow: View {
                         .fontWeight(isPreferred ? .bold : .semibold)
                         .foregroundStyle(isPreferred ? Color.accentColor : .primary)
                         .lineLimit(1)
-                    if preference != nil {
+                    if let preference {
                         Button(action: onCyclePreference) {
                             Image(systemName: isPreferred ? "hand.thumbsup.fill" : "hand.thumbsdown.fill")
                                 .font(.caption)
