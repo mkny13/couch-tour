@@ -1011,7 +1011,7 @@ final class Player: NSObject, ObservableObject {
             unprepare: nil,
             process: gainTapProcess
         )
-        #if swift(>=6.0)
+        #if compiler(>=6.0)
         var tapOut: MTAudioProcessingTap?
         let status = MTAudioProcessingTapCreate(
             kCFAllocatorDefault,
