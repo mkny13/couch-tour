@@ -552,3 +552,11 @@ Posting comments for `covered` issues is opt-in (`run-smoke.sh --auto-verify`) s
 does not write to issues unattended until the owner has seen the report table. Kept
 couch-tour-specific and compatible with the Mahler-wide gate in mkny13/mahler#611 part 3.
 
+## D330 — macOS Feedback includes diagnostics behind a Settings toggle, default on (#436)
+
+Mirrors Android D296. With `PlaybackSettings.includeDiagnostics` on (default `true`), the Feedback
+button copies `DiagnosticsLog.tailLines(200)` to the clipboard and adds `summaryLines()` to the issue
+body under `## Diagnostics`; off leaves the clipboard and URL exactly as before. The URL carries only
+the short summary (capped at 1000 chars, then shrunk until the encoded URL is under 2400), never log
+lines — those travel by clipboard because GitHub pre-fill URLs can't hold them. The log is already
+redacted at write time (D315).

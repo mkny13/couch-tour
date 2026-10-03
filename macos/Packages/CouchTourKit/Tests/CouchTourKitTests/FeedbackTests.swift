@@ -56,4 +56,33 @@ final class FeedbackTests: XCTestCase {
         let body = try XCTUnwrap(components.queryItems?.first { $0.name == "body" }?.value)
         XCTAssertTrue(body.contains("Screen: Home & Away?"))
     }
+
+    private func body(of url: URL?) throws -> String {
+        let url = try XCTUnwrap(url)
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        return try XCTUnwrap(components.queryItems?.first { $0.name == "body" }?.value)
+    }
+
+    func testDiagnosticsSummaryAddsASection() throws {
+        let body = try body(of: feedbackIssueURL(context: context, diagnosticsSummary: "Entries: 12\nSize: 900 bytes"))
+        XCTAssertTrue(body.contains("## Diagnostics\nEntries: 12\nSize: 900 bytes"))
+    }
+
+    func testNoSummaryOmitsTheDiagnosticsSection() throws {
+        let without = try body(of: feedbackIssueURL(context: context))
+        XCTAssertFalse(without.contains("## Diagnostics"))
+        XCTAssertFalse(try body(of: feedbackIssueURL(context: context, diagnosticsSummary: "")).contains("## Diagnostics"))
+        XCTAssertEqual(without, try body(of: feedbackIssueURL(context: context, diagnosticsSummary: nil)))
+    }
+
+    func testHugeSummaryIsCappedAndURLStaysUnderLimit() throws {
+        // Newlines and punctuation percent-encode to 3 chars each — the worst case for URL length.
+        let huge = String(repeating: "k: v\n", count: 2000)
+        let url = try XCTUnwrap(feedbackIssueURL(context: context, diagnosticsSummary: huge))
+        XCTAssertLessThan(url.absoluteString.count, 2500)
+        let body = try body(of: url)
+        XCTAssertTrue(body.contains("## Diagnostics"))
+        let summary = try XCTUnwrap(body.components(separatedBy: "## Diagnostics\n").last)
+        XCTAssertLessThanOrEqual(summary.count, feedbackDiagnosticsSummaryMaxChars)
+    }
 }
