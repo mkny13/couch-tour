@@ -19,7 +19,7 @@ GH_BIN="${CCTV_SMOKE_GH:-gh}"
 MAHLER_BIN="${CCTV_SMOKE_MAHLER:-mahler}"
 
 TAG=""; PLATFORM="both"; OUT_DIR="smoke-reports"; FILE_BUGS=true
-COMMIT_SCREENSHOTS=false; KEEP_GOING=false
+COMMIT_SCREENSHOTS=false; KEEP_GOING=false; AUTO_VERIFY=false
 WAIVE_ARGS=(); WAIVE_IDS=()
 
 usage() {
@@ -34,6 +34,8 @@ Options:
   --no-file-bugs             Do not file or comment on GitHub issues (exploratory runs)
   --commit-screenshots       Leave smoke-reports/<tag>/*.png unignored; default keeps them local
                              because they show the owner's signed-in library (this repo is public)
+  --auto-verify              Post a verify-comment.sh evidence comment on every shipped issue the report
+                             marks 'covered' (opt-in; needs the issue list, so not with --no-file-bugs)
   --keep-going               Carry on to the next platform when a runner exits with a usage error
                              (1); a preflight failure (2) never stops the other platform
   -h, --help                 Print this usage message
@@ -61,11 +63,14 @@ while [[ $# -gt 0 ]]; do
       fi ;;
     --no-file-bugs) FILE_BUGS=false; shift ;;
     --commit-screenshots) COMMIT_SCREENSHOTS=true; shift ;;
+    --auto-verify) AUTO_VERIFY=true; shift ;;
     --keep-going) KEEP_GOING=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "Unknown argument: $1" ;;
   esac
 done
+
+[[ "$AUTO_VERIFY" == false || "$FILE_BUGS" == true ]] || die "--auto-verify cannot be combined with --no-file-bugs"
 
 cd "$REPO_ROOT"
 
@@ -170,10 +175,36 @@ if [[ "$FILE_BUGS" == true && ${#RESULT_ARGS[@]} -gt 0 ]]; then
   done
 fi
 
+# ---- Shipped-but-unverified issues (#404) ---------------------------------------------------
+# Closed issues still labelled mahler:verifying with no <!-- mahler:verified --> comment. Soft-fail:
+# a missing gh/jq or network just means the report has no cross-reference section.
+UNVERIFIED_FILE="$RUN_DIR/unverified-issues.tsv"; UNVERIFIED_ARGS=()
+if "$GH_BIN" issue list -R "$REPO_SLUG" --state closed --label mahler:verifying --limit 100 \
+     --json number,title,body,comments 2>/dev/null \
+   | jq -r '.[] | select(([.comments[].body] | any(contains("<!-- mahler:verified -->"))) | not)
+            | [.number, .title, .body] | map(tostring | gsub("[\t\r\n]+"; " ")) | join("\t")' \
+   > "$UNVERIFIED_FILE" 2>/dev/null; then
+  UNVERIFIED_ARGS=(--unverified-issues "$UNVERIFIED_FILE")
+else
+  echo "WARN: could not list unverified shipped issues; report will omit that section" >&2
+fi
+
 # ---- Report -------------------------------------------------------------------------------
 REPORT="$OUT_DIR/$TAG.md"
 "$SCRIPT_DIR/report.sh" "${RESULT_ARGS[@]}" --tag "$TAG" --out "$REPORT" \
-  ${WAIVE_ARGS[@]+"${WAIVE_ARGS[@]}"} ${NOTRUN_ARGS[@]+"${NOTRUN_ARGS[@]}"} ${ISSUE_ARGS[@]+"${ISSUE_ARGS[@]}"}
+  ${WAIVE_ARGS[@]+"${WAIVE_ARGS[@]}"} ${NOTRUN_ARGS[@]+"${NOTRUN_ARGS[@]}"} ${ISSUE_ARGS[@]+"${ISSUE_ARGS[@]}"} \
+  ${UNVERIFIED_ARGS[@]+"${UNVERIFIED_ARGS[@]}"}
+
+# Clear covered issues: the evidence is the report line that names the passing journey.
+if [[ "$AUTO_VERIFY" == true && ${#UNVERIFIED_ARGS[@]} -gt 0 ]]; then
+  while IFS='|' read -r _ num _ status evidence _; do
+    num="${num//[[:space:]]/}"; status="${status//[[:space:]]/ }"; status="${status# }"; status="${status% }"
+    [[ "$num" =~ ^#[0-9]+$ && "$status" == covered ]] || continue
+    evidence="${evidence# }"; evidence="${evidence% }"; evidence="${evidence//\\|/|}"
+    "$SCRIPT_DIR/verify-comment.sh" "$num" "$TAG" "$evidence" >/dev/null \
+      || echo "WARN: could not post verification on $num" >&2
+  done < <(awk '/^## Unverified shipped issues/{f=1;next} /^## /{f=0} f' "$REPORT")
+fi
 
 echo
 echo "Report:  $REPORT"

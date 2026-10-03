@@ -39,6 +39,13 @@ scripts/smoke/run-smoke.sh --tag <beta-tag> [--platform mac|android|both] [--no-
 ```
 Writes `smoke-reports/<tag>.md` (the promotion gate reads it) and files a `mahler`-labelled issue per failing journey. Exit codes: `0` ran and reported, `1` usage, `2` a platform couldn't run (no device/app; never a PASS). Headless checks, no app needed: `scripts/smoke/test-report.sh`, `scripts/smoke/check-journeys.sh`. Details: `scripts/smoke/README.md`.
 
+### Verifying shipped issues
+A shipped issue (merged, still labelled `mahler:verifying`) counts as verified only with a comment citing a beta tag plus evidence: a smoke-report line (`smoke-reports/<tag>.md`), a screenshot or dump, or an owner UAT note. Post it in the standard format (carries the `<!-- mahler:verified -->` marker):
+```bash
+scripts/smoke/verify-comment.sh [--dry-run] <issue> <tag> <evidence...>
+```
+Each smoke report lists the unverified shipped issues as covered / not covered / still reproduces; `run-smoke.sh --auto-verify` posts the comment for the covered ones. Headless test: `python3 scripts/smoke/test_verify_comment.py`.
+
 ### macOS UI tests (XCUITest)
 Regenerate the Xcode project, then run the deterministic app-target UI suite:
 ```bash

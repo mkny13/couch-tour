@@ -21,6 +21,11 @@ Options:
   --not-run <platform> - <reason>
                             Same as a preflight line, given on the command line (repeatable)
   --issue <id>=<url>        Link a filed bug issue to a failing journey (repeatable)
+  --unverified-issues <file>
+                            Tab-separated shipped-but-unverified issues (<number>\t<title>\t<body>);
+                            adds an "Unverified shipped issues" table marking each covered, not covered,
+                            or still reproduces against this run's journeys (#404)
+  --journeys <file>         JOURNEYS.md used to map issue numbers to journeys (default: next to this script)
   --commit <sha>            Commit shown in the footer (default: git rev-parse --short HEAD)
   -h, --help                Print this usage message
 
@@ -36,12 +41,15 @@ RESULTS=(); TAG=""; OUT=""; COMMIT=""
 WAIVE_IDS=(); WAIVE_REASONS=()
 NOTRUN_PLATFORMS=(); NOTRUN_REASONS=()
 ISSUE_IDS=(); ISSUE_URLS=()
+UNVERIFIED=""; JOURNEYS_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/JOURNEYS.md"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --results) [[ -n "${2:-}" ]] || die "--results requires a file"; RESULTS+=("$2"); shift 2 ;;
     --tag) [[ -n "${2:-}" ]] || die "--tag requires a value"; TAG="$2"; shift 2 ;;
     --out) [[ -n "${2:-}" ]] || die "--out requires a file"; OUT="$2"; shift 2 ;;
+    --unverified-issues) [[ -n "${2:-}" ]] || die "--unverified-issues requires a file"; UNVERIFIED="$2"; shift 2 ;;
+    --journeys) [[ -n "${2:-}" ]] || die "--journeys requires a file"; JOURNEYS_FILE="$2"; shift 2 ;;
     --commit) COMMIT="${2:-}"; shift 2 ;;
     --waive|--not-run)
       flag="$1"; [[ -n "${2:-}" ]] || die "$flag requires '<name> - <reason>'"
@@ -67,6 +75,7 @@ done
 [[ -n "$TAG" ]] || die "--tag is required"
 [[ -n "$OUT" ]] || die "--out is required"
 [[ "$TAG" != *$'\n'* ]] || die "--tag must be a single line"
+[[ -z "$UNVERIFIED" || -f "$UNVERIFIED" ]] || die "unverified-issues file not found: $UNVERIFIED"
 for f in "${RESULTS[@]}"; do [[ -f "$f" ]] || die "results file not found: $f"; done
 
 lookup() { # lookup <needle> <array-name-of-keys> <array-name-of-values>
@@ -122,6 +131,38 @@ verdict=PASS
 [[ ${#NOTRUN_PLATFORMS[@]} -eq 0 ]] || verdict=FAIL
 [[ ${#ROW_ID[@]} -gt 0 ]] || verdict=FAIL
 
+# Journey -> issue-number references from JOURNEYS.md ("#345" inside a journey's section or table row).
+JREF_ID=(); JREF_NUM=()
+if [[ -n "$UNVERIFIED" && -f "$JOURNEYS_FILE" ]]; then
+  cur=""
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^###[[:space:]]+\`([a-z0-9-]+)\` ]]; then cur="${BASH_REMATCH[1]}"; continue; fi
+    row=""
+    [[ "$line" =~ ^\|[[:space:]]*\`([a-z0-9-]+)\` ]] && row="${BASH_REMATCH[1]}"
+    owner="${row:-$cur}"; [[ -n "$owner" ]] || continue
+    for n in $(printf '%s\n' "$line" | grep -oE '#[0-9]+' || true); do JREF_ID+=("$owner"); JREF_NUM+=("${n#\#}"); done
+  done < "$JOURNEYS_FILE"
+fi
+
+# unverified_row <number> <title> <body> -> "<status>\t<notes>"; a FAIL anywhere beats a PASS.
+unverified_row() {
+  local num="$1" hay="$2 $3" i j id state="not covered" note="no journey ran for this issue" pass_note="" fail_note=""
+  local -a cand=()
+  for ((j = 0; j < ${#JREF_ID[@]}; j++)); do [[ "${JREF_NUM[$j]}" == "$num" ]] && cand+=("${JREF_ID[$j]}"); done
+  for ((i = 0; i < ${#ROW_ID[@]}; i++)); do
+    id="${ROW_ID[$i]}"; local hit=false c
+    for c in ${cand[@]+"${cand[@]}"}; do [[ "$c" == "$id" ]] && hit=true; done
+    [[ "$hit" == true || "$hay" == *"$id"* ]] || continue
+    case "${ROW_STATUS[$i]}" in
+      FAIL) [[ -n "$fail_note" ]] || fail_note="FAIL \`$id\` (${ROW_PLAT[$i]}): ${ROW_EVID[$i]}" ;;
+      PASS) [[ -n "$pass_note" ]] || pass_note="PASS \`$id\` (${ROW_PLAT[$i]})" ;;
+    esac
+  done
+  if [[ -n "$fail_note" ]]; then state="still reproduces"; note="$fail_note"
+  elif [[ -n "$pass_note" ]]; then state="covered"; note="smoke-reports/$TAG.md: $pass_note"; fi
+  printf '%s\t%s' "$state" "$note"
+}
+
 [[ -n "$COMMIT" ]] || COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 mkdir -p "$(dirname "$OUT")"
@@ -162,6 +203,24 @@ mkdir -p "$(dirname "$OUT")"
     echo "| \`${ROW_ID[$i]}\` | ${ROW_PLAT[$i]} | ${ROW_STATUS[$i]} | $(cell "${ROW_EVID[$i]}") |"
   done
   echo
+
+  if [[ -n "$UNVERIFIED" ]]; then
+    echo "## Unverified shipped issues"
+    echo
+    echo "Shipped issues with no \`<!-- mahler:verified -->\` evidence comment, checked against this run's journeys."
+    echo
+    echo "| Issue | Title | Status | Evidence / Notes |"
+    echo "|---|---|---|---|"
+    unv=0
+    while IFS=$'\t' read -r unum utitle ubody || [[ -n "${unum:-}" ]]; do
+      [[ -n "${unum// /}" ]] || continue
+      unv=$((unv + 1))
+      res="$(unverified_row "${unum#\#}" "${utitle:-}" "${ubody:-}")"
+      echo "| #${unum#\#} | $(cell "${utitle:-}") | ${res%%$'\t'*} | $(cell "${res#*$'\t'}") |"
+    done < "$UNVERIFIED"
+    [[ $unv -gt 0 ]] || echo "| none | | | |"
+    echo
+  fi
 
   if [[ $skips -gt 0 ]]; then
     echo "## Skipped (not verified)"

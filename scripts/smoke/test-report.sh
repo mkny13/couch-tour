@@ -56,6 +56,15 @@ run preflight-waive-cannot-help FAIL --results "$DATA/preflight.tsv" --waive lau
 run not-run-flag FAIL --results "$DATA/all-pass.tsv" --not-run android - "adb missing"
 check "not-run-flag: names platform" grep -q '`android`: adb missing' "$TMP/not-run-flag.md"
 
+# Unverified shipped issues cross-reference (#404): covered / still reproduces / not covered.
+run unverified FAIL --results "$DATA/fail.tsv" --unverified-issues "$DATA/unverified.tsv" --journeys "$DATA/journeys.md"
+check "unverified: section and header present" grep -qx '| Issue | Title | Status | Evidence / Notes |' "$TMP/unverified.md"
+check "unverified: journey ref + PASS is covered" grep -q '^| #345 | Mockup favorites | covered | smoke-reports/v9.99-beta.md: PASS `launch-cold-start`' "$TMP/unverified.md"
+check "unverified: journey id in body + FAIL is still reproduces" grep -q '^| #346 | Search broken | still reproduces | FAIL `search-artist-hit`' "$TMP/unverified.md"
+check "unverified: no journey is not covered" grep -q '^| #347 | Other thing | not covered |' "$TMP/unverified.md"
+run no-unverified PASS --results "$DATA/all-pass.tsv"
+check "no --unverified-issues: no section" test "$(grep -c '^## Unverified shipped issues' "$TMP/no-unverified.md")" = 0
+
 # Two result files merge into one report.
 run merged PASS --results "$DATA/all-pass.tsv" --results "$DATA/skip.tsv"
 
