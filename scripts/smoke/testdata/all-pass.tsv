@@ -1,0 +1,4 @@
+mac	launch-cold-start	PASS	sidebar.nav.home present
+mac	search-artist-hit	PASS	search.tab.artists hits=3
+android	launch-cold-start	PASS	nav.home present
+android	search-artist-hit	PASS	search.section.artists rows=2

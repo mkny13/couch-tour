@@ -526,3 +526,17 @@ D66 recorded that a receiver cannot apply Media3's `ClippingConfiguration`; the 
 ## D326 — macOS search returns public playlists (#427)
 
 Supersedes the D5 omission of a `playlists` bucket in `SearchHits`: now that #428 gave public playlists a screen, `SearchResults` decodes `playlists` into `PublicPlaylistSummary` and `SearchHits.playlists` carries them. They count as Phish-only (dropped when filtering to another artist, like tracks), appear in the All tab and a dedicated Playlists tab, and a tap opens `PublicPlaylistView`.
+
+## D327 — A smoke run's committed evidence is its report; screenshots stay local (#371)
+
+`scripts/smoke/run-smoke.sh` writes `smoke-reports/<tag>.md` and that file is what gets
+committed and what #358's promotion gate reads (`Tag:`, one `Smoke: PASS|FAIL`, optional
+`Waived:` lines). Failure screenshots (`smoke-reports/**/*.png`) and the per-platform result
+files are gitignored: this repo is public, and the screenshots show the owner's signed-in
+library, favorites, and listening history. `--commit-screenshots` exists as the owner's
+opt-out; flipping the default is a one-line change once they've seen a report.
+A platform that could not be run at all (runner exit 2, or a crash) can never produce a `PASS`;
+the report names it. `SKIP` is neither pass nor fail: it is listed as "not verified" and does
+not block a `PASS`. Whether `SKIP` should block promotion is a policy call left to the owner.
+The formatter passes runner evidence through verbatim, so the runners are what must keep
+evidence identifier-level. A run with zero results is a `FAIL`.

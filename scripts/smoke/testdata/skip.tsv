@@ -1,0 +1,3 @@
+mac	launch-cold-start	PASS	sidebar.nav.home present
+android	launch-cold-start	PASS	nav.home present
+android	favorite-persists-across-relaunch	SKIP	not signed in
