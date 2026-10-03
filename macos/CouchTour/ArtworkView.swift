@@ -35,9 +35,22 @@ struct ArtworkView: View {
         }
         .frame(width: scaledSize, height: scaledSize)
         .clipShape(RoundedRectangle(cornerRadius: scaledSize / 8))
-        // The show/track identity beside every one of these already names it; announcing
-        // "image" too would just add noise to every VoiceOver pass.
-        .accessibilityHidden(true)
+        // Small thumbnails render no date badge and sit beside text that already names the
+        // show/track, so announcing "image" there would just add noise (VoiceOver passes).
+        // The large form carries the badge as its only readable content, so it becomes one
+        // element; the label (not accessibilityValue) because XCUITest on macOS reads an
+        // empty value for combined SwiftUI elements.
+        .accessibilityElement(children: .ignore)
+        .accessibilityHidden(!showsDateBadge)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var showsDateBadge: Bool { scaledSize >= 60 }
+
+    private var accessibilityDescription: String {
+        let badge = ShowArtworkGenerator.dateBadge(from: date)
+        guard let artist, !artist.isEmpty else { return badge }
+        return "\(artist), \(badge)"
     }
 
     /// #62, decided 2026-08-31: a seeded gradient plus the artist monogram, not a port of
@@ -64,7 +77,7 @@ struct ArtworkView: View {
                         .padding(.horizontal, scaledSize / 10)
                     // Skipped below ~60pt (the mini player's default 36) — there isn't room for
                     // a second line without it reading as noise rather than a date.
-                    if scaledSize >= 60 {
+                    if showsDateBadge {
                         Text(ShowArtworkGenerator.dateBadge(from: date))
                             .font(.system(size: scaledSize / 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.85))

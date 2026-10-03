@@ -61,6 +61,7 @@ final class CouchTourUITests: XCTestCase {
     func testLargeArtworkShowsDateBadge() {
         let large = app.descendants(matching: .any)["uih.artwork.large"].firstMatch
         XCTAssertTrue(large.waitForExistence(timeout: 10))
-        XCTAssertEqual(large.label, "1980-01-02")
+        // The label comes from ArtworkView itself (artist + badge); the harness adds no override.
+        XCTAssertTrue(large.label.contains("1980-01-02"), "label was: \(large.label)")
     }
 }
