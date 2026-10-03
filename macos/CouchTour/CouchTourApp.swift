@@ -151,6 +151,7 @@ struct CouchTourApp: App {
                     .tag(SettingsTab.sync)
             }
             .frame(width: 450)
+            .accessibilityIdentifier(AXIdentifiers.settingsScreen)
             .preferredColorScheme(appModel.themeSettings.themeMode.colorScheme)
         }
     }

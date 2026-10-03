@@ -63,6 +63,7 @@ struct ShowsView: View {
                                 VStack(alignment: .leading) {
                                     HStack {
                                         Text(show.date)
+                                            .accessibilityIdentifier("\(AXIdentifiers.showsRow).\(show.date)")
                                         if show.partial {
                                             Text("partial")
                                                 .font(.caption2)
@@ -83,6 +84,7 @@ struct ShowsView: View {
                                 }
                             }
                         }
+                        .accessibilityIdentifier(AXIdentifiers.showsList)
                     }
                 }
             }
