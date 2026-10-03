@@ -357,7 +357,7 @@ public enum PhishInAPI {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let carriedToken = authenticated ? authToken : nil
         if let carriedToken { request.setValue(carriedToken, forHTTPHeaderField: "X-Auth-Token") }
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Diagnostics.timedCall(request) { try await URLSession.shared.data(for: request) }
         guard let http = response as? HTTPURLResponse else { throw APIException("No HTTP response") }
         if http.statusCode == 401 && carriedToken != nil { await onUnauthorized?() }
         guard (200...299).contains(http.statusCode) else { throw APIException("HTTP \(http.statusCode)", code: http.statusCode) }

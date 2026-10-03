@@ -7,6 +7,7 @@ struct CouchTourApp: App {
     @StateObject private var player: Player
 
     init() {
+        Diagnostics.installDefault()
         // Owner-supplied YouTube Data API key (D44 precedent — the builder never registers
         // one). Read from UserDefaults so it's settable per-install without a rebuild:
         // `defaults write dev.mike.couchtour.mac youtubeAPIKey <key>`.
