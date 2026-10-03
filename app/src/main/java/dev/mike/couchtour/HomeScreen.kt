@@ -621,7 +621,7 @@ private fun SurpriseMeChip(artists: List<ArtistRef>, nav: NavHostController) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController, modifier: Modifier = Modifier) {
+internal fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: NavHostController, modifier: Modifier = Modifier) {
     val ledger = LocalLedgerColors.current
     val playerState by vm.state.collectAsState()
     val isCurrentlyPlaying = playerState.hasQueue && playerState.queueKey == progress.queueKey
@@ -822,4 +822,3 @@ private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController, modif
         )
     }
 }
-
