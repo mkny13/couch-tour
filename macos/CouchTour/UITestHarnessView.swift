@@ -107,6 +107,11 @@ struct UITestHarnessView: View {
                             date: "1980-01-02",
                             size: 120
                         )
+                        // ArtworkView hides itself from accessibility, so the harness exposes one
+                        // element per artwork carrying the badge text the view renders.
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Large artwork")
+                        .accessibilityValue(ShowArtworkGenerator.dateBadge(from: "1980-01-02"))
                         .accessibilityIdentifier("uih.artwork.large")
                     }
                     VStack(alignment: .leading, spacing: 8) {
@@ -118,6 +123,8 @@ struct UITestHarnessView: View {
                             date: "1980-01-02",
                             size: 36
                         )
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Small artwork")
                         .accessibilityIdentifier("uih.artwork.small")
                     }
                 }
