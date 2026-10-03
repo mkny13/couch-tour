@@ -105,3 +105,21 @@ Each failing, unwaived journey is filed with `mahler add phish-in` and labelled 
 isn't on `PATH`). The body carries a `smoke-journey:<id>` marker; if an open issue with that
 marker exists, `run-smoke.sh` comments on it with the new tag instead of filing a duplicate.
 `--no-file-bugs` turns all of this off.
+
+## Verifying shipped issues (#404)
+
+A shipped issue counts as verified only with a comment citing a beta tag plus evidence (a smoke-report
+line, a screenshot or dump, or an owner UAT note).
+
+`verify-comment.sh [--dry-run] <issue> <tag> <evidence...>` posts it in one format: `<issue>` is `346` or
+`#346`, `<tag>` looks like `v0.87` or `v0.87-beta`, and `--dry-run` prints the comment instead of posting.
+The `<!-- mahler:verified -->` marker on the first line is what tooling looks for. Test:
+`python3 scripts/smoke/test_verify_comment.py`.
+
+`run-smoke.sh` lists closed `mahler:verifying` issues without that marker, and `report.sh` renders them in an
+`## Unverified shipped issues` table (`Issue | Title | Status | Evidence / Notes`). An issue maps to a journey
+when `JOURNEYS.md` mentions its `#N` in that journey, or the journey id appears in its title or body:
+`covered` (a mapped journey passed), `still reproduces` (a mapped journey failed; this wins over a pass),
+`not covered` (no mapped journey ran). `report.sh --unverified-issues <tsv> [--journeys <md>]` takes the list
+from a file so `test-report.sh` can test it headlessly. `run-smoke.sh --auto-verify` (opt-in) then posts a
+verification comment on each `covered` issue.

@@ -540,3 +540,15 @@ the report names it. `SKIP` is neither pass nor fail: it is listed as "not verif
 not block a `PASS`. Whether `SKIP` should block promotion is a policy call left to the owner.
 The formatter passes runner evidence through verbatim, so the runners are what must keep
 evidence identifier-level. A run with zero results is a `FAIL`.
+
+## D329 — Shipped issues are verified only by a beta-tag evidence comment (#404)
+
+A merged issue stays `mahler:verifying` until a comment carrying `<!-- mahler:verified -->`, a beta
+tag and evidence (smoke-report line, screenshot/dump, or owner UAT note) is posted;
+`scripts/smoke/verify-comment.sh` writes that format. Each smoke report cross-references closed
+`mahler:verifying` issues without the marker against the run's journeys (mapped via `#N` in
+`JOURNEYS.md` or the journey id in the issue text): `covered`, `not covered`, or `still reproduces`.
+Posting comments for `covered` issues is opt-in (`run-smoke.sh --auto-verify`) so a weekly run
+does not write to issues unattended until the owner has seen the report table. Kept
+couch-tour-specific and compatible with the Mahler-wide gate in mkny13/mahler#611 part 3.
+
