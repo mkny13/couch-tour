@@ -32,6 +32,13 @@ Tests are local (Robolectric + MockWebServer); run after any change.
 ### Accessibility checks (macOS)
 Dump the running beta's accessibility tree (bounded, identifier-scoped): `scripts/smoke/ax-tree.sh`
 
+### Smoke journeys (Mac + Android)
+Run the journeys against the installed beta (natural step after `scripts/cut-beta.sh`; needs the Mac beta running and/or an adb device):
+```bash
+scripts/smoke/run-smoke.sh --tag <beta-tag> [--platform mac|android|both] [--no-file-bugs]   # --help for all flags
+```
+Writes `smoke-reports/<tag>.md` (the promotion gate reads it) and files a `mahler`-labelled issue per failing journey. Exit codes: `0` ran and reported, `1` usage, `2` a platform couldn't run (no device/app; never a PASS). Headless checks, no app needed: `scripts/smoke/test-report.sh`, `scripts/smoke/check-journeys.sh`. Details: `scripts/smoke/README.md`.
+
 ### macOS UI tests (XCUITest)
 Regenerate the Xcode project, then run the deterministic app-target UI suite:
 ```bash
