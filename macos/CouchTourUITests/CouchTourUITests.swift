@@ -61,6 +61,6 @@ final class CouchTourUITests: XCTestCase {
     func testLargeArtworkShowsDateBadge() {
         let large = app.descendants(matching: .any)["uih.artwork.large"].firstMatch
         XCTAssertTrue(large.waitForExistence(timeout: 10))
-        XCTAssertEqual(large.value as? String, "1980-01-02")
+        XCTAssertEqual(large.label, "1980-01-02")
     }
 }
