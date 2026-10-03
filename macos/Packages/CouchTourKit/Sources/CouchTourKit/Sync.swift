@@ -442,6 +442,11 @@ public final class SyncSession: ObservableObject {
     /// nothing was wrong).
     @Published public private(set) var lastError: String?
 
+    /// The favorites store every sync applies server rows to. Held here so call sites that
+    /// don't pass one (the debounced playback push) still apply pulled favorites; otherwise
+    /// they'd advance the shared pull cursor past favorite rows they threw away.
+    public var favorites: Favorites?
+
     public init(store: SyncTokenStore = SyncTokenStore()) {
         self.store = store
         let targetHost = SyncAPI.baseURL.host ?? ""
@@ -511,8 +516,9 @@ public final class SyncSession: ObservableObject {
     ///
     /// Usually one round trip: only a first pair (watermark 0, so the whole progress table is
     /// "changed") has enough backlog to need more than one.
-    public func sync(_ progressStore: ProgressStore, favorites: Favorites? = nil) async throws {
+    public func sync(_ progressStore: ProgressStore, favorites explicitFavorites: Favorites? = nil) async throws {
         guard store.deviceToken != nil else { return }
+        let favorites = explicitFavorites ?? self.favorites
         let began = Date()
         pulledCount = 0
         pushedCount = 0

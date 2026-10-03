@@ -642,6 +642,22 @@ final class SyncSessionTests: XCTestCase {
         XCTAssertTrue(pushed.contains(#""queueKey":"show:1997-11-17""#))
     }
 
+    @MainActor
+    func testDebouncedPushAppliesFavoriteRowsReturnedByTheServer() async throws {
+        try await claim()
+        let favorites = Favorites(defaults: UserDefaults(suiteName: suiteName)!)
+        session.favorites = favorites
+        server.enqueue(#"{"seq":3,"changes":[],"favoriteArtistChanges":[{"artistKey":"relisten:wsp","updatedAt":9000,"deletedAt":null}]}"#)
+        let gate = DebounceGate()
+        session.sleepForDebounce = { _ in await gate.park() }
+
+        session.requestDebouncedPush(store, delay: .milliseconds(50))
+        gate.open()
+        await session.pushTask?.value
+
+        XCTAssertTrue(favorites.keys.contains("relisten:wsp"))
+    }
+
     // ------------------------------------------------------------------ push chunking
     //
     // The server caps a push at 500 entries because D1 allows only 100 bound parameters per

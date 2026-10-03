@@ -87,6 +87,7 @@ final class AppModel: ObservableObject {
         SyncAPI.baseURL = SyncConfig.resolveBaseURL(defaultBase: SyncConfig.prodBaseURL)
         syncSession = SyncSession()
         #endif
+        syncSession.favorites = favorites
 
         do {
             progressStore = try ProgressStore(url: databaseURL)
