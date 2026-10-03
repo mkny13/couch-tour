@@ -805,6 +805,10 @@ android_toggle_favorite() {
 
 android_sync_step() {
   local step="$1" key="${CCTV_SMOKE_SYNC_ARTIST_ANDROID:-}"
+  # An installed-but-closed beta shows the launcher, so bring the app to the foreground first
+  # (no force-stop: that would drop a still-running client's in-memory state mid round trip).
+  adb_cmd shell am start -W -n "$BETA_PKG/dev.mike.couchtour.MainActivity" >&2 || android_unavailable "cannot launch $BETA_PKG"
+  android::wait_for_tag "nav.home" "$TIMEOUT" || android_unavailable "app did not reach nav.home after launch (paired/signed in?)"
   # bash 3.2 (macOS) has no ;;& fall-through, so the shared favorite-step preamble lives here.
   case "$step" in
     favorite-*)
