@@ -72,6 +72,21 @@ CREATE TABLE progress (
 CREATE INDEX progress_seq ON progress(groupId, seq);
 CREATE INDEX progress_deletedAt_seq ON progress(deletedAt, groupId, seq);
 
+-- Synced favorite artists. Same tombstone and seq semantics as progress: a removed favorite
+-- must replicate across devices, and every accepted write gets a group-wide seq so clients
+-- can page by one cursor.
+CREATE TABLE favorite_artists (
+    groupId TEXT NOT NULL REFERENCES groups(id),
+    artistKey TEXT NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER,
+    seq INTEGER NOT NULL,
+    lastWriterDeviceId TEXT,
+    PRIMARY KEY (groupId, artistKey)
+);
+CREATE INDEX favorite_artists_seq ON favorite_artists(groupId, seq);
+CREATE INDEX favorite_artists_deletedAt_seq ON favorite_artists(deletedAt, groupId, seq);
+
 -- The seq counter itself, one row per group. Allocated with a single
 -- `UPDATE seqs SET next = next + ? WHERE groupId = ? RETURNING next` — D1 has no interactive
 -- transactions, so the counter bump and the row writes it labels both go in one db.batch()

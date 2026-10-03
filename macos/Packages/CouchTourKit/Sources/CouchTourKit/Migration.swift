@@ -40,7 +40,7 @@ public enum UnsandboxedMigration {
     private static let fillKeys = ["skip_filler_tracks", "level_volume", "app_theme_mode", "playerVolume"]
     /// Cursors: the lower of the two, so a re-pull or re-push is the worst case rather than a
     /// skipped row. The merged database already holds the union either way.
-    private static let minKeys = ["sync.lastSeq", "sync.lastPushWatermark"]
+    private static let minKeys = ["sync.lastSeq", "sync.lastPushWatermark", "sync.lastFavoritesPushWatermark"]
     private static let maxKeys = ["sync.lastSyncedAt"]
 
     /// - Parameters:
