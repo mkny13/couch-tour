@@ -107,12 +107,6 @@ struct UITestHarnessView: View {
                             date: "1980-01-02",
                             size: 120
                         )
-                        // ArtworkView hides itself from accessibility, so the harness exposes one
-                        // element per artwork carrying the badge text the view renders.
-                        .accessibilityElement(children: .ignore)
-                        // XCUITest on macOS doesn't surface accessibilityValue for a combined
-                        // SwiftUI element, so the badge text rides on the label.
-                        .accessibilityLabel(ShowArtworkGenerator.dateBadge(from: "1980-01-02"))
                         .accessibilityIdentifier("uih.artwork.large")
                     }
                     VStack(alignment: .leading, spacing: 8) {
