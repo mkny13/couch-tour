@@ -262,6 +262,11 @@ data class ShowSummary(
      *  leaves this at the default 0, which is what lets [SearchSortMode.MOST_LIKED] sort
      *  Relisten hits after every phish.in one without a special-cased branch. */
     val likesCount: Int = 0,
+    /** phish.in's numeric show id and `liked_by_user` flag (#431) — what the show-detail
+     *  header's Like pill toggles. Relisten has no show-like concept and leaves both at the
+     *  defaults, which is how the pill knows to hide itself (`id == 0`). */
+    val id: Long = 0,
+    val likedByUser: Boolean = false,
     val externalRelease: ExternalRelease? = null,
 ) {
     /** "McNichols Arena · Denver, CO" */
@@ -695,6 +700,8 @@ internal fun Show.toShowSummary() = ShowSummary(
     recordingCount = 1,
     tags = tags.map { it.toTagRef() },
     likesCount = likesCount,
+    id = id,
+    likedByUser = likedByUser,
     externalRelease = CuratedMatches.match(Backend.PHISHIN, PHISH.id, date) ?: if (externalReleasePlatform != null && externalReleaseUrl != null) {
         runCatching {
             ExternalRelease(
