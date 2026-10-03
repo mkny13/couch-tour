@@ -24,7 +24,9 @@ final class MockServer {
     /// search fan-out across backends, `resolveLocalPlaylistTracks`'s fan-out across distinct
     /// shows) deterministic instead of racing over a single unscoped FIFO queue — mirroring
     /// the Kotlin tests' path-routing `MockWebServer` `Dispatcher` (D175) for the same reason.
-    private var responses: [(host: String?, pathContaining: String?, code: Int, body: String, headers: [String: String])] = []
+    private var responses: [(host: String?, pathContaining: String?, code: Int, body: String, headers: [String: String], gated: Bool)] = []
+    /// Requests whose matched response is gated: parked here until `releaseGatedResponses()`.
+    private var parked: [(URLProtocol, (host: String?, pathContaining: String?, code: Int, body: String, headers: [String: String], gated: Bool))] = []
     private(set) var requests: [URLRequest] = []
     private let lock = NSLock()
     /// Total requests ever received, unlike `requests.count` which shrinks as `takeRequest`
@@ -43,16 +45,42 @@ final class MockServer {
 
     func enqueue(
         _ body: String, code: Int = 200, headers: [String: String] = [:],
-        forHost host: String? = nil, forPathContaining pathContaining: String? = nil
+        forHost host: String? = nil, forPathContaining pathContaining: String? = nil,
+        gated: Bool = false
     ) {
         lock.lock(); defer { lock.unlock() }
-        responses.append((host, pathContaining, code, body, headers))
+        responses.append((host, pathContaining, code, body, headers, gated))
     }
 
     func takeRequest() -> URLRequest? {
         lock.lock(); defer { lock.unlock() }
         guard !requests.isEmpty else { return nil }
         return requests.removeFirst()
+    }
+
+    /// Number of requests currently parked behind a gated response.
+    var parkedCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return parked.count
+    }
+
+    /// Suspends until `count` requests are parked, so a test knows a call is mid-round-trip
+    /// without timing assumptions. Yields rather than sleeping; fails the wait after `maxYields`.
+    func waitUntilParked(_ count: Int, maxYields: Int = 200_000) async -> Bool {
+        for _ in 0..<maxYields {
+            if parkedCount >= count { return true }
+            await Task.yield()
+        }
+        return false
+    }
+
+    /// Answers every parked request with its gated response.
+    func releaseGatedResponses() {
+        lock.lock()
+        let toRelease = parked
+        parked.removeAll()
+        lock.unlock()
+        for (instance, response) in toRelease { respond(instance, with: response) }
     }
 
     fileprivate func handle(_ protocolInstance: URLProtocol) {
@@ -65,12 +93,24 @@ final class MockServer {
             ($0.host == nil || $0.host == requestHost)
                 && ($0.pathContaining == nil || requestPath.contains($0.pathContaining!))
         }).map { responses.remove(at: $0) }
+        if let next, next.gated {
+            parked.append((protocolInstance, next))
+            lock.unlock()
+            return
+        }
         lock.unlock()
 
         guard let next else {
             protocolInstance.client?.urlProtocol(protocolInstance, didFailWithError: URLError(.unknown))
             return
         }
+        respond(protocolInstance, with: next)
+    }
+
+    private func respond(
+        _ protocolInstance: URLProtocol,
+        with next: (host: String?, pathContaining: String?, code: Int, body: String, headers: [String: String], gated: Bool)
+    ) {
         let url = protocolInstance.request.url!
         let response = HTTPURLResponse(url: url, statusCode: next.code, httpVersion: "HTTP/1.1", headerFields: next.headers)!
         protocolInstance.client?.urlProtocol(protocolInstance, didReceive: response, cacheStoragePolicy: .notAllowed)
