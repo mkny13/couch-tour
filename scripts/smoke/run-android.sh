@@ -803,6 +803,14 @@ android_toggle_favorite() {
   android::back
 }
 
+android_clear_progress() {
+  local clear="${CCTV_SMOKE_ANDROID_PROGRESS_CLEAR_TAG:-}"
+  [[ -n "$clear" ]] || android_unavailable "CCTV_SMOKE_ANDROID_PROGRESS_CLEAR_TAG (a control that clears In Progress) not set"
+  android::tap "nav.home" 2>/dev/null || true
+  android::dump >/dev/null || true
+  android::tap "$clear" || android_unavailable "cannot tap $clear"
+}
+
 android_sync_step() {
   local step="$1" key="${CCTV_SMOKE_SYNC_ARTIST_ANDROID:-}"
   # An installed-but-closed beta shows the launcher, so bring the app to the foreground first
@@ -821,6 +829,10 @@ android_sync_step() {
       [[ -n "$entry" ]] || android_unavailable "CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG (tag that opens the artist screen) not set"
       android_toggle_favorite "$entry" ;;
     favorite-remove) android_toggle_favorite "favorites.row.$key" ;;
+    favorite-ensure-absent)
+      # Known starting state: drop a leftover favorite so favorite-add can't toggle it off.
+      if android::row_present "favorites.row.$key"; then android_toggle_favorite "favorites.row.$key"; fi
+      smoke::poll "$TIMEOUT" android::row_absent "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-present) smoke::poll "$TIMEOUT" android::row_present "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-absent) smoke::poll "$TIMEOUT" android::row_absent "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
     progress-start)
@@ -829,12 +841,11 @@ android_sync_step() {
       android::dump >/dev/null || true
       android::tap "$seed" || android_unavailable "cannot tap $seed"
       sleep 5 ;;
-    progress-clear)
-      local clear="${CCTV_SMOKE_ANDROID_PROGRESS_CLEAR_TAG:-}"
-      [[ -n "$clear" ]] || android_unavailable "CCTV_SMOKE_ANDROID_PROGRESS_CLEAR_TAG (a control that clears In Progress) not set"
+    progress-clear) android_clear_progress ;;
+    progress-ensure-absent)
       android::tap "nav.home" 2>/dev/null || true
-      android::dump >/dev/null || true
-      android::tap "$clear" || android_unavailable "cannot tap $clear" ;;
+      if android::row_present "home.section.in-progress.row."; then android_clear_progress; fi
+      smoke::poll "$TIMEOUT" android::row_absent "home.section.in-progress.row." || exit "$SMOKE_STEP_TIMEOUT" ;;
     progress-present)
       android::tap "nav.home" 2>/dev/null || true
       smoke::poll "$TIMEOUT" android::row_present "home.section.in-progress.row." || exit "$SMOKE_STEP_TIMEOUT" ;;

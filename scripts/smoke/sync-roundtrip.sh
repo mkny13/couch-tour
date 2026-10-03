@@ -71,13 +71,24 @@ step() {
 
 # direction <id> <action-plat> <action-step> <assert-plat> <assert-step> [depends-on-id]
 # Records PASS/FAIL/SKIP for one direction; evidence is identifier-level only.
+# $PRE ("plat:step ..." words) run first and must all succeed: the staging group can't be wiped
+# up front (reset also drops the pairings), so each direction instead forces both clients into a
+# known starting state, and a PASS then means this run's action synced, not that a stale or
+# locally-toggled row happened to match.
 declare -a FAILED_IDS=()
+PRE=""
 direction() {
-  local id="$1" ap="$2" as="$3" bp="$4" bs="$5" dep="${6:-}" r
+  local id="$1" ap="$2" as="$3" bp="$4" bs="$5" dep="${6:-}" r pre pp ps
   [[ -z "$ABORT" ]] || { smoke::result sync "$id" SKIP "not run: $ABORT"; return 0; }
   if [[ -n "$dep" ]] && printf '%s\n' ${FAILED_IDS[@]+"${FAILED_IDS[@]}"} | grep -qx "$dep"; then
     smoke::result sync "$id" SKIP "needs state from $dep, which failed"; return 0
   fi
+  for pre in $PRE; do
+    pp="${pre%%:*}"; ps="${pre#*:}"
+    r="$(step "$pp" "$ps")"
+    [[ "$r" != ABORT ]] || ABORT="$pp runner failed preflight during sync step '$ps'"
+    [[ "$r" == OK ]] || { smoke::result sync "$id" SKIP "precondition $pp '$ps' not met ($r); starting state unknown"; return 0; }
+  done
   r="$(step "$ap" "$as")"
   [[ "$r" != ABORT ]] || ABORT="$ap runner failed preflight during sync step '$as'"
   case "$r" in
@@ -97,8 +108,13 @@ direction() {
   esac
 }
 
+PRE="android:favorite-ensure-absent mac:favorite-ensure-absent"
 direction favorite-syncs-android-to-mac android favorite-add    mac     favorite-present
+# The removal must start from a favorite both clients hold, or Android's own local removal would pass it.
+PRE="android:favorite-present mac:favorite-present"
 direction favorite-syncs-mac-to-android mac     favorite-remove android favorite-absent favorite-syncs-android-to-mac
+PRE="android:progress-ensure-absent mac:progress-ensure-absent"
 direction in-progress-syncs-android-to-mac android progress-start mac     progress-present
+PRE="android:progress-present mac:progress-present"
 direction in-progress-syncs-mac-to-android mac     progress-clear  android progress-absent in-progress-syncs-android-to-mac
 exit 0

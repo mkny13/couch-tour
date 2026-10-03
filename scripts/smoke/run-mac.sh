@@ -1223,6 +1223,13 @@ mac_toggle_favorite() {
   mac::click "$toggle" "$DEEP" || mac_unavailable "favorite toggle identifier '$toggle' not found (set CCTV_SMOKE_MAC_FAVORITE_TOGGLE)"
 }
 
+mac_clear_progress() {
+  local clear="${CCTV_SMOKE_MAC_PROGRESS_CLEAR_ID:-}"
+  [[ -n "$clear" ]] || mac_unavailable "CCTV_SMOKE_MAC_PROGRESS_CLEAR_ID (a control that clears In Progress) not set"
+  mac::click "sidebar.nav.home" >/dev/null 2>&1 || true
+  mac::click "$clear" "$DEEP" || mac_unavailable "cannot click $clear"
+}
+
 mac_sync_step() {
   local step="$1" art="${CCTV_SMOKE_SYNC_ARTIST_MAC:-}"
   # bash 3.2 (macOS) has no ;;& fall-through, so the shared favorite-step preamble lives here.
@@ -1237,6 +1244,10 @@ mac_sync_step() {
       mac::wait_for_id "artists.list" "$TIMEOUT" "$DEEP" >/dev/null || mac_unavailable "artists.list not shown"
       mac_toggle_favorite "artists.row.$art" ;;
     favorite-remove) mac_toggle_favorite "sidebar.favorites.row.$art" ;;
+    favorite-ensure-absent)
+      # Known starting state: drop a leftover favorite so favorite-add can't toggle it off.
+      if mac::row_present "sidebar.favorites.row.$art"; then mac_toggle_favorite "sidebar.favorites.row.$art"; fi
+      smoke::poll "$TIMEOUT" mac::row_absent "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-present) smoke::poll "$TIMEOUT" mac::row_present "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-absent) smoke::poll "$TIMEOUT" mac::row_absent "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
     progress-start)
@@ -1244,11 +1255,11 @@ mac_sync_step() {
       [[ -n "$seed" ]] || mac_unavailable "CCTV_SMOKE_MAC_PROGRESS_SEED_ID (a track row to play) not set"
       mac::click "$seed" "$DEEP" || mac_unavailable "cannot click $seed"
       sleep 5 ;;
-    progress-clear)
-      local clear="${CCTV_SMOKE_MAC_PROGRESS_CLEAR_ID:-}"
-      [[ -n "$clear" ]] || mac_unavailable "CCTV_SMOKE_MAC_PROGRESS_CLEAR_ID (a control that clears In Progress) not set"
+    progress-clear) mac_clear_progress ;;
+    progress-ensure-absent)
       mac::click "sidebar.nav.home" >/dev/null 2>&1 || true
-      mac::click "$clear" "$DEEP" || mac_unavailable "cannot click $clear" ;;
+      if mac::row_present "home.in_progress.card"; then mac_clear_progress; fi
+      smoke::poll "$TIMEOUT" mac::row_absent "home.in_progress.card" || exit "$SMOKE_STEP_TIMEOUT" ;;
     progress-present)
       mac::click "sidebar.nav.home" >/dev/null 2>&1 || true
       smoke::poll "$TIMEOUT" mac::row_present "home.in_progress.card" || exit "$SMOKE_STEP_TIMEOUT" ;;

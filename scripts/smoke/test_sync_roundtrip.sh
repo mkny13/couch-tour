@@ -75,6 +75,19 @@ run action-fail STUB_RC_android_favorite_add=1
 check "action-fail: FAIL" test "$(status action-fail favorite-syncs-android-to-mac)" = FAIL
 check "action-fail: evidence names the action" grep -q "android action 'favorite-add'" "$TMP/action-fail.tsv"
 
+# 5b. Preconditions: each direction starts from a known state, and a stale one is never a PASS.
+run pre-ok
+check "pre: favorite add preceded by ensure-absent on both clients" grep -qx 'android favorite-ensure-absent' "$TMP/calls"
+check "pre: mac ensure-absent ran" grep -qx 'mac favorite-ensure-absent' "$TMP/calls"
+check "pre: removal checks both clients hold the favorite first" test "$(grep -c '^android favorite-present$' "$TMP/calls")" = 1
+check "pre: progress ensure-absent ran" grep -qx 'mac progress-ensure-absent' "$TMP/calls"
+run pre-stale STUB_RC_mac_favorite_ensure_absent=3
+check "pre-stale: SKIP, not PASS" test "$(status pre-stale favorite-syncs-android-to-mac)" = SKIP
+check "pre-stale: action never ran" bash -c "! grep -qx 'android favorite-add' '$TMP/calls'"
+run pre-nohold STUB_RC_android_favorite_present=3
+check "pre-nohold: removal SKIP" test "$(status pre-nohold favorite-syncs-mac-to-android)" = SKIP
+check "pre-nohold: removal never ran" bash -c "! grep -qx 'mac favorite-remove' '$TMP/calls'"
+
 # 6. Preflight failure: exit 2, later directions SKIP, teardown still runs.
 run preflight STUB_PREFLIGHT_mac=1
 check "preflight: exit 2" test "$RC" = 2
