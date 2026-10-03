@@ -15,12 +15,13 @@ REPO_SLUG="mkny13/couch-tour"
 # Overridable so the filing flow can be exercised with stubs.
 RUN_MAC="${CCTV_SMOKE_RUN_MAC:-$SCRIPT_DIR/run-mac.sh}"
 RUN_ANDROID="${CCTV_SMOKE_RUN_ANDROID:-$SCRIPT_DIR/run-android.sh}"
+RUN_SYNC="${CCTV_SMOKE_RUN_SYNC:-$SCRIPT_DIR/sync-roundtrip.sh}"
 GH_BIN="${CCTV_SMOKE_GH:-gh}"
 MAHLER_BIN="${CCTV_SMOKE_MAHLER:-mahler}"
 
 TAG=""; PLATFORM="both"; OUT_DIR="smoke-reports"; FILE_BUGS=true
 COMMIT_SCREENSHOTS=false; KEEP_GOING=false; AUTO_VERIFY=false
-WAIVE_ARGS=(); WAIVE_IDS=()
+WAIVE_ARGS=(); WAIVE_IDS=(); RUN_SYNC_JOURNEYS=true
 
 usage() {
   cat << 'EOF2'
@@ -36,6 +37,8 @@ Options:
                              because they show the owner's signed-in library (this repo is public)
   --auto-verify              Post a verify-comment.sh evidence comment on every shipped issue the report
                              marks 'covered' (opt-in; needs the issue list, so not with --no-file-bugs)
+  --no-sync                  Skip the two-client sync round trips (they run by default with --platform both
+                             and reset the staging sync group afterwards; see README.md)
   --keep-going               Carry on to the next platform when a runner exits with a usage error
                              (1); a preflight failure (2) never stops the other platform
   -h, --help                 Print this usage message
@@ -64,6 +67,7 @@ while [[ $# -gt 0 ]]; do
     --no-file-bugs) FILE_BUGS=false; shift ;;
     --commit-screenshots) COMMIT_SCREENSHOTS=true; shift ;;
     --auto-verify) AUTO_VERIFY=true; shift ;;
+    --no-sync) RUN_SYNC_JOURNEYS=false; shift ;;
     --keep-going) KEEP_GOING=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "Unknown argument: $1" ;;
@@ -108,6 +112,24 @@ for plat in "${PLATFORMS[@]}"; do
       [[ "$KEEP_GOING" == true ]] || break ;;
   esac
 done
+
+# ---- Two-client sync round trips (#406) -------------------------------------------------------
+# Needs both clients, so only with --platform both and after both runners finished. The
+# orchestrator resets the staging sync group on exit, pass or fail.
+if [[ "$PLATFORM" == both && "$RUN_SYNC_JOURNEYS" == true && $notrun -eq 0 ]]; then
+  results="$RUN_DIR/sync-results.txt"; errlog="$RUN_DIR/sync-stderr.txt"
+  echo "== sync: $RUN_SYNC" >&2
+  rc=0
+  "$RUN_SYNC" --tag "$TAG" --out "$results" 2> >(tee "$errlog" >&2) >/dev/null || rc=$?
+  wait 2>/dev/null || true
+  if [[ $rc -eq 0 ]]; then
+    ran=$((ran + 1)); RESULT_ARGS+=(--results "$results"); RESULT_FILES+=("$results")
+  else
+    reason="$(grep -h 'ERROR:' "$errlog" 2>/dev/null | tail -1 | sed 's/^ERROR: //' || true)"
+    [[ -n "$reason" ]] || reason="sync round trips exited $rc (see $errlog)"
+    NOTRUN_ARGS+=(--not-run "sync - $reason"); notrun=$((notrun + 1))
+  fi
+fi
 
 if [[ $ran -eq 0 ]]; then
   echo "No platform could be run; no report written." >&2

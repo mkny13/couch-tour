@@ -139,3 +139,21 @@ smoke::require_journeys_file() {
     fi
   fi
 }
+
+# Sync-step exit codes shared by the runners' --sync-step mode and sync-roundtrip.sh.
+# 0 = step satisfied, 3 = assertion timed out (a real FAIL), 4 = the control or fixture the step
+# needs is not available (a SKIP, never a PASS). Exit 2 stays "preflight failed".
+SMOKE_STEP_TIMEOUT=3
+SMOKE_STEP_UNAVAILABLE=4
+
+# Poll `$@` (a command that succeeds once the condition holds) until it does or <timeout>s pass.
+# Usage: smoke::poll <timeout> <cmd...>
+smoke::poll() {
+  local timeout="$1"; shift
+  local deadline=$(( $(date +%s) + timeout ))
+  while true; do
+    if "$@"; then return 0; fi
+    [[ "$(date +%s)" -lt "$deadline" ]] || return 1
+    sleep 1
+  done
+}

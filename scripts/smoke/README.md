@@ -123,3 +123,28 @@ when `JOURNEYS.md` mentions its `#N` in that journey, or the journey id appears 
 `not covered` (no mapped journey ran). `report.sh --unverified-issues <tsv> [--journeys <md>]` takes the list
 from a file so `test-report.sh` can test it headlessly. `run-smoke.sh --auto-verify` (opt-in) then posts a
 verification comment on each `covered` issue.
+
+## Two-client sync round trips (#406)
+
+`sync-roundtrip.sh` runs the four `sync` journeys in `JOURNEYS.md` (favorites and In Progress, each
+android→mac and mac→android). `run-smoke.sh --platform both` runs it after both platform runners; skip it
+with `--no-sync`. Run it alone: `scripts/smoke/sync-roundtrip.sh --tag <tag> --out <file> [--timeout 30] [--no-reset]`.
+
+Prerequisites:
+- Couch Tour Beta (macOS) running and an Android device with the beta attached, **both already paired to the
+  isolated staging sync group** (#359). Pairing is not automated.
+- `wrangler` authenticated, because teardown runs `scripts/smoke-sync-reset.sh --yes` on exit (pass or fail).
+  The reset empties the staging group including its pairings, so re-pair the betas before the next run.
+- `CCTV_SMOKE_SYNC_ARTIST_MAC` (`<backend>.<id>`) and `CCTV_SMOKE_SYNC_ARTIST_ANDROID` (`<artistKey>`): the
+  same artist on each platform.
+- Control hooks for actions with no accessibility identifier yet (an unset or missing one makes that direction
+  `SKIP`, never `PASS`): `CCTV_SMOKE_MAC_FAVORITE_TOGGLE` (default `artist.favorite`),
+  `CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE` (default `artist.favorite`), `CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG`,
+  `CCTV_SMOKE_{MAC_PROGRESS_SEED_ID,ANDROID_PROGRESS_SEED_TAG}` (a track row to play) and
+  `CCTV_SMOKE_{MAC_PROGRESS_CLEAR_ID,ANDROID_PROGRESS_CLEAR_TAG}` (a control that clears In Progress).
+
+Each runner exposes its half through `--sync-step favorite-add|favorite-remove|favorite-present|favorite-absent|
+progress-start|progress-clear|progress-present|progress-absent` (exit 0 satisfied, 3 timed out, 4 control or
+fixture unavailable, 2 preflight). Results are per direction under platform `sync`: a timeout is `FAIL` on the
+asserting direction, so `favorite-syncs-*` fails until #351 lands. The orchestration test needs no hardware or
+network: `bash scripts/smoke/test_sync_roundtrip.sh`.

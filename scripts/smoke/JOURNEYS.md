@@ -28,9 +28,10 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 | `next-stop-chip-focus` | mac, android | none | tapping a Next Stop artist chip changes selection to the artist, not the tour picker |
 | `jam-chart-note-details` | mac, android | none | `jam_chart.note` present with details and a source link |
 | `library-phishin-playlists` | mac, android | signed-in | Library lists the phish.in account's playlists |
-| `favorite-syncs-mac-to-android` | mac→android | signed-in | the favorited artist appears on the other platform |
-| `favorite-syncs-android-to-mac` | android→mac | signed-in | the favorited artist appears on the other platform |
-| `in-progress-syncs-android-to-mac` | android→mac | signed-in | the Android In Progress queue appears on the Mac |
+| `favorite-syncs-android-to-mac` | sync (android→mac) | staging-group | an artist favorited on Android appears in the Mac sidebar favorites |
+| `favorite-syncs-mac-to-android` | sync (mac→android) | staging-group | an artist un-favorited on the Mac disappears from the Android favorites |
+| `in-progress-syncs-android-to-mac` | sync (android→mac) | staging-group | a track started on Android appears in the Mac In Progress section |
+| `in-progress-syncs-mac-to-android` | sync (mac→android) | staging-group | In Progress cleared on the Mac disappears from the Android In Progress section |
 | `nav-reaches-every-destination` | mac, android | none | all five `nav.*` destinations reachable and show their section identifier |
 | `search-result-sections` | mac, android | none | artists/shows/tracks sections render for a query that has all three |
 | `live-data-not-mockup` | mac, android | signed-in | a known current artist resolves to a real phish.in show — the #345 mockup-favorites regression guard |
@@ -111,29 +112,56 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **steps**: In a signed-in session, navigate to the Library screen.
 - **pass condition**: On macOS, selecting `sidebar.nav.library` shows `library.screen` with its `library.row.<id>` items; on Android, selecting `nav.library` displays the user's phish.in account playlists.
 
-### `favorite-syncs-mac-to-android`
+## Two-client sync round trips
 
-- **id**: `favorite-syncs-mac-to-android`
-- **platforms**: `mac,android` (mac→android)
-- **fixture**: `signed-in`
-- **steps**: On macOS, favorite an artist from `sidebar.favorites.list`. Trigger a sync or wait for sync cycle completion. Open the Android application and view the favorites list.
-- **pass condition**: On macOS, the artist appears in `sidebar.favorites.list` (`sidebar.favorites.row`); after sync, on Android, the same artist appears in `favorites.list` under `favorites.row.<artistKey>`.
+These four journeys need both clients, so neither single-platform runner can run them. They are
+orchestrated by `scripts/smoke/sync-roundtrip.sh` (invoked by `run-smoke.sh` when both platforms are
+selected) and reported under platform `sync`, one result line per direction. Each is one half of a
+round trip: an action on one client (`--sync-step <action>`), then an assertion on the other client
+(`--sync-step <assertion>`) polled for the timeout (default **30s**, `--timeout`).
+
+- **Fixture `staging-group`**: both betas are installed and already paired to the isolated staging
+  sync group (#359). Pairing is not automated. Env: `CCTV_SMOKE_SYNC_ARTIST_MAC` (`<backend>.<id>`)
+  and `CCTV_SMOKE_SYNC_ARTIST_ANDROID` (`<artistKey>`) name the same artist on each platform; the
+  per-platform control hooks are listed in README.md.
+- **Clean state**: teardown always runs `scripts/smoke-sync-reset.sh --yes`, even when a step fails
+  or times out, so the group is left as found (this also removes the pairings; re-pair afterwards).
+- **Result semantics**: a timeout is `FAIL` attributed to the asserting direction. A control or fixture
+  that doesn't exist yet is `SKIP`, never `PASS`. A second direction that needs state from a failed
+  first direction is `SKIP`.
+- `favorite-syncs-*` accurately `FAIL`s while favorites don't sync (#351).
 
 ### `favorite-syncs-android-to-mac`
 
 - **id**: `favorite-syncs-android-to-mac`
-- **platforms**: `mac,android` (android→mac)
-- **fixture**: `signed-in`
-- **steps**: On Android, favorite an artist in `favorites.list`. Trigger a sync or wait for sync cycle completion. Open the macOS application and view the sidebar favorites list.
-- **pass condition**: On Android, the artist appears in `favorites.list` under `favorites.row.<artistKey>`; after sync, on macOS, the same artist appears in `sidebar.favorites.list` under `sidebar.favorites.row`.
+- **platforms**: `sync` (android→mac)
+- **fixture**: `staging-group`
+- **steps**: On Android, favorite the fixture artist (`favorite-add`). On macOS, poll for it (`favorite-present`).
+- **pass condition**: Within the timeout, `sidebar.favorites.row.<backend>.<id>` appears inside `sidebar.favorites.list` on macOS.
+
+### `favorite-syncs-mac-to-android`
+
+- **id**: `favorite-syncs-mac-to-android`
+- **platforms**: `sync` (mac→android)
+- **fixture**: `staging-group`
+- **steps**: Needs `favorite-syncs-android-to-mac` to have passed. On macOS, un-favorite the fixture artist (`favorite-remove`). On Android, poll for its removal (`favorite-absent`).
+- **pass condition**: Within the timeout, `favorites.row.<artistKey>` is gone from `favorites.list` on Android.
 
 ### `in-progress-syncs-android-to-mac`
 
 - **id**: `in-progress-syncs-android-to-mac`
-- **platforms**: `mac,android` (android→mac)
-- **fixture**: `signed-in`
-- **steps**: On Android, start playback on a track and allow it to enter the In Progress queue. Trigger sync or wait for sync cycle completion. Launch the macOS application and inspect Home.
-- **pass condition**: On Android, `home.section.in-progress` contains `home.section.in-progress.row.<queueKey>`; after sync, on macOS, `home.in_progress` is present and contains the synced track row.
+- **platforms**: `sync` (android→mac)
+- **fixture**: `staging-group`
+- **steps**: On Android, start playback of a track (`progress-start`) so it enters the In Progress queue. On macOS, poll Home (`progress-present`).
+- **pass condition**: Within the timeout, `home.in_progress.card.<queueKey>` appears under `home.in_progress` on macOS.
+
+### `in-progress-syncs-mac-to-android`
+
+- **id**: `in-progress-syncs-mac-to-android`
+- **platforms**: `sync` (mac→android)
+- **fixture**: `staging-group`
+- **steps**: Needs `in-progress-syncs-android-to-mac` to have passed. On macOS, clear the In Progress entry (`progress-clear`). On Android, poll Home (`progress-absent`).
+- **pass condition**: Within the timeout, no `home.section.in-progress.row.<queueKey>` remains under `home.section.in-progress` on Android.
 
 ### `nav-reaches-every-destination`
 
