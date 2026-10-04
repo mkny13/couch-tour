@@ -138,8 +138,8 @@ Prerequisites:
 - `CCTV_SMOKE_SYNC_ARTIST_MAC` (`<backend>.<id>`) and `CCTV_SMOKE_SYNC_ARTIST_ANDROID` (`<artistKey>`): the
   same artist on each platform.
 - Control hooks for actions with no accessibility identifier yet (an unset or missing one makes that direction
-  `SKIP`, never `PASS`): `CCTV_SMOKE_MAC_FAVORITE_TOGGLE` (default `artist.favorite`),
-  `CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE` (default `artist.favorite`), `CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG`,
+  `SKIP`, never `PASS`): `CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE` (default `artist.favorite`),
+  `CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG`,
   `CCTV_SMOKE_{MAC_PROGRESS_SEED_ID,ANDROID_PROGRESS_SEED_TAG}` (a track row to play) and
   `CCTV_SMOKE_{MAC_PROGRESS_CLEAR_ID,ANDROID_PROGRESS_CLEAR_TAG}` (a control that clears In Progress).
 

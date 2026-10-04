@@ -1215,12 +1215,13 @@ mac::row_absent() { [[ -z "$(mac::ax_query "$1" "$DEEP")" ]]; }
 
 mac_unavailable() { smoke::log "sync step unavailable: $*"; exit "$SMOKE_STEP_UNAVAILABLE"; }
 
-# Open the artist screen via <entry id>, then click the favorite toggle.
+# The only Mac favorite toggle is the star on the artist's row in the Artists list
+# (artists.favorite.<backend>.<id>); the artist screen and sidebar rows have none.
 mac_toggle_favorite() {
-  local entry="$1" toggle="${CCTV_SMOKE_MAC_FAVORITE_TOGGLE:-artist.favorite}"
-  mac::click "$entry" "$DEEP" || mac_unavailable "cannot click $entry"
-  mac::wait_for_id "artist.screen" "$TIMEOUT" "$DEEP" >/dev/null || mac_unavailable "artist.screen not shown after $entry"
-  mac::click "$toggle" "$DEEP" || mac_unavailable "favorite toggle identifier '$toggle' not found (set CCTV_SMOKE_MAC_FAVORITE_TOGGLE)"
+  local art="$1"
+  mac::click "sidebar.nav.artists" || mac_unavailable "cannot click sidebar.nav.artists"
+  mac::wait_for_id "artists.list" "$TIMEOUT" "$DEEP" >/dev/null || mac_unavailable "artists.list not shown"
+  mac::click "artists.favorite.$art" "$DEEP" || mac_unavailable "cannot click artists.favorite.$art"
 }
 
 mac_clear_progress() {
@@ -1239,14 +1240,10 @@ mac_sync_step() {
       mac::click "sidebar.nav.home" >/dev/null 2>&1 || true ;;
   esac
   case "$step" in
-    favorite-add)
-      mac::click "sidebar.nav.artists" || mac_unavailable "cannot click sidebar.nav.artists"
-      mac::wait_for_id "artists.list" "$TIMEOUT" "$DEEP" >/dev/null || mac_unavailable "artists.list not shown"
-      mac_toggle_favorite "artists.row.$art" ;;
-    favorite-remove) mac_toggle_favorite "sidebar.favorites.row.$art" ;;
+    favorite-add|favorite-remove) mac_toggle_favorite "$art" ;;
     favorite-ensure-absent)
       # Known starting state: drop a leftover favorite so favorite-add can't toggle it off.
-      if mac::row_present "sidebar.favorites.row.$art"; then mac_toggle_favorite "sidebar.favorites.row.$art"; fi
+      if mac::row_present "sidebar.favorites.row.$art"; then mac_toggle_favorite "$art"; fi
       smoke::poll "$TIMEOUT" mac::row_absent "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-present) smoke::poll "$TIMEOUT" mac::row_present "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-absent) smoke::poll "$TIMEOUT" mac::row_absent "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
