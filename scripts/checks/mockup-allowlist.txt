@@ -17,3 +17,4 @@ macos/Packages/CouchTourKit/Sources/CouchTourKit/Artwork.swift:"WSP"  # per-arti
 macos/Packages/CouchTourKit/Sources/CouchTourKit/Artwork.swift:"TAB"  # per-artist artwork palette keyed by real artist slug
 app/src/main/java/dev/mike/couchtour/Artwork.kt:"Grateful Dead"  # KDoc example of the monogram derivation, not data
 macos/CouchTour/FeedbackButton.swift:"Grateful Dead"  # doc comment example, not data
+macos/CouchTour/UITestHarnessView.swift:"Grateful Dead"  # deterministic fixture for XCUITest harness, only shown under UI-test launch

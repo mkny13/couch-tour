@@ -66,6 +66,10 @@ struct PlaybackSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             }
             Section {
+                Toggle("Include diagnostics with feedback", isOn: $settings.includeDiagnostics)
+                Text("When on, Send Feedback copies the last 200 diagnostics log lines to the clipboard and adds a short summary to the GitHub issue. Tokens and codes are redacted.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Button("Diagnostics…") { showDiagnostics = true }
                     .accessibilityIdentifier(AXIdentifiers.settingsDiagnosticsOpen)
                 Text(Bundle.main.appVersionString)

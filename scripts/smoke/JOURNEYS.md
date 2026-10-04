@@ -53,7 +53,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `seeded-favorite`
 - **steps**: With an active session having at least one track in progress and at least one favorited artist, terminate (force-quit) the application and relaunch it. Inspect the Home screen.
-- **pass condition**: All three Home sections are present: on macOS, `home.in_progress`, `home.next_tour_stops`, and `home.on_this_date` are present; on Android, `home.section.in-progress`, `home.section.next-tour-stops`, and `home.section.on-this-date` are present.
+- **pass condition**: All three Home sections are present: on macOS, `home.in_progress` (with at least one `home.in_progress.card.<queueKey>` card), `home.next_tour_stops`, and `home.on_this_date` are present; on Android, `home.section.in-progress`, `home.section.next-tour-stops`, and `home.section.on-this-date` are present.
 
 ### `browse-artists-to-artist`
 
@@ -61,7 +61,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `none`
 - **steps**: Navigate to the Artists section. Scroll or search within the artists list and select artist `moe.` to open its catalog screen.
-- **pass condition**: On macOS, `sidebar.nav.artists` is selectable and navigates to the artists list, opening the artist screen; on Android, navigation from `nav.home` reaches the artist catalog screen for `moe.`.
+- **pass condition**: On macOS, `sidebar.nav.artists` navigates to `artists.list`, and selecting the `artists.row.<backend>.<id>` row for `moe.` opens `artist.screen`; on Android, navigation from `nav.home` reaches the artist catalog screen for `moe.`.
 
 ### `search-artist-hit`
 
@@ -93,7 +93,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `none`
 - **steps**: On the Home screen, locate the Next Tour Stops card section. Tap or click an artist chip within one of the tour stop cards.
-- **pass condition**: Clicking the artist chip changes selection to the artist screen rather than opening the tour picker: on macOS, `home.next_tour_stops` contains the artist chip and navigation focuses the artist without activating `home.track_tour`; on Android, `home.section.next-tour-stops` row item chip (`home.section.next-tour-stops.row.<showKey>`) focuses the artist screen rather than the tour picker dialog.
+- **pass condition**: Clicking the artist chip changes selection to the artist screen rather than opening the tour picker: on macOS, `home.next_tour_stops` contains the artist chip (`home.next_tour_stops.chip.<backend>.<id>`) and clicking it navigates (to `show.detail`) without activating `home.track_tour`; on Android, `home.section.next-tour-stops` row item chip (`home.section.next-tour-stops.row.<showKey>`) focuses the artist screen rather than the tour picker dialog.
 
 ### `jam-chart-note-details`
 
@@ -101,7 +101,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `none`
 - **steps**: Navigate to a track known to have jam chart annotations (e.g. a Phish jam chart selection) and open the track / Now Playing view.
-- **pass condition**: `jam_chart.note` is present, displaying jam chart note text and a source link to phish.net (on macOS, queries `jam_chart.note`; on Android, `A11yTags` lacks a distinct jam chart tag at HEAD, which is noted as a platform tag gap, but the condition asserts on `jam_chart.note`).
+- **pass condition**: `jam_chart.note` is present, displaying jam chart note text and a source link (on macOS, `jam_chart.note` plus the `jam_chart.source` link; on Android, `A11yTags` lacks a distinct jam chart tag at HEAD, which is noted as a platform tag gap, but the condition asserts on `jam_chart.note`).
 
 ### `library-phishin-playlists`
 
@@ -109,7 +109,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `signed-in`
 - **steps**: In a signed-in session, navigate to the Library screen.
-- **pass condition**: On macOS, selecting `sidebar.nav.library` displays the user's phish.in account playlists; on Android, selecting `nav.library` displays the user's phish.in account playlists.
+- **pass condition**: On macOS, selecting `sidebar.nav.library` shows `library.screen` with its `library.row.<id>` items; on Android, selecting `nav.library` displays the user's phish.in account playlists.
 
 ### `favorite-syncs-mac-to-android`
 
@@ -141,7 +141,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `none`
 - **steps**: Tap or click each primary navigation destination in sequence.
-- **pass condition**: On macOS, all sidebar navigation items are present and selectable: `sidebar.nav.home`, `sidebar.nav.artists`, `sidebar.nav.search`, `sidebar.nav.library`, `sidebar.nav.history`, and `sidebar.nav.settings`; on Android, all bottom/drawer navigation destinations are present and selectable: `nav.home`, `nav.search`, `nav.library`, `nav.history`, and `nav.settings`.
+- **pass condition**: On macOS, each sidebar item is selectable and shows its screen identifier: `sidebar.nav.home`→`home.screen`, `sidebar.nav.artists`→`artists.screen`, `sidebar.nav.search`→`search.screen`, `sidebar.nav.library`→`library.screen`, `sidebar.nav.history`→`history.screen`, `sidebar.nav.settings`→`settings.screen`; on Android, all bottom/drawer navigation destinations are present and selectable: `nav.home`, `nav.search`, `nav.library`, `nav.history`, and `nav.settings`.
 
 ### `search-result-sections`
 
@@ -157,7 +157,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `signed-in`
 - **steps**: From the favorites list, select a favorited artist (e.g. Phish) and navigate into the shows list.
-- **pass condition**: On macOS, selecting the artist from `sidebar.favorites.list` loads live show data from phish.in (not hardcoded mockup shows); on Android, selecting the artist from `favorites.list` loads live show data from the backend (regression guard for #345).
+- **pass condition**: On macOS, selecting the artist from `sidebar.favorites.list` opens `artist.screen`; a period (`artist.period.row.*`) lists loaded `shows.row.<date>` entries and opening one shows `show.detail` (live data, not hardcoded mockup shows); on Android, selecting the artist from `favorites.list` loads live show data from the backend (regression guard for #345).
 
 ---
 

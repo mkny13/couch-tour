@@ -526,3 +526,37 @@ D66 recorded that a receiver cannot apply Media3's `ClippingConfiguration`; the 
 ## D326 — macOS search returns public playlists (#427)
 
 Supersedes the D5 omission of a `playlists` bucket in `SearchHits`: now that #428 gave public playlists a screen, `SearchResults` decodes `playlists` into `PublicPlaylistSummary` and `SearchHits.playlists` carries them. They count as Phish-only (dropped when filtering to another artist, like tracks), appear in the All tab and a dedicated Playlists tab, and a tap opens `PublicPlaylistView`.
+
+## D327 — A smoke run's committed evidence is its report; screenshots stay local (#371)
+
+`scripts/smoke/run-smoke.sh` writes `smoke-reports/<tag>.md` and that file is what gets
+committed and what #358's promotion gate reads (`Tag:`, one `Smoke: PASS|FAIL`, optional
+`Waived:` lines). Failure screenshots (`smoke-reports/**/*.png`) and the per-platform result
+files are gitignored: this repo is public, and the screenshots show the owner's signed-in
+library, favorites, and listening history. `--commit-screenshots` exists as the owner's
+opt-out; flipping the default is a one-line change once they've seen a report.
+A platform that could not be run at all (runner exit 2, or a crash) can never produce a `PASS`;
+the report names it. `SKIP` is neither pass nor fail: it is listed as "not verified" and does
+not block a `PASS`. Whether `SKIP` should block promotion is a policy call left to the owner.
+The formatter passes runner evidence through verbatim, so the runners are what must keep
+evidence identifier-level. A run with zero results is a `FAIL`.
+
+## D329 — Shipped issues are verified only by a beta-tag evidence comment (#404)
+
+A merged issue stays `mahler:verifying` until a comment carrying `<!-- mahler:verified -->`, a beta
+tag and evidence (smoke-report line, screenshot/dump, or owner UAT note) is posted;
+`scripts/smoke/verify-comment.sh` writes that format. Each smoke report cross-references closed
+`mahler:verifying` issues without the marker against the run's journeys (mapped via `#N` in
+`JOURNEYS.md` or the journey id in the issue text): `covered`, `not covered`, or `still reproduces`.
+Posting comments for `covered` issues is opt-in (`run-smoke.sh --auto-verify`) so a weekly run
+does not write to issues unattended until the owner has seen the report table. Kept
+couch-tour-specific and compatible with the Mahler-wide gate in mkny13/mahler#611 part 3.
+
+## D330 — macOS Feedback includes diagnostics behind a Settings toggle, default on (#436)
+
+Mirrors Android D296. With `PlaybackSettings.includeDiagnostics` on (default `true`), the Feedback
+button copies `DiagnosticsLog.tailLines(200)` to the clipboard and adds `summaryLines()` to the issue
+body under `## Diagnostics`; off leaves the clipboard and URL exactly as before. The URL carries only
+the short summary (capped at 1000 chars, then shrunk until the encoded URL is under 2400), never log
+lines — those travel by clipboard because GitHub pre-fill URLs can't hold them. The log is already
+redacted at write time (D315).

@@ -18,6 +18,30 @@ public enum AXIdentifiers {
     public static let homeTrackTour = "home.track_tour"
     public static let homeBrowsePlaylists = "home.browse_playlists"
 
+    // Destination screens (#520)
+    public static let homeScreen = "home.screen"
+    public static let artistsScreen = "artists.screen"
+    public static let searchScreen = "search.screen"
+    public static let libraryScreen = "library.screen"
+    public static let historyScreen = "history.screen"
+    public static let settingsScreen = "settings.screen"
+
+    // Home cards (#520)
+    public static let homeInProgressCard = "home.in_progress.card"
+    public static let homeNextStopChip = "home.next_tour_stops.chip"
+
+    // Artists, artist screen, shows (#520)
+    public static let artistsList = "artists.list"
+    public static let artistsRow = "artists.row"
+    public static let artistScreen = "artist.screen"
+    public static let artistPeriodRow = "artist.period.row"
+    public static let showsList = "shows.list"
+    public static let showsRow = "shows.row"
+    public static let showDetail = "show.detail"
+
+    // Library (#520)
+    public static let libraryRow = "library.row"
+
     // Public playlists (#428)
     public static let publicPlaylistsList = "public_playlists.list"
     public static let publicPlaylistTracks = "public_playlist.tracks"
@@ -44,4 +68,5 @@ public enum AXIdentifiers {
 
     // Jam Chart
     public static let jamChartNote = "jam_chart.note"
+    public static let jamChartSource = "jam_chart.source"
 }

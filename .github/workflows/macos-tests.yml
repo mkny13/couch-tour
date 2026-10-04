@@ -1,9 +1,11 @@
 name: macOS unit tests
 
 # Runs CouchTourKit's plain SwiftPM test suite alongside an unsigned Debug build of the
-# macOS app target (macos/CouchTour) on a GitHub-hosted macOS runner. This ensures that
-# neither changes to shared core logic (API clients, catalog model, queue-key grammar,
-# progress storage) nor UI/app-layer changes silently break compilation or tests.
+# macOS app target (macos/CouchTour) and a small deterministic XCUITest suite
+# (macos/CouchTourUITests) on a GitHub-hosted macOS runner. This ensures that neither
+# changes to shared core logic (API clients, catalog model, queue-key grammar, progress
+# storage) nor UI/app-layer changes silently break compilation, tests, or the UI chrome
+# covered by the harness (sort, tag filter, context menu, artwork badge).
 on:
   pull_request:
     paths:
@@ -34,7 +36,7 @@ jobs:
 
   macos-build:
     runs-on: macos-14
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -51,3 +53,9 @@ jobs:
       - name: Build macOS app (Debug, unsigned)
         working-directory: macos
         run: xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
+
+      # Ad-hoc signed ("Sign to Run Locally") because XCUITest's runner app must be signed
+      # to launch; the unsigned build above stays as the plain compile gate.
+      - name: Run macOS XCUITests
+        working-directory: macos
+        run: xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -configuration Debug -destination 'platform=macOS' test -only-testing:CouchTourUITests CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=

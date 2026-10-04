@@ -42,6 +42,7 @@ public final class PlaybackSettings: ObservableObject {
     private let levelVolumeKey = "level_volume"
     private let audioQualityKey = "audio_quality"
     private let gaplessKey = "gapless"
+    private let includeDiagnosticsKey = "include_diagnostics"
 
     /// Notifies listeners that cached loudness measurements should be cleared (#269).
     public let clearCacheSubject = PassthroughSubject<Void, Never>()
@@ -81,12 +82,21 @@ public final class PlaybackSettings: ObservableObject {
         }
     }
 
+    /// Whether the Feedback button copies the diagnostics tail to the clipboard and adds a
+    /// summary to the issue body (#436, mirrors Android D296). On by default.
+    @Published public var includeDiagnostics: Bool {
+        didSet {
+            defaults.set(includeDiagnostics, forKey: includeDiagnosticsKey)
+        }
+    }
+
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.skipFiller = defaults.bool(forKey: skipFillerKey)
         self.levelVolume = defaults.bool(forKey: levelVolumeKey)
         self.audioQuality = defaults.string(forKey: audioQualityKey).flatMap(AudioQuality.init(rawValue:)) ?? .lossless
         self.gapless = defaults.object(forKey: gaplessKey) as? Bool ?? true
+        self.includeDiagnostics = defaults.object(forKey: includeDiagnosticsKey) as? Bool ?? true
     }
 
     /// Signals playback and storage to clear all cached loudness measurements and cancel

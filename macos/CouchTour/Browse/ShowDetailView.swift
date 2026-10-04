@@ -39,6 +39,7 @@ struct ShowDetailView: View {
             case .loaded:
                 if let detail {
                     loadedContent(detail)
+                        .accessibilityIdentifier(AXIdentifiers.showDetail)
                 }
             }
         }

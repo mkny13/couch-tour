@@ -93,4 +93,12 @@ final class PlaybackSettingsTests: XCTestCase {
         XCTAssertFalse(AudioQuality.compressed.playsFlac(flac: "f", mp3: "m"))
         XCTAssertTrue(AudioQuality.lossless.playsFlac(flac: "f", mp3: "m"))
     }
+
+    func testIncludeDiagnosticsDefaultsOnAndPersists() {
+        let defaults = UserDefaults(suiteName: "include-diagnostics-\(UUID().uuidString)")!
+        let settings = PlaybackSettings(defaults: defaults)
+        XCTAssertTrue(settings.includeDiagnostics)
+        settings.includeDiagnostics = false
+        XCTAssertFalse(PlaybackSettings(defaults: defaults).includeDiagnostics)
+    }
 }

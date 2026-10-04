@@ -66,6 +66,7 @@ struct ArtistsView: View {
                             }
                         }
                     }
+                    .accessibilityIdentifier(AXIdentifiers.artistsList)
                 }
             }
         }
@@ -89,6 +90,7 @@ struct ArtistsView: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text(artist.name)
+                        .accessibilityIdentifier("\(AXIdentifiers.artistsRow).\(artist.backend.rawValue).\(artist.id)")
                     if artist.showCount > 0 {
                         Text("\(artist.showCount) \(plural(artist.showCount, "show"))")
                             .font(.caption)

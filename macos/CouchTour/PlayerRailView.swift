@@ -310,6 +310,7 @@ struct PlayerRailView: View {
                                         .foregroundStyle(colors.accent)
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityIdentifier(AXIdentifiers.jamChartSource)
                                 }
                             }
                             .padding(.top, 10)

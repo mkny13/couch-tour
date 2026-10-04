@@ -1,0 +1,3 @@
+mac	launch-cold-start	PASS	sidebar.nav.home present
+mac	search-artist-hit	FAIL	search.tab.artists missing; query hit 'Planted Artist Xyzzy' not found | pipe
+android	launch-cold-start	PASS	nav.home present

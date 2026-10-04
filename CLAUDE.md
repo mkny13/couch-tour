@@ -32,6 +32,26 @@ Tests are local (Robolectric + MockWebServer); run after any change.
 ### Accessibility checks (macOS)
 Dump the running beta's accessibility tree (bounded, identifier-scoped): `scripts/smoke/ax-tree.sh`
 
+### Smoke journeys (Mac + Android)
+Run the journeys against the installed beta (natural step after `scripts/cut-beta.sh`; needs the Mac beta running and/or an adb device):
+```bash
+scripts/smoke/run-smoke.sh --tag <beta-tag> [--platform mac|android|both] [--no-file-bugs]   # --help for all flags
+```
+Writes `smoke-reports/<tag>.md` (the promotion gate reads it) and files a `mahler`-labelled issue per failing journey. Exit codes: `0` ran and reported, `1` usage, `2` a platform couldn't run (no device/app; never a PASS). Headless checks, no app needed: `scripts/smoke/test-report.sh`, `scripts/smoke/check-journeys.sh`. Details: `scripts/smoke/README.md`.
+
+### Verifying shipped issues
+A shipped issue (merged, still labelled `mahler:verifying`) counts as verified only with a comment citing a beta tag plus evidence: a smoke-report line (`smoke-reports/<tag>.md`), a screenshot or dump, or an owner UAT note. Post it in the standard format (carries the `<!-- mahler:verified -->` marker):
+```bash
+scripts/smoke/verify-comment.sh [--dry-run] <issue> <tag> <evidence...>
+```
+Each smoke report lists the unverified shipped issues as covered / not covered / still reproduces; `run-smoke.sh --auto-verify` posts the comment for the covered ones. Headless test: `python3 scripts/smoke/test_verify_comment.py`.
+
+### macOS UI tests (XCUITest)
+Regenerate the Xcode project, then run the deterministic app-target UI suite:
+```bash
+cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -destination 'platform=macOS' test -only-testing:CouchTourUITests
+```
+
 ## Building (sync backend)
 
 `sync/` is a Cloudflare Worker + D1 service (`https://couch-tour-sync.mkastellec.workers.dev`).
@@ -86,7 +106,7 @@ They are declared in `macos/CouchTour/AXIdentifiers.swift` and verified by `maco
 - **macOS Build Hazards:**
   - `macos/CouchTour.xcodeproj` may be a symlink to the main checkout. Remove symlink before running `xcodegen generate`.
   - Ensure `xcodebuild` resolves local `CouchTourKit` from the worktree, not the main checkout.
-  - `swift test` covers `CouchTourKit` package only, not the app UI (track UI checks in `UAT.md`).
+  - `swift test` covers `CouchTourKit` package only; app UI coverage lives in `CouchTourUITests` (`xcodebuild ... -only-testing:CouchTourUITests`).
 
 ## Session continuity (primary checkout only)
 

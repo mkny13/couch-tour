@@ -566,6 +566,38 @@ class CatalogTest {
     }
 
     @Test
+    fun `a phish-in show carries its id and liked state into ShowSummary`() {
+        // The Show Detail header's Like pill toggles by id, and takes its initial fill from
+        // likedByUser (#431), so both have to survive the mapping or the pill either talks to
+        // the wrong show or opens in the wrong state.
+        val plain = show().toShowSummary()
+        assertEquals(0L, plain.id)
+        assertFalse(plain.likedByUser)
+
+        val liked = show().copy(id = 42, likedByUser = true).toShowSummary()
+        assertEquals(42L, liked.id)
+        assertTrue(liked.likedByUser)
+    }
+
+    @Test
+    fun `a show detail carries the id the like pill needs`() {
+        val detail = show().copy(id = 77, likedByUser = true).toShowDetail()
+        assertEquals(77L, detail.summary.id)
+        assertTrue(detail.summary.likedByUser)
+    }
+
+    @Test
+    fun `a relisten show defaults id and likedByUser so the pill hides itself`() {
+        // Relisten has no show-level like API, so the id stays 0 and the Like pill, which only
+        // renders for a nonzero id, never appears for a Relisten show (#431).
+        val summary = RelistenShowSummary(displayDate = "1977-05-08", sourceCount = 1)
+            .toShowSummary(dead)
+
+        assertEquals(0L, summary.id)
+        assertFalse(summary.likedByUser)
+    }
+
+    @Test
     fun `search sort orders shows by date both directions`() {
         val s1 = ShowSummary(artist = dead, date = "1977-05-07")
         val s2 = ShowSummary(artist = dead, date = "1977-05-09")

@@ -42,6 +42,7 @@ struct PeriodsView: View {
                             NavigationLink(value: Route.period(artist: artist, period: period)) {
                                 VStack(alignment: .leading) {
                                     Text(period.label)
+                                        .accessibilityIdentifier("\(AXIdentifiers.artistPeriodRow).\(period.label)")
                                     if period.showCount > 0 {
                                         Text("\(period.showCount) \(plural(period.showCount, "show"))")
                                             .font(.caption)
@@ -55,6 +56,7 @@ struct PeriodsView: View {
                         youtubeSection
                     }
                 }
+                .accessibilityIdentifier(AXIdentifiers.artistScreen)
             }
         }
         .task {

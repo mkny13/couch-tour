@@ -20,12 +20,28 @@ public struct FeedbackContext: Sendable {
     }
 }
 
+/// Longest diagnostics summary placed in the issue body, in characters.
+public let feedbackDiagnosticsSummaryMaxChars = 1000
+/// Browsers and GitHub start rejecting pre-filled URLs well past this; the issue asks for < 2500.
+public let feedbackURLMaxLength = 2400
+
 /// Builds a pre-filled GitHub new-issue URL for the Feedback button (#97). `URLComponents`
 /// percent-encodes the title/body query items rather than string interpolation, so anything odd
-/// in a screen name or device string can't corrupt the URL.
-public func feedbackIssueURL(context: FeedbackContext) -> URL? {
+/// in a screen name or device string can't corrupt the URL. A non-empty `diagnosticsSummary`
+/// adds a `## Diagnostics` section (#436); it is truncated so the encoded URL stays under
+/// `feedbackURLMaxLength` (percent-encoding can triple the length of newlines and punctuation).
+public func feedbackIssueURL(context: FeedbackContext, diagnosticsSummary: String? = nil) -> URL? {
+    var summary = String((diagnosticsSummary ?? "").prefix(feedbackDiagnosticsSummaryMaxChars))
+    while true {
+        let url = buildFeedbackURL(context: context, diagnosticsSummary: summary)
+        if summary.isEmpty || (url?.absoluteString.count ?? 0) <= feedbackURLMaxLength { return url }
+        summary = String(summary.prefix(max(0, summary.count - 50)))
+    }
+}
+
+private func buildFeedbackURL(context: FeedbackContext, diagnosticsSummary: String) -> URL? {
     let title = "Feedback (Couch Tour \(context.appVersion))"
-    let body = """
+    var body = """
     ## Feedback
     [Describe your feedback, suggestion, or issue here]
 
@@ -37,6 +53,9 @@ public func feedbackIssueURL(context: FeedbackContext) -> URL? {
     - macOS: \(context.osVersion)
     - Channel: \(context.channel)
     """
+    if !diagnosticsSummary.isEmpty {
+        body += "\n\n## Diagnostics\n\(diagnosticsSummary)"
+    }
 
     var components = URLComponents(string: "https://github.com/mkny13/couch-tour/issues/new")
     components?.queryItems = [

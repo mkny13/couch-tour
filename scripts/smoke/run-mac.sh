@@ -107,6 +107,9 @@ fi
 # Exits 2 if the beta app is not running or if permissions are missing.
 smoke::preflight_macos_beta
 
+# Rows nested in List/ScrollView content sit deeper than the default walk depth.
+DEEP=14
+
 # -----------------------------------------------------------------------------
 # Query Layer
 # -----------------------------------------------------------------------------
@@ -326,12 +329,13 @@ JXA
 mac::wait_for_id() {
   local id="$1"
   local to="${2:-$TIMEOUT}"
+  local depth="${3:-6}"
   local start_time
   start_time="$(date +%s)"
 
   while true; do
     local matches
-    matches="$(mac::ax_query "$id")"
+    matches="$(mac::ax_query "$id" "$depth")"
     if [[ -n "$matches" ]]; then
       echo "$matches"
       return 0
@@ -686,9 +690,34 @@ mac_run_home_sections_after_relaunch() {
   smoke::require_journeys_file "$id"
   smoke::log "Executing journey $id..."
 
-  # home.in_progress identifies the whole shelf, including its empty state.
-  # There is no stable card identifier at HEAD to prove a seeded track survived.
-  smoke::result "mac" "$id" "SKIP" "missing stable AXIdentifier for an in-progress card; cannot verify seeded track after relaunch"
+  # Fixture: seeded-favorite (a track in progress). home.in_progress is the whole
+  # shelf, including its empty state; home.in_progress.card.<queueKey> is one card.
+  if [[ -z "$(mac::ax_query "home.in_progress.card" "$DEEP")" ]]; then
+    smoke::result "mac" "$id" "SKIP" "seeded-favorite fixture unavailable: no home.in_progress.card present before relaunch"
+    return 0
+  fi
+
+  if [[ "$NO_INPUT" != "true" ]]; then
+    if ! mac::relaunch; then
+      mac_screenshot "$id"
+      smoke::result "mac" "$id" "FAIL" "sidebar.nav.home not present after relaunching $APP_NAME"
+      return 0
+    fi
+  fi
+
+  local missing=()
+  local section
+  for section in home.in_progress home.next_tour_stops home.on_this_date; do
+    mac::wait_for_id "$section" "$TIMEOUT" "$DEEP" >/dev/null || missing+=("$section")
+  done
+  mac::wait_for_id "home.in_progress.card" "$TIMEOUT" "$DEEP" >/dev/null || missing+=("home.in_progress.card")
+
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    smoke::result "mac" "$id" "PASS" "all three Home sections and an in-progress card present"
+  else
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "missing after relaunch: ${missing[*]}"
+  fi
 }
 
 mac_run_browse_artists_to_artist() {
@@ -701,7 +730,39 @@ mac_run_browse_artists_to_artist() {
     return 0
   fi
 
-  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for artists list and artist screen (platform gap)"
+  if ! mac::click "sidebar.nav.artists"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.artists"
+    return 0
+  fi
+
+  if ! mac::wait_for_id "artists.list" "$TIMEOUT" "$DEEP" >/dev/null; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "artists.list not present within ${TIMEOUT}s"
+    return 0
+  fi
+
+  # The artist name is the row's value; select the moe. row by it.
+  local moe_row
+  moe_row="$(mac::ax_query "artists.row" "$DEEP" | awk -F'\t' '$3 == "moe." { print $1; exit }')"
+  if [[ -z "$moe_row" ]]; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "no artists.row.* with name moe. in artists.list"
+    return 0
+  fi
+
+  if ! mac::click "$moe_row" "$DEEP"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "could not click $moe_row"
+    return 0
+  fi
+
+  if mac::wait_for_id "artist.screen" "$TIMEOUT" "$DEEP" >/dev/null; then
+    smoke::result "mac" "$id" "PASS" "artists.list -> $moe_row opened artist.screen"
+  else
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "artist.screen not present after selecting $moe_row"
+  fi
 }
 
 mac_run_search_artist_hit() {
@@ -887,7 +948,33 @@ mac_run_next_stop_chip_focus() {
     return 0
   fi
 
-  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for artist chip and artist target screen (platform gap)"
+  if ! mac::click "sidebar.nav.home"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.home"
+    return 0
+  fi
+
+  mac::wait_for_id "home.next_tour_stops" "$TIMEOUT" "$DEEP" >/dev/null || true
+  local chip
+  chip="$(mac::ax_query "home.next_tour_stops.chip" "$DEEP" | head -n1 | cut -f1)"
+  if [[ -z "$chip" ]]; then
+    smoke::result "mac" "$id" "SKIP" "fixture unavailable: no upcoming tour stop chip in home.next_tour_stops"
+    return 0
+  fi
+
+  if ! mac::click "$chip" "$DEEP"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "could not click $chip"
+    return 0
+  fi
+
+  # The row navigates (Route.show); the tour picker sheet must not open.
+  if mac::wait_for_id "show.detail" "$TIMEOUT" "$DEEP" >/dev/null; then
+    smoke::result "mac" "$id" "PASS" "$chip navigated to show.detail; tour picker not opened"
+  else
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "show.detail not present after clicking $chip (tour picker may have opened)"
+  fi
 }
 
 # A visible note card is not enough: the journey requires the phish.in source link too.
@@ -896,9 +983,18 @@ mac_run_jam_chart_note_details() {
   smoke::require_journeys_file "$id"
   smoke::log "Executing journey $id..."
 
-  # The app exposes jam_chart.note but has no distinct source-link identifier.
-  # Presence of the note card alone cannot prove that its required link exists.
-  smoke::result "mac" "$id" "SKIP" "missing AXIdentifier for the jam chart source link; cannot verify the required link"
+  # The note card only renders while a jam-chart track is playing with its note expanded.
+  if [[ -z "$(mac::ax_query "jam_chart.note" "$DEEP")" ]]; then
+    smoke::result "mac" "$id" "SKIP" "fixture unavailable: no jam_chart.note visible (needs a jam-chart track playing with its note open)"
+    return 0
+  fi
+
+  if [[ -n "$(mac::ax_query "jam_chart.source" "$DEEP")" ]]; then
+    smoke::result "mac" "$id" "PASS" "jam_chart.note and jam_chart.source both present"
+  else
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "jam_chart.note present but jam_chart.source link missing"
+  fi
 }
 
 mac_run_library_phishin_playlists() {
@@ -919,7 +1015,23 @@ mac_run_library_phishin_playlists() {
     return 0
   fi
 
-  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for library playlists (platform gap)"
+  if ! mac::click "sidebar.nav.library"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.library"
+    return 0
+  fi
+
+  if ! mac::wait_for_id "library.screen" "$TIMEOUT" "$DEEP" >/dev/null; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "library.screen not present within ${TIMEOUT}s"
+    return 0
+  fi
+
+  if mac::wait_for_id "library.row" "$TIMEOUT" "$DEEP" >/dev/null; then
+    smoke::result "mac" "$id" "PASS" "library.screen lists playlist rows (library.row.*)"
+  else
+    smoke::result "mac" "$id" "SKIP" "fixture unavailable: signed-in account has no library.row items"
+  fi
 }
 
 mac_run_favorite_syncs_mac_to_android() {
@@ -956,7 +1068,29 @@ mac_run_nav_reaches_every_destination() {
     return 0
   fi
 
-  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for destination target views (platform gap)"
+  local nav screen failed=()
+  for pair in \
+    sidebar.nav.home:home.screen \
+    sidebar.nav.artists:artists.screen \
+    sidebar.nav.search:search.screen \
+    sidebar.nav.library:library.screen \
+    sidebar.nav.history:history.screen \
+    sidebar.nav.settings:settings.screen; do
+    nav="${pair%%:*}"
+    screen="${pair##*:}"
+    if ! mac::click "$nav"; then
+      failed+=("$nav (click)")
+    elif ! mac::wait_for_id "$screen" "$TIMEOUT" "$DEEP" >/dev/null; then
+      failed+=("$nav -> $screen")
+    fi
+  done
+
+  if [[ ${#failed[@]} -eq 0 ]]; then
+    smoke::result "mac" "$id" "PASS" "all six sidebar destinations reached and showed their screen identifier"
+  else
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "destinations not reached: ${failed[*]}"
+  fi
 }
 
 mac_run_search_result_sections() {
@@ -1049,7 +1183,44 @@ mac_run_live_data_not_mockup() {
     return 0
   fi
 
-  smoke::result "mac" "$id" "SKIP" "missing AXIdentifiers for live show data verification (platform gap)"
+  local row_id
+  row_id="$(echo "$fav_rows" | head -n1 | cut -f1)"
+
+  mac::click "sidebar.nav.home" || true
+  if ! mac::click "$row_id"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "could not click $row_id"
+    return 0
+  fi
+
+  if ! mac::wait_for_id "artist.screen" "$TIMEOUT" "$DEEP" >/dev/null; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "artist.screen not present after selecting $row_id"
+    return 0
+  fi
+
+  local period
+  period="$(mac::wait_for_id "artist.period.row" "$TIMEOUT" "$DEEP" | head -n1 | cut -f1 || true)"
+  if [[ -z "$period" ]] || ! mac::click "$period" "$DEEP"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "no clickable artist.period.row.* on artist.screen"
+    return 0
+  fi
+
+  local show
+  show="$(mac::wait_for_id "shows.row" "$TIMEOUT" "$DEEP" | head -n1 | cut -f1 || true)"
+  if [[ -z "$show" ]]; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "no shows.row.<date> loaded in shows.list"
+    return 0
+  fi
+
+  if mac::click "$show" "$DEEP" && mac::wait_for_id "show.detail" "$TIMEOUT" "$DEEP" >/dev/null; then
+    smoke::result "mac" "$id" "PASS" "$row_id -> $show loaded live show.detail"
+  else
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "show.detail not present after opening $show"
+  fi
 }
 
 # -----------------------------------------------------------------------------
