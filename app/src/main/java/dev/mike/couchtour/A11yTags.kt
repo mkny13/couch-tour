@@ -22,6 +22,12 @@ object A11yTags {
     const val FAVORITES_LIST = "favorites.list"
     fun favoritesRow(artistKey: String) = "favorites.row.$artistKey"
 
+    // The smoke runner's only way to favorite an artist that isn't favorited yet: Home's
+    // "Browse artists" row, then the star on that artist's row (#533).
+    const val HOME_BROWSE_ARTISTS = "home.browse-artists"
+    const val ARTISTS_LIST = "artists.list"
+    fun artistFavorite(artistKey: String) = "artists.favorite.$artistKey"
+
     const val SEARCH_FIELD = "search.field"
     const val SEARCH_SECTION_ARTISTS = "search.section.artists"
     const val SEARCH_SECTION_SHOWS = "search.section.shows"

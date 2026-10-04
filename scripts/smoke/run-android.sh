@@ -793,13 +793,28 @@ android::row_absent() { android::dump >/dev/null || true; [[ "$(android::count "
 
 android_unavailable() { smoke::log "sync step unavailable: $*"; exit "$SMOKE_STEP_UNAVAILABLE"; }
 
-# Tap <entry tag> to open the artist screen, then tap the favorite toggle.
+# Swipe down until <tag> is on screen. Lazy lists only compose visible rows, so an off-screen
+# row is missing from the dump entirely, not merely hidden. <list> (optional) is the tag whose
+# bounds the swipe stays inside.
+android_scroll_to() {
+  local tag="$1" list="${2:-}" i
+  for ((i = 0; i < ${CCTV_SMOKE_ANDROID_MAX_SCROLLS:-40}; i++)); do
+    android::row_present "$tag" && return 0
+    android::scroll "$list" "down"
+    sleep 0.3
+  done
+  android::row_present "$tag"
+}
+
+# Home -> Browse artists -> the star on <artistKey>'s row (artists.favorite.<key>, #533). Every
+# row has the star, favorited or not, so add and remove are the same tap.
 android_toggle_favorite() {
-  local entry="$1" toggle="${CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE:-artist.favorite}"
-  android::dump >/dev/null || true
-  android::tap "$entry" || android_unavailable "cannot tap $entry"
-  android::wait_for_tag "$toggle" "$TIMEOUT" || android_unavailable "favorite toggle tag '$toggle' not found (set CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE)"
-  android::tap "$toggle" || android_unavailable "cannot tap $toggle"
+  local star="artists.favorite.$1"
+  android_scroll_to "home.browse-artists" || android_unavailable "home.browse-artists not found on Home"
+  android::tap "home.browse-artists" || android_unavailable "cannot tap home.browse-artists"
+  android::wait_for_tag "artists.list" "$TIMEOUT" || android_unavailable "artists.list not shown"
+  android_scroll_to "$star" "artists.list" || android_unavailable "$star not found in artists.list"
+  android::tap "$star" || android_unavailable "cannot tap $star"
   android::back
 }
 
@@ -824,14 +839,10 @@ android_sync_step() {
       android::tap "nav.home" 2>/dev/null || true ;;
   esac
   case "$step" in
-    favorite-add)
-      local entry="${CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG:-}"
-      [[ -n "$entry" ]] || android_unavailable "CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG (tag that opens the artist screen) not set"
-      android_toggle_favorite "$entry" ;;
-    favorite-remove) android_toggle_favorite "favorites.row.$key" ;;
+    favorite-add|favorite-remove) android_toggle_favorite "$key" ;;
     favorite-ensure-absent)
       # Known starting state: drop a leftover favorite so favorite-add can't toggle it off.
-      if android::row_present "favorites.row.$key"; then android_toggle_favorite "favorites.row.$key"; fi
+      if android::row_present "favorites.row.$key"; then android_toggle_favorite "$key"; fi
       smoke::poll "$TIMEOUT" android::row_absent "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-present) smoke::poll "$TIMEOUT" android::row_present "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
     favorite-absent) smoke::poll "$TIMEOUT" android::row_absent "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;

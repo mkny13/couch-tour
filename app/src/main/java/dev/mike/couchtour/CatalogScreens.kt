@@ -53,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -196,7 +197,7 @@ fun ArtistsScreen(nav: NavHostController) {
                 return@Loaded
             }
 
-            LazyColumn {
+            LazyColumn(Modifier.testTag(A11yTags.ARTISTS_LIST)) {
                 phishMatches?.let { phish ->
                     item(key = "${phish.backend.id}-${phish.id}") {
                         RowItem(
@@ -956,7 +957,10 @@ private fun TourEntireYearOption(
 private fun FavoriteButton(artist: ArtistRef) {
     val favoriteKeys by Favorites.keys.collectAsState()
     val favorited = artist.key in favoriteKeys
-    IconButton(onClick = { Favorites.toggle(artist.key) }) {
+    IconButton(
+        onClick = { Favorites.toggle(artist.key) },
+        modifier = Modifier.testTag(A11yTags.artistFavorite(artist.key)),
+    ) {
         Icon(
             if (favorited) Icons.Filled.Star else Icons.Filled.StarBorder,
             if (favorited) "Unfavorite ${artist.name}" else "Favorite ${artist.name}",
