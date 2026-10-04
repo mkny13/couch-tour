@@ -2,10 +2,13 @@
 -- design this implements. Applied with:
 --   npm run db:migrate:local   (local dev)
 --   npm run db:migrate:remote  (the real Cloudflare D1 database, once one exists)
+-- Every migrate replays this whole file against a database that already has the earlier
+-- tables, so each CREATE must be IF NOT EXISTS — otherwise the first existing table aborts
+-- the run and anything new (tables, indexes) never lands. Column changes still need an ALTER.
 
 -- A pair (or more) of devices that sync progress with each other. Created implicitly by the
 -- first device to start a pairing.
-CREATE TABLE groups (
+CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY,
     createdAt INTEGER NOT NULL
 );
@@ -15,7 +18,7 @@ CREATE TABLE groups (
 -- previousTokenHash/previousTokenExpiresAt hold the prior token through a 48h grace window
 -- after rotation, so a client that crashes between receiving a new token and persisting it
 -- isn't locked out — see the rotation logic in src/index.ts.
-CREATE TABLE devices (
+CREATE TABLE IF NOT EXISTS devices (
     id TEXT PRIMARY KEY,
     groupId TEXT NOT NULL REFERENCES groups(id),
     name TEXT NOT NULL,
@@ -28,22 +31,22 @@ CREATE TABLE devices (
     lastSeenAt INTEGER,
     revokedAt INTEGER
 );
-CREATE INDEX devices_previousTokenHash ON devices(previousTokenHash);
-CREATE INDEX devices_group_revoked ON devices(groupId, revokedAt, id, name, platform, createdAt, lastSeenAt);
+CREATE INDEX IF NOT EXISTS devices_previousTokenHash ON devices(previousTokenHash);
+CREATE INDEX IF NOT EXISTS devices_group_revoked ON devices(groupId, revokedAt, id, name, platform, createdAt, lastSeenAt);
 
 -- A short-lived pairing code, single-use, looked up by the code alone (D127) — no separate
 -- pairing id, so a human can type the whole thing. codeHash is SHA-256 of the code shown on
 -- screen, same reasoning as devices.tokenHash: a leaked database row can't be used to claim a
 -- pairing after the fact. No per-row attempt counter either — the code space (8 base32
 -- characters, ~10^12 possibilities) against a 10-minute TTL is the actual defense.
-CREATE TABLE pairings (
+CREATE TABLE IF NOT EXISTS pairings (
     id TEXT PRIMARY KEY,
     groupId TEXT NOT NULL REFERENCES groups(id),
     codeHash TEXT NOT NULL,
     expiresAt INTEGER NOT NULL,
     claimedAt INTEGER
 );
-CREATE INDEX pairings_codeHash ON pairings(codeHash);
+CREATE INDEX IF NOT EXISTS pairings_codeHash ON pairings(codeHash);
 
 -- The synced progress rows: the 11 client columns verbatim (queueKey, title, subtitle,
 -- artUrl, trackIndex, positionMs, trackTitle, updatedAt, finished, dismissed, artist), plus
@@ -51,7 +54,7 @@ CREATE INDEX pairings_codeHash ON pairings(codeHash);
 -- seq, the monotonic per-group ordering cursor sync clients page through, and
 -- lastWriterDeviceId, kept for display/debugging only — conflict resolution itself is
 -- row-level last-write-wins on updatedAt, with seq as the tie-break.
-CREATE TABLE progress (
+CREATE TABLE IF NOT EXISTS progress (
     groupId TEXT NOT NULL REFERENCES groups(id),
     queueKey TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -69,13 +72,13 @@ CREATE TABLE progress (
     lastWriterDeviceId TEXT,
     PRIMARY KEY (groupId, queueKey)
 );
-CREATE INDEX progress_seq ON progress(groupId, seq);
-CREATE INDEX progress_deletedAt_seq ON progress(deletedAt, groupId, seq);
+CREATE INDEX IF NOT EXISTS progress_seq ON progress(groupId, seq);
+CREATE INDEX IF NOT EXISTS progress_deletedAt_seq ON progress(deletedAt, groupId, seq);
 
 -- Synced favorite artists. Same tombstone and seq semantics as progress: a removed favorite
 -- must replicate across devices, and every accepted write gets a group-wide seq so clients
 -- can page by one cursor.
-CREATE TABLE favorite_artists (
+CREATE TABLE IF NOT EXISTS favorite_artists (
     groupId TEXT NOT NULL REFERENCES groups(id),
     artistKey TEXT NOT NULL,
     updatedAt INTEGER NOT NULL,
@@ -84,8 +87,8 @@ CREATE TABLE favorite_artists (
     lastWriterDeviceId TEXT,
     PRIMARY KEY (groupId, artistKey)
 );
-CREATE INDEX favorite_artists_seq ON favorite_artists(groupId, seq);
-CREATE INDEX favorite_artists_deletedAt_seq ON favorite_artists(deletedAt, groupId, seq);
+CREATE INDEX IF NOT EXISTS favorite_artists_seq ON favorite_artists(groupId, seq);
+CREATE INDEX IF NOT EXISTS favorite_artists_deletedAt_seq ON favorite_artists(deletedAt, groupId, seq);
 
 -- The seq counter itself, one row per group. Allocated with a single
 -- `UPDATE seqs SET next = next + ? WHERE groupId = ? RETURNING next` — D1 has no interactive
@@ -98,7 +101,7 @@ CREATE INDEX favorite_artists_deletedAt_seq ON favorite_artists(deletedAt, group
 -- next push. `since` is a seq value, not a timestamp, so this floor has to live on the same
 -- scale rather than being compared against wall-clock time. The floor is raised by the
 -- daily 180-day tombstone-purge job (see purgeOldTombstones in src/index.ts).
-CREATE TABLE seqs (
+CREATE TABLE IF NOT EXISTS seqs (
     groupId TEXT PRIMARY KEY REFERENCES groups(id),
     next INTEGER NOT NULL,
     retentionFloorSeq INTEGER NOT NULL DEFAULT 0
