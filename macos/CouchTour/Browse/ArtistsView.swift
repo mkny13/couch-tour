@@ -113,6 +113,7 @@ struct ArtistsView: View {
                         ? "Remove \(artist.name) from favorites"
                         : "Add \(artist.name) to favorites"
                 )
+                .accessibilityIdentifier("\(AXIdentifiers.artistsFavorite).\(artist.backend.rawValue).\(artist.id)")
             }
         }
     }

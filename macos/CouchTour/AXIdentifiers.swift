@@ -33,6 +33,8 @@ public enum AXIdentifiers {
     // Artists, artist screen, shows (#520)
     public static let artistsList = "artists.list"
     public static let artistsRow = "artists.row"
+    // The star on an artists.row — the only favorite toggle on Mac (#406 sync smoke).
+    public static let artistsFavorite = "artists.favorite"
     public static let artistScreen = "artist.screen"
     public static let artistPeriodRow = "artist.period.row"
     public static let showsList = "shows.list"

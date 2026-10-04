@@ -22,6 +22,7 @@ MAIN_ACTIVITY="dev.mike.couchtour.MainActivity"
 APK_PATH=""
 SERIAL="${CCTV_SMOKE_SERIAL:-}"
 RUN_JOURNEYS=()
+SYNC_STEP=""
 TAG=""
 OUT_FILE=""
 NO_INPUT="false"
@@ -44,6 +45,7 @@ Options:
   --timeout <s>       Maximum seconds to wait for a UI tag to appear (default: 20)
   --keep-installed    Do not uninstall the beta app on completion
   --test              Run parser fixture tests without hardware and exit
+  --sync-step <s>   Run one half of a cross-client sync round trip (see sync-roundtrip.sh) and exit
   -h, --help          Print this usage message
 EOF
 }
@@ -252,6 +254,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     --test)
       run_self_tests
+      ;;
+    --sync-step)
+      [[ -n "${2:-}" ]] || smoke::die 1 "--sync-step requires a step name"
+      SYNC_STEP="$2"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -695,50 +702,6 @@ android_run_library_phishin_playlists() {
   smoke::result "android" "$id" "PASS" "library playlists rendered for signed-in session"
 }
 
-android_run_favorite_syncs_mac_to_android() {
-  local id="favorite-syncs-mac-to-android"
-  smoke::require_journeys_file "$id"
-  smoke::log "Executing journey $id..."
-
-  smoke::result "android" "$id" "SKIP" "mac->android sync source requires macOS runner"
-}
-
-android_run_favorite_syncs_android_to_mac() {
-  local id="favorite-syncs-android-to-mac"
-  smoke::require_journeys_file "$id"
-  smoke::log "Executing journey $id..."
-
-  if ! android_is_signed_in; then
-    smoke::result "android" "$id" "SKIP" "signed-in fixture unavailable"
-    return 0
-  fi
-
-  if [[ "$NO_INPUT" == "true" ]]; then
-    smoke::result "android" "$id" "SKIP" "--no-input active"
-    return 0
-  fi
-
-  smoke::result "android" "$id" "SKIP" "unimplemented cross-platform sync verification"
-}
-
-android_run_in_progress_syncs_android_to_mac() {
-  local id="in-progress-syncs-android-to-mac"
-  smoke::require_journeys_file "$id"
-  smoke::log "Executing journey $id..."
-
-  if ! android_is_signed_in; then
-    smoke::result "android" "$id" "SKIP" "signed-in fixture unavailable"
-    return 0
-  fi
-
-  if [[ "$NO_INPUT" == "true" ]]; then
-    smoke::result "android" "$id" "SKIP" "--no-input active"
-    return 0
-  fi
-
-  smoke::result "android" "$id" "SKIP" "unimplemented cross-platform sync verification"
-}
-
 android_run_nav_reaches_every_destination() {
   local id="nav-reaches-every-destination"
   smoke::require_journeys_file "$id"
@@ -821,6 +784,79 @@ android_run_live_data_not_mockup() {
   smoke::result "android" "$id" "SKIP" "unimplemented live data verification"
 }
 
+# Sync steps (--sync-step), driven by sync-roundtrip.sh. Each step is one half of a cross-client
+# round trip: an action on this client, or an assertion that the other client's change arrived.
+# Exit 0 satisfied, 3 assertion timed out, 4 needed control/fixture unavailable.
+
+android::row_present() { android::dump >/dev/null || true; [[ "$(android::count "$1")" -gt 0 ]]; }
+android::row_absent() { android::dump >/dev/null || true; [[ "$(android::count "$1")" -eq 0 ]]; }
+
+android_unavailable() { smoke::log "sync step unavailable: $*"; exit "$SMOKE_STEP_UNAVAILABLE"; }
+
+# Tap <entry tag> to open the artist screen, then tap the favorite toggle.
+android_toggle_favorite() {
+  local entry="$1" toggle="${CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE:-artist.favorite}"
+  android::dump >/dev/null || true
+  android::tap "$entry" || android_unavailable "cannot tap $entry"
+  android::wait_for_tag "$toggle" "$TIMEOUT" || android_unavailable "favorite toggle tag '$toggle' not found (set CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE)"
+  android::tap "$toggle" || android_unavailable "cannot tap $toggle"
+  android::back
+}
+
+android_clear_progress() {
+  local clear="${CCTV_SMOKE_ANDROID_PROGRESS_CLEAR_TAG:-}"
+  [[ -n "$clear" ]] || android_unavailable "CCTV_SMOKE_ANDROID_PROGRESS_CLEAR_TAG (a control that clears In Progress) not set"
+  android::tap "nav.home" 2>/dev/null || true
+  android::dump >/dev/null || true
+  android::tap "$clear" || android_unavailable "cannot tap $clear"
+}
+
+android_sync_step() {
+  local step="$1" key="${CCTV_SMOKE_SYNC_ARTIST_ANDROID:-}"
+  # An installed-but-closed beta shows the launcher, so bring the app to the foreground first
+  # (no force-stop: that would drop a still-running client's in-memory state mid round trip).
+  adb_cmd shell am start -W -n "$BETA_PKG/dev.mike.couchtour.MainActivity" >&2 || android_unavailable "cannot launch $BETA_PKG"
+  android::wait_for_tag "nav.home" "$TIMEOUT" || android_unavailable "app did not reach nav.home after launch (paired/signed in?)"
+  # bash 3.2 (macOS) has no ;;& fall-through, so the shared favorite-step preamble lives here.
+  case "$step" in
+    favorite-*)
+      [[ -n "$key" ]] || android_unavailable "CCTV_SMOKE_SYNC_ARTIST_ANDROID (<artistKey>) not set"
+      android::tap "nav.home" 2>/dev/null || true ;;
+  esac
+  case "$step" in
+    favorite-add)
+      local entry="${CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG:-}"
+      [[ -n "$entry" ]] || android_unavailable "CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG (tag that opens the artist screen) not set"
+      android_toggle_favorite "$entry" ;;
+    favorite-remove) android_toggle_favorite "favorites.row.$key" ;;
+    favorite-ensure-absent)
+      # Known starting state: drop a leftover favorite so favorite-add can't toggle it off.
+      if android::row_present "favorites.row.$key"; then android_toggle_favorite "favorites.row.$key"; fi
+      smoke::poll "$TIMEOUT" android::row_absent "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    favorite-present) smoke::poll "$TIMEOUT" android::row_present "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    favorite-absent) smoke::poll "$TIMEOUT" android::row_absent "favorites.row.$key" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    progress-start)
+      local seed="${CCTV_SMOKE_ANDROID_PROGRESS_SEED_TAG:-}"
+      [[ -n "$seed" ]] || android_unavailable "CCTV_SMOKE_ANDROID_PROGRESS_SEED_TAG (a track row to play) not set"
+      android::dump >/dev/null || true
+      android::tap "$seed" || android_unavailable "cannot tap $seed"
+      sleep 5 ;;
+    progress-clear) android_clear_progress ;;
+    progress-ensure-absent)
+      android::tap "nav.home" 2>/dev/null || true
+      if android::row_present "home.section.in-progress.row."; then android_clear_progress; fi
+      smoke::poll "$TIMEOUT" android::row_absent "home.section.in-progress.row." || exit "$SMOKE_STEP_TIMEOUT" ;;
+    progress-present)
+      android::tap "nav.home" 2>/dev/null || true
+      smoke::poll "$TIMEOUT" android::row_present "home.section.in-progress.row." || exit "$SMOKE_STEP_TIMEOUT" ;;
+    progress-absent)
+      android::tap "nav.home" 2>/dev/null || true
+      smoke::poll "$TIMEOUT" android::row_absent "home.section.in-progress.row." || exit "$SMOKE_STEP_TIMEOUT" ;;
+    *) smoke::die 1 "Unknown --sync-step: $step" ;;
+  esac
+  exit 0
+}
+
 # -----------------------------------------------------------------------------
 # Main Runner Dispatch
 # -----------------------------------------------------------------------------
@@ -834,13 +870,14 @@ ALL_JOURNEYS=(
   next-stop-chip-focus
   jam-chart-note-details
   library-phishin-playlists
-  favorite-syncs-mac-to-android
-  favorite-syncs-android-to-mac
-  in-progress-syncs-android-to-mac
   nav-reaches-every-destination
   search-result-sections
   live-data-not-mockup
 )
+
+if [[ -n "$SYNC_STEP" ]]; then
+  android_sync_step "$SYNC_STEP"
+fi
 
 if [[ ${#RUN_JOURNEYS[@]} -gt 0 ]]; then
   TARGET_JOURNEYS=("${RUN_JOURNEYS[@]}")
