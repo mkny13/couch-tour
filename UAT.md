@@ -279,3 +279,7 @@ Long-standing items that predate this sprint.
 ## Playlists in macOS search (#427)
 
 - [ ] `uat-086` **Search finds public playlists** (macOS) — Search "middle class". Confirm a Playlists tab with a count appears and "2024's Middle Class" is listed under All and Playlists. Click it and confirm the playlist opens and plays. Filter to a non-Phish artist and confirm playlists disappear.
+
+## macOS Library separates saved items from history (#539)
+
+- [ ] `uat-087` **Library lists saved items, History lists playback** (macOS) — Play a show without liking it. Confirm it appears in History/Continue Listening but not in Library, and that Library → Shows says "No saved shows yet" with a "Shows you've played are in History" link that opens History. Like a Relisten track (heart in the player rail or a show's track menu), reopen Library → Tracks, and confirm the row shows the track title and show date/venue (never a UUID); click it and confirm it plays. Confirm local playlists and their tracks are still listed, and that category counts, search, and the sort menu still work.

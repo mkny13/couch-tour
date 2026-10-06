@@ -10,10 +10,12 @@ import SwiftUI
 struct LocalPlaylistsView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
+    @EnvironmentObject private var likedTracks: LikedTracks
     @Environment(\.ledgerColors) private var colors
 
     @State private var playlists: [LocalPlaylist] = []
-    @State private var recentProgress: [PlaybackProgress] = []
+    @State private var hasPlaybackHistory = false
+    @State private var playError: String?
     @State private var playlistTracks: [LocalPlaylistTrack] = []
     @State private var query = ""
     @State private var selectedCategory: LibraryCategory = .all
@@ -36,20 +38,6 @@ struct LocalPlaylistsView: View {
         case tracks = "Tracks"
 
         var id: String { rawValue }
-    }
-
-    struct LibraryItem: Identifiable {
-        let id: String
-        let type: String
-        let name: String
-        let subtitle: String
-        let artist: String
-        let rating: String
-        let length: String
-        let added: String
-        let playlist: LocalPlaylist?
-        let showSummary: ShowSummary?
-        let track: PlayableTrack?
     }
 
     var body: some View {
@@ -184,9 +172,9 @@ struct LocalPlaylistsView: View {
 
     private var filterTabsRow: some View {
         let allCount = items.count
-        let playlistsCount = items.filter { $0.type == "PLAYLIST" }.count
-        let showsCount = items.filter { $0.type == "SHOW" }.count
-        let tracksCount = items.filter { $0.type == "TRACK" }.count
+        let playlistsCount = items.filter { $0.kind == .playlist }.count
+        let showsCount = items.filter { $0.kind == .show }.count
+        let tracksCount = items.filter { $0.kind == .track }.count
 
         return HStack(spacing: 8) {
             categoryTabButton(.all, label: "All \(allCount)")
@@ -284,15 +272,51 @@ struct LocalPlaylistsView: View {
             ForEach(filtered) { item in
                 tableRow(item)
             }
+            if filtered.isEmpty { emptyState }
         }
     }
 
     @ViewBuilder
-    private func tableRow(_ item: LibraryItem) -> some View {
+    private var emptyState: some View {
+        let searching = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        VStack(spacing: 8) {
+            Text(emptyMessage(searching: searching))
+                .font(.system(size: 13))
+                .foregroundStyle(colors.textMuted)
+                .multilineTextAlignment(.center)
+            if !searching, selectedCategory == .shows || selectedCategory == .all, hasPlaybackHistory {
+                Button("Shows you've played are in History") {
+                    appModel.path.append(.listening)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(colors.accentTintText)
+                .accessibilityIdentifier(AXIdentifiers.libraryHistoryLink)
+            }
+            if let playError {
+                Text(playError).font(.system(size: 12)).foregroundStyle(colors.textMuted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+    }
+
+    private func emptyMessage(searching: Bool) -> String {
+        if searching { return "Nothing in your library matches \"\(query)\"." }
+        switch selectedCategory {
+        case .shows: return "No saved shows yet."
+        case .tracks: return "No liked tracks yet. Tap the heart on a Relisten track to save it here."
+        case .playlists: return "No playlists yet."
+        case .all: return "Your library is empty."
+        }
+    }
+
+    @ViewBuilder
+    private func tableRow(_ item: LibrarySourceItem) -> some View {
         HStack(spacing: 8) {
             // TYPE Badge
             HStack {
-                TypeBadge(type: item.type)
+                TypeBadge(type: item.kind.rawValue)
                 Spacer()
             }
             .frame(width: 74)
@@ -308,7 +332,7 @@ struct LocalPlaylistsView: View {
                         .lineLimit(1)
                         .accessibilityIdentifier("\(AXIdentifiers.libraryRow).\(item.id)")
 
-                    if !item.subtitle.isEmpty {
+                    if item.kind != .playlist, !item.subtitle.isEmpty {
                         Text(item.subtitle)
                             .font(.system(size: 12))
                             .foregroundStyle(colors.textMuted)
@@ -328,21 +352,21 @@ struct LocalPlaylistsView: View {
                 .lineLimit(1)
 
             // RATING / TRACKS
-            Text(item.rating)
+            Text(item.kind == .playlist ? item.subtitle : "")
                 .font(.system(size: 13))
-                .foregroundStyle(item.rating.contains("★") ? colors.ratingAmber : colors.textSubtle)
+                .foregroundStyle(colors.textSubtle)
                 .frame(width: 74, alignment: .trailing)
                 .lineLimit(1)
 
             // LENGTH
-            Text(item.length)
+            Text(lengthText(for: item))
                 .font(.system(size: 13))
                 .foregroundStyle(colors.textSubtle)
                 .frame(width: 64, alignment: .trailing)
                 .lineLimit(1)
 
             // ADDED
-            Text(item.added)
+            Text(item.addedAt.map { relativeTime($0) } ?? "")
                 .font(.system(size: 13))
                 .foregroundStyle(colors.textMuted)
                 .frame(width: 86, alignment: .trailing)
@@ -391,95 +415,62 @@ struct LocalPlaylistsView: View {
         )
     }
 
-    private func handleItemClick(_ item: LibraryItem) {
+    private func handleItemClick(_ item: LibrarySourceItem) {
         if let pl = item.playlist {
             appModel.path.append(.localPlaylist(pl))
-        } else if let show = item.showSummary {
-            appModel.path.append(.show(show))
+        } else if let record = item.likedTrack {
+            Task { await play(record) }
         }
+    }
+
+    /// A liked Relisten track plays through the same fetch-and-resolve path as playlist rows,
+    /// wrapped as a one-track queue keyed by the track so History can reopen it.
+    private func play(_ record: LikedTrackRecord) async {
+        let tracks = await resolveLocalPlaylistTracks([record.asPlaylistTrack])
+        guard !tracks.isEmpty else {
+            playError = "Couldn't load \"\(record.title)\" right now."
+            return
+        }
+        let artist = ArtistRef(backend: .relisten, id: record.artistSlug ?? "", name: record.artistSlug ?? "Relisten")
+        let summary = ShowSummary(artist: artist, date: record.showDate)
+        let detail = ShowDetail(summary: summary, tracks: tracks, queueKey: "liked:\(record.trackId)")
+        player.play(detail: detail, startIndex: 0)
+    }
+
+    private func lengthText(for item: LibrarySourceItem) -> String {
+        item.likedTrack.map { formatCompactDuration(ms: $0.durationMs) } ?? ""
     }
 
     // MARK: - Data Loading & Aggregation
 
-    private var items: [LibraryItem] {
-        var result: [LibraryItem] = []
-
-        // User playlists
-        for pl in playlists {
-            result.append(LibraryItem(
-                id: "playlist-\(pl.id)",
-                type: "PLAYLIST",
-                name: pl.name,
-                subtitle: "\(pl.trackCount) \(plural(pl.trackCount, "track"))",
-                artist: "",
-                rating: "\(pl.trackCount) tracks",
-                length: "",
-                added: relativeTime(pl.updatedAt),
-                playlist: pl,
-                showSummary: nil,
-                track: nil
-            ))
-        }
-
-        // In-progress / history shows
-        for prog in recentProgress {
-            result.append(LibraryItem(
-                id: "progress-\(prog.queueKey)",
-                type: "SHOW",
-                name: prog.title,
-                subtitle: prog.trackTitle,
-                artist: prog.artist,
-                rating: "",
-                length: fmt(prog.positionMs),
-                added: relativeTime(prog.updatedAt),
-                playlist: nil,
-                showSummary: nil,
-                track: nil
-            ))
-        }
-
-        // Playlist tracks
-        for (idx, tr) in playlistTracks.enumerated() {
-            result.append(LibraryItem(
-                id: "track-\(tr.rowId ?? Int64(idx))",
-                type: "TRACK",
-                name: tr.title,
-                subtitle: "\(tr.showDate) · \(tr.venueName ?? "")",
-                artist: tr.artistSlug ?? tr.backend,
-                rating: "",
-                length: formatCompactDuration(ms: tr.durationMs),
-                added: "",
-                playlist: nil,
-                showSummary: nil,
-                track: nil
-            ))
-        }
-
-        return result
+    /// Saved local sources only: playlists, their tracks, and locally liked Relisten tracks.
+    /// Playback history lives in `ListeningView` and is deliberately not read here (#539).
+    private var items: [LibrarySourceItem] {
+        LibrarySources.items(
+            playlists: playlists, playlistTracks: playlistTracks, likedTracks: likedTracks.listableRecords
+        )
     }
 
-    private var filteredItems: [LibraryItem] {
-        let categoryFiltered: [LibraryItem]
+    private var filteredItems: [LibrarySourceItem] {
+        let categoryFiltered: [LibrarySourceItem]
         switch selectedCategory {
         case .all:
             categoryFiltered = items
         case .playlists:
-            categoryFiltered = items.filter { $0.type == "PLAYLIST" }
+            categoryFiltered = items.filter { $0.kind == .playlist }
         case .shows:
-            categoryFiltered = items.filter { $0.type == "SHOW" }
+            categoryFiltered = items.filter { $0.kind == .show }
         case .tracks:
-            categoryFiltered = items.filter { $0.type == "TRACK" }
+            categoryFiltered = items.filter { $0.kind == .track }
         }
 
-        let sorted: [LibraryItem]
-        switch librarySort {
-        case .recentlyAdded:
-            sorted = categoryFiltered
-        case .title:
-            sorted = categoryFiltered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        case .artist:
-            sorted = categoryFiltered.sorted { $0.artist.localizedCaseInsensitiveCompare($1.artist) == .orderedAscending }
-        }
+        let sorted = LibrarySources.sorted(categoryFiltered, by: {
+            switch librarySort {
+            case .recentlyAdded: return .recentlyAdded
+            case .title: return .title
+            case .artist: return .artist
+            }
+        }())
 
         if query.trimmingCharacters(in: .whitespaces).isEmpty {
             return sorted
@@ -495,7 +486,7 @@ struct LocalPlaylistsView: View {
 
     private func load() {
         playlists = (try? appModel.localPlaylistStore?.playlists()) ?? []
-        recentProgress = (try? appModel.progressStore?.inProgress()) ?? []
+        hasPlaybackHistory = ((try? appModel.progressStore?.history().count) ?? 0) > 0
         var allTr: [LocalPlaylistTrack] = []
         for pl in playlists {
             if let trs = try? appModel.localPlaylistStore?.tracks(playlistId: pl.id) {

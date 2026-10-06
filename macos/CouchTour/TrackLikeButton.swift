@@ -10,6 +10,9 @@ struct TrackLikeButton: View {
     let trackID: String
     let likesCount: Int
     let likedByUser: Bool
+    /// Display metadata persisted when a Relisten track is liked, so the Library can list and
+    /// play it (#539). Unused for phish.in, whose likes live on the account.
+    let record: LikedTrackRecord?
 
     @EnvironmentObject private var session: PhishInSession
     @EnvironmentObject private var likedTracks: LikedTracks
@@ -17,11 +20,12 @@ struct TrackLikeButton: View {
     @State private var liked: Bool
     @State private var count: Int
 
-    init(backend: Backend, trackID: String, likesCount: Int, likedByUser: Bool) {
+    init(backend: Backend, trackID: String, likesCount: Int, likedByUser: Bool, record: LikedTrackRecord? = nil) {
         self.backend = backend
         self.trackID = trackID
         self.likesCount = likesCount
         self.likedByUser = likedByUser
+        self.record = record
         _liked = State(initialValue: likedByUser)
         _count = State(initialValue: likesCount)
     }
@@ -31,7 +35,12 @@ struct TrackLikeButton: View {
         case .relisten:
             let isLiked = likedTracks.ids.contains(trackID)
             Button {
-                likedTracks.toggle(trackID)
+                if var record {
+                    record.likedAt = Int64(Date().timeIntervalSince1970 * 1000)
+                    likedTracks.toggle(record)
+                } else {
+                    likedTracks.toggle(trackID)
+                }
             } label: {
                 Image(systemName: isLiked ? "heart.fill" : "heart")
                     .foregroundStyle(isLiked ? .pink : .secondary)
