@@ -362,7 +362,7 @@ struct PlayerRailView: View {
                                 likedByUser: currentTrack.likedByUser,
                             record: LikedTrackRecord(
                                 trackId: currentTrack.id, backend: Backend.relisten.rawValue,
-                                showDate: show.date, artistSlug: show.artist.id, recordingId: nil,
+                                showDate: show.date, artistSlug: show.artist.id, recordingId: player.recording?.id,
                                 title: currentTrack.title, durationMs: currentTrack.durationMs,
                                 venueName: show.where_, artUrl: currentTrack.artURL
                             )
@@ -421,7 +421,7 @@ struct PlayerRailView: View {
                                     trackId: currentTrack.id,
                                     showDate: show.date,
                                     artistSlug: show.artist.backend == .relisten ? show.artist.id : nil,
-                                    recordingId: nil,
+                                    recordingId: player.recording?.id,
                                     title: currentTrack.title,
                                     durationMs: currentTrack.durationMs,
                                     venueName: show.where_,
