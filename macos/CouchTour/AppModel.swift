@@ -87,6 +87,7 @@ final class AppModel: ObservableObject {
         SyncAPI.baseURL = SyncConfig.resolveBaseURL(defaultBase: SyncConfig.prodBaseURL)
         syncSession = SyncSession()
         #endif
+        syncSession.favorites = favorites
 
         do {
             progressStore = try ProgressStore(url: databaseURL)
@@ -135,7 +136,7 @@ final class AppModel: ObservableObject {
     /// a guaranteed-background mechanism.
     func syncNow() {
         guard let progressStore else { return }
-        Task { try? await syncSession.sync(progressStore) }
+        Task { try? await syncSession.sync(progressStore, favorites: favorites) }
     }
 
     func checkForUpdates() {
@@ -179,4 +180,3 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.open(scriptURL)
     }
 }
-

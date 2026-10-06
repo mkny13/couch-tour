@@ -35,6 +35,7 @@ final class SyncTokenStoreTests: XCTestCase {
     func testDefaultsTheCursorsToZero() {
         XCTAssertEqual(0, store().lastSeq)
         XCTAssertEqual(0, store().lastPushWatermark)
+        XCTAssertEqual(0, store().lastFavoritesPushWatermark)
         XCTAssertEqual(0, store().lastSyncedAt)
     }
 
@@ -42,9 +43,11 @@ final class SyncTokenStoreTests: XCTestCase {
         let store = store()
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastFavoritesPushWatermark = 9
         store.lastSyncedAt = 1_700_000_000_000
         XCTAssertEqual(42, store.lastSeq)
         XCTAssertEqual(7, store.lastPushWatermark)
+        XCTAssertEqual(9, store.lastFavoritesPushWatermark)
         XCTAssertEqual(1_700_000_000_000, store.lastSyncedAt)
     }
 
@@ -54,6 +57,7 @@ final class SyncTokenStoreTests: XCTestCase {
         store.deviceId = "device-1"
         store.lastSeq = 42
         store.lastPushWatermark = 7
+        store.lastFavoritesPushWatermark = 9
         store.lastSyncedAt = 1_700_000_000_000
 
         store.clear()
@@ -63,6 +67,7 @@ final class SyncTokenStoreTests: XCTestCase {
         XCTAssertNil(store.tokenHost)
         XCTAssertEqual(0, store.lastSeq)
         XCTAssertEqual(0, store.lastPushWatermark)
+        XCTAssertEqual(0, store.lastFavoritesPushWatermark)
         XCTAssertEqual(0, store.lastSyncedAt)
     }
 
@@ -635,6 +640,22 @@ final class SyncSessionTests: XCTestCase {
         XCTAssertEqual(1, server.requestCount - requestsBeforeDebounce)
         let pushed = server.takeRequest()!.bodyString!
         XCTAssertTrue(pushed.contains(#""queueKey":"show:1997-11-17""#))
+    }
+
+    @MainActor
+    func testDebouncedPushAppliesFavoriteRowsReturnedByTheServer() async throws {
+        try await claim()
+        let favorites = Favorites(defaults: UserDefaults(suiteName: suiteName)!)
+        session.favorites = favorites
+        server.enqueue(#"{"seq":3,"changes":[],"favoriteArtistChanges":[{"artistKey":"relisten:wsp","updatedAt":9000,"deletedAt":null}]}"#)
+        let gate = DebounceGate()
+        session.sleepForDebounce = { _ in await gate.park() }
+
+        session.requestDebouncedPush(store, delay: .milliseconds(50))
+        gate.open()
+        await session.pushTask?.value
+
+        XCTAssertTrue(favorites.keys.contains("relisten:wsp"))
     }
 
     // ------------------------------------------------------------------ push chunking
