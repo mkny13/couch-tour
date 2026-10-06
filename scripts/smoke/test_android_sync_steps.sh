@@ -35,7 +35,7 @@ case "$1" in
     node nav.home "[50,2186][200,2300]"
     if [[ "$screen" == home ]]; then
       [[ -e "$S/fav" ]] && node "favorites.row.$STUB_KEY" "[40,1950][200,2000]"
-      (( $(read_n hscroll) >= 2 )) && node home.browse-artists "[0,1000][1080,1100]"
+      (( $(read_n hscroll) >= 2 && $(read_n hscroll) <= 5 )) && node home.browse-artists "[0,1000][1080,1100]"
     else
       node artists.list "[0,200][1080,2100]"
       (( $(read_n ascroll) >= 3 )) && node "artists.favorite.$STUB_KEY" "[900,1000][1000,1100]"
@@ -46,12 +46,15 @@ case "$1" in
       input)
         case "$3" in
           swipe) screen="$(cat "$S/screen")"; k=hscroll; [[ "$screen" == artists ]] && k=ascroll
-                 echo $(( $(read_n $k) + 1 )) > "$S/$k"; echo "swipe $screen" >> "$S/log" ;;
+                 # y2 < y1 is a finger moving up = list scrolls down; the reverse scrolls back up.
+                 d=1; (( $7 > $5 )) && d=-1
+                 n=$(( $(read_n $k) + d )); (( n < 0 )) && n=0
+                 echo "$n" > "$S/$k"; echo "swipe $screen" >> "$S/log" ;;
           keyevent) echo home > "$S/screen"; echo "back" >> "$S/log" ;;
           tap)
             screen="$(cat "$S/screen")"; xy="$4,$5"
             if [[ "$xy" == 125,2243 ]]; then echo home > "$S/screen"; echo "tap nav.home" >> "$S/log"
-            elif [[ "$screen" == home && "$xy" == 540,1050 && $(read_n hscroll) -ge 2 ]]; then
+            elif [[ "$screen" == home && "$xy" == 540,1050 && $(read_n hscroll) -ge 2 && $(read_n hscroll) -le 5 ]]; then
               echo artists > "$S/screen"; echo 0 > "$S/ascroll"; echo "tap home.browse-artists" >> "$S/log"
             elif [[ "$screen" == artists && "$xy" == 950,1050 && $(read_n ascroll) -ge 3 ]]; then
               if [[ -e "$S/fav" ]]; then rm "$S/fav"; else : > "$S/fav"; fi
@@ -70,6 +73,7 @@ step() {
   local name="$1" syncstep="$2" fav="$3"
   rm -f "$TMP/state/"*; echo home > "$TMP/state/screen"; : > "$TMP/state/log"
   [[ "$fav" == yes ]] && : > "$TMP/state/fav"
+  [[ -n "${H0:-}" ]] && echo "$H0" > "$TMP/state/hscroll"
   PATH="$TMP/bin:$PATH" STUB_STATE="$TMP/state" STUB_KEY=moe CCTV_SMOKE_SERIAL=stub \
     CCTV_SMOKE_SYNC_ARTIST_ANDROID=moe CCTV_SMOKE_ANDROID_MAX_SCROLLS=6 \
     env -u CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE -u CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG \
@@ -84,6 +88,12 @@ check "favorite-add: exit 0" test "$RC" = 0
 check "favorite-add: scrolled Home and tapped home.browse-artists" tapped home.browse-artists
 check "favorite-add: scrolled the Artists list and tapped the star" tapped artists.favorite.moe
 check "favorite-add: artist is now favorited" faved
+
+# Home retained a scroll position below the "Browse artists" row: the runner must swipe back up.
+H0=9 step below favorite-add no
+check "Home scrolled past the row: exit 0" test "$RC" = 0
+check "Home scrolled past the row: tapped home.browse-artists" tapped home.browse-artists
+check "Home scrolled past the row: artist is now favorited" faved
 
 step remove favorite-remove yes
 check "favorite-remove: exit 0" test "$RC" = 0
