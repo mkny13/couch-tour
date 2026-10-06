@@ -32,6 +32,56 @@ final class LikedTracksTests: XCTestCase {
     }
 }
 
+@MainActor
+final class LikedTrackRecordsTests: XCTestCase {
+    private func isolatedDefaults() -> UserDefaults {
+        let suiteName = "LikedTrackRecordsTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
+        return defaults
+    }
+
+    private let rec = LikedTrackRecord(
+        trackId: "uuid-1", backend: "relisten", showDate: "1997-11-22", artistSlug: "phish",
+        recordingId: "tape-1", title: "Tweezer", durationMs: 600, venueName: "Hampton", likedAt: 42
+    )
+
+    func testRecordSurvivesReload() {
+        let defaults = isolatedDefaults()
+        let first = LikedTracks(defaults: defaults)
+        first.toggle(rec)
+        let reloaded = LikedTracks(defaults: defaults)
+        XCTAssertTrue(reloaded.ids.contains("uuid-1"))
+        XCTAssertEqual([rec], reloaded.listableRecords)
+    }
+
+    func testLegacyIdsStayLikedButAreNotListable() {
+        let defaults = isolatedDefaults()
+        defaults.set(["legacy-uuid"], forKey: "liked_relisten_track_ids")
+        let liked = LikedTracks(defaults: defaults)
+        XCTAssertTrue(liked.ids.contains("legacy-uuid"))
+        XCTAssertTrue(liked.listableRecords.isEmpty)
+    }
+
+    func testUnlikingDropsRecord() {
+        let defaults = isolatedDefaults()
+        let liked = LikedTracks(defaults: defaults)
+        liked.toggle(rec)
+        liked.toggle(rec)
+        XCTAssertTrue(LikedTracks(defaults: defaults).ids.isEmpty)
+        XCTAssertTrue(LikedTracks(defaults: defaults).listableRecords.isEmpty)
+    }
+
+    func testListableRowsContainNoRawId() {
+        let liked = LikedTracks(defaults: isolatedDefaults())
+        liked.toggle(rec)
+        liked.toggle(LikedTrackRecord(trackId: "uuid-bare", backend: "relisten", showDate: "", title: "", durationMs: 0))
+        let items = LibrarySources.items(playlists: [], playlistTracks: [], likedTracks: liked.listableRecords)
+        XCTAssertEqual(["Tweezer"], items.map(\.name))
+        XCTAssertFalse(items.contains { "\($0.name)\($0.subtitle)\($0.artist)".contains("uuid") })
+    }
+}
+
 final class PhishInAPILikesRequestTests: XCTestCase {
     private var server: MockServer!
 
