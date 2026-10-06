@@ -20,6 +20,7 @@ BUNDLE_ID="dev.mike.couchtour.mac.beta"
 APP_NAME="Couch Tour Beta"
 
 RUN_JOURNEYS=()
+SYNC_STEP=""
 TAG=""
 OUT_FILE=""
 NO_INPUT="false"
@@ -37,6 +38,7 @@ Options:
   --no-input        Run read-only assertions only, skipping interactive actions
   --timeout <s>     Maximum seconds to wait for an identifier to appear (default: 20)
   --allow-focus     Allow activating Couch Tour Beta into the foreground
+  --sync-step <s>   Run one half of a cross-client sync round trip (see sync-roundtrip.sh) and exit
   -h, --help        Print this usage message
 EOF
 }
@@ -85,6 +87,11 @@ while [[ $# -gt 0 ]]; do
     --allow-focus)
       ALLOW_FOCUS="true"
       shift
+      ;;
+    --sync-step)
+      [[ -n "${2:-}" ]] || smoke::die 1 "--sync-step requires a step name"
+      SYNC_STEP="$2"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -1034,30 +1041,6 @@ mac_run_library_phishin_playlists() {
   fi
 }
 
-mac_run_favorite_syncs_mac_to_android() {
-  local id="favorite-syncs-mac-to-android"
-  smoke::require_journeys_file "$id"
-  smoke::log "Executing journey $id..."
-
-  smoke::result "mac" "$id" "SKIP" "cross-platform; covered by the Android runner and the report"
-}
-
-mac_run_favorite_syncs_android_to_mac() {
-  local id="favorite-syncs-android-to-mac"
-  smoke::require_journeys_file "$id"
-  smoke::log "Executing journey $id..."
-
-  smoke::result "mac" "$id" "SKIP" "cross-platform; covered by the Android runner and the report"
-}
-
-mac_run_in_progress_syncs_android_to_mac() {
-  local id="in-progress-syncs-android-to-mac"
-  smoke::require_journeys_file "$id"
-  smoke::log "Executing journey $id..."
-
-  smoke::result "mac" "$id" "SKIP" "cross-platform; covered by the Android runner and the report"
-}
-
 mac_run_nav_reaches_every_destination() {
   local id="nav-reaches-every-destination"
   smoke::require_journeys_file "$id"
@@ -1223,6 +1206,68 @@ mac_run_live_data_not_mockup() {
   fi
 }
 
+# Sync steps (--sync-step), driven by sync-roundtrip.sh. Each step is one half of a cross-client
+# round trip: an action on this client, or an assertion that the other client's change arrived.
+# Exit 0 satisfied, 3 assertion timed out, 4 needed control/fixture unavailable.
+
+mac::row_present() { [[ -n "$(mac::ax_query "$1" "$DEEP")" ]]; }
+mac::row_absent() { [[ -z "$(mac::ax_query "$1" "$DEEP")" ]]; }
+
+mac_unavailable() { smoke::log "sync step unavailable: $*"; exit "$SMOKE_STEP_UNAVAILABLE"; }
+
+# The only Mac favorite toggle is the star on the artist's row in the Artists list
+# (artists.favorite.<backend>.<id>); the artist screen and sidebar rows have none.
+mac_toggle_favorite() {
+  local art="$1"
+  mac::click "sidebar.nav.artists" || mac_unavailable "cannot click sidebar.nav.artists"
+  mac::wait_for_id "artists.list" "$TIMEOUT" "$DEEP" >/dev/null || mac_unavailable "artists.list not shown"
+  mac::click "artists.favorite.$art" "$DEEP" || mac_unavailable "cannot click artists.favorite.$art"
+}
+
+mac_clear_progress() {
+  local clear="${CCTV_SMOKE_MAC_PROGRESS_CLEAR_ID:-}"
+  [[ -n "$clear" ]] || mac_unavailable "CCTV_SMOKE_MAC_PROGRESS_CLEAR_ID (a control that clears In Progress) not set"
+  mac::click "sidebar.nav.home" >/dev/null 2>&1 || true
+  mac::click "$clear" "$DEEP" || mac_unavailable "cannot click $clear"
+}
+
+mac_sync_step() {
+  local step="$1" art="${CCTV_SMOKE_SYNC_ARTIST_MAC:-}"
+  # bash 3.2 (macOS) has no ;;& fall-through, so the shared favorite-step preamble lives here.
+  case "$step" in
+    favorite-*)
+      [[ -n "$art" ]] || mac_unavailable "CCTV_SMOKE_SYNC_ARTIST_MAC (<backend>.<id>) not set"
+      mac::click "sidebar.nav.home" >/dev/null 2>&1 || true ;;
+  esac
+  case "$step" in
+    favorite-add|favorite-remove) mac_toggle_favorite "$art" ;;
+    favorite-ensure-absent)
+      # Known starting state: drop a leftover favorite so favorite-add can't toggle it off.
+      if mac::row_present "sidebar.favorites.row.$art"; then mac_toggle_favorite "$art"; fi
+      smoke::poll "$TIMEOUT" mac::row_absent "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    favorite-present) smoke::poll "$TIMEOUT" mac::row_present "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    favorite-absent) smoke::poll "$TIMEOUT" mac::row_absent "sidebar.favorites.row.$art" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    progress-start)
+      local seed="${CCTV_SMOKE_MAC_PROGRESS_SEED_ID:-}"
+      [[ -n "$seed" ]] || mac_unavailable "CCTV_SMOKE_MAC_PROGRESS_SEED_ID (a track row to play) not set"
+      mac::click "$seed" "$DEEP" || mac_unavailable "cannot click $seed"
+      sleep 5 ;;
+    progress-clear) mac_clear_progress ;;
+    progress-ensure-absent)
+      mac::click "sidebar.nav.home" >/dev/null 2>&1 || true
+      if mac::row_present "home.in_progress.card"; then mac_clear_progress; fi
+      smoke::poll "$TIMEOUT" mac::row_absent "home.in_progress.card" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    progress-present)
+      mac::click "sidebar.nav.home" >/dev/null 2>&1 || true
+      smoke::poll "$TIMEOUT" mac::row_present "home.in_progress.card" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    progress-absent)
+      mac::click "sidebar.nav.home" >/dev/null 2>&1 || true
+      smoke::poll "$TIMEOUT" mac::row_absent "home.in_progress.card" || exit "$SMOKE_STEP_TIMEOUT" ;;
+    *) smoke::die 1 "Unknown --sync-step: $step" ;;
+  esac
+  exit 0
+}
+
 # -----------------------------------------------------------------------------
 # Main Runner Dispatch
 # -----------------------------------------------------------------------------
@@ -1236,13 +1281,14 @@ ALL_JOURNEYS=(
   next-stop-chip-focus
   jam-chart-note-details
   library-phishin-playlists
-  favorite-syncs-mac-to-android
-  favorite-syncs-android-to-mac
-  in-progress-syncs-android-to-mac
   nav-reaches-every-destination
   search-result-sections
   live-data-not-mockup
 )
+
+if [[ -n "$SYNC_STEP" ]]; then
+  mac_sync_step "$SYNC_STEP"
+fi
 
 if [[ ${#RUN_JOURNEYS[@]} -gt 0 ]]; then
   TARGET_JOURNEYS=("${RUN_JOURNEYS[@]}")

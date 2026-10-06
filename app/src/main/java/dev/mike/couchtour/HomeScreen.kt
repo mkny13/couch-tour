@@ -441,6 +441,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                     subtitle = artists?.getOrNull()?.let { "${it.size} ${plural(it.size, "artist")} on phish.in and Relisten" }
                         ?: "Explore artists on phish.in and Relisten",
                     artUrl = null,
+                    modifier = Modifier.testTag(A11yTags.HOME_BROWSE_ARTISTS),
                     onClick = { nav.navigate("artists") }
                 )
             }
