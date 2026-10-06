@@ -113,4 +113,17 @@ class FavoritesTest {
         assertEquals(tombstoneTime, rows.first().updatedAt)
         org.junit.Assert.assertNotNull(rows.first().deletedAt)
     }
+
+    @Test
+    fun `legacy migration stamp loses to a tombstone synced while the device was on the old build`() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = context.getSharedPreferences("favorites", android.content.Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("artist_keys", setOf(PHISH.key)).commit()
+
+        Favorites.init(context)
+        val migrated = Favorites.changedSince(0).single()
+        // A tombstone minted any time before the upgrade must beat the migrated favorite.
+        val tombstoneTime = System.currentTimeMillis() - 60_000L
+        assertTrue(migrated.updatedAt < tombstoneTime)
+    }
 }

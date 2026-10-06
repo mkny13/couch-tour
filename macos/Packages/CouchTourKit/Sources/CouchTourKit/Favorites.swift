@@ -87,7 +87,9 @@ public final class Favorites: ObservableObject {
         }
         let legacy = defaults.stringArray(forKey: storageKey) ?? []
         guard !legacy.isEmpty else { return ([], false) }
-        let now = Int64(Date().timeIntervalSince1970 * 1000)
-        return (legacy.map { FavoriteArtistSyncRow(artistKey: $0, updatedAt: now, deletedAt: nil) }, true)
+        // Epoch floor, not "now": a legacy favorite has no real edit time, and a current stamp would
+        // beat a tombstone synced from another device while this one was on the old build.
+        // 1 (not 0) so changedSince(0) still pushes it.
+        return (legacy.map { FavoriteArtistSyncRow(artistKey: $0, updatedAt: 1, deletedAt: nil) }, true)
     }
 }

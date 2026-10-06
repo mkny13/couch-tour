@@ -116,8 +116,10 @@ object Favorites {
 
         val legacyLive = prefs.getStringSet(KEY_ARTISTS, emptySet()).orEmpty()
         if (legacyLive.isEmpty()) return Pair(emptyList(), false)
-        val now = System.currentTimeMillis()
-        val migratedRows = legacyLive.map { FavoriteArtistSyncRow(artistKey = it, updatedAt = now, deletedAt = null) }
+        // Stamp at the epoch floor, not "now": a legacy favorite has no real edit time, and a
+        // current stamp would beat a tombstone another device synced while this one was still on
+        // the old build. 1 (not 0) so changedSince(0) still pushes it.
+        val migratedRows = legacyLive.map { FavoriteArtistSyncRow(artistKey = it, updatedAt = 1L, deletedAt = null) }
         return Pair(migratedRows, true)
     }
 }
