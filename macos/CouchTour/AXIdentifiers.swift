@@ -43,6 +43,7 @@ public enum AXIdentifiers {
 
     // Library (#520)
     public static let libraryRow = "library.row"
+    public static let libraryHistoryLink = "library.history_link"
 
     // Public playlists (#428)
     public static let publicPlaylistsList = "public_playlists.list"

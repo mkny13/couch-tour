@@ -666,7 +666,12 @@ private struct TrackTableRow: View {
         // Dots Menu
         Menu {
             Button("Play Track", action: onTap)
-            TrackLikeButton(backend: backend, trackID: track.id, likesCount: track.likesCount, likedByUser: track.likedByUser)
+            TrackLikeButton(backend: backend, trackID: track.id, likesCount: track.likesCount, likedByUser: track.likedByUser,
+                           record: LikedTrackRecord(
+                               trackId: track.id, backend: backend.rawValue, showDate: track.showDate ?? "",
+                               artistSlug: artistSlug, recordingId: recordingId, title: track.title,
+                               durationMs: track.durationMs, venueName: track.venueName, artUrl: track.artURL
+                           ))
             AddToPlaylistButton {
                 [LocalPlaylistTrack(
                     playlistId: "", backend: backend.rawValue, trackId: track.id,

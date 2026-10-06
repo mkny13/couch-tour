@@ -396,7 +396,13 @@ struct ExpandedNowPlayingView: View {
                             backend: show.artist.backend,
                             trackID: currentTrack.id,
                             likesCount: currentTrack.likesCount,
-                            likedByUser: currentTrack.likedByUser
+                            likedByUser: currentTrack.likedByUser,
+                            record: LikedTrackRecord(
+                                trackId: currentTrack.id, backend: Backend.relisten.rawValue,
+                                showDate: show.date, artistSlug: show.artist.id, recordingId: nil,
+                                title: currentTrack.title, durationMs: currentTrack.durationMs,
+                                venueName: show.where_, artUrl: currentTrack.artURL
+                            )
                         )
                         .frame(width: 64, height: 64)
                     } else {
