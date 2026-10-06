@@ -106,11 +106,3 @@ CREATE TABLE IF NOT EXISTS seqs (
     next INTEGER NOT NULL,
     retentionFloorSeq INTEGER NOT NULL DEFAULT 0
 );
-
--- Devices known to decode favoriteArtistChanges. Favorites share the progress seq counter, so a
--- pre-favorites client moves its cursor past favorite rows it ignored; the first sync from a
--- device not listed here replays favorites from seq 0 (see handleSync).
-CREATE TABLE IF NOT EXISTS favorite_aware_devices (
-    deviceId TEXT PRIMARY KEY REFERENCES devices(id),
-    createdAt INTEGER NOT NULL
-);
