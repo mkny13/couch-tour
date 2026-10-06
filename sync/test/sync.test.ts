@@ -165,9 +165,27 @@ describe("staggered upgrade", () => {
     };
     expect(upgradedBody.favoriteArtistChanges.map((f) => f.artistKey)).toEqual(["phish"]);
 
-    // Once replayed, it isn't resent on every sync.
+    // Replay is unconditional, so a later sync resends it (idempotent on the client).
     const again = await sync(tokenB, upgradedBody.seq, []);
-    expect(((await again.json()) as { favoriteArtistChanges: unknown[] }).favoriteArtistChanges).toEqual([]);
+    const againBody = (await again.json()) as { favoriteArtistChanges: { artistKey: string }[] };
+    expect(againBody.favoriteArtistChanges.map((f) => f.artistKey)).toEqual(["phish"]);
+  });
+
+  test("a dropped first favorites-aware response is replayed on retry", async () => {
+    const { tokenA, tokenB } = await pairTwoDevices();
+    await sync(tokenA, 0, [], [favoriteChange({ artistKey: "phish", updatedAt: 1000 })]);
+    await sync(tokenA, 0, [change()]);
+
+    const legacy = await legacySync(tokenB, 0);
+    const { seq } = (await legacy.json()) as { seq: number };
+
+    // First favorites-aware request: response is discarded (network drop).
+    await sync(tokenB, seq, []);
+
+    // Identical retry with the same cursor must still carry the favorite.
+    const retry = await sync(tokenB, seq, []);
+    const retryBody = (await retry.json()) as { favoriteArtistChanges: { artistKey: string }[] };
+    expect(retryBody.favoriteArtistChanges.map((f) => f.artistKey)).toEqual(["phish"]);
   });
 });
 

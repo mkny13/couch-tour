@@ -189,7 +189,7 @@ And a deterministic macOS app-target XCUITest suite (4 tests):
 cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -destination 'platform=macOS' test -only-testing:CouchTourUITests
 ```
 
-26 sync backend tests, run against real Miniflare D1 rather than a mock:
+29 sync backend tests, run against real Miniflare D1 rather than a mock:
 
 ```bash
 cd sync && npm test

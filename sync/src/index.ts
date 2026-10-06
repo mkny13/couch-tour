@@ -481,20 +481,16 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     .bind(device.groupId, since)
     .all<ProgressRow>();
   // The seq counter is shared with progress, so a client that predates favorites advances its
-  // cursor past favorite rows it cannot decode. Never send those clients favorites, and when a
-  // device first shows it understands them, replay favorites from 0 instead of from its
-  // cursor — otherwise a favorite written while it was still on the old build is lost for good.
+  // cursor past favorite rows it cannot decode. Never send those clients favorites. Favorites-aware
+  // requests always replay from 0 rather than from the cursor: a favorite written while the device
+  // was on the old build would otherwise be lost, and so would one whose first replay response was
+  // dropped. Clients merge by timestamp/tombstone, so repeats are idempotent and the set is small.
   let favoriteResults: FavoriteArtistRow[] = [];
-  let firstFavoriteSync = false;
   if (favoritesAware) {
-    const known = await env.DB.prepare("SELECT 1 AS ok FROM favorite_aware_devices WHERE deviceId = ?")
-      .bind(device.id)
-      .first<{ ok: number }>();
-    firstFavoriteSync = !known;
     const favoriteRows = await env.DB.prepare(
-      "SELECT * FROM favorite_artists WHERE groupId = ? AND seq > ? ORDER BY seq ASC"
+      "SELECT * FROM favorite_artists WHERE groupId = ? ORDER BY seq ASC"
     )
-      .bind(device.groupId, firstFavoriteSync ? 0 : since)
+      .bind(device.groupId)
       .all<FavoriteArtistRow>();
     favoriteResults = favoriteRows.results ?? [];
   }
@@ -517,13 +513,6 @@ async function handleSync(request: Request, env: Env): Promise<Response> {
     progressResults.length > 0 ? progressResults[progressResults.length - 1].seq : since;
   const lastFavoriteSeq =
     favoriteResults.length > 0 ? favoriteResults[favoriteResults.length - 1].seq : since;
-  if (firstFavoriteSync) {
-    await env.DB.prepare(
-      "INSERT OR IGNORE INTO favorite_aware_devices (deviceId, createdAt) VALUES (?, ?)"
-    )
-      .bind(device.id, now)
-      .run();
-  }
   const lastRowSeq = Math.max(lastProgressSeq, lastFavoriteSeq);
   const currentSeq = Math.max(lastRowSeq, cursor.retentionFloorSeq);
   console.log(
