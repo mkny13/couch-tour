@@ -7,7 +7,7 @@ import schemaSql from "../schema.sql?raw";
 
 // Tables in child-before-parent order, so DROP TABLE never trips a foreign key still
 // pointing at a not-yet-dropped table.
-const TABLES = ["favorite_artists", "progress", "pairings", "devices", "seqs", "groups"];
+const TABLES = ["favorite_aware_devices", "favorite_artists", "progress", "pairings", "devices", "seqs", "groups"];
 
 /**
  * `D1Database.exec()` treats each newline as a separate statement rather than parsing
@@ -134,6 +134,42 @@ async function sync(
     })
   );
 }
+
+async function legacySync(token: string, since: number) {
+  // Pre-favorites clients never send favoriteArtistChanges.
+  return call(
+    req("/sync", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` },
+      body: JSON.stringify({ since, changes: [] }),
+    })
+  );
+}
+
+describe("staggered upgrade", () => {
+  test("a favorite synced while a device is on an old client still reaches it after it upgrades", async () => {
+    const { tokenA, tokenB } = await pairTwoDevices();
+    await sync(tokenA, 0, [], [favoriteChange({ artistKey: "phish", updatedAt: 1000 })]);
+    await sync(tokenA, 0, [change()]);
+
+    // B is still on the old build: no favorites are sent, and its cursor moves past the favorite.
+    const legacy = await legacySync(tokenB, 0);
+    const legacyBody = (await legacy.json()) as { seq: number; favoriteArtistChanges: unknown[] };
+    expect(legacyBody.favoriteArtistChanges).toEqual([]);
+
+    // B upgrades and syncs from its saved cursor; the favorite must still arrive.
+    const upgraded = await sync(tokenB, legacyBody.seq, []);
+    const upgradedBody = (await upgraded.json()) as {
+      seq: number;
+      favoriteArtistChanges: { artistKey: string }[];
+    };
+    expect(upgradedBody.favoriteArtistChanges.map((f) => f.artistKey)).toEqual(["phish"]);
+
+    // Once replayed, it isn't resent on every sync.
+    const again = await sync(tokenB, upgradedBody.seq, []);
+    expect(((await again.json()) as { favoriteArtistChanges: unknown[] }).favoriteArtistChanges).toEqual([]);
+  });
+});
 
 describe("happy paths", () => {
   test("health check", async () => {
