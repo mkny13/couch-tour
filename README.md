@@ -25,7 +25,7 @@ hosted on archive.org.
   listening"; opening one again restarts it from the top
 - A History screen lists everything you've played — in progress, completed, or removed by
   hand — with the completed ones marked
-- A Library screen lists your saved items across both backends — saved shows, local playlists, and Relisten liked tracks, plus live phish.in playlists, shows, and tracks when signed in
+- A Library screen lists your saved items across both backends — saved shows, local playlists, and Relisten liked tracks, plus live phish.in playlists, shows, and tracks when signed in (macOS too: fetched live, never mirrored, nothing requested when signed out)
 - On a "Continue listening" card: tap to open it, tap the play button to resume, long-press
   for open / mark completed / remove
 - "Shuffle all" on My tracks plays your liked tracks in random order
@@ -177,7 +177,7 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML report lands in
 `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-561 macOS package tests under `macos/Packages/CouchTourKit`:
+567 macOS package tests under `macos/Packages/CouchTourKit`:
 
 ```bash
 cd macos/Packages/CouchTourKit && swift test

@@ -11,11 +11,13 @@ struct LocalPlaylistsView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
     @EnvironmentObject private var likedTracks: LikedTracks
+    @EnvironmentObject private var session: PhishInSession
     @Environment(\.ledgerColors) private var colors
 
     @State private var playlists: [LocalPlaylist] = []
     @State private var hasPlaybackHistory = false
     @State private var playError: String?
+    @State private var account = LibraryAccountData.empty
     @State private var playlistTracks: [LocalPlaylistTrack] = []
     @State private var query = ""
     @State private var selectedCategory: LibraryCategory = .all
@@ -77,6 +79,13 @@ struct LocalPlaylistsView: View {
             }
         }
         .task { load() }
+        // Re-fetch live on entry and whenever the shared session signs in/out; signed out
+        // clears account rows without a request.
+        .task(id: session.username) {
+            account = .empty
+            let loaded = await LibraryAccountData.load(signedIn: session.username != nil)
+            if !Task.isCancelled { account = loaded }
+        }
         .onChange(of: showNewPlaylistField) { _, isShowing in if !isShowing { load() } }
     }
 
@@ -293,6 +302,10 @@ struct LocalPlaylistsView: View {
                 .foregroundStyle(colors.accentTintText)
                 .accessibilityIdentifier(AXIdentifiers.libraryHistoryLink)
             }
+            if account.failed {
+                Text("Couldn't load your phish.in account content. Local items are shown.")
+                    .font(.system(size: 12)).foregroundStyle(colors.textMuted)
+            }
             if let playError {
                 Text(playError).font(.system(size: 12)).foregroundStyle(colors.textMuted)
             }
@@ -418,6 +431,12 @@ struct LocalPlaylistsView: View {
     private func handleItemClick(_ item: LibrarySourceItem) {
         if let pl = item.playlist {
             appModel.path.append(.localPlaylist(pl))
+        } else if let pl = item.accountPlaylist {
+            appModel.path.append(.publicPlaylist(pl))
+        } else if let show = item.accountShow {
+            appModel.path.append(.show(show))
+        } else if let track = item.accountTrack {
+            play(accountTrack: track)
         } else if let record = item.likedTrack {
             Task { await play(record) }
         }
@@ -437,8 +456,23 @@ struct LocalPlaylistsView: View {
         player.play(detail: detail, startIndex: 0)
     }
 
+    /// An account-liked phish.in track already carries its mp3 URL, so it plays as a one-track
+    /// queue without a further fetch.
+    private func play(accountTrack track: Track) {
+        guard track.playable else {
+            playError = "\"\(track.title)\" has no audio right now."
+            return
+        }
+        let summary = ShowSummary(artist: PHISH, date: track.showDate ?? "", venue: track.venueName)
+        let detail = ShowDetail(
+            summary: summary, tracks: [track.toPlayableTrack(showArt: track.showAlbumCoverUrl)],
+            queueKey: "liked:phishin-\(track.id)")
+        player.play(detail: detail, startIndex: 0)
+    }
+
     private func lengthText(for item: LibrarySourceItem) -> String {
-        item.likedTrack.map { formatCompactDuration(ms: $0.durationMs) } ?? ""
+        if let t = item.accountTrack { return formatCompactDuration(ms: t.duration) }
+        return item.likedTrack.map { formatCompactDuration(ms: $0.durationMs) } ?? ""
     }
 
     // MARK: - Data Loading & Aggregation
@@ -447,7 +481,8 @@ struct LocalPlaylistsView: View {
     /// Playback history lives in `ListeningView` and is deliberately not read here (#539).
     private var items: [LibrarySourceItem] {
         LibrarySources.items(
-            playlists: playlists, playlistTracks: playlistTracks, likedTracks: likedTracks.listableRecords
+            playlists: playlists, playlistTracks: playlistTracks, likedTracks: likedTracks.listableRecords,
+            account: account
         )
     }
 
