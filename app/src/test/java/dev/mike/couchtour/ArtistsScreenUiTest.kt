@@ -3,6 +3,7 @@ package dev.mike.couchtour
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -105,6 +106,17 @@ class ArtistsScreenUiTest {
             listOf("Phish", "FAVORITES", "Aqueous", "ARTISTS", "Billy Strings", "Grateful Dead"),
             ui.compose.onScreenOrder(artists + sections),
         )
+    }
+
+    @Test
+    fun `each star carries a per-artist tag the smoke runner taps`() {
+        render()
+        ui.compose.onNodeWithTag(A11yTags.ARTISTS_LIST).assertExists()
+        ui.compose.onNodeWithTag(A11yTags.artistFavorite(PHISH.key)).performClick()
+        assertEquals(setOf(PHISH.key), Favorites.keys.value)
+        // Tapping it again (now in the pinned row, same tag) is how the runner unfavorites.
+        ui.compose.onNodeWithTag(A11yTags.artistFavorite(PHISH.key)).performClick()
+        assertEquals(emptySet<String>(), Favorites.keys.value)
     }
 
     @Test
