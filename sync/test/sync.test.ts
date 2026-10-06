@@ -7,7 +7,7 @@ import schemaSql from "../schema.sql?raw";
 
 // Tables in child-before-parent order, so DROP TABLE never trips a foreign key still
 // pointing at a not-yet-dropped table.
-const TABLES = ["favorite_aware_devices", "favorite_artists", "progress", "pairings", "devices", "seqs", "groups"];
+const TABLES = ["favorite_artists", "progress", "pairings", "devices", "seqs", "groups"];
 
 /**
  * `D1Database.exec()` treats each newline as a separate statement rather than parsing
