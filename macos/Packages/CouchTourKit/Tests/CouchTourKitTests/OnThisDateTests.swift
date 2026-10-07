@@ -56,6 +56,22 @@ final class OnThisDateTests: XCTestCase {
         XCTAssertEqual(500, batched[2].showCount)
     }
 
+    func testPhishInRangesDefaultCapKeepsBatchesUnder300AndCoversEveryYear() {
+        let periods = (1990...1999).map { PeriodRef(id: "\($0)", label: "\($0)", showCount: 90) }
+
+        let batched = phishInRanges(periods: periods)
+        XCTAssertEqual(300, phishInRangeCap)
+        XCTAssertTrue(batched.allSatisfy { $0.showCount <= 300 })
+        XCTAssertGreaterThan(batched.count, phishInRanges(periods: periods, cap: 900).count)
+
+        var covered: [Int] = []
+        for b in batched {
+            let parts = b.id.split(separator: "-").compactMap { Int($0) }
+            covered += Array(parts[0]...parts[1])
+        }
+        XCTAssertEqual(Array(1990...1999), covered)
+    }
+
     func testPickAnniversaryShowsSortsNewestFirstAndCapsCount() {
         let matches = (1980...2000).map { year in
             ShowSummary(artist: PHISH, date: "\(year)-05-08")
