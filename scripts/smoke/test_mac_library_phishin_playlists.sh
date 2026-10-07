@@ -20,11 +20,24 @@ smoke::log() { :; }
 smoke::result() { RESULT="$3|$4"; }
 mac_screenshot() { :; }
 mac::click() { return 0; }
-mac::ax_query() { echo "sidebar.favorites.row.stub"; }
-# Prefix match over the stubbed ids, like the real mac::wait_for_id.
-mac::wait_for_id() {
+mac::ax_query() {
+  local target_id="$1"
   local id
-  for id in $IDS; do [[ "$id" == "$1"* ]] && { echo "$id"; return 0; }; done
+  for id in $IDS; do
+    if [[ "$id" == "$target_id" ]] || [[ "$id" == "$target_id."* ]]; then
+      echo "$id"
+    fi
+  done
+}
+mac::wait_for_id() {
+  local target_id="$1"
+  local id
+  for id in $IDS; do
+    if [[ "$id" == "$target_id" ]] || [[ "$id" == "$target_id."* ]]; then
+      echo "$id"
+      return 0
+    fi
+  done
   return 1
 }
 TIMEOUT=1 DEEP=1 NO_INPUT=false
@@ -36,9 +49,9 @@ run() { # <name> <want status> <ids>
   if [[ "${RESULT%%|*}" == "$2" ]]; then ok "$1: $2"; else bad "$1: want $2, got $RESULT"; fi
 }
 
-run "no rows" SKIP "library.screen"
-run "local-only rows" SKIP "library.screen library.row.playlist-abc library.row.track-1 library.row.liked-9"
-run "account playlist row" PASS "library.screen library.row.playlist-abc library.row.account-playlist-my-list"
+run "no rows" SKIP "sidebar.favorites.row.stub library.screen"
+run "local-only rows" SKIP "sidebar.favorites.row.stub library.screen library.row.playlist-abc library.row.track-1 library.row.liked-9"
+run "account playlist row" PASS "sidebar.favorites.row.stub library.screen library.row.playlist-abc library.row.account-playlist-my-list"
 
 (( failures == 0 )) || { echo "$failures failure(s)"; exit 1; }
 echo "all passed"
