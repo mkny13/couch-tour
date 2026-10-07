@@ -477,7 +477,7 @@ struct LocalPlaylistsView: View {
         let summary = ShowSummary(artist: PHISH, date: track.showDate ?? "", venue: track.venueName)
         let detail = ShowDetail(
             summary: summary, tracks: [track.toPlayableTrack(showArt: track.showAlbumCoverUrl)],
-            queueKey: likedTrackQueueKey("phishin-\(track.id)"))
+            queueKey: phishinLikedTrackQueueKey(track.id))
         player.play(detail: detail, startIndex: 0)
     }
 

@@ -157,25 +157,35 @@ final class QueueKeyTests: XCTestCase {
         XCTAssertNil(parseQueueKey("notyoutube:x"))
     }
 
-    // ------------------------------------------------------------- liked tracks (#539, #544)
+    // ------------------------------------------------------------- liked tracks (#539, #542, #544)
 
     func testBuildsALikedTrackKey() {
         XCTAssertEqual("liked:track-123", likedTrackQueueKey("track-123"))
+        XCTAssertEqual("liked:phishin-456", phishinLikedTrackQueueKey(456))
+        XCTAssertEqual("liked:phishin-456", phishinLikedTrackQueueKey(Int64(456)))
     }
 
     func testRoundTripsALikedTrackKey() {
-        let ref = parseQueueKey(likedTrackQueueKey("track-123"))
-        XCTAssertEqual(QueueRef(kind: .likedTrack, id: "track-123"), ref)
-        XCTAssertEqual("liked:track-123", ref!.key)
+        let relistenRef = parseQueueKey(likedTrackQueueKey("track-123"))
+        XCTAssertEqual(QueueRef(kind: .likedTrack, id: "track-123"), relistenRef)
+        XCTAssertEqual("liked:track-123", relistenRef!.key)
+
+        let phishinRef = parseQueueKey(phishinLikedTrackQueueKey(456))
+        XCTAssertEqual(QueueRef(kind: .likedTrack, id: "phishin-456"), phishinRef)
+        XCTAssertEqual("liked:phishin-456", phishinRef!.key)
     }
 
-    func testRejectsAnEmptyLikedTrackKey() {
+    func testRejectsAnEmptyOrMalformedLikedTrackKey() {
         XCTAssertNil(parseQueueKey("liked:"))
+        XCTAssertNil(parseQueueKey("liked:phishin-"))
+        XCTAssertNil(parseQueueKey("liked:phishin-abc"))
+        XCTAssertNil(parseQueueKey("liked:phishin-123a"))
     }
 
     func testLikedTrackKeysDoNotCollideWithOtherPrefixes() {
         XCTAssertEqual(QueueKind.show, parseQueueKey("show:1997-02-13")!.kind)
         XCTAssertEqual(QueueKind.likedTrack, parseQueueKey("liked:track-123")!.kind)
+        XCTAssertEqual(QueueKind.likedTrack, parseQueueKey("liked:phishin-456")!.kind)
         XCTAssertEqual(QueueKind.playlist, parseQueueKey("playlist:liked:x")!.kind)
         XCTAssertNil(parseQueueKey("liked:"))
         XCTAssertNil(parseQueueKey("notliked:x"))

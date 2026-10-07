@@ -15,8 +15,8 @@ public enum QueueKind: Equatable {
     /// recognize the prefix skips the row (returns nil) rather than mis-playing it, which
     /// is what makes this safe for the eventual shared `progress` table.
     case youtube
-    /// A single locally liked track played from the Library (#539, #544). The id is the
-    /// backend-specific trackId (e.g. Relisten track UUID).
+    /// A single liked track played from the Library (#539, #542, #544). The id is either
+    /// a Relisten track UUID or a phish.in track ID prefixed with "phishin-".
     case likedTrack
 }
 
@@ -85,6 +85,14 @@ public func youtubeQueueKey(_ videoId: String) -> String { youtubePrefix + video
 
 public func likedTrackQueueKey(_ trackId: String) -> String { likedTrackPrefix + trackId }
 
+public func phishinLikedTrackQueueKey(_ trackId: Int64) -> String {
+    likedTrackQueueKey("\(phishinLikedTrackPrefix)\(trackId)")
+}
+
+public func phishinLikedTrackQueueKey(_ trackId: Int) -> String {
+    phishinLikedTrackQueueKey(Int64(trackId))
+}
+
 /// Splits a stored key back into its parts. Returns nil for anything unrecognised rather than
 /// guessing — an unknown key should be skipped, not played as the wrong thing.
 public func parseQueueKey(_ raw: String) -> QueueRef? {
@@ -109,7 +117,12 @@ public func parseQueueKey(_ raw: String) -> QueueRef? {
     }
     if raw.hasPrefix(likedTrackPrefix) {
         let rest = String(raw.dropFirst(likedTrackPrefix.count))
-        return rest.isEmpty ? nil : QueueRef(kind: .likedTrack, id: rest)
+        guard !rest.isEmpty else { return nil }
+        if rest.hasPrefix(phishinLikedTrackPrefix) {
+            let idPart = String(rest.dropFirst(phishinLikedTrackPrefix.count))
+            guard !idPart.isEmpty, Int64(idPart) != nil else { return nil }
+        }
+        return QueueRef(kind: .likedTrack, id: rest)
     }
     // Validated on the way in, unlike the other two: a recording id that isn't all three
     // parts is unusable, and failing here beats failing at fetch time. Note that
@@ -139,3 +152,4 @@ private let recordingPrefix = "relisten:"
 private let localPlaylistPrefix = "local-playlist:"
 private let youtubePrefix = "youtube:"
 private let likedTrackPrefix = "liked:"
+public let phishinLikedTrackPrefix = "phishin-"

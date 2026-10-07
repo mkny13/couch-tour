@@ -6,8 +6,15 @@ import Foundation
 /// from the network rather than trusting anything stale in the row beyond display fields.
 /// A `.playlist` key is a public phish.in playlist (#428), re-fetched by slug; local playlists
 /// (#59) are handled below.
-enum ResumeError: Error {
+enum ResumeError: LocalizedError {
     case unresumable
+
+    var errorDescription: String? {
+        switch self {
+        case .unresumable:
+            return "This item can no longer be resumed."
+        }
+    }
 }
 
 @MainActor
@@ -45,17 +52,40 @@ func resolveShowDetail(
         return try await localPlaylistShowDetail(playlist, store: localPlaylistStore)
 
     case .likedTrack:
-        guard let likedTracks, let record = likedTracks.records[ref.id] else {
-            throw ResumeError.unresumable
+        if ref.id.hasPrefix(phishinLikedTrackPrefix) {
+            let idString = String(ref.id.dropFirst(phishinLikedTrackPrefix.count))
+            guard let trackId = Int64(idString) else {
+                throw ResumeError.unresumable
+            }
+            let tracks: [Track]
+            do {
+                tracks = try await PhishInAPI.likedTracks()
+            } catch {
+                throw ResumeError.unresumable
+            }
+            guard let track = tracks.first(where: { $0.id == trackId }), track.playable else {
+                throw ResumeError.unresumable
+            }
+            let showDate = track.showDate ?? progress.title
+            let summary = ShowSummary(artist: PHISH, date: showDate, venue: track.venueName)
+            return ShowDetail(
+                summary: summary,
+                tracks: [track.toPlayableTrack(showArt: track.showAlbumCoverUrl)],
+                queueKey: phishinLikedTrackQueueKey(trackId)
+            )
+        } else {
+            guard let likedTracks, let record = likedTracks.records[ref.id] else {
+                throw ResumeError.unresumable
+            }
+            let tracks = await resolveLocalPlaylistTracks([record.asPlaylistTrack])
+            guard !tracks.isEmpty else {
+                throw ResumeError.unresumable
+            }
+            let backend = Backend(rawValue: record.backend) ?? .relisten
+            let artist = ArtistRef(backend: backend, id: record.artistSlug ?? "", name: record.artistSlug ?? "Relisten")
+            let summary = ShowSummary(artist: artist, date: record.showDate)
+            return ShowDetail(summary: summary, tracks: tracks, queueKey: likedTrackQueueKey(record.trackId))
         }
-        let tracks = await resolveLocalPlaylistTracks([record.asPlaylistTrack])
-        guard !tracks.isEmpty else {
-            throw ResumeError.unresumable
-        }
-        let backend = Backend(rawValue: record.backend) ?? .relisten
-        let artist = ArtistRef(backend: backend, id: record.artistSlug ?? "", name: record.artistSlug ?? "Relisten")
-        let summary = ShowSummary(artist: artist, date: record.showDate)
-        return ShowDetail(summary: summary, tracks: tracks, queueKey: likedTrackQueueKey(record.trackId))
     }
 }
 
