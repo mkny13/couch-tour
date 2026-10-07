@@ -88,9 +88,18 @@ final class CouchTourUITests: XCTestCase {
         app.launch()
 
         let statusText = app.staticTexts["uih.resume_status"]
-        XCTAssertTrue(statusText.waitForExistence(timeout: 10))
         let expectedCode = URLError(.notConnectedToInternet).errorCode
         let expectedText = "URLError:\(expectedCode)"
+        // The element renders "pending" before the harness `.task` finishes, so existence
+        // alone isn't completion; wait for the injected result itself.
+        let resolved = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                ((statusText.value as? String) ?? statusText.label) == expectedText
+            },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [resolved], timeout: 10), .completed,
+                       "status was: \((statusText.value as? String) ?? statusText.label)")
         let actual = (statusText.value as? String) ?? statusText.label
         XCTAssertEqual(actual, expectedText)
 
