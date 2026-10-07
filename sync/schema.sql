@@ -78,6 +78,8 @@ CREATE INDEX IF NOT EXISTS progress_deletedAt_seq ON progress(deletedAt, groupId
 -- Synced favorite artists. Same tombstone and seq semantics as progress: a removed favorite
 -- must replicate across devices, and every accepted write gets a group-wide seq so clients
 -- can page by one cursor.
+-- (#570: prod never got this table because the deploy's change check skipped migrations; this
+-- comment edit makes the fixed check run the idempotent migration once.)
 CREATE TABLE IF NOT EXISTS favorite_artists (
     groupId TEXT NOT NULL REFERENCES groups(id),
     artistKey TEXT NOT NULL,

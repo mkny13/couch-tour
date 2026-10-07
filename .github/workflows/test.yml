@@ -48,6 +48,9 @@ jobs:
       - name: Source guard — syncBaseUrl intent extra must be debug-gated
         run: scripts/test_sync_base_url_intent_guard.sh
 
+      - name: Sync deploy schema-change detection (headless)
+        run: scripts/test_sync_schema_changed.sh
+
       - name: Smoke sync round-trip orchestration (headless)
         run: |
           bash scripts/smoke/test_sync_roundtrip.sh
