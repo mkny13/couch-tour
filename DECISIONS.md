@@ -580,3 +580,7 @@ macOS `OnThisDate.swift` carried the same `phishInRangeCap = 900` batching as An
 ### D336: Require the `test` check on `main`; run it on every PR (#561)
 
 `main` had no branch protection, so nothing mechanically required the PR test check (Mahler practices audit, mahler#780). `test.yml` had a `paths:` filter, which would make a required check hang forever on docs-only and macos-only PRs, so the filter is removed and the Android suite now runs on every PR (cost: ~1-2 min of CI on PRs that can't affect it). `scripts/apply-branch-protection.sh` requires status context `test` with strict=false, no required reviews, no admin enforcement, and ensures squash merge is on; strict=false and no reviews keep it compatible with the conductor merging on green (D18). It is applied by hand once, after the PR merges, so the setting can't gate its own PR.
+
+### D337: Sign macOS builds with a stable self-signed certificate (#568)
+
+CI and `install.sh` signed ad-hoc, so each build's designated requirement was a new cdhash and Keychain "Always Allow" on the phish.in login and sync-token items was lost on every update (two prompts per beta/prod update). Releases now import a self-signed code-signing cert from secrets and build with it; `install.sh` uses a `Couch Tour Signing` cert when present. The release workflow fails if secrets are missing or the result is still cdhash-pinned, rather than silently falling back. A paid Developer ID would also fix Gatekeeper but isn't needed for this. Setup: `macos/SIGNING.md`.
