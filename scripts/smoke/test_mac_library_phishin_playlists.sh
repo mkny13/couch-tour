@@ -31,17 +31,35 @@ mac::ax_query() {
 }
 mac::wait_for_id() {
   local target_id="$1"
-  local id
-  for id in $IDS; do
-    if [[ "$id" == "$target_id" ]] || [[ "$id" == "$target_id."* ]]; then
-      echo "$id"
-      return 0
-    fi
-  done
+  local matches
+  matches="$(mac::ax_query "$target_id")"
+  if [[ -n "$matches" ]]; then
+    echo "$matches"
+    return 0
+  fi
   return 1
 }
 TIMEOUT=1 DEEP=1 NO_INPUT=false
 eval "$fn"
+
+# Bounded assertion: mac::wait_for_id delegates to mac::ax_query, so they must agree
+# for both a hyphen-terminated prefix (which mac::ax_query rejects because no dot
+# follows the hyphen) and the concrete account-playlist identifier (exact match).
+IDS="library.row.account-playlist-my-list"
+pref_q="$(mac::ax_query "library.row.account-playlist-")"
+pref_w="$(mac::wait_for_id "library.row.account-playlist-")"
+if [[ -z "$pref_q" && -z "$pref_w" ]]; then
+  ok "agreement: hyphen-terminated prefix rejected by both ax_query and wait_for_id"
+else
+  bad "agreement: hyphen-terminated prefix mismatch (ax_query='$pref_q', wait_for_id='$pref_w')"
+fi
+id_q="$(mac::ax_query "library.row.account-playlist-my-list")"
+id_w="$(mac::wait_for_id "library.row.account-playlist-my-list")"
+if [[ "$id_q" == "$id_w" && "$id_w" == "library.row.account-playlist-my-list" ]]; then
+  ok "agreement: concrete identifier matched by both ax_query and wait_for_id"
+else
+  bad "agreement: concrete identifier mismatch (ax_query='$id_q', wait_for_id='$id_w')"
+fi
 
 run() { # <name> <want status> <ids>
   IDS="$3" RESULT=""
