@@ -1034,10 +1034,12 @@ mac_run_library_phishin_playlists() {
     return 0
   fi
 
-  if mac::wait_for_id "library.row" "$TIMEOUT" "$DEEP" >/dev/null; then
-    smoke::result "mac" "$id" "PASS" "library.screen lists playlist rows (library.row.*)"
+  # Local playlist/track/liked rows share the library.row.* prefix, so only the account-playlist
+  # prefix proves the phish.in account content path works (#547).
+  if mac::wait_for_id "library.row.account-playlist-" "$TIMEOUT" "$DEEP" >/dev/null; then
+    smoke::result "mac" "$id" "PASS" "library.screen lists a phish.in account playlist row (library.row.account-playlist-*)"
   else
-    smoke::result "mac" "$id" "SKIP" "fixture unavailable: signed-in account has no library.row items"
+    smoke::result "mac" "$id" "SKIP" "fixture unavailable: signed-in account has no library.row.account-playlist-* item (local-only rows do not count)"
   fi
 }
 

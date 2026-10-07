@@ -61,4 +61,5 @@ jobs:
       - name: Smoke sync round-trip orchestration (headless)
         run: |
           bash scripts/smoke/test_sync_roundtrip.sh
+          bash scripts/smoke/test_mac_library_phishin_playlists.sh
           bash scripts/smoke/check-journeys.sh
