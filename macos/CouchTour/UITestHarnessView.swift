@@ -53,6 +53,18 @@ struct UITestHarnessView: View {
     }
 
     var body: some View {
+        // Its own screen: stacked under the show list it squeezed that list to zero height.
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_SCREEN"] == "library" {
+            // A liked track whose resolution returns no tracks (#545).
+            LocalPlaylistsView(resolveTracks: { _ in [] })
+                .environmentObject(harnessLikes)
+                .accessibilityIdentifier("uih.library")
+        } else {
+            showsHarness
+        }
+    }
+
+    private var showsHarness: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 Text("UI Test Harness")
@@ -135,14 +147,6 @@ struct UITestHarnessView: View {
                         .accessibilityIdentifier("uih.artwork.small")
                     }
                 }
-
-                Divider()
-
-                // Library with one liked track whose resolution returns no tracks (#545).
-                LocalPlaylistsView(resolveTracks: { _ in [] })
-                    .environmentObject(harnessLikes)
-                    .frame(height: 320)
-                    .accessibilityIdentifier("uih.library")
             }
             .padding(20)
         }
