@@ -64,4 +64,21 @@ final class CouchTourUITests: XCTestCase {
         // The label comes from ArtworkView itself (artist + badge); the harness adds no override.
         XCTAssertTrue(large.label.contains("1980-01-02"), "label was: \(large.label)")
     }
+
+    func testLikedTrackPlayFailureShowsErrorAlongsideRow() {
+        app.terminate()
+        app.launchEnvironment["COUCHTOUR_UI_TEST_SCREEN"] = "library"
+        app.launch()
+
+        let row = app.buttons["library.row.liked-uih-liked-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.click()
+
+        let error = app.staticTexts["library.play_error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        // A SwiftUI Text surfaces its string as the element's value, not its label.
+        let message = error.value as? String ?? ""
+        XCTAssertTrue(message.contains("Harness Liked Track"), "value was: \(message)")
+        XCTAssertTrue(row.exists)
+    }
 }

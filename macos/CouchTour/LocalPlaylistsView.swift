@@ -14,6 +14,9 @@ struct LocalPlaylistsView: View {
     @EnvironmentObject private var session: PhishInSession
     @Environment(\.ledgerColors) private var colors
 
+    /// Injectable so the UI-test harness can force a resolution failure without the network.
+    var resolveTracks: ([LocalPlaylistTrack]) async -> [PlayableTrack] = resolveLocalPlaylistTracks
+
     @State private var playlists: [LocalPlaylist] = []
     @State private var hasPlaybackHistory = false
     @State private var playError: String?
@@ -278,6 +281,15 @@ struct LocalPlaylistsView: View {
         let filtered = filteredItems
 
         return VStack(spacing: 0) {
+            // Outside emptyState so a failed play stays visible while library rows remain.
+            if let playError {
+                Text(playError)
+                    .font(.system(size: 12))
+                    .foregroundStyle(colors.textMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .accessibilityIdentifier(AXIdentifiers.libraryPlayError)
+            }
             ForEach(filtered) { item in
                 tableRow(item)
             }
@@ -305,9 +317,6 @@ struct LocalPlaylistsView: View {
             if account.failed {
                 Text("Couldn't load your phish.in account content. Local items are shown.")
                     .font(.system(size: 12)).foregroundStyle(colors.textMuted)
-            }
-            if let playError {
-                Text(playError).font(.system(size: 12)).foregroundStyle(colors.textMuted)
             }
         }
         .frame(maxWidth: .infinity)
@@ -445,11 +454,12 @@ struct LocalPlaylistsView: View {
     /// A liked Relisten track plays through the same fetch-and-resolve path as playlist rows,
     /// wrapped as a one-track queue keyed by the track so History can reopen it.
     private func play(_ record: LikedTrackRecord) async {
-        let tracks = await resolveLocalPlaylistTracks([record.asPlaylistTrack])
+        let tracks = await resolveTracks([record.asPlaylistTrack])
         guard !tracks.isEmpty else {
             playError = "Couldn't load \"\(record.title)\" right now."
             return
         }
+        playError = nil
         let artist = ArtistRef(backend: .relisten, id: record.artistSlug ?? "", name: record.artistSlug ?? "Relisten")
         let summary = ShowSummary(artist: artist, date: record.showDate)
         let detail = ShowDetail(summary: summary, tracks: tracks, queueKey: "liked:\(record.trackId)")
@@ -463,6 +473,7 @@ struct LocalPlaylistsView: View {
             playError = "\"\(track.title)\" has no audio right now."
             return
         }
+        playError = nil
         let summary = ShowSummary(artist: PHISH, date: track.showDate ?? "", venue: track.venueName)
         let detail = ShowDetail(
             summary: summary, tracks: [track.toPlayableTrack(showArt: track.showAlbumCoverUrl)],
