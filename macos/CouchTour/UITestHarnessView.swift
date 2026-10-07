@@ -8,6 +8,18 @@ struct UITestHarnessView: View {
     @State private var selectedTag: String = "All"
     @State private var contextAction = "None"
 
+    /// Isolated defaults so the seeded like never touches the real library.
+    @StateObject private var harnessLikes: LikedTracks = {
+        let defaults = UserDefaults(suiteName: "dev.mike.couchtour.uitest-harness")!
+        defaults.removePersistentDomain(forName: "dev.mike.couchtour.uitest-harness")
+        let likes = LikedTracks(defaults: defaults)
+        likes.toggle(LikedTrackRecord(
+            trackId: "uih-liked-1", backend: "relisten", showDate: "1977-05-08",
+            artistSlug: "grateful-dead", recordingId: "gd77-05-08", title: "Harness Liked Track",
+            durationMs: 300_000, likedAt: 1))
+        return likes
+    }()
+
     private let sampleArtist = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
     private let sampleShows: [ShowSummary] = [
         ShowSummary(
@@ -123,6 +135,14 @@ struct UITestHarnessView: View {
                         .accessibilityIdentifier("uih.artwork.small")
                     }
                 }
+
+                Divider()
+
+                // Library with one liked track whose resolution returns no tracks (#545).
+                LocalPlaylistsView(resolveTracks: { _ in [] })
+                    .environmentObject(harnessLikes)
+                    .frame(height: 320)
+                    .accessibilityIdentifier("uih.library")
             }
             .padding(20)
         }

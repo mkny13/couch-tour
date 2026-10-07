@@ -64,4 +64,15 @@ final class CouchTourUITests: XCTestCase {
         // The label comes from ArtworkView itself (artist + badge); the harness adds no override.
         XCTAssertTrue(large.label.contains("1980-01-02"), "label was: \(large.label)")
     }
+
+    func testLikedTrackPlayFailureShowsErrorAlongsideRow() {
+        let row = app.staticTexts["Harness Liked Track"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.click()
+
+        let error = app.staticTexts["library.play_error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(error.label.contains("Harness Liked Track"), "label was: \(error.label)")
+        XCTAssertTrue(row.exists)
+    }
 }
