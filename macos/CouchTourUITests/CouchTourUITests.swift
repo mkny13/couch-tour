@@ -65,7 +65,7 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(large.label.contains("1980-01-02"), "label was: \(large.label)")
     }
 
-    func testLikedTrackPlayFailureShowsErrorAlongsideRow() {
+    func testLikedTrackResolutionErrorAppearsWithRows() {
         app.terminate()
         app.launchEnvironment["COUCHTOUR_UI_TEST_SCREEN"] = "library"
         app.launch()
