@@ -26,6 +26,6 @@ public enum PlaybackMode: Equatable, Sendable {
 public func playbackMode(for kind: QueueKind) -> PlaybackMode {
     switch kind {
     case .youtube: return .youtubeVideo
-    case .show, .playlist, .recording, .localPlaylist: return .audio
+    case .show, .playlist, .recording, .localPlaylist, .likedTrack: return .audio
     }
 }

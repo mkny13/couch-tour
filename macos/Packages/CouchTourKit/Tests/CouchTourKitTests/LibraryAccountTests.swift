@@ -23,8 +23,8 @@ final class LibraryAccountTests: XCTestCase {
     }
 
     private func enqueueAccount(mine: [String], liked: [String]) {
-        server.enqueue(#"{"playlists":[\#(mine.joined(separator: ","))]}"#, forPathContaining: "playlists")
-        server.enqueue(#"{"playlists":[\#(liked.joined(separator: ","))]}"#, forPathContaining: "playlists")
+        server.enqueue(#"{"playlists":[\#(mine.joined(separator: ","))]}"#, forPathContaining: "filter=mine")
+        server.enqueue(#"{"playlists":[\#(liked.joined(separator: ","))]}"#, forPathContaining: "filter=liked")
         server.enqueue(#"{"shows":[{"date":"1997-11-22","venue_name":"Hampton","audio_status":"complete","id":5}]}"#, forPathContaining: "shows")
         server.enqueue(#"{"tracks":[{"id":9,"title":"Tweezer","show_date":"1997-11-22","venue_name":"Hampton","audio_status":"complete","mp3_url":"https://x/y.mp3"}]}"#, forPathContaining: "tracks")
     }

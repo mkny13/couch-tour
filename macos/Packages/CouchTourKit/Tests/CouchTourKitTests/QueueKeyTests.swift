@@ -156,4 +156,28 @@ final class QueueKeyTests: XCTestCase {
         XCTAssertNil(parseQueueKey("youtube:"))
         XCTAssertNil(parseQueueKey("notyoutube:x"))
     }
+
+    // ------------------------------------------------------------- liked tracks (#539, #544)
+
+    func testBuildsALikedTrackKey() {
+        XCTAssertEqual("liked:track-123", likedTrackQueueKey("track-123"))
+    }
+
+    func testRoundTripsALikedTrackKey() {
+        let ref = parseQueueKey(likedTrackQueueKey("track-123"))
+        XCTAssertEqual(QueueRef(kind: .likedTrack, id: "track-123"), ref)
+        XCTAssertEqual("liked:track-123", ref!.key)
+    }
+
+    func testRejectsAnEmptyLikedTrackKey() {
+        XCTAssertNil(parseQueueKey("liked:"))
+    }
+
+    func testLikedTrackKeysDoNotCollideWithOtherPrefixes() {
+        XCTAssertEqual(QueueKind.show, parseQueueKey("show:1997-02-13")!.kind)
+        XCTAssertEqual(QueueKind.likedTrack, parseQueueKey("liked:track-123")!.kind)
+        XCTAssertEqual(QueueKind.playlist, parseQueueKey("playlist:liked:x")!.kind)
+        XCTAssertNil(parseQueueKey("liked:"))
+        XCTAssertNil(parseQueueKey("notliked:x"))
+    }
 }

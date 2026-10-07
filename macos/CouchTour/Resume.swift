@@ -10,7 +10,12 @@ enum ResumeError: Error {
     case unresumable
 }
 
-func resolveShowDetail(for progress: PlaybackProgress, localPlaylistStore: LocalPlaylistStore?) async throws -> ShowDetail {
+@MainActor
+func resolveShowDetail(
+    for progress: PlaybackProgress,
+    localPlaylistStore: LocalPlaylistStore?,
+    likedTracks: LikedTracks? = nil
+) async throws -> ShowDetail {
     guard let ref = parseQueueKey(progress.queueKey) else { throw ResumeError.unresumable }
     switch ref.kind {
     case .show:
@@ -38,6 +43,19 @@ func resolveShowDetail(for progress: PlaybackProgress, localPlaylistStore: Local
             throw ResumeError.unresumable
         }
         return try await localPlaylistShowDetail(playlist, store: localPlaylistStore)
+
+    case .likedTrack:
+        guard let likedTracks, let record = likedTracks.records[ref.id] else {
+            throw ResumeError.unresumable
+        }
+        let tracks = await resolveLocalPlaylistTracks([record.asPlaylistTrack])
+        guard !tracks.isEmpty else {
+            throw ResumeError.unresumable
+        }
+        let backend = Backend(rawValue: record.backend) ?? .relisten
+        let artist = ArtistRef(backend: backend, id: record.artistSlug ?? "", name: record.artistSlug ?? "Relisten")
+        let summary = ShowSummary(artist: artist, date: record.showDate)
+        return ShowDetail(summary: summary, tracks: tracks, queueKey: likedTrackQueueKey(record.trackId))
     }
 }
 
@@ -55,8 +73,11 @@ enum ResumeNavigationTarget: Hashable {
 /// local playlist first — a cheap local `LocalPlaylistStore` read — rather than routing it
 /// through `resolveShowDetail`'s heavier track-resolving `.localPlaylist` branch, which exists
 /// to build a playable queue, not just to identify the target screen.
+@MainActor
 func resolveNavigationTarget(
-    for progress: PlaybackProgress, localPlaylistStore: LocalPlaylistStore?
+    for progress: PlaybackProgress,
+    localPlaylistStore: LocalPlaylistStore?,
+    likedTracks: LikedTracks? = nil
 ) async throws -> ResumeNavigationTarget {
     guard let ref = parseQueueKey(progress.queueKey) else { throw ResumeError.unresumable }
     if ref.kind == .localPlaylist {
@@ -68,15 +89,28 @@ func resolveNavigationTarget(
     if ref.kind == .playlist {
         return .publicPlaylist(try await PhishInAPI.publicPlaylist(ref.id).summary)
     }
-    let detail = try await resolveShowDetail(for: progress, localPlaylistStore: localPlaylistStore)
+    let detail = try await resolveShowDetail(
+        for: progress,
+        localPlaylistStore: localPlaylistStore,
+        likedTracks: likedTracks
+    )
     return .show(detail.summary)
 }
 
 /// Resumes at the stored track/position, unless the queue already finished — replaying a
 /// finished queue restarts from the top rather than reopening it a second from the end (D22).
 @MainActor
-func resume(_ progress: PlaybackProgress, player: Player, localPlaylistStore: LocalPlaylistStore?) async throws {
-    let detail = try await resolveShowDetail(for: progress, localPlaylistStore: localPlaylistStore)
+func resume(
+    _ progress: PlaybackProgress,
+    player: Player,
+    localPlaylistStore: LocalPlaylistStore?,
+    likedTracks: LikedTracks? = nil
+) async throws {
+    let detail = try await resolveShowDetail(
+        for: progress,
+        localPlaylistStore: localPlaylistStore,
+        likedTracks: likedTracks
+    )
     guard !detail.tracks.isEmpty else { throw ResumeError.unresumable }
     if progress.finished {
         player.play(detail: detail, startIndex: 0)
