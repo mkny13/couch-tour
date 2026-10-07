@@ -39,10 +39,39 @@ jobs:
           cd macos
           xcodegen generate
 
+      - name: Import signing certificate
+        env:
+          MACOS_SIGNING_CERT_P12: ${{ secrets.MACOS_SIGNING_CERT_P12 }}
+          MACOS_SIGNING_CERT_PASSWORD: ${{ secrets.MACOS_SIGNING_CERT_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          # A stable identity keeps the app's designated requirement constant across builds,
+          # so Keychain "Always Allow" grants survive updates (#568). Ad-hoc signing pins the
+          # requirement to the cdhash, which changes every build. Fail rather than silently
+          # fall back to ad-hoc: that regression is exactly what this step prevents.
+          for v in MACOS_SIGNING_CERT_P12 MACOS_SIGNING_CERT_PASSWORD MACOS_SIGNING_IDENTITY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Secret $v is not set. See macos/SIGNING.md." >&2
+              exit 1
+            fi
+          done
+          kc="$RUNNER_TEMP/signing.keychain-db"
+          kc_pw="$(uuidgen)"
+          echo "$MACOS_SIGNING_CERT_P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$kc_pw" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kc_pw" "$kc"
+          security import "$RUNNER_TEMP/signing.p12" -k "$kc" -P "$MACOS_SIGNING_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pw" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" login.keychain-db
+          rm -f "$RUNNER_TEMP/signing.p12"
+          security find-identity -p codesigning "$kc"
+
       - name: Build macOS app
         env:
           IS_BETA: ${{ inputs.is_beta || github.event.release.prerelease }}
           TAG_NAME: ${{ inputs.release_tag || github.event.release.tag_name }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           tag="${TAG_NAME:-$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.51")}"
           clean_ver="${tag#v}"
@@ -64,8 +93,18 @@ jobs:
           xcodebuild -project CouchTour.xcodeproj -scheme "$scheme" \
             -configuration Release -destination 'platform=macOS' \
             -derivedDataPath build \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$MACOS_SIGNING_IDENTITY" DEVELOPMENT_TEAM= \
             MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
-            
+
+          # Gate: the designated requirement must not pin a cdhash, or Keychain approvals
+          # break on the next update (#568).
+          dr="$(codesign -d -r- "build/Build/Products/Release/$app_name" 2>&1)"
+          echo "$dr"
+          if echo "$dr" | grep -q cdhash; then
+            echo "::error::App is ad-hoc signed (designated requirement pins a cdhash)." >&2
+            exit 1
+          fi
+
           cd build/Build/Products/Release
           ditto -c -k --sequesterRsrc --keepParent "$app_name" "$zip_name"
 

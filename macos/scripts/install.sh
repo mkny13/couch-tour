@@ -63,11 +63,23 @@ if [ ! -f "$entitlements" ]; then
     echo "Couldn't find $entitlements (xcodegen should have generated it)." >&2
     exit 1
 fi
-echo "Signing application bundle and embedded frameworks..."
-codesign --force --deep --sign - "$built_app"
+# A stable identity keeps Keychain "Always Allow" grants valid across reinstalls (#568);
+# ad-hoc ("-") changes the app's designated requirement on every build. Set
+# MACOS_SIGNING_IDENTITY, or create a cert named "Couch Tour Signing" (macos/SIGNING.md).
+sign_id="${MACOS_SIGNING_IDENTITY:-}"
+if [ -z "$sign_id" ]; then
+    if security find-identity -p codesigning 2>/dev/null | grep -q '"Couch Tour Signing"'; then
+        sign_id="Couch Tour Signing"
+    else
+        sign_id="-"
+        echo "No signing cert found; ad-hoc signing means Keychain will re-prompt after this install (see macos/SIGNING.md)." >&2
+    fi
+fi
+echo "Signing application bundle and embedded frameworks ($sign_id)..."
+codesign --force --deep --sign "$sign_id" "$built_app"
 # Second, shallow pass: entitlements go on the app's own executable only. `--deep` would push
 # them onto Sparkle's nested helpers, which must not be sandboxed by our entitlements.
-codesign --force --sign - --entitlements "$entitlements" "$built_app"
+codesign --force --sign "$sign_id" --entitlements "$entitlements" "$built_app"
 
 echo "Installing to $dest..."
 rm -rf "$dest"
