@@ -21,7 +21,8 @@ enum ResumeError: LocalizedError {
 func resolveShowDetail(
     for progress: PlaybackProgress,
     localPlaylistStore: LocalPlaylistStore?,
-    likedTracks: LikedTracks? = nil
+    likedTracks: LikedTracks? = nil,
+    fetchPhishInLikedTracks: (@Sendable () async throws -> [Track]) = { try await PhishInAPI.likedTracks() }
 ) async throws -> ShowDetail {
     guard let ref = parseQueueKey(progress.queueKey) else { throw ResumeError.unresumable }
     switch ref.kind {
@@ -57,12 +58,7 @@ func resolveShowDetail(
             guard let trackId = Int64(idString) else {
                 throw ResumeError.unresumable
             }
-            let tracks: [Track]
-            do {
-                tracks = try await PhishInAPI.likedTracks()
-            } catch {
-                throw ResumeError.unresumable
-            }
+            let tracks = try await fetchPhishInLikedTracks()
             guard let track = tracks.first(where: { $0.id == trackId }), track.playable else {
                 throw ResumeError.unresumable
             }

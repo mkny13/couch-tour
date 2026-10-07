@@ -81,4 +81,33 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(message.contains("Harness Liked Track"), "value was: \(message)")
         XCTAssertTrue(row.exists)
     }
+
+    func testLikedTrackResolutionPreservesTransientRequestError() {
+        app.terminate()
+        app.launchEnvironment["COUCHTOUR_UI_TEST_SCREEN"] = "resume_transient_error"
+        app.launch()
+
+        let statusText = app.staticTexts["uih.resume_status"]
+        XCTAssertTrue(statusText.waitForExistence(timeout: 10))
+        let expectedCode = URLError(.notConnectedToInternet).errorCode
+        let expectedText = "URLError:\(expectedCode)"
+        let actual = (statusText.value as? String) ?? statusText.label
+        XCTAssertEqual(actual, expectedText)
+
+        let invalidIdText = app.staticTexts["uih.invalid_id_status"]
+        XCTAssertTrue(invalidIdText.waitForExistence(timeout: 5))
+        let invalidIdActual = (invalidIdText.value as? String) ?? invalidIdText.label
+        XCTAssertEqual(invalidIdActual, "ResumeError.unresumable")
+
+        let missingTrackText = app.staticTexts["uih.missing_track_status"]
+        XCTAssertTrue(missingTrackText.waitForExistence(timeout: 5))
+        let missingTrackActual = (missingTrackText.value as? String) ?? missingTrackText.label
+        XCTAssertEqual(missingTrackActual, "ResumeError.unresumable")
+
+        let unplayableTrackText = app.staticTexts["uih.unplayable_track_status"]
+        XCTAssertTrue(unplayableTrackText.waitForExistence(timeout: 5))
+        let unplayableTrackActual = (unplayableTrackText.value as? String) ?? unplayableTrackText.label
+        XCTAssertEqual(unplayableTrackActual, "ResumeError.unresumable")
+    }
 }
+

@@ -59,6 +59,8 @@ struct UITestHarnessView: View {
             LocalPlaylistsView(resolveTracks: { _ in [] })
                 .environmentObject(harnessLikes)
                 .accessibilityIdentifier("uih.library")
+        } else if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_SCREEN"] == "resume_transient_error" {
+            ResumeTransientErrorHarnessView()
         } else {
             showsHarness
         }
@@ -152,3 +154,130 @@ struct UITestHarnessView: View {
         }
     }
 }
+
+private struct ResumeTransientErrorHarnessView: View {
+    @State private var errorResult: String = "pending"
+    @State private var invalidIdResult: String = "pending"
+    @State private var missingTrackResult: String = "pending"
+    @State private var unplayableTrackResult: String = "pending"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Resume Transient Error Harness")
+                .font(.title2.weight(.semibold))
+
+            Text(errorResult)
+                .accessibilityIdentifier("uih.resume_status")
+
+            Text(invalidIdResult)
+                .accessibilityIdentifier("uih.invalid_id_status")
+
+            Text(missingTrackResult)
+                .accessibilityIdentifier("uih.missing_track_status")
+
+            Text(unplayableTrackResult)
+                .accessibilityIdentifier("uih.unplayable_track_status")
+        }
+        .padding(20)
+        .task {
+            await runChecks()
+        }
+    }
+
+    private func runChecks() async {
+        // 1. Transient error: injected URLError must propagate unchanged.
+        let progress = PlaybackProgress(
+            queueKey: phishinLikedTrackQueueKey(12345),
+            title: "Ghost",
+            subtitle: "1997-11-17",
+            artUrl: nil,
+            trackIndex: 0,
+            positionMs: 0,
+            trackTitle: "Ghost",
+            updatedAt: 1000,
+            finished: false,
+            dismissed: false,
+            artist: "Phish"
+        )
+        do {
+            _ = try await resolveShowDetail(
+                for: progress,
+                localPlaylistStore: nil,
+                likedTracks: nil,
+                fetchPhishInLikedTracks: {
+                    throw URLError(.notConnectedToInternet)
+                }
+            )
+            errorResult = "unexpected_success"
+        } catch let urlError as URLError {
+            errorResult = "URLError:\(urlError.code.rawValue)"
+        } catch ResumeError.unresumable {
+            errorResult = "ResumeError.unresumable"
+        } catch {
+            errorResult = "other:\(error)"
+        }
+
+        // 2. Invalid liked-track ID (non-numeric ID)
+        let invalidIdProgress = PlaybackProgress(
+            queueKey: "liked:phishin-notanumber",
+            title: "Ghost",
+            subtitle: "1997-11-17",
+            artUrl: nil,
+            trackIndex: 0,
+            positionMs: 0,
+            trackTitle: "Ghost",
+            updatedAt: 1000,
+            finished: false,
+            dismissed: false,
+            artist: "Phish"
+        )
+        do {
+            _ = try await resolveShowDetail(
+                for: invalidIdProgress,
+                localPlaylistStore: nil,
+                likedTracks: nil,
+                fetchPhishInLikedTracks: { [] }
+            )
+            invalidIdResult = "unexpected_success"
+        } catch ResumeError.unresumable {
+            invalidIdResult = "ResumeError.unresumable"
+        } catch {
+            invalidIdResult = "other:\(error)"
+        }
+
+        // 3. Missing track (ID not present in fetched tracks)
+        do {
+            _ = try await resolveShowDetail(
+                for: progress,
+                localPlaylistStore: nil,
+                likedTracks: nil,
+                fetchPhishInLikedTracks: { [] }
+            )
+            missingTrackResult = "unexpected_success"
+        } catch ResumeError.unresumable {
+            missingTrackResult = "ResumeError.unresumable"
+        } catch {
+            missingTrackResult = "other:\(error)"
+        }
+
+        // 4. Unplayable track (track present but playable == false)
+        let unplayableTrack = Track(
+            id: 12345,
+            title: "Ghost"
+        )
+        do {
+            _ = try await resolveShowDetail(
+                for: progress,
+                localPlaylistStore: nil,
+                likedTracks: nil,
+                fetchPhishInLikedTracks: { [unplayableTrack] }
+            )
+            unplayableTrackResult = "unexpected_success"
+        } catch ResumeError.unresumable {
+            unplayableTrackResult = "ResumeError.unresumable"
+        } catch {
+            unplayableTrackResult = "other:\(error)"
+        }
+    }
+}
+
