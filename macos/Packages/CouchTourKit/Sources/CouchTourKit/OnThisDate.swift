@@ -1,7 +1,9 @@
 import Foundation
 
-/// Past this many shows in one `year_range=` request, phish.in's `per_page=1000` would truncate the page.
-public let phishInRangeCap = 900
+/// Caps shows per `year_range=` request. 900 shows is ~2.7 MB, slow enough to time out, and a timed-out
+/// range looks like years with no shows. 300 (~0.9 MB) mirrors Android's `PHISHIN_RANGE_CAP` and stays
+/// well under phish.in's `per_page=1000` page limit.
+public let phishInRangeCap = 300
 
 /// Relisten artists beyond this many don't participate at all. Each favorite costs one on-date request.
 public let maxRelistenArtists = 10
