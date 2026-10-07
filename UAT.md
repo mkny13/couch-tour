@@ -283,3 +283,7 @@ Long-standing items that predate this sprint.
 ## macOS Library separates saved items from history (#539)
 
 - [ ] `uat-087` **Library lists saved items, History lists playback** (macOS) — Play a show without liking it. Confirm it appears in History/Continue Listening but not in Library, and that Library → Shows says "No saved shows yet" with a "Shows you've played are in History" link that opens History. Like a Relisten track (heart in the player rail or a show's track menu), reopen Library → Tracks, and confirm the row shows the track title and show date/venue (never a UUID); click it and confirm it plays. Confirm local playlists and their tracks are still listed, and that category counts, search, and the sort menu still work.
+
+## macOS Library includes phish.in account content (#540)
+
+- [ ] `uat-088` **Library shows signed-in phish.in content** (macOS) — Signed in with an account that has created/liked playlists, liked shows, and liked tracks, open Library. Confirm those appear under Playlists, Shows, and Tracks (a playlist both created and liked appears once), alongside any local items; counts, search, and sort still work, and account rows sort after local ones under Recently added. Click a playlist, show, and track and confirm each opens or plays. With Library open, sign out in Account: only the phish.in rows disappear and local items stay. Sign in again: they return. Signed out, confirm no phish.in account rows. (Offline/failed account load: local items remain, with a "Couldn't load your phish.in account content" line.)

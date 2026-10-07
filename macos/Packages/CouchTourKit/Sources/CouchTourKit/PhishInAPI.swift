@@ -280,6 +280,17 @@ struct ShowsPage: Decodable {
 
 // -------------------------------------------------------------------- auth (#57)
 
+struct TracksPage: Decodable {
+    let tracks: [Track]
+
+    enum CodingKeys: String, CodingKey { case tracks }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tracks = try c.decodeIfPresent([Track].self, forKey: .tracks) ?? []
+    }
+}
+
 public struct LoginResponse: Decodable, Equatable {
     public let jwt: String
     public let username: String
@@ -439,6 +450,50 @@ public enum PhishInAPI {
 
     public static func publicPlaylist(_ slug: String) async throws -> PublicPlaylist {
         try decoder.decode(PublicPlaylist.self, from: try await get(path("playlists", slug).url!))
+    }
+
+    // ------------------------------------------------------------ account content (#540)
+    // Every call below is account-only. Unauthenticated, `filter=mine|liked` is silently ignored
+    // and returns every public playlist (D26), so each throws before touching the network when
+    // there is no token rather than relying on the caller to remember.
+
+    private static func requireToken() throws {
+        guard let token = authToken, !token.isEmpty else { throw APIException("Not signed in", code: 401) }
+    }
+
+    /// `filter` is "mine" (created) or "liked".
+    public static func accountPlaylists(filter: String) async throws -> [PublicPlaylistSummary] {
+        try requireToken()
+        var components = path("playlists")
+        components.queryItems = [
+            URLQueryItem(name: "filter", value: filter),
+            URLQueryItem(name: "sort", value: "likes_count:desc"),
+            URLQueryItem(name: "per_page", value: "100"),
+        ]
+        return try decoder.decode(PublicPlaylistsPage.self, from: try await get(components.url!)).playlists
+    }
+
+    public static func likedShows() async throws -> [Show] {
+        try requireToken()
+        var components = path("shows")
+        components.queryItems = [
+            URLQueryItem(name: "liked_by_user", value: "true"),
+            URLQueryItem(name: "audio_status", value: "complete_or_partial"),
+            URLQueryItem(name: "sort", value: "date:desc"),
+            URLQueryItem(name: "per_page", value: "1000"),
+        ]
+        return try decoder.decode(ShowsPage.self, from: try await get(components.url!)).shows
+    }
+
+    public static func likedTracks() async throws -> [Track] {
+        try requireToken()
+        var components = path("tracks")
+        components.queryItems = [
+            URLQueryItem(name: "liked_by_user", value: "true"),
+            URLQueryItem(name: "audio_status", value: "complete_or_partial"),
+            URLQueryItem(name: "per_page", value: "1000"),
+        ]
+        return try decoder.decode(TracksPage.self, from: try await get(components.url!)).tracks
     }
 
     public static func login(email: String, password: String) async throws -> LoginResponse {
