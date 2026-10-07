@@ -78,6 +78,12 @@ $ echo $?
 2
 ```
 
+### Library journey matching
+
+`bash scripts/smoke/test_mac_library_phishin_playlists.sh` runs the real `mac_run_library_phishin_playlists`
+against stubbed accessibility lookups (no app needed) and checks that local-only `library.row.*` ids
+yield `SKIP` while a `library.row.account-playlist-*` id yields `PASS`.
+
 ### Report grammar
 
 `report.sh --results <file>... --tag <tag> --out <report.md> [--waive ...] [--not-run ...] [--issue ...]`

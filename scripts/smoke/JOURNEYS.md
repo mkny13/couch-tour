@@ -110,7 +110,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `signed-in`
 - **steps**: In a signed-in session, navigate to the Library screen.
-- **pass condition**: On macOS, selecting `sidebar.nav.library` shows `library.screen` with its `library.row.<id>` items; on Android, selecting `nav.library` displays the user's phish.in account playlists.
+- **pass condition**: On macOS, selecting `sidebar.nav.library` shows `library.screen` with at least one phish.in account playlist row, `library.row.account-playlist-<slug>` (local `library.row.playlist-*`, `track-*` and `liked-*` rows do not count; with none, the journey is a fixture-unavailable `SKIP`, not a pass); on Android, selecting `nav.library` displays the user's phish.in account playlists.
 
 ## Two-client sync round trips
 
