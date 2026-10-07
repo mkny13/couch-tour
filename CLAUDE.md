@@ -94,8 +94,32 @@ They are declared in `macos/CouchTour/AXIdentifiers.swift` and verified by `maco
 
 ## Working under Mahler
 
-- **Worktrees & Branches:** Mahler owns worktrees and branches. Never run `git worktree add/remove`, `git reset`, or `git checkout -b`. Stay within your assigned worktree.
-- **Completion:** Job ends at git push. Do not open PRs, watch CI, or comment on issues.
+Mahler (`~/Mahler`) conducts coding agents through the issue backlog.
+
+### Interactive sessions (working on an issue by hand)
+
+If you are a chat session (not an autonomous Mahler run), take part in the lease protocol (DESIGN D6).
+**Every change starts from an issue.** If there isn't one, file it (`mahler add phish-in "title"`)
+before you write code; phish-in only sees issues labelled `mahler` (`gh issue edit N -R mkny13/couch-tour --add-label mahler`).
+
+```bash
+mahler claim phish-in#12        # before you start. If an agent held it, you win and it hands over
+mahler heartbeat phish-in#12    # while working (leases lapse after 30 min idle)
+mahler ship phish-in#12         # when it's pushed: the conductor opens/watches the PR and merges it
+mahler release phish-in#12      # when you stop without finishing
+```
+
+**Finish every task one of two ways**, never by leaving a PR open:
+1. **`mahler ship phish-in#N [--pr X]`** (the default). Run it after you push. The conductor watches CI and merges on green (D18). It adds `Fixes #N` to the PR if missing, and releases your claim.
+2. **Merge it yourself**, following the repo's by-hand merge protocol. Put `Fixes #N` in any PR you open.
+
+Work in your own worktree on branch `mahler/<N>-short-slug`, never by switching branches in the primary checkout. Other sessions share it.
+
+### Autonomous runs (Mahler issue build agents)
+
+If you are running as an autonomous build agent (`MAHLER_ISSUE` set):
+- **Worktrees & Branches:** Mahler owns worktrees and branches. Work on branch `mahler/<N>-short-slug`. Never run `git worktree add/remove`, `git reset`, or `git checkout -b`. Stay within your assigned worktree.
+- **Workflow:** Implement, verify, commit, and push to your branch. Your job ends at the push — do not open PRs, watch CI, or comment on issues. The conductor opens, reviews, and merges their PR (D18).
 - **Status Lines:** End final agent response with exactly one status line:
   `STATUS: DONE <summary>` / `STATUS: NEEDS-YOU <question> [OPTIONS: ...]` / `STATUS: BLOCKED <reason>` / `STATUS: YIELDED <handoff>`.
 - **Decision IDs:** Allocate sequential IDs with `mahler next-id <project> <prefix>` (e.g. `mahler next-id couch-tour D`). Do not manually grep `DECISIONS.md`.
