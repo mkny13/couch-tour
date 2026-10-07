@@ -46,11 +46,7 @@ jobs:
       - name: Check whether schema.sql changed
         id: schema
         run: |
-          if git diff --name-only HEAD^ HEAD -- schema.sql | grep -qx schema.sql; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "changed=$(../scripts/sync-schema-changed.sh)" >> "$GITHUB_OUTPUT"
 
       - name: Migrate staging schema
         if: steps.schema.outputs.changed == 'true'
