@@ -282,7 +282,7 @@ Long-standing items that predate this sprint.
 
 ## macOS Library separates saved items from history (#539)
 
-- [ ] `uat-087` **Library lists saved items, History lists playback** (macOS) — Play a show without liking it. Confirm it appears in History/Continue Listening but not in Library, and that Library → Shows says "No saved shows yet" with a "Shows you've played are in History" link that opens History. Like a Relisten track (heart in the player rail or a show's track menu), reopen Library → Tracks, and confirm the row shows the track title and show date/venue (never a UUID); click it and confirm it plays. Confirm local playlists and their tracks are still listed, and that category counts, search, and the sort menu still work.
+- [ ] `uat-087` **Library lists saved items, History lists playback** (macOS) — Play a show without liking it. Confirm it appears in History/Continue Listening but not in Library, and that Library → Shows says "No saved shows yet" with a "Shows you've played are in History" link that opens History. Like a Relisten track (heart in the player rail or a show's track menu), reopen Library → Tracks, and confirm the row shows the track title and show date/venue (never a UUID); click it and confirm it plays. Confirm the played liked track appears in History/Continue Listening; open its row to confirm it navigates to the show, and resume it to confirm it resolves the liked track and resumes playback from its stored position. Confirm local playlists and their tracks are still listed, and that category counts, search, and the sort menu still work.
 
 ## macOS Library includes phish.in account content (#540)
 

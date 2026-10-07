@@ -88,7 +88,7 @@ final class MockServer {
         requests.append(protocolInstance.request)
         requestCount += 1
         let requestHost = protocolInstance.request.url?.host
-        let requestPath = protocolInstance.request.url?.path ?? ""
+        let requestPath = protocolInstance.request.url.map { "\($0.path)\($0.query.map { "?\($0)" } ?? "")" } ?? ""
         let next = responses.firstIndex(where: {
             ($0.host == nil || $0.host == requestHost)
                 && ($0.pathContaining == nil || requestPath.contains($0.pathContaining!))

@@ -662,7 +662,12 @@ struct HomeView: View {
 
     private func tapResume(_ row: PlaybackProgress) async {
         do {
-            try await resume(row, player: player, localPlaylistStore: appModel.localPlaylistStore)
+            try await resume(
+                row,
+                player: player,
+                localPlaylistStore: appModel.localPlaylistStore,
+                likedTracks: appModel.likedTracks
+            )
         } catch {
             alertMessage = "Couldn't resume \(row.title): \(error.localizedDescription)"
         }
@@ -671,7 +676,11 @@ struct HomeView: View {
     private func openResumeRow(_ row: PlaybackProgress) async {
         resolvingResumeRow = row.queueKey
         do {
-            switch try await resolveNavigationTarget(for: row, localPlaylistStore: appModel.localPlaylistStore) {
+            switch try await resolveNavigationTarget(
+                for: row,
+                localPlaylistStore: appModel.localPlaylistStore,
+                likedTracks: appModel.likedTracks
+            ) {
             case .show(let show): appModel.path.append(.show(show))
             case .localPlaylist(let playlist): appModel.path.append(.localPlaylist(playlist))
             case .publicPlaylist(let playlist): appModel.path.append(.publicPlaylist(playlist))

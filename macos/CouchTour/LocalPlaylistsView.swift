@@ -462,7 +462,7 @@ struct LocalPlaylistsView: View {
         playError = nil
         let artist = ArtistRef(backend: .relisten, id: record.artistSlug ?? "", name: record.artistSlug ?? "Relisten")
         let summary = ShowSummary(artist: artist, date: record.showDate)
-        let detail = ShowDetail(summary: summary, tracks: tracks, queueKey: "liked:\(record.trackId)")
+        let detail = ShowDetail(summary: summary, tracks: tracks, queueKey: likedTrackQueueKey(record.trackId))
         player.play(detail: detail, startIndex: 0)
     }
 
@@ -477,7 +477,7 @@ struct LocalPlaylistsView: View {
         let summary = ShowSummary(artist: PHISH, date: track.showDate ?? "", venue: track.venueName)
         let detail = ShowDetail(
             summary: summary, tracks: [track.toPlayableTrack(showArt: track.showAlbumCoverUrl)],
-            queueKey: "liked:phishin-\(track.id)")
+            queueKey: likedTrackQueueKey("phishin-\(track.id)"))
         player.play(detail: detail, startIndex: 0)
     }
 

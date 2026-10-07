@@ -15,6 +15,9 @@ public enum QueueKind: Equatable {
     /// recognize the prefix skips the row (returns nil) rather than mis-playing it, which
     /// is what makes this safe for the eventual shared `progress` table.
     case youtube
+    /// A single locally liked track played from the Library (#539, #544). The id is the
+    /// backend-specific trackId (e.g. Relisten track UUID).
+    case likedTrack
 }
 
 /// Playback progress is stored under a namespaced key so every kind of queue can share one
@@ -38,6 +41,7 @@ public struct QueueRef: Equatable {
         case .recording: return recordingPrefix + id
         case .localPlaylist: return localPlaylistQueueKey(id)
         case .youtube: return youtubeQueueKey(id)
+        case .likedTrack: return likedTrackQueueKey(id)
         }
     }
 }
@@ -79,6 +83,8 @@ public func recordingShowKey(_ artistSlug: String, _ date: String) -> String {
 
 public func youtubeQueueKey(_ videoId: String) -> String { youtubePrefix + videoId }
 
+public func likedTrackQueueKey(_ trackId: String) -> String { likedTrackPrefix + trackId }
+
 /// Splits a stored key back into its parts. Returns nil for anything unrecognised rather than
 /// guessing — an unknown key should be skipped, not played as the wrong thing.
 public func parseQueueKey(_ raw: String) -> QueueRef? {
@@ -100,6 +106,10 @@ public func parseQueueKey(_ raw: String) -> QueueRef? {
     if raw.hasPrefix(youtubePrefix) {
         let rest = String(raw.dropFirst(youtubePrefix.count))
         return rest.isEmpty ? nil : QueueRef(kind: .youtube, id: rest)
+    }
+    if raw.hasPrefix(likedTrackPrefix) {
+        let rest = String(raw.dropFirst(likedTrackPrefix.count))
+        return rest.isEmpty ? nil : QueueRef(kind: .likedTrack, id: rest)
     }
     // Validated on the way in, unlike the other two: a recording id that isn't all three
     // parts is unusable, and failing here beats failing at fetch time. Note that
@@ -128,3 +138,4 @@ private let playlistPrefix = "playlist:"
 private let recordingPrefix = "relisten:"
 private let localPlaylistPrefix = "local-playlist:"
 private let youtubePrefix = "youtube:"
+private let likedTrackPrefix = "liked:"

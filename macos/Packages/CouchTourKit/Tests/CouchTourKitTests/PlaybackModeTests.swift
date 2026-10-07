@@ -11,7 +11,7 @@ final class PlaybackModeTests: XCTestCase {
     }
 
     func testAudioKindsMapToTheAudioSurface() {
-        for kind in [QueueKind.show, .playlist, .recording, .localPlaylist] {
+        for kind in [QueueKind.show, .playlist, .recording, .localPlaylist, .likedTrack] {
             XCTAssertEqual(.audio, playbackMode(for: kind), "\(kind) must stay on the audio path")
         }
     }
