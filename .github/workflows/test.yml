@@ -6,7 +6,7 @@ name: Unit tests
 # here instead. Same reasoning as build-debug-apk.yml, which says so for the APK build.
 on:
   pull_request:
-    # `test` is the required status check on main (D336, scripts/apply-branch-protection.sh),
+    # `test` is the required status check on main (#559, D336, scripts/apply-branch-protection.sh),
     # so this workflow must report on every PR. A paths: filter would leave docs-only and
     # macos-only PRs waiting on a check that never runs. Cost: the ~1-2 min Android suite now
     # runs on PRs that can't affect it.

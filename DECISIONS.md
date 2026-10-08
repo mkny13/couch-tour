@@ -577,9 +577,9 @@ Follows Android's D304 on macOS. When `PhishInSession` is signed in, `LibraryAcc
 
 macOS `OnThisDate.swift` carried the same `phishInRangeCap = 900` batching as Android, producing ~2.7 MB `year_range=` responses that risk timeouts, which look like years with no shows. Lowered the cap to 300 (~0.9 MB), matching Android's `PHISHIN_RANGE_CAP` in D307 (#352). No concurrency bound was added because macOS fetches periods sequentially. The "no daily cache on a partial load" rule was already in place via #467 (`OnThisDate.load` caches only when `complete`), so it is unchanged. `PhishInAPI.swift` and timeouts are untouched. Guard: `testPhishInRangesDefaultCapKeepsBatchesUnder300AndCoversEveryYear`.
 
-### D336: Require the `test` check on `main`; run it on every PR (#561)
+### D336: Require the `test` check on `main`; run it on every PR (#561, #559)
 
-`main` had no branch protection, so nothing mechanically required the PR test check (Mahler practices audit, mahler#780). `test.yml` had a `paths:` filter, which would make a required check hang forever on docs-only and macos-only PRs, so the filter is removed and the Android suite now runs on every PR (cost: ~1-2 min of CI on PRs that can't affect it). `scripts/apply-branch-protection.sh` requires status context `test` with strict=false, no required reviews, no admin enforcement, and ensures squash merge is on; strict=false and no reviews keep it compatible with the conductor merging on green (D18). It is applied by hand once, after the PR merges, so the setting can't gate its own PR.
+`main` had no branch protection, so nothing mechanically required the PR test check (Mahler practices audit, mahler#780). `test.yml` had a `paths:` filter, which would make a required check hang forever on docs-only and macos-only PRs, so the filter is removed and the Android suite now runs on every PR (cost: ~1-2 min of CI on PRs that can't affect it). `scripts/apply-branch-protection.sh` requires status context `test` with strict=false, no required reviews, no admin enforcement, and ensures squash merge is on; strict=false and no reviews keep it compatible with the conductor merging on green (D18). It is applied by hand once, after the PR merges, so the setting can't gate its own PR (applied in #559).
 
 ### D337: Sign macOS builds with a stable self-signed certificate (#568)
 
