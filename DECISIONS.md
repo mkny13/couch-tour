@@ -588,3 +588,15 @@ CI and `install.sh` signed ad-hoc, so each build's designated requirement was a 
 ### D338: Sync deploy's schema-change check matched repo-root paths, so prod migrations never ran (#570)
 
 `sync-deploy.yml` decided whether to migrate with `git diff --name-only HEAD^ HEAD -- schema.sql | grep -qx schema.sql`, run from `sync/`. `git diff` prints repo-root paths (`sync/schema.sql`), so the match never hit and every "Migrate staging/production schema" step was skipped, including the one that creates `favorite_artists` (#351). Prod D1 had no such table, so favorite sync never worked on prod and Android's favorites had nowhere to go. The check is now `scripts/sync-schema-changed.sh` (uses `--relative`), covered by `scripts/test_sync_schema_changed.sh` in `test.yml`. This PR also edits a comment in `schema.sql` so the merge itself runs the idempotent migration once. Separately, the Mac prod favorites were already phish-only before the sync build (rows stamped `updatedAt=1`); the likely cause is the #345 sandbox-store swap, and Android is the surviving copy to sync back.
+
+### D339: Practices audit tracked-secrets reviewed false positives (.mahler/secret-reviews.json) (#558)
+
+The Mahler practices audit (mahler#780) flagged heuristic candidates for `tracked-secrets`. A manual audit confirmed that zero real secrets, credentials, or private personal data exist in git-tracked files. All flagged lines fall into clean non-secret categories:
+1. Idiomatic language identifiers, parameter names, and property assignments in Android, macOS, and Sync source files (e.g. UI state lambda parameters, auth token forwarding, device token rotation, and `SessionToken` references).
+2. Test fixtures, mock tokens, and assertions in unit test suites (e.g. placeholder tokens, mock sync device tokens, and log redaction assertions verifying sensitive keys are obscured).
+3. YouTube search fixture pagination token (`"nextPageToken"`).
+4. Build configuration reading signing credentials from untracked, gitignored `local.properties`.
+5. Architectural documentation in `DECISIONS-ARCHIVE.md` discussing credential handling and redaction.
+
+Under Mahler D39 (mahler#821), content-bound review entries are recorded in `.mahler/secret-reviews.json` binding each reviewed candidate line to the file's SHA-256 hash, enabling the mechanical practices audit check to pass while ensuring any new or modified candidate lines require fresh human review.
+
