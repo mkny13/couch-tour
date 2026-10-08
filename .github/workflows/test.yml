@@ -33,8 +33,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Symlink Android Studio JDK for verify compatibility
+        run: |
+          sudo mkdir -p "/Applications/Android Studio.app/Contents/jbr/Contents"
+          sudo ln -sfn "$JAVA_HOME" "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+
       - name: Run unit tests (including Compose UI suites)
-        run: ./gradlew testDebugUnitTest
+        run: JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
 
       # The HTML report is the useful artifact on a failure; Gradle's console output only
       # names the failing test, not the assertion.
