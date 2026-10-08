@@ -55,7 +55,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # Without this, AGP auto-generates a fresh debug keystore on every run, since a
       # GitHub-hosted runner starts clean and keeps nothing between builds. Each build would
