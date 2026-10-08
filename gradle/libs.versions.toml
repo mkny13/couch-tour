@@ -3,7 +3,7 @@
 # room 2.6.1, androidx-security-crypto 1.1.0-alpha06, workManager 2.11.2,
 # coil 2.7.0, camerax 1.4.1, mlkitBarcode 17.3.0, zxingCore 3.5.3
 [versions]
-agp = "8.10.0"
+agp = "9.4.1"
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.28"
 coreKtx = "1.15.0"
