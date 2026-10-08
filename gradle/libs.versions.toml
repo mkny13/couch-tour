@@ -4,27 +4,27 @@
 # coil 2.7.0, camerax 1.4.1, mlkitBarcode 17.3.0, zxingCore 3.5.3
 [versions]
 agp = "8.10.0"
-kotlin = "2.0.21"
-ksp = "2.0.21-1.0.28"
-coreKtx = "1.15.0"
+kotlin = "2.4.20"
+ksp = "2.3.12"
+coreKtx = "1.19.1"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.12.01"
-navigation = "2.8.5"
+navigation = "2.10.2"
 # 1.9 is the floor for casting: earlier CastPlayers hardcode the device volume away.
-media3 = "1.10.1"
+media3 = "1.11.1"
 # Kept in step with what media3-cast itself depends on, so the declared versions are the
 # ones that actually resolve.
-castFramework = "22.1.0"
+castFramework = "22.3.1"
 mediarouter = "1.8.1"
-room = "2.6.1"
+room = "2.8.5"
 okhttp = "4.12.0"
-serialization = "1.7.3"
+serialization = "1.11.0"
 coil = "2.7.0"
 palette = "1.0.0"
 securityCrypto = "1.1.0-alpha06"
-workManager = "2.11.2"
-zxingCore = "3.5.3"
+workManager = "2.12.0"
+zxingCore = "3.5.4"
 # YouTube stream resolution (#232): the planning note's recommended choice — no API key,
 # widely used by Android YouTube clients. Coordinates are JitPack's (com.github prefix).
 newpipeExtractor = "v0.26.5"
@@ -35,9 +35,9 @@ mlkitBarcode = "17.3.0"
 tvFoundation = "1.0.0"
 tvMaterial = "1.1.0"
 junit = "4.13.2"
-robolectric = "4.14.1"
-coroutinesTest = "1.9.0"
-androidxTestCore = "1.6.1"
+robolectric = "4.17"
+coroutinesTest = "1.11.0"
+androidxTestCore = "1.7.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
