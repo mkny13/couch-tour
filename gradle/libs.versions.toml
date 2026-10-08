@@ -1,5 +1,5 @@
 # Audited baseline versions (no open CVEs as of Sept 2026):
-# okhttp 4.12.0, media3 1.10.1, play-services-cast-framework 22.1.0,
+# okhttp 5.5.0, media3 1.10.1, play-services-cast-framework 22.1.0,
 # room 2.8.5, androidx-security-crypto 1.1.0-alpha06, workManager 2.11.2,
 # coil 2.7.0, camerax 1.4.1, mlkitBarcode 17.3.0, zxingCore 3.5.3
 [versions]
@@ -18,7 +18,7 @@ media3 = "1.10.1"
 castFramework = "22.1.0"
 mediarouter = "1.8.1"
 room = "2.8.5"
-okhttp = "4.12.0"
+okhttp = "5.5.0"
 serialization = "1.7.3"
 coil = "2.7.0"
 palette = "1.0.0"
