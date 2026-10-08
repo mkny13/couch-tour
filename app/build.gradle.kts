@@ -37,7 +37,7 @@ fun gitVersionName(isBeta: Boolean): String {
 
 android {
     namespace = "dev.mike.couchtour"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.mike.couchtour"
