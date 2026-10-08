@@ -1,0 +1,2 @@
+[verify]
+fast = 'JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest && swift test --package-path macos/Packages/CouchTourKit'

@@ -7,6 +7,13 @@ Unofficial native client for [phish.in](https://phish.in) and Relisten's catalog
 
 See [README.md](README.md) (overview), [DECISIONS.md](DECISIONS.md) (architecture log), and [ROADMAP.md](ROADMAP.md) (backlog).
 
+## Verification
+
+Run before every push:
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest && swift test --package-path macos/Packages/CouchTourKit
+```
+
 ## Building (Android)
 
 **Java on `PATH` is absent; require Android Studio's bundled JDK:**
