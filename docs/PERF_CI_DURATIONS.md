@@ -30,10 +30,11 @@ Gradle files, `checks.yml` is ~12 s of grep, `contract-check.yml` is weekly cron
 
 ## Changes made
 
-- `test.yml`: `pull_request` now has a `paths` filter (`app/**`, `gradle/**`, `gradlew*`, root Gradle files,
+- `test.yml`: initially had a `paths` filter (`app/**`, `gradle/**`, `gradlew*`, root Gradle files,
   `scripts/test_sync_base_url_intent_guard.sh`, and the workflow file), mirroring `build-debug-apk.yml`.
-  `workflow_dispatch` is kept. No required status check depends on it (`main` has no branch protection or
-  rulesets), so the whole workflow is skipped rather than keeping the job and skipping its steps.
+  However, `main` branch protection now requires the `test` status check (#559, #561, D336).
+  Because a `paths:` filter would cause docs-only or macOS-only PRs to wait indefinitely on a required check
+  that never runs, the `paths:` filter was removed so `test.yml` runs unconditionally on every PR.
 - `macos-tests.yml`: cache `macos/Packages/CouchTourKit/.build` with `actions/cache`, keyed on
   `Package.swift` + `Package.resolved`. The `macos-build` job's Xcode build isn't cached.
 - Gradle cache: `gradle/actions/setup-gradle@v4` already caches. By default it only writes the cache from the
