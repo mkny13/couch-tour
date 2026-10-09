@@ -32,7 +32,7 @@ jobs:
           # before the merge.
           fetch-depth: 2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           # Wrangler 4.x (resolved from ^4.0.0, currently 4.123.0) requires Node >= 22 —
           # pinning 20 made every deploy run die at `npm run deploy:staging` with
