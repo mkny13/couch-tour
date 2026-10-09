@@ -45,7 +45,7 @@ jobs:
       # names the failing test, not the assertion.
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-report
           path: app/build/reports/tests/testDebugUnitTest/
