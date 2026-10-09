@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Keyed on the manifest and lockfile so a dependency bump rebuilds from scratch.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: macos/Packages/CouchTourKit/.build
           key: spm-${{ runner.os }}-${{ hashFiles('macos/Packages/CouchTourKit/Package.swift', 'macos/Packages/CouchTourKit/Package.resolved') }}
