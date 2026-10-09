@@ -275,15 +275,25 @@ public final class ProgressStore {
         }
     }
 
+    // Both bump updatedAt: it is the sync push watermark, so without it the flag change never
+    // leaves this device.
     public func dismiss(key: String) throws {
+        try dismiss(key: key, now: Int64(Date().timeIntervalSince1970 * 1000))
+    }
+
+    public func dismiss(key: String, now: Int64) throws {
         try dbQueue.write { db in
-            try db.execute(sql: "UPDATE progress SET dismissed = 1 WHERE queueKey = ?", arguments: [key])
+            try db.execute(sql: "UPDATE progress SET dismissed = 1, updatedAt = ? WHERE queueKey = ?", arguments: [now, key])
         }
     }
 
     public func markFinished(key: String) throws {
+        try markFinished(key: key, now: Int64(Date().timeIntervalSince1970 * 1000))
+    }
+
+    public func markFinished(key: String, now: Int64) throws {
         try dbQueue.write { db in
-            try db.execute(sql: "UPDATE progress SET finished = 1 WHERE queueKey = ?", arguments: [key])
+            try db.execute(sql: "UPDATE progress SET finished = 1, updatedAt = ? WHERE queueKey = ?", arguments: [now, key])
         }
     }
 

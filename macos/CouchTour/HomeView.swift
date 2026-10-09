@@ -695,6 +695,7 @@ struct HomeView: View {
         guard let store = appModel.progressStore else { return }
         do {
             try store.markFinished(key: row.queueKey)
+            appModel.syncSession.requestDebouncedPush(store)
             await reloadProgress()
         } catch {
             alertMessage = "Couldn't update \(row.title): \(error.localizedDescription)"
@@ -705,6 +706,7 @@ struct HomeView: View {
         guard let store = appModel.progressStore else { return }
         do {
             try store.dismiss(key: row.queueKey)
+            appModel.syncSession.requestDebouncedPush(store)
             await reloadProgress()
         } catch {
             alertMessage = "Couldn't remove \(row.title): \(error.localizedDescription)"

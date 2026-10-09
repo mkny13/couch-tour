@@ -159,6 +159,19 @@ class ProgressDaoTest {
     }
 
     @Test
+    fun `marking completed and dismissing bump updatedAt so sync pushes them`() = runBlocking {
+        dao.put(progress("show:a", updatedAt = 100))
+        dao.put(progress("show:b", updatedAt = 100))
+
+        dao.markFinished("show:a", now = 500)
+        dao.dismiss("show:b", now = 600)
+
+        assertEquals(500L, dao.get("show:a")!!.updatedAt)
+        assertEquals(600L, dao.get("show:b")!!.updatedAt)
+        assertEquals(setOf("show:a", "show:b"), dao.changedSince(100).map { it.queueKey }.toSet())
+    }
+
+    @Test
     fun `marking completed leaves the position intact`() = runBlocking {
         dao.put(progress("show:1997-02-13", trackIndex = 5, positionMs = 35_342))
 

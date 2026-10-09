@@ -592,7 +592,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
      * it again brings it back.
      */
     fun dismiss(progress: Progress) {
-        viewModelScope.launch { progressDao.dismiss(progress.queueKey) }
+        viewModelScope.launch {
+            progressDao.dismiss(progress.queueKey)
+            SyncSession.requestDebouncedPush(progressDao)
+        }
     }
 
     /** Erase from history entirely. */
@@ -602,7 +605,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Mark as played through without actually playing to the end. */
     fun markCompleted(progress: Progress) {
-        viewModelScope.launch { progressDao.markFinished(progress.queueKey) }
+        viewModelScope.launch {
+            progressDao.markFinished(progress.queueKey)
+            SyncSession.requestDebouncedPush(progressDao)
+        }
     }
 
     suspend fun progressFor(key: String): Progress? = progressDao.get(key)
