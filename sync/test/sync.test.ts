@@ -319,6 +319,66 @@ describe("happy paths", () => {
   });
 });
 
+describe("finished/dismissed flag sync", () => {
+  test("finished flag pushed by device A is pulled by device B", async () => {
+    const { tokenA, tokenB } = await pairTwoDevices();
+
+    // Device A pushes initial progress row
+    const push1 = await sync(tokenA, 0, [change({ updatedAt: 1000 })]);
+    expect(push1.status).toBe(200);
+    const push1Body = (await push1.json()) as { seq: number };
+
+    // Device B pulls and receives the row
+    const pull1 = await sync(tokenB, 0, []);
+    expect(pull1.status).toBe(200);
+    const pull1Body = (await pull1.json()) as { seq: number; changes: { finished: boolean }[] };
+    expect(pull1Body.changes).toHaveLength(1);
+    expect(pull1Body.changes[0].finished).toBe(false);
+
+    // Device A updates the row with finished: true and a newer updatedAt
+    const push2 = await sync(tokenA, push1Body.seq, [change({ finished: true, updatedAt: 2000 })]);
+    expect(push2.status).toBe(200);
+    const push2Body = (await push2.json()) as { seq: number };
+
+    // Device B pulls and receives the updated row with finished: true
+    const pull2 = await sync(tokenB, pull1Body.seq, []);
+    expect(pull2.status).toBe(200);
+    const pull2Body = (await pull2.json()) as { seq: number; changes: { finished: boolean }[] };
+    expect(pull2Body.changes).toHaveLength(1);
+    expect(pull2Body.changes[0].finished).toBe(true);
+    expect(pull2Body.seq).toBe(push2Body.seq);
+  });
+
+  test("dismissed flag pushed by device A is pulled by device B", async () => {
+    const { tokenA, tokenB } = await pairTwoDevices();
+
+    // Device A pushes initial progress row
+    const push1 = await sync(tokenA, 0, [change({ updatedAt: 1000 })]);
+    expect(push1.status).toBe(200);
+    const push1Body = (await push1.json()) as { seq: number };
+
+    // Device B pulls and receives the row
+    const pull1 = await sync(tokenB, 0, []);
+    expect(pull1.status).toBe(200);
+    const pull1Body = (await pull1.json()) as { seq: number; changes: { dismissed: boolean }[] };
+    expect(pull1Body.changes).toHaveLength(1);
+    expect(pull1Body.changes[0].dismissed).toBe(false);
+
+    // Device A updates the row with dismissed: true and a newer updatedAt
+    const push2 = await sync(tokenA, push1Body.seq, [change({ dismissed: true, updatedAt: 2000 })]);
+    expect(push2.status).toBe(200);
+    const push2Body = (await push2.json()) as { seq: number };
+
+    // Device B pulls and receives the updated row with dismissed: true
+    const pull2 = await sync(tokenB, pull1Body.seq, []);
+    expect(pull2.status).toBe(200);
+    const pull2Body = (await pull2.json()) as { seq: number; changes: { dismissed: boolean }[] };
+    expect(pull2Body.changes).toHaveLength(1);
+    expect(pull2Body.changes[0].dismissed).toBe(true);
+    expect(pull2Body.seq).toBe(push2Body.seq);
+  });
+});
+
 describe("F1: duplicate queueKey within one push", () => {
   test("keeps the entry with the newest updatedAt and allocates exactly one seq", async () => {
     const { tokenA } = await pairTwoDevices();
