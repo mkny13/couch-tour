@@ -293,6 +293,9 @@ final class Player: NSObject, ObservableObject {
         } else {
             // Show finished
             recorder.markFinished(queueKey: queueKey)
+            if let syncSession, let progressStore {
+                syncSession.requestDebouncedPush(progressStore)
+            }
             self.currentIndex = nil
             self.isPlaying = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
@@ -735,6 +738,9 @@ final class Player: NSObject, ObservableObject {
                 return
             }
             recorder.markFinished(queueKey: queueKey)
+            if let syncSession, let progressStore {
+                syncSession.requestDebouncedPush(progressStore)
+            }
             currentIndex = nil
             isPlaying = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
