@@ -200,6 +200,7 @@ struct ListeningView: View {
         guard let store = appModel.progressStore else { return }
         do {
             try store.markFinished(key: row.queueKey)
+            appModel.syncSession.requestDebouncedPush(store)
             await load()
         } catch {
             resumeError = "Couldn't update \(row.title): \(error.localizedDescription)"
@@ -210,6 +211,7 @@ struct ListeningView: View {
         guard let store = appModel.progressStore else { return }
         do {
             try store.dismiss(key: row.queueKey)
+            appModel.syncSession.requestDebouncedPush(store)
             await load()
         } catch {
             resumeError = "Couldn't remove \(row.title): \(error.localizedDescription)"

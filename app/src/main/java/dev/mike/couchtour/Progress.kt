@@ -90,11 +90,13 @@ interface ProgressDao {
     @Query("SELECT * FROM progress WHERE queueKey = :key AND deletedAt IS NULL")
     suspend fun get(key: String): Progress?
 
-    @Query("UPDATE progress SET dismissed = 1 WHERE queueKey = :key")
-    suspend fun dismiss(key: String)
+    // Both bump updatedAt: it is the sync push watermark, so without it the flag change never
+    // leaves this device and the other one keeps showing the row in Continue listening.
+    @Query("UPDATE progress SET dismissed = 1, updatedAt = :now WHERE queueKey = :key")
+    suspend fun dismiss(key: String, now: Long = System.currentTimeMillis())
 
-    @Query("UPDATE progress SET finished = 1 WHERE queueKey = :key")
-    suspend fun markFinished(key: String)
+    @Query("UPDATE progress SET finished = 1, updatedAt = :now WHERE queueKey = :key")
+    suspend fun markFinished(key: String, now: Long = System.currentTimeMillis())
 
     /**
      * Tombstones the row rather than deleting it, so a sync client can tell "removed" apart

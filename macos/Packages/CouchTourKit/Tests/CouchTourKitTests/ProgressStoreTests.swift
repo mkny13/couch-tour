@@ -117,6 +117,18 @@ final class ProgressStoreTests: XCTestCase {
         XCTAssertEqual(1, try store.history().count)
     }
 
+    func testMarkingCompletedAndDismissingBumpUpdatedAtSoSyncPushesThem() throws {
+        try store.put(progress(key: "show:a", updatedAt: 100))
+        try store.put(progress(key: "show:b", updatedAt: 100))
+
+        try store.markFinished(key: "show:a", now: 500)
+        try store.dismiss(key: "show:b", now: 600)
+
+        XCTAssertEqual(500, try store.get(key: "show:a")!.updatedAt)
+        XCTAssertEqual(600, try store.get(key: "show:b")!.updatedAt)
+        XCTAssertEqual(Set(["show:a", "show:b"]), Set(try store.changedSince(100).map { $0.queueKey }))
+    }
+
     func testMarkingCompletedLeavesThePositionIntact() throws {
         try store.put(progress(key: "show:1997-02-13", trackIndex: 5, positionMs: 35_342))
 
