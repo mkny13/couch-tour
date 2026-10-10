@@ -25,7 +25,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # HEAD^ has to exist for the schema-change check below; a squash-merged PR is a
           # single new commit on main, so depth 2 is enough to diff it against what main was

@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Self-test the mockup-data check
         run: scripts/checks/test_check_mockup_data.sh
       - name: Check shipping code for mockup/placeholder data
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Self-test the workflow-permissions check
         run: scripts/checks/test_check_workflow_permissions.sh
       - name: Check every workflow declares top-level permissions
