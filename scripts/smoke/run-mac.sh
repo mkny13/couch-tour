@@ -788,7 +788,7 @@ mac_run_search_artist_hit() {
     return 0
   fi
 
-  if ! mac::wait_for_id "search.field" "$TIMEOUT" >/dev/null; then
+  if ! mac::wait_for_id "search.field" "$TIMEOUT" "$DEEP" >/dev/null; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "search.field not rendered within ${TIMEOUT}s"
     return 0
@@ -796,7 +796,7 @@ mac_run_search_artist_hit() {
 
   mac::click "search.field" || true
   # Clear existing query if clear button is present
-  if [[ -n "$(mac::ax_query "search.clear")" ]]; then
+  if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
     mac::click "search.clear" || true
   fi
 
@@ -809,7 +809,7 @@ mac_run_search_artist_hit() {
 
   while true; do
     local artist_tab
-    artist_tab="$(mac::ax_query "search.tab.artists")"
+    artist_tab="$(mac::ax_query "search.tab.artists" "$DEEP")"
     if [[ -n "$artist_tab" ]]; then
       # Expect "Artists <N>" where N > 0
       local count
@@ -1108,14 +1108,14 @@ mac_run_search_result_sections() {
     return 0
   fi
 
-  if ! mac::wait_for_id "search.field" "$TIMEOUT" >/dev/null; then
+  if ! mac::wait_for_id "search.field" "$TIMEOUT" "$DEEP" >/dev/null; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "search.field not present"
     return 0
   fi
 
   mac::click "search.field" || true
-  if [[ -n "$(mac::ax_query "search.clear")" ]]; then
+  if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
     mac::click "search.clear" || true
   fi
 
@@ -1129,9 +1129,9 @@ mac_run_search_result_sections() {
   while true; do
     missing=()
     local artists_tab shows_tab tracks_tab
-    artists_tab="$(mac::ax_query "search.tab.artists")"
-    shows_tab="$(mac::ax_query "search.tab.shows")"
-    tracks_tab="$(mac::ax_query "search.tab.tracks")"
+    artists_tab="$(mac::ax_query "search.tab.artists" "$DEEP")"
+    shows_tab="$(mac::ax_query "search.tab.shows" "$DEEP")"
+    tracks_tab="$(mac::ax_query "search.tab.tracks" "$DEEP")"
 
     local a_cnt s_cnt t_cnt
     a_cnt="$(echo "$artists_tab" | grep -o -E '[0-9]+' | tail -n1 || true)"
