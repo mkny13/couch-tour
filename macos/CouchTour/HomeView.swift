@@ -63,11 +63,13 @@ struct HomeView: View {
                 // Next Tour Stops Card
                 nextTourStopsCard
                     .padding(.bottom, 20)
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier(AXIdentifiers.homeNextTourStops)
 
                 // On This Date Shelf
                 onThisDateShelf
                     .padding(.bottom, 24)
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier(AXIdentifiers.homeOnThisDate)
 
                 browsePlaylistsRow
