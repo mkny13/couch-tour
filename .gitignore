@@ -49,3 +49,4 @@ __pycache__/
 smoke-reports/**/*.png
 smoke-reports/*/mac-*.txt
 smoke-reports/*/android-*.txt
+smoke-reports/*/*.apk
