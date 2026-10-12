@@ -131,7 +131,13 @@ jobs:
           stage="$RUNNER_TEMP/appcast-stage"
           mkdir -p "$stage"
           cp "$ZIP_PATH" "$stage/"
-          cp "$APPCAST_NAME" "$stage/" 2>/dev/null || true
+          # Seed with the previous feed so old items stay; main's copy is only the
+          # fallback before the appcast branch exists.
+          if git fetch --quiet origin appcast 2>/dev/null; then
+            git show "FETCH_HEAD:$APPCAST_NAME" > "$stage/$APPCAST_NAME" 2>/dev/null || true
+          else
+            cp "$APPCAST_NAME" "$stage/" 2>/dev/null || true
+          fi
 
           echo "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
             --ed-key-file - \
@@ -141,33 +147,11 @@ jobs:
 
           echo "APPCAST_STAGE=$stage" >> $GITHUB_ENV
 
-      - name: Commit updated appcast to main
+      - name: Publish appcast to appcast branch
         run: |
+          # main is protected (requires `test`), so feeds live on the unprotected
+          # `appcast` branch (D341). The script works in its own worktree, so the
+          # build's dirty Package.resolved can't interfere.
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Retry up to 5 times in case a concurrent push (e.g. cut-beta.sh, another
-          # release workflow) lands between our fetch and push, causing a non-fast-forward
-          # rejection. Rebase re-applies our appcast change on top of whatever arrived.
-          for attempt in 1 2 3 4 5; do
-            git fetch origin main
-            git checkout main
-            # The build step's xcodebuild run resolves Sparkle into CouchTourKit's own
-            # Package.resolved as a side effect (SPM quirk with a local package sibling to an
-            # external dependency in the same workspace) — that leaves an unstaged, unrelated
-            # change in the working tree, which git rebase refuses to run over. Discard it;
-            # this step only ever means to commit APPCAST_NAME.
-            git checkout -- .
-            git rebase origin/main
-            cp "$APPCAST_STAGE/$APPCAST_NAME" "$APPCAST_NAME"
-            git add "$APPCAST_NAME"
-            if git diff --cached --quiet; then
-              echo "No appcast changes to commit."
-              break
-            fi
-            git commit -m "Update $APPCAST_NAME for $TAG_NAME"
-            if git push origin main; then
-              break
-            fi
-            echo "Push rejected (attempt $attempt/5), rebasing and retrying..."
-            git reset --soft HEAD~1
-          done
+          scripts/publish-appcast.sh "$APPCAST_STAGE/$APPCAST_NAME" "$APPCAST_NAME" "$TAG_NAME"
