@@ -16,6 +16,9 @@ from datetime import datetime, timezone
 REPO_SLUG = os.environ.get("GITHUB_REPOSITORY", "mkny13/couch-tour")
 DEFAULT_MAX_AGE_DAYS = 7
 MARKER_PREFIX = "Beta promotion overdue:"
+MAC_MARKER_PREFIX = "Mac build missing:"
+# CouchTour-v0.88.zip (production) or CouchTourBeta-v0.88.zip (side-installed beta).
+MAC_ZIP_RE = re.compile(r"^CouchTour(Beta)?-v\d+\.\d+\.zip$")
 
 
 class GhError(RuntimeError):
@@ -197,7 +200,7 @@ def render_comment_body(beta: dict, prod: dict, gap: int) -> str:
     )
 
 
-def parse_existing_issue(raw_json) -> int | None:
+def parse_existing_issue(raw_json, prefix: str = MARKER_PREFIX) -> int | None:
     """Parse gh issue list JSON and find an open issue with the marker title prefix."""
     if isinstance(raw_json, list):
         data = raw_json
@@ -211,7 +214,7 @@ def parse_existing_issue(raw_json) -> int | None:
 
     for issue in data:
         title = issue.get("title", "")
-        if title.startswith(MARKER_PREFIX):
+        if title.startswith(prefix):
             return int(issue["number"])
     return None
 
@@ -262,6 +265,68 @@ def find_existing_issue() -> int | None:
         "--json", "number,title",
     ])
     return parse_existing_issue(out)
+
+
+def has_mac_zip(release: dict) -> bool:
+    """True if the release carries a CouchTour*-vX.Y.zip asset."""
+    return any(MAC_ZIP_RE.match(a.get("name", "")) for a in release.get("assets") or [])
+
+
+def releases_missing_mac(releases: list[dict]) -> list[dict]:
+    """Pre-releases newer than the newest release that carries a Mac zip, newest first.
+
+    v0.85-v0.87 shipped Android-only because the macOS run failed unnoticed. Releases are
+    sorted newest first, so everything before the first zip-bearing release is missing one.
+    """
+    missing = []
+    for r in releases:
+        if has_mac_zip(r):
+            break
+        if r.get("prerelease", False):
+            missing.append(r)
+    return missing
+
+
+def render_mac_body(missing: list[dict]) -> str:
+    tags = ", ".join(r.get("tag_name", "unknown") for r in missing)
+    return (
+        "## Problem\n\n"
+        f"Pre-release(s) **{tags}** are newer than the last release with a "
+        "`CouchTour*-vX.Y.zip` asset, so the macOS release run failed or never ran and "
+        "they shipped Android-only.\n\n"
+        "## Goal\n\n"
+        "Check the `macos-release.yml` run for each tag, fix the failure, and re-run it "
+        "(`gh workflow run macos-release.yml --ref main -f release_tag=<tag> -f is_beta=true`).\n\n"
+        "---\n"
+        "Filed automatically by `.github/workflows/beta-guard.yml`."
+    )
+
+
+def run_mac_guard(releases: list[dict]) -> dict:
+    """Flag pre-releases that lack a Mac zip, upserting one issue like run_guard does."""
+    missing = releases_missing_mac(releases)
+    if not missing:
+        msg = "Mac build guard: latest pre-release has a Mac zip (or none is newer than one)."
+        print(msg)
+        write_step_summary(msg)
+        return {"flagged": False, "action": "none"}
+
+    tags = [r.get("tag_name", "unknown") for r in missing]
+    title = f"{MAC_MARKER_PREFIX} {tags[0]}"
+    existing = parse_existing_issue(run_gh([
+        "issue", "list", "--repo", REPO_SLUG, "--state", "open",
+        "--search", f'"{MAC_MARKER_PREFIX}" in:title', "--json", "number,title",
+    ]), MAC_MARKER_PREFIX)
+    if existing is not None:
+        comment_on_issue(existing, f"Still missing a Mac zip: {', '.join(tags)}.")
+        action, number = "comment", existing
+    else:
+        number = create_issue(title, render_mac_body(missing))
+        action = "create"
+    msg = f"Mac build guard: {', '.join(tags)} lack a Mac zip. {action} issue #{number}."
+    print(msg)
+    write_step_summary(msg)
+    return {"flagged": True, "action": action, "issue": number, "tags": tags}
 
 
 def run_guard(now=None, max_age_days=None) -> dict:
@@ -339,6 +404,11 @@ def main() -> int:
     except Exception as e:
         print(f"Error in beta_guard: {e}", file=sys.stderr)
         write_step_summary(f"Beta promotion guard encountered an error: {e}")
+    try:
+        run_mac_guard(parse_releases(run_gh(["api", "--paginate", f"repos/{REPO_SLUG}/releases"])))
+    except Exception as e:
+        print(f"Error in mac build guard: {e}", file=sys.stderr)
+        write_step_summary(f"Mac build guard encountered an error: {e}")
     return 0
 
 

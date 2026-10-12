@@ -11,11 +11,13 @@ set -euo pipefail
 
 notes=""
 tag=""
+watch=1
 while [ $# -gt 0 ]; do
     case "$1" in
         -t|--tag) tag="$2"; shift 2 ;;
+        --no-watch) watch=0; shift ;;
         -h|--help)
-            echo "Usage: $0 [-t vX.Y] <release notes>" >&2
+            echo "Usage: $0 [-t vX.Y] [--no-watch] <release notes>" >&2
             exit 0
             ;;
         *) notes="$1"; shift ;;
@@ -23,7 +25,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$notes" ]; then
-    echo "Usage: $0 [-t vX.Y] <release notes>" >&2
+    echo "Usage: $0 [-t vX.Y] [--no-watch] <release notes>" >&2
     exit 1
 fi
 
@@ -57,10 +59,13 @@ gh workflow run build-debug-apk.yml \
 
 echo "Waiting for Android run to register..."
 android_url=""
+android_id=""
 for _ in 1 2 3 4 5; do
     sleep 2
     android_url="$(gh run list --workflow=build-debug-apk.yml --event=workflow_dispatch \
-        --limit 1 --json url,createdAt -q '.[0].url' 2>/dev/null || true)"
+        --limit 1 --json url -q '.[0].url' 2>/dev/null || true)"
+    android_id="$(gh run list --workflow=build-debug-apk.yml --event=workflow_dispatch \
+        --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
     [ -n "$android_url" ] && break
 done
 
@@ -72,10 +77,13 @@ gh workflow run macos-release.yml --ref main \
 
 echo "Waiting for macOS run to register..."
 macos_url=""
+macos_id=""
 for _ in 1 2 3 4 5; do
     sleep 2
     macos_url="$(gh run list --workflow=macos-release.yml --event=workflow_dispatch \
-        --limit 1 --json url,createdAt -q '.[0].url' 2>/dev/null || true)"
+        --limit 1 --json url -q '.[0].url' 2>/dev/null || true)"
+    macos_id="$(gh run list --workflow=macos-release.yml --event=workflow_dispatch \
+        --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
     [ -n "$macos_url" ] && break
 done
 
@@ -91,3 +99,44 @@ if [ -n "$macos_url" ]; then
 else
     echo "macOS: dispatched but run URL not found — check: gh run list --workflow=macos-release.yml"
 fi
+
+[ "$watch" = 1 ] || exit 0
+
+# A dispatched run that later fails used to go unnoticed (v0.85-v0.87 shipped Android-only),
+# so block on each run and make a failure impossible to miss.
+failed=0
+watch_run() {
+    local label="$1" id="$2" url="$3"
+    if [ -z "$id" ]; then
+        echo "" >&2
+        echo "!!! $label BUILD UNVERIFIED: run id not found, cannot watch it. Check: ${url:-gh run list}" >&2
+        failed=1
+        return
+    fi
+    echo ""
+    echo "Watching $label run $id..."
+    if gh run watch "$id" --exit-status >/dev/null 2>&1; then
+        echo "$label build succeeded."
+        return
+    fi
+    failed=1
+    {
+        echo ""
+        echo "=========================================================="
+        echo "$label BUILD FAILED for $tag: $url"
+        echo "----------------------- failed log tail ------------------"
+        gh run view "$id" --log-failed 2>&1 | tail -40 || true
+        echo "=========================================================="
+    } >&2
+}
+
+watch_run "ANDROID" "$android_id" "$android_url"
+watch_run "MAC" "$macos_id" "$macos_url"
+
+if [ "$failed" != 0 ]; then
+    echo "" >&2
+    echo "Beta $tag is NOT fully shipped; see the failure above." >&2
+    exit 1
+fi
+echo ""
+echo "Beta $tag shipped on Android and macOS."
