@@ -50,7 +50,7 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
-        SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml"
+        SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/appcast/appcast.xml"
         SUPublicEDKey: "yWmYH/MYjiHVgfRTWDz1QQH39t+upIPeK1Dkh8eqcbA="
         SUEnableAutomaticChecks: true
     entitlements:
@@ -99,7 +99,7 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: ""
-        SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast-beta.xml"
+        SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/appcast/appcast-beta.xml"
         SUPublicEDKey: "yWmYH/MYjiHVgfRTWDz1QQH39t+upIPeK1Dkh8eqcbA="
         SUEnableAutomaticChecks: true
     entitlements:

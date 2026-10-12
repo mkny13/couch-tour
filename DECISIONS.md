@@ -600,3 +600,13 @@ The Mahler practices audit (mahler#780) flagged heuristic candidates for `tracke
 
 Under Mahler D39 (mahler#821), content-bound review entries are recorded in `.mahler/secret-reviews.json` binding each reviewed candidate line to the file's SHA-256 hash, enabling the mechanical practices audit check to pass while ensuring any new or modified candidate lines require fresh human review.
 
+
+### D340: Sparkle appcasts publish to an unprotected `appcast` branch, not `main` (#609)
+
+Since `main` requires the `test` check (D336), `macos-release.yml`'s direct push of `appcast*.xml` was rejected (GH006), freezing the Mac feeds at 0.84-beta / 0.83. Its retry loop was also broken: `git reset --soft HEAD~1` left the appcast staged, so the next `git rebase` aborted.
+
+**Decision:** both feeds live on an orphan `appcast` branch holding only `appcast.xml` and `appcast-beta.xml`, written by `scripts/publish-appcast.sh` in a throwaway worktree (so the build's dirty `Package.resolved` can't interfere), with fetch + `reset --hard` retries and a hard refusal to target `main`. `SUFeedURL` points at `raw.githubusercontent.com/mkny13/couch-tour/appcast/appcast[-beta].xml`, and generate_appcast is seeded from `origin/appcast` so old items stay. The first publish seeds the branch from `main`'s current feeds. Covered by `scripts/test_publish_appcast.sh` in the `test` job.
+
+**Rejected:** a bypass actor (admin setup plus a new secret, weakens D336); a PR merged by the conductor (`GITHUB_TOKEN` PRs don't trigger `test.yml`, so the required check never reports); a rolling GitHub release (fires `macos-release.yml` and counts in `beta_guard.py`); Pages (admin setting).
+
+**Supersedes** D198's commit-to-`main` step. `main`'s legacy `appcast*.xml` stay frozen after a one-time bootstrap (#639), because installs with the old `SUFeedURL` baked in still read them.
