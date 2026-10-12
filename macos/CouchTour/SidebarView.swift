@@ -138,9 +138,13 @@ struct SidebarView: View {
                         }
                     }
                     .padding(.horizontal, 8)
+                    // The list id lives on this contained group, not on the ScrollView: an
+                    // AXScrollArea also exposes its scroll bars as children, which the
+                    // no-unfavorited-in-favorites journey counted as unconfirmed rows (#614).
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier(AXIdentifiers.sidebarFavoritesList)
                 }
             }
-            .accessibilityIdentifier(AXIdentifiers.sidebarFavoritesList)
 
             Spacer()
 
