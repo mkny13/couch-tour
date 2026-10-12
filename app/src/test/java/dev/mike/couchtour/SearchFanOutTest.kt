@@ -60,6 +60,28 @@ class SearchFanOutTest {
         assertTrue(hits.failed.isEmpty())
     }
 
+    /** The `search-result-sections` smoke journey's contract: one query fills the artists,
+     *  shows and tracks sections together, which is what makes `search.results` render. */
+    @Test
+    fun `one query yields artists, shows and tracks together`() = runBlocking {
+        val body = javaClass.classLoader!!.getResourceAsStream("fixtures/search.json")!!
+            .bufferedReader().use { it.readText() }
+        phishInServer.enqueue(MockResponse().setBody(body))
+        relistenServer.enqueue(
+            MockResponse().setBody(
+                """{"Artists":[{"uuid":"u","slug":"ghost","name":"Ghost","show_count":10}],
+                    "Shows":[],"Songs":[],"Venues":[]}"""
+            )
+        )
+
+        val hits = searchAll("ghost")
+
+        assertTrue(hits.artists.isNotEmpty())
+        assertTrue(hits.shows.isNotEmpty())
+        assertTrue(hits.tracks.isNotEmpty())
+        assertTrue(hits.failed.isEmpty())
+    }
+
     @Test
     fun `one backend failing doesn't cost the other's results`() = runBlocking {
         phishInServer.enqueue(MockResponse().setResponseCode(500))
