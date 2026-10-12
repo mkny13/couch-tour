@@ -48,44 +48,52 @@ if [ -z "$tag" ]; then
     tag="${major}.$((minor + 1))"
 fi
 
+# Resolve the run `gh workflow run` just dispatched. Newer gh prints its URL, which is exact;
+# taking the newest run from `gh run list` instead can pick up someone else's concurrent dispatch,
+# so that stays only as the fallback for when no URL was printed.
+resolve_run() {
+    local workflow="$1" dispatch_out="$2" url
+    url="$(printf '%s\n' "$dispatch_out" | grep -Eo 'https://[^ ]+/actions/runs/[0-9]+' | head -1 || true)"
+    if [ -n "$url" ]; then
+        run_url="$url"
+        run_id="${url##*/}"
+        return
+    fi
+    run_url=""
+    run_id=""
+    for _ in 1 2 3 4 5; do
+        sleep 2
+        run_url="$(gh run list --workflow="$workflow" --event=workflow_dispatch \
+            --limit 1 --json url -q '.[0].url' 2>/dev/null || true)"
+        run_id="$(gh run list --workflow="$workflow" --event=workflow_dispatch \
+            --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
+        [ -n "$run_url" ] && break
+    done
+    return 0  # a failed last `[ -n ]` must not trip set -e; callers handle the empty case
+}
+
 echo "Cutting beta $tag (Android: side_install + prerelease; macOS: is_beta)..."
 
 # Android
-gh workflow run build-debug-apk.yml \
+android_dispatch="$(gh workflow run build-debug-apk.yml \
     -f release_tag="$tag" \
     -f release_notes="$notes" \
     -f prerelease=true \
-    -f side_install=true
+    -f side_install=true 2>&1)"
 
-echo "Waiting for Android run to register..."
-android_url=""
-android_id=""
-for _ in 1 2 3 4 5; do
-    sleep 2
-    android_url="$(gh run list --workflow=build-debug-apk.yml --event=workflow_dispatch \
-        --limit 1 --json url -q '.[0].url' 2>/dev/null || true)"
-    android_id="$(gh run list --workflow=build-debug-apk.yml --event=workflow_dispatch \
-        --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
-    [ -n "$android_url" ] && break
-done
+resolve_run build-debug-apk.yml "$android_dispatch"
+android_url="$run_url"
+android_id="$run_id"
 
 # macOS — runs against main branch; the workflow uses the release_tag input to determine
 # what to build and where to upload the zip.
-gh workflow run macos-release.yml --ref main \
+macos_dispatch="$(gh workflow run macos-release.yml --ref main \
     -f release_tag="$tag" \
-    -f is_beta=true
+    -f is_beta=true 2>&1)"
 
-echo "Waiting for macOS run to register..."
-macos_url=""
-macos_id=""
-for _ in 1 2 3 4 5; do
-    sleep 2
-    macos_url="$(gh run list --workflow=macos-release.yml --event=workflow_dispatch \
-        --limit 1 --json url -q '.[0].url' 2>/dev/null || true)"
-    macos_id="$(gh run list --workflow=macos-release.yml --event=workflow_dispatch \
-        --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
-    [ -n "$macos_url" ] && break
-done
+resolve_run macos-release.yml "$macos_dispatch"
+macos_url="$run_url"
+macos_id="$run_id"
 
 echo ""
 echo "Tag: $tag"

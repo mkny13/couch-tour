@@ -19,7 +19,15 @@ FAKE_GIT = "#!/bin/sh\n[ \"$1\" = tag ] && echo v0.87\nexit 0\n"
 # FAIL_WORKFLOW names the workflow whose `gh run watch` should fail.
 FAKE_GH = r"""#!/bin/sh
 case "$1 $2" in
-  "workflow run") exit 0 ;;
+  "workflow run")
+    # DISPATCH_URL=1: print the new run's URL like current gh does.
+    if [ "$DISPATCH_URL" = "1" ]; then
+      case "$*" in
+        *build-debug-apk*) echo "https://github.com/o/r/actions/runs/901" ;;
+        *) echo "https://github.com/o/r/actions/runs/902" ;;
+      esac
+    fi
+    exit 0 ;;
   "run list")
     case "$*" in
       *build-debug-apk*)
@@ -55,13 +63,15 @@ exit 0
 
 
 class CutBetaTests(unittest.TestCase):
-    def run_script(self, fail_id="", *args):
+    def run_script(self, fail_id="", *args, dispatch_url=False):
         with tempfile.TemporaryDirectory() as d:
             for name, body in (("git", FAKE_GIT), ("gh", FAKE_GH), ("sleep", "#!/bin/sh\n")):
                 p = Path(d, name)
                 p.write_text(body)
                 p.chmod(p.stat().st_mode | stat.S_IEXEC)
             env = {**os.environ, "PATH": f"{d}:{os.environ['PATH']}", "FAIL_ID": fail_id}
+            if dispatch_url:
+                env["DISPATCH_URL"] = "1"
             if fail_id == "empty_android":
                 env["EMPTY_ANDROID"] = "1"
             if fail_id == "empty_macos":
@@ -116,6 +126,24 @@ class CutBetaTests(unittest.TestCase):
         r = self.run_script("empty_android", "--no-watch")
         self.assertEqual(r.returncode, 0)
         self.assertIn("ANDROID BUILD UNVERIFIED", r.stderr)
+
+    def test_dispatch_url_beats_newer_run_in_list(self):
+        # `gh run list` would return 111/222 (someone else's newer run); the printed URLs win.
+        r = self.run_script("902", dispatch_url=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("MAC BUILD FAILED", r.stderr)
+        self.assertIn("actions/runs/901", r.stdout)
+        self.assertIn("actions/runs/902", r.stdout)
+        self.assertNotIn("runs/111", r.stdout)
+
+    def test_dispatch_url_success(self):
+        r = self.run_script(dispatch_url=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_no_dispatch_url_falls_back_to_run_list(self):
+        r = self.run_script()
+        self.assertIn("https://example/runs/111", r.stdout)
+        self.assertIn("https://example/runs/222", r.stdout)
 
 
 if __name__ == "__main__":
