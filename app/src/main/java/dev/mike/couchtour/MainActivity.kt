@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Layers
@@ -1028,6 +1029,7 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
         val isHome = currentRoute == "home"
         val isSearch = currentRoute in listOf("artists", "search")
         val isLibrary = currentRoute in listOf("library", "local-playlists", "playlists", "mine/shows", "mine/tracks", "mine/playlists")
+        val isHistory = currentRoute == "history"
         val isSettings = currentRoute in listOf("settings", "sync", "login", "scan")
 
         BottomNavItem(
@@ -1062,6 +1064,17 @@ fun LedgerBottomBar(currentRoute: String?, nav: NavHostController) {
             onClick = {
                 if (!isLibrary) {
                     nav.navigate("library")
+                }
+            }
+        )
+        BottomNavItem(
+            label = "History",
+            icon = Icons.Default.History,
+            selected = isHistory,
+            testTag = A11yTags.NAV_HISTORY,
+            onClick = {
+                if (!isHistory) {
+                    nav.navigate("history")
                 }
             }
         )

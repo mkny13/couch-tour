@@ -113,7 +113,6 @@ struct ThreePaneRootView: View {
                     .accessibilityIdentifier(AXIdentifiers.artistsScreen)
             case .listening:
                 ListeningView()
-                    .accessibilityIdentifier(AXIdentifiers.historyScreen)
             case .playlists:
                 LocalPlaylistsView()
                     .accessibilityIdentifier(AXIdentifiers.libraryScreen)
