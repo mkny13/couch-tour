@@ -281,5 +281,54 @@ class BetaGuardWorkflowExecutionTests(unittest.TestCase):
                 os.remove(summary_path)
 
 
+class MacZipGuardTests(unittest.TestCase):
+    @staticmethod
+    def rel(tag, day, zip_name=None, prerelease=True):
+        return {"tag_name": tag, "prerelease": prerelease, "published_at": f"2026-09-{day:02d}T00:00:00Z",
+                "assets": [{"name": zip_name}] if zip_name else [{"name": "app-debug.apk"}]}
+
+    def test_android_only_prereleases_after_last_zip_are_missing(self):
+        releases = beta_guard.parse_releases([
+            self.rel("v0.87", 25), self.rel("v0.86", 24), self.rel("v0.84", 20, "CouchTourBeta-v0.84.zip"),
+            self.rel("v0.83", 10),
+        ])
+        self.assertEqual([r["tag_name"] for r in beta_guard.releases_missing_mac(releases)], ["v0.87", "v0.86"])
+
+    def test_latest_with_zip_is_clean(self):
+        releases = beta_guard.parse_releases([
+            self.rel("v0.88", 26, "CouchTourBeta-v0.88.zip"), self.rel("v0.87", 25),
+        ])
+        self.assertEqual(beta_guard.releases_missing_mac(releases), [])
+
+    def test_production_zip_name_counts(self):
+        self.assertTrue(beta_guard.has_mac_zip(self.rel("v0.9", 1, "CouchTour-v0.9.zip", prerelease=False)))
+        self.assertFalse(beta_guard.has_mac_zip(self.rel("v0.9", 1, "CouchTour-v0.9.dmg")))
+
+    def test_run_mac_guard_creates_then_comments(self):
+        releases = beta_guard.parse_releases([self.rel("v0.87", 25)])
+        calls = []
+
+        def gh(args, existing="[]"):
+            calls.append(args)
+            if args[:2] == ["issue", "list"]:
+                return existing
+            return "https://github.com/mkny13/couch-tour/issues/700\n"
+
+        with mock.patch.object(beta_guard, "run_gh", side_effect=gh):
+            res = beta_guard.run_mac_guard(releases)
+        self.assertEqual((res["action"], res["issue"]), ("create", 700))
+        self.assertTrue(any(c[:2] == ["issue", "create"] and "Mac build missing: v0.87" in c for c in calls))
+
+        with mock.patch.object(beta_guard, "run_gh",
+                               side_effect=lambda a: gh(a, '[{"number": 700, "title": "Mac build missing: v0.87"}]')):
+            res = beta_guard.run_mac_guard(releases)
+        self.assertEqual((res["action"], res["issue"]), ("comment", 700))
+
+    def test_run_mac_guard_no_flag(self):
+        releases = beta_guard.parse_releases([self.rel("v0.88", 26, "CouchTourBeta-v0.88.zip")])
+        with mock.patch.object(beta_guard, "run_gh", side_effect=AssertionError("no gh call expected")):
+            self.assertFalse(beta_guard.run_mac_guard(releases)["flagged"])
+
+
 if __name__ == "__main__":
     unittest.main()
