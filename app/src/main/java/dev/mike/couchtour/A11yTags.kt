@@ -26,6 +26,9 @@ object A11yTags {
     // "Browse artists" row, then the star on that artist's row (#533).
     const val HOME_BROWSE_ARTISTS = "home.browse-artists"
     const val ARTISTS_LIST = "artists.list"
+    // Mirrors macOS's artists.row.<backend>.<id>, so the smoke runner can pick one artist (#611).
+    fun artistRow(backendId: String, artistId: String) = "artists.row.$backendId.$artistId"
+    const val ARTIST_SCREEN = "artist.screen"
     fun artistFavorite(artistKey: String) = "artists.favorite.$artistKey"
 
     const val SEARCH_FIELD = "search.field"
