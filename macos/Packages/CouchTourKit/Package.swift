@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "CouchTourKit", targets: ["CouchTourKit"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.29.0"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
     ],
     targets: [
         .target(
