@@ -43,6 +43,9 @@ struct ListeningView: View {
                 loadedBody
             }
         }
+        // A transparent Group makes no AX element, so the identifier must sit on a container.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(AXIdentifiers.historyScreen)
         .task { await load() }
         // A crude but sufficient refresh trigger for the MVP: reload whenever playback moves
         // to a new queue, so starting or advancing a show updates this list if it's on screen.
