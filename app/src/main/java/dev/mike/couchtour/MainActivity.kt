@@ -316,54 +316,6 @@ fun App(
 
 // ---------------------------------------------------------------- screens
 
-@Composable
-fun TagBadge(
-    tag: TagRef,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-) {
-    val fallbackColor = when (tag.name.uppercase()) {
-        "SBD", "SOUNDBOARD" -> MaterialTheme.colorScheme.primary
-        "FLAC" -> MaterialTheme.colorScheme.secondary
-        "MATRIX", "MATRIX?" -> MaterialTheme.colorScheme.tertiary
-        "JAMCHARTS" -> Color(0xFFE91E63)
-        "BUSTOUT", "BUSTOUT*" -> Color(0xFFFF9800)
-        "GUEST" -> Color(0xFF9C27B0)
-        "LORE" -> Color(0xFF009688)
-        else -> MaterialTheme.colorScheme.outline
-    }
-    val badgeColor = parseTagColor(tag.color, fallbackColor)
-    val baseModifier = modifier.padding(end = 4.dp)
-    Surface(
-        color = badgeColor.copy(alpha = 0.18f),
-        contentColor = badgeColor,
-        shape = RoundedCornerShape(4.dp),
-        modifier = if (onClick != null) baseModifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = onClick) else baseModifier,
-    ) {
-        Text(
-            text = tag.name,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
-    }
-}
-
-private fun parseTagColor(colorStr: String?, defaultColor: Color): Color {
-    if (colorStr.isNullOrBlank()) return defaultColor
-    return try {
-        val hex = colorStr.trim().removePrefix("#")
-        val colorInt = when (hex.length) {
-            6 -> (0xFF000000 or hex.toLong(16)).toInt()
-            8 -> hex.toLong(16).toInt()
-            else -> return defaultColor
-        }
-        Color(colorInt)
-    } catch (_: Throwable) {
-        defaultColor
-    }
-}
-
 /**
  * Heart toggle for a Relisten [PlayableTrack] (#11, #372), backed by [LikedTracks]. Deliberately
  * separate from phish.in's [LikeButton]: no account gate, no server round-trip, no public
@@ -475,54 +427,6 @@ internal fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun AddTracksToPlaylistDialog(
-    vm: PlayerViewModel,
-    tracks: List<LocalPlaylistTrackEntity>,
-    onDismiss: () -> Unit
-) {
-    var creating by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val playlists by vm.localPlaylistDao.playlists().collectAsState(initial = emptyList())
-
-    if (creating) {
-        NewPlaylistDialog(
-            onDismiss = { creating = false },
-            onCreate = { name ->
-                creating = false
-                scope.launch {
-                    val id = vm.createLocalPlaylist(name)
-                    tracks.forEach { vm.addToLocalPlaylist(id, it) }
-                    onDismiss()
-                }
-            }
-        )
-    } else {
-        ModalBottomSheet(onDismissRequest = onDismiss) {
-            LazyColumn {
-                item {
-                    RowItem("New playlist", "", null) {
-                        creating = true
-                    }
-                }
-                items(playlists, key = { it.id }) { playlist ->
-                    RowItem(
-                        title = playlist.name,
-                        subtitle = "${playlist.trackCount} ${plural(playlist.trackCount, "track")}",
-                        artUrl = null,
-                    ) {
-                        scope.launch {
-                            tracks.forEach { vm.addToLocalPlaylist(playlist.id, it) }
-                            onDismiss()
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
