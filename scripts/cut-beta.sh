@@ -100,12 +100,10 @@ else
     echo "macOS: dispatched but run URL not found — check: gh run list --workflow=macos-release.yml"
 fi
 
-[ "$watch" = 1 ] || exit 0
-
 # A dispatched run that later fails used to go unnoticed (v0.85-v0.87 shipped Android-only),
 # so block on each run and make a failure impossible to miss.
 failed=0
-watch_run() {
+check_missing() {
     local label="$1" id="$2" url="$3"
     if [ -z "$id" ]; then
         echo "" >&2
@@ -113,6 +111,21 @@ watch_run() {
         failed=1
         return
     fi
+}
+
+check_missing "ANDROID" "$android_id" "$android_url"
+check_missing "MAC" "$macos_id" "$macos_url"
+
+if [ "$watch" != 1 ]; then
+    if [ "$failed" != 0 ]; then
+        echo "" >&2
+        echo "Beta $tag is NOT fully shipped; see the failure above." >&2
+    fi
+    exit 0
+fi
+
+watch_run() {
+    local label="$1" id="$2" url="$3"
     echo ""
     echo "Watching $label run $id..."
     if gh run watch "$id" --exit-status >/dev/null 2>&1; then

@@ -22,11 +22,32 @@ case "$1 $2" in
   "workflow run") exit 0 ;;
   "run list")
     case "$*" in
-      *build-debug-apk*) id=111 ;;
-      *) id=222 ;;
+      *build-debug-apk*)
+        if [ "$EMPTY_ANDROID" = "1" ] || [ "$EMPTY_BOTH" = "1" ]; then
+          id=""
+        else
+          id=111
+        fi ;;
+      *)
+        if [ "$EMPTY_MACOS" = "1" ] || [ "$EMPTY_BOTH" = "1" ]; then
+          id=""
+        else
+          id=222
+        fi ;;
     esac
-    case "$*" in *databaseId*) echo $id ;; *) echo "https://example/runs/$id" ;; esac ;;
-  "run watch") [ "$3" = "$FAIL_ID" ] && exit 1; exit 0 ;;
+    case "$*" in *databaseId*)
+      echo $id ;;
+    *)
+      if [ -n "$id" ]; then
+        echo "https://example/runs/$id"
+      else
+        echo ""
+      fi ;;
+    esac ;;
+  "run watch")
+    [ -z "$FAIL_ID" ] && exit 0
+    [ "$3" = "$FAIL_ID" ] && exit 1
+    exit 0 ;;
   "run view") echo "step X: boom"; echo "Commit updated appcast failed" ;;
 esac
 exit 0
@@ -41,6 +62,13 @@ class CutBetaTests(unittest.TestCase):
                 p.write_text(body)
                 p.chmod(p.stat().st_mode | stat.S_IEXEC)
             env = {**os.environ, "PATH": f"{d}:{os.environ['PATH']}", "FAIL_ID": fail_id}
+            if fail_id == "empty_android":
+                env["EMPTY_ANDROID"] = "1"
+            if fail_id == "empty_macos":
+                env["EMPTY_MACOS"] = "1"
+            if fail_id == "empty_both":
+                env["EMPTY_ANDROID"] = "1"
+                env["EMPTY_MACOS"] = "1"
             return subprocess.run(["bash", str(SCRIPT), *args, "notes"], env=env,
                                   capture_output=True, text=True, timeout=60)
 
@@ -65,6 +93,29 @@ class CutBetaTests(unittest.TestCase):
         r = self.run_script("222", "--no-watch")
         self.assertEqual(r.returncode, 0)
         self.assertNotIn("FAILED", r.stderr)
+
+    def test_android_id_empty_unverified_branch(self):
+        r = self.run_script("empty_android")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ANDROID BUILD UNVERIFIED", r.stderr)
+        self.assertNotIn("MAC BUILD FAILED", r.stderr)
+
+    def test_macos_id_empty_unverified_branch(self):
+        r = self.run_script("empty_macos")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("MAC BUILD UNVERIFIED", r.stderr)
+        self.assertNotIn("ANDROID BUILD FAILED", r.stderr)
+
+    def test_both_ids_empty_unverified_branch(self):
+        r = self.run_script("empty_both")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ANDROID BUILD UNVERIFIED", r.stderr)
+        self.assertIn("MAC BUILD UNVERIFIED", r.stderr)
+
+    def test_no_watch_with_missing_id(self):
+        r = self.run_script("empty_android", "--no-watch")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("ANDROID BUILD UNVERIFIED", r.stderr)
 
 
 if __name__ == "__main__":
