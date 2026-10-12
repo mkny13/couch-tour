@@ -61,15 +61,25 @@ Three entry points, all run from the repo root:
   Add `--out <file>` to also write them to a file.
 
 `run-smoke.sh` options: `--platform mac|android|both`, `--out <dir>`, `--waive <id> - <reason>`,
-`--no-file-bugs`, `--commit-screenshots`, `--keep-going` (see `--help`). Exit codes: `0` = every
+`--no-file-bugs`, `--commit-screenshots`, `--keep-going`, `--allow-focus` (Mac; or
+`CCTV_SMOKE_ALLOW_FOCUS=1`), `--apk <path>`, `--serial <id>`, `--build-apk` (see `--help`).
+On Android a tag run downloads `couch-tour-<tag>.apk` from that release (`gh release download`) so it
+tests the tag; if the download fails the platform is not-run, never silently a local build. `--build-apk`
+uses the locally built APK instead (local dev runs); `--apk` and `--build-apk` are mutually exclusive. Exit codes: `0` = every
 selected platform ran and a report was written, `1` = usage error, `2` = a platform could not be
 run. If no platform could run, no report is written and no issue is filed. If some did, the
 report is written, says which platform didn't run, is `FAIL`, and the exit code is still `2`.
 
-Worked example, no device attached:
+Unattended / gated run (the desktop gate starts it while the beta is in the background):
 
 ```
-$ scripts/smoke/run-smoke.sh --tag v0.0-demo --platform android
+mahler desktop run -- scripts/smoke/run-smoke.sh --tag <tag> --platform both --allow-focus --serial emulator-5554
+```
+
+Worked example, no device attached (`--build-apk` skips the release download):
+
+```
+$ scripts/smoke/run-smoke.sh --tag v0.0-demo --platform android --build-apk
 == android: .../scripts/smoke/run-android.sh
 ERROR: No Android device attached in 'device' state. adb devices output:\nList of devices attached
 No platform could be run; no report written.

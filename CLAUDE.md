@@ -44,7 +44,11 @@ Run the journeys against the installed beta (natural step after `scripts/cut-bet
 ```bash
 scripts/smoke/run-smoke.sh --tag <beta-tag> [--platform mac|android|both] [--no-file-bugs]   # --help for all flags
 ```
-Writes `smoke-reports/<tag>.md` (the promotion gate reads it) and files a `mahler`-labelled issue per failing journey. Exit codes: `0` ran and reported, `1` usage, `2` a platform couldn't run (no device/app; never a PASS). Headless checks, no app needed: `scripts/smoke/test-report.sh`, `scripts/smoke/check-journeys.sh`. Details: `scripts/smoke/README.md`.
+Writes `smoke-reports/<tag>.md` (the promotion gate reads it) and files a `mahler`-labelled issue per failing journey. Unattended (desktop-gated) runs add `--allow-focus` (Mac) and `--serial <id>` (Android); a tag run downloads that release's `couch-tour-<tag>.apk` unless `--apk <path>` or `--build-apk` is given:
+```bash
+mahler desktop run -- scripts/smoke/run-smoke.sh --tag <tag> --platform both --allow-focus --serial emulator-5554
+```
+Exit codes: `0` ran and reported, `1` usage, `2` a platform couldn't run (no device/app; never a PASS). Headless checks, no app needed: `scripts/smoke/test-report.sh`, `scripts/smoke/check-journeys.sh`, `scripts/smoke/test-run-smoke.sh`. Details: `scripts/smoke/README.md`.
 
 ### Verifying shipped issues
 A shipped issue (merged, still labelled `mahler:verifying`) counts as verified only with a comment citing a beta tag plus evidence: a smoke-report line (`smoke-reports/<tag>.md`), a screenshot or dump, or an owner UAT note. Post it in the standard format (carries the `<!-- mahler:verified -->` marker):

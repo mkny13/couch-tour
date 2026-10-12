@@ -22,6 +22,8 @@ MAHLER_BIN="${CCTV_SMOKE_MAHLER:-mahler}"
 TAG=""; PLATFORM="both"; OUT_DIR="smoke-reports"; FILE_BUGS=true
 COMMIT_SCREENSHOTS=false; KEEP_GOING=false; AUTO_VERIFY=false
 WAIVE_ARGS=(); WAIVE_IDS=(); RUN_SYNC_JOURNEYS=true
+ALLOW_FOCUS=false; [[ "${CCTV_SMOKE_ALLOW_FOCUS:-}" == 1 ]] && ALLOW_FOCUS=true
+APK=""; SERIAL=""; BUILD_APK=false
 
 usage() {
   cat << 'EOF2'
@@ -39,6 +41,12 @@ Options:
                              marks 'covered' (opt-in; needs the issue list, so not with --no-file-bugs)
   --no-sync                  Skip the two-client sync round trips (they run by default with --platform both
                              and reset the staging sync group afterwards; see README.md)
+  --allow-focus              Mac: let the runner take focus (needed when the desktop gate starts the run
+                             while the beta is in the background); or set CCTV_SMOKE_ALLOW_FOCUS=1
+  --apk <path>               Android: test this APK instead of downloading the tag's release asset
+  --serial <id>              Android: adb serial of the emulator/device to use
+  --build-apk                Android: use the locally built APK (runner searches build output) instead of
+                             downloading couch-tour-<tag>.apk from the release; not with --apk
   --keep-going               Carry on to the next platform when a runner exits with a usage error
                              (1); a preflight failure (2) never stops the other platform
   -h, --help                 Print this usage message
@@ -68,6 +76,10 @@ while [[ $# -gt 0 ]]; do
     --commit-screenshots) COMMIT_SCREENSHOTS=true; shift ;;
     --auto-verify) AUTO_VERIFY=true; shift ;;
     --no-sync) RUN_SYNC_JOURNEYS=false; shift ;;
+    --allow-focus) ALLOW_FOCUS=true; shift ;;
+    --apk) [[ -n "${2:-}" ]] || die "--apk requires a path"; APK="$2"; shift 2 ;;
+    --serial) [[ -n "${2:-}" ]] || die "--serial requires an id"; SERIAL="$2"; shift 2 ;;
+    --build-apk) BUILD_APK=true; shift ;;
     --keep-going) KEEP_GOING=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "Unknown argument: $1" ;;
@@ -75,6 +87,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$AUTO_VERIFY" == false || "$FILE_BUGS" == true ]] || die "--auto-verify cannot be combined with --no-file-bugs"
+
+[[ -z "$APK" || "$BUILD_APK" == false ]] || die "--apk and --build-apk cannot be combined"
 
 cd "$REPO_ROOT"
 
@@ -91,15 +105,37 @@ RUN_DIR="$OUT_DIR/$TAG"
 mkdir -p "$RUN_DIR"
 PLATFORMS=(); case "$PLATFORM" in both) PLATFORMS=(mac android) ;; *) PLATFORMS=("$PLATFORM") ;; esac
 
+# A tag run tests the tag's released APK, not whatever is in build output. A failed download is a
+# not-run, never a silent fallback to a local build.
+APK_FAILED=false
+if [[ " ${PLATFORMS[*]} " == *" android "* && -z "$APK" && "$BUILD_APK" == false ]]; then
+  if "$GH_BIN" release download "$TAG" -R "$REPO_SLUG" --pattern "couch-tour-$TAG.apk" --dir "$RUN_DIR" --clobber >&2 \
+     && [[ -f "$RUN_DIR/couch-tour-$TAG.apk" ]]; then
+    APK="$RUN_DIR/couch-tour-$TAG.apk"
+  else
+    APK_FAILED=true
+  fi
+fi
+
 RESULT_ARGS=(); RESULT_FILES=(); NOTRUN_ARGS=(); ran=0; notrun=0
 for plat in "${PLATFORMS[@]}"; do
   results="$RUN_DIR/$plat-results.txt"; errlog="$RUN_DIR/$plat-stderr.txt"
   rm -f "$results"
   runner="$RUN_MAC"; [[ "$plat" == android ]] && runner="$RUN_ANDROID"
+  extra=()
+  if [[ "$plat" == mac && "$ALLOW_FOCUS" == true ]]; then extra+=(--allow-focus); fi
+  if [[ "$plat" == android ]]; then
+    if [[ "$APK_FAILED" == true ]]; then
+      NOTRUN_ARGS+=(--not-run "android - could not download couch-tour-$TAG.apk from release $TAG (pass --apk or --build-apk)")
+      notrun=$((notrun + 1)); continue
+    fi
+    [[ -z "$APK" ]] || extra+=(--apk "$APK")
+    [[ -z "$SERIAL" ]] || extra+=(--serial "$SERIAL")
+  fi
   echo "== $plat: $runner" >&2
   rc=0
   # The runners write their screenshots under smoke-reports/<tag>/ relative to the repo root.
-  "$runner" --tag "$TAG" --out "$results" 2> >(tee "$errlog" >&2) >/dev/null || rc=$?
+  "$runner" --tag "$TAG" --out "$results" ${extra[@]+"${extra[@]}"} 2> >(tee "$errlog" >&2) >/dev/null || rc=$?
   wait 2>/dev/null || true
   case "$rc" in
     0) ran=$((ran + 1)); RESULT_ARGS+=(--results "$results"); RESULT_FILES+=("$results") ;;
