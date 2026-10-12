@@ -205,6 +205,7 @@ fun ArtistsScreen(nav: NavHostController) {
                             subtitle = "${phish.showCount} ${plural(phish.showCount, "show")}",
                             artUrl = null,
                             trailingContent = { FavoriteButton(phish) },
+                            modifier = Modifier.testTag(A11yTags.artistRow(phish.backend.id, phish.id)),
                             onClick = { nav.navigate("artist/${phish.backend.id}/${phish.id}") }
                         )
                     }
@@ -217,6 +218,7 @@ fun ArtistsScreen(nav: NavHostController) {
                             subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
                             artUrl = null,
                             trailingContent = { FavoriteButton(artist) },
+                            modifier = Modifier.testTag(A11yTags.artistRow(artist.backend.id, artist.id)),
                             onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
                         )
                     }
@@ -228,6 +230,7 @@ fun ArtistsScreen(nav: NavHostController) {
                         subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
                         artUrl = null,
                         trailingContent = { FavoriteButton(artist) },
+                        modifier = Modifier.testTag(A11yTags.artistRow(artist.backend.id, artist.id)),
                         onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
                     )
                 }
@@ -246,7 +249,7 @@ fun ArtistScreen(backendId: String, artistId: String, nav: NavHostController) {
         artist to source.periods(artist)
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().testTag(A11yTags.ARTIST_SCREEN)) {
         Header(loaded.value?.getOrNull()?.first?.name ?: artistId, nav, trailing = {
             loaded.value?.getOrNull()?.first?.let { FavoriteButton(it) }
         })

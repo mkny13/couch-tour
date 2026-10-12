@@ -66,6 +66,9 @@ struct ArtistsView: View {
                             }
                         }
                     }
+                    // A bare List can drop its identifier from the AX tree, so put it on a
+                    // container (as History does, #613).
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier(AXIdentifiers.artistsList)
                 }
             }

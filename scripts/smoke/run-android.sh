@@ -555,30 +555,31 @@ android_run_browse_artists_to_artist() {
   android::tap "nav.home" 2>/dev/null || true
   android::wait_for_tag "nav.home" "$TIMEOUT"
 
-  local found=false
-  if [[ "$(android::count "favorites.row.moe")" -gt 0 ]]; then
-    android::tap "favorites.row.moe"
-    found=true
+  # Home -> Browse artists -> artists.list -> the moe. row (Relisten slug "moe") -> artist.screen.
+  local row="artists.row.relisten.moe"
+  if ! android_scroll_to "home.browse-artists" "" up || ! android::tap "home.browse-artists"; then
+    android_screenshot "$id"
+    smoke::result "android" "$id" "FAIL" "home.browse-artists not found on Home"
+    return 0
   fi
 
-  if [[ "$found" == "false" ]]; then
-    for _ in 1 2; do
-      if [[ "$(android::count "favorites.row.moe")" -gt 0 ]]; then
-        android::tap "favorites.row.moe"
-        found=true
-        break
-      fi
-      android::scroll "" "down"
-      android::dump >/dev/null || true
-    done
+  if ! android::wait_for_tag "artists.list" "$TIMEOUT"; then
+    android_screenshot "$id"
+    smoke::result "android" "$id" "FAIL" "artists.list not present within ${TIMEOUT}s"
+    return 0
   fi
 
-  if [[ "$found" == "true" ]]; then
-    sleep 1
-    smoke::result "android" "$id" "PASS" "artist catalog screen opened"
+  if ! android_scroll_to "$row" "artists.list" || ! android::tap "$row"; then
+    android_screenshot "$id"
+    smoke::result "android" "$id" "FAIL" "$row not found in artists.list"
+    return 0
+  fi
+
+  if android::wait_for_tag "artist.screen" "$TIMEOUT"; then
+    smoke::result "android" "$id" "PASS" "artists.list -> $row opened artist.screen"
   else
     android_screenshot "$id"
-    smoke::result "android" "$id" "FAIL" "tag favorites.row.moe not found on Home"
+    smoke::result "android" "$id" "FAIL" "artist.screen not present after selecting $row"
   fi
 }
 
