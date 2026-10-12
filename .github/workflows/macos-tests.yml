@@ -30,6 +30,10 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('macos/Packages/CouchTourKit/Package.swift', 'macos/Packages/CouchTourKit/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
+      # The runner default is Swift 5.10; GRDB 7 needs Swift tools 6.0.
+      - name: Select Xcode 16.2
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
       - name: Run CouchTourKit tests
         run: swift test --package-path macos/Packages/CouchTourKit
 
