@@ -18,3 +18,21 @@ updates:
         update-types:
           - minor
           - patch
+  - package-ecosystem: npm
+    directory: /sync
+    schedule:
+      interval: weekly
+    groups:
+      non-major:
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: swift
+    directory: /macos/Packages/CouchTourKit
+    schedule:
+      interval: weekly
+    groups:
+      non-major:
+        update-types:
+          - minor
+          - patch
