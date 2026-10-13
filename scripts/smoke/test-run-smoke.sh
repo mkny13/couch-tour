@@ -91,9 +91,64 @@ check "g: exit 1" test "$RC" = 1
 run h -- --platform mac
 check "h: no gh release download" bash -c "! grep -q 'release download' '$TMP/h/calls.gh' 2>/dev/null"
 
+# (i) --avd / CCTV_SMOKE_AVD reach android only
+run i -- --platform android --apk /x/a.apk --avd phishin_test
+check "i: android gets --avd" grep -q -- '--avd phishin_test' "$TMP/i/calls.android"
+run i2 CCTV_SMOKE_AVD=envavd -- --platform android --apk /x/a.apk
+check "i: CCTV_SMOKE_AVD passes --avd" grep -q -- '--avd envavd' "$TMP/i2/calls.android"
+run i3 -- --platform android --apk /x/a.apk
+check "i: absent without the flag" bash -c "! grep -q -- --avd '$TMP/i3/calls.android'"
+
+# (j) run-android.sh --avd boot logic with stub adb + emulator
+mkdir -p "$TMP/bin"
+cat > "$TMP/bin/adb" << STUB
+#!/usr/bin/env bash
+if [[ "\$1" == devices ]]; then
+  echo "List of devices attached"
+  [[ -e "$TMP/booted" ]] && printf 'emulator-5554\tdevice\n'
+  [[ -n "\${PHONE:-}" ]] && printf 'R5CT123\tdevice\n'
+  exit 0
+fi
+[[ "\$1" == -s ]] && shift 2
+case "\$1 \$2" in
+  "shell getprop") [[ -e "$TMP/bootprop" ]] && echo 1 ;;
+esac
+exit 0
+STUB
+cat > "$TMP/emulator" << STUB
+#!/usr/bin/env bash
+echo "\$*" > "$TMP/emulator.args"
+echo "\$\$" > "$TMP/emulator.pid"
+[[ "\${EMU_EXIT:-}" == 1 ]] && exit 1
+touch "$TMP/booted"; [[ "\${EMU_NOBOOT:-}" == 1 ]] || touch "$TMP/bootprop"
+exec sleep 300
+STUB
+chmod +x "$TMP/bin/adb" "$TMP/emulator"
+avd_run() { # name [VAR=val...] -- args; stderr in $TMP/<name>.err
+  local name="$1"; shift; local envs=()
+  while [[ "$1" != -- ]]; do envs+=("$1"); shift; done; shift
+  rm -f "$TMP/booted" "$TMP/bootprop" "$TMP/emulator.args" "$TMP/emulator.pid"
+  env PATH="$TMP/bin:$PATH" CCTV_SMOKE_EMULATOR="$TMP/emulator" CCTV_SMOKE_AVD_TIMEOUT=6 ${envs[@]+"${envs[@]}"} \
+    "$DIR/run-android.sh" --apk "$TMP/none.apk" "$@" >/dev/null 2>"$TMP/$name.err"
+  RC=$?
+}
+avd_run j1 -- --avd phishin_test
+check "j1: boots emulator headless with the AVD" grep -q -- '-avd phishin_test -no-window -no-audio -no-snapshot-save' "$TMP/emulator.args"
+check "j1: uses the emulator serial" grep -q "booted as emulator-5554" "$TMP/j1.err"
+check "j1: emulator killed on exit" bash -c "! kill -0 \$(cat '$TMP/emulator.pid') 2>/dev/null"
+avd_run j2 EMU_NOBOOT=1 -- --avd phishin_test
+check "j2: boot timeout exits 2 with ERROR" bash -c "[[ $RC == 2 ]] && grep -q 'ERROR:.*did not finish booting' '$TMP/j2.err'"
+check "j2: emulator killed after timeout" bash -c "! kill -0 \$(cat '$TMP/emulator.pid') 2>/dev/null"
+avd_run j3 PHONE=1 -- --avd phishin_test
+check "j3: physical device not used" bash -c "! grep -q R5CT123 '$TMP/j3.err'"
+avd_run j4 EMU_EXIT=1 -- --avd phishin_test
+check "j4: emulator dying exits 2" bash -c "[[ $RC == 2 ]] && grep -q 'ERROR:.*exited before booting' '$TMP/j4.err'"
+avd_run j5 CCTV_SMOKE_EMULATOR=/nonexistent -- --avd phishin_test
+check "j5: missing emulator binary exits 2" bash -c "[[ $RC == 2 ]] && grep -q 'ERROR:.*emulator binary not found' '$TMP/j5.err'"
+
 # --help lists the new flags
 help="$("$DIR/run-smoke.sh" --help)"
-for flag in --allow-focus --apk --serial --build-apk; do
+for flag in --allow-focus --apk --serial --avd --build-apk; do
   check "help lists $flag" grep -q -- "$flag" <<< "$help"
 done
 

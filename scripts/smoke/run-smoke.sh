@@ -23,7 +23,7 @@ TAG=""; PLATFORM="both"; OUT_DIR="smoke-reports"; FILE_BUGS=true
 COMMIT_SCREENSHOTS=false; KEEP_GOING=false; AUTO_VERIFY=false
 WAIVE_ARGS=(); WAIVE_IDS=(); RUN_SYNC_JOURNEYS=true
 ALLOW_FOCUS=false; [[ "${CCTV_SMOKE_ALLOW_FOCUS:-}" == 1 ]] && ALLOW_FOCUS=true
-APK=""; SERIAL=""; BUILD_APK=false
+APK=""; SERIAL=""; AVD="${CCTV_SMOKE_AVD:-}"; BUILD_APK=false
 
 usage() {
   cat << 'EOF2'
@@ -45,6 +45,8 @@ Options:
                              while the beta is in the background); or set CCTV_SMOKE_ALLOW_FOCUS=1
   --apk <path>               Android: test this APK instead of downloading the tag's release asset
   --serial <id>              Android: adb serial of the emulator/device to use
+  --avd <name>               Android: with no emulator attached, boot this AVD headless (or CCTV_SMOKE_AVD);
+                             never uses a physical device
   --build-apk                Android: use the locally built APK (runner searches build output) instead of
                              downloading couch-tour-<tag>.apk from the release; not with --apk
   --keep-going               Carry on to the next platform when a runner exits with a usage error
@@ -79,6 +81,7 @@ while [[ $# -gt 0 ]]; do
     --allow-focus) ALLOW_FOCUS=true; shift ;;
     --apk) [[ -n "${2:-}" ]] || die "--apk requires a path"; APK="$2"; shift 2 ;;
     --serial) [[ -n "${2:-}" ]] || die "--serial requires an id"; SERIAL="$2"; shift 2 ;;
+    --avd) [[ -n "${2:-}" ]] || die "--avd requires a name"; AVD="$2"; shift 2 ;;
     --build-apk) BUILD_APK=true; shift ;;
     --keep-going) KEEP_GOING=true; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -131,6 +134,7 @@ for plat in "${PLATFORMS[@]}"; do
     fi
     [[ -z "$APK" ]] || extra+=(--apk "$APK")
     [[ -z "$SERIAL" ]] || extra+=(--serial "$SERIAL")
+    [[ -z "$AVD" ]] || extra+=(--avd "$AVD")
   fi
   echo "== $plat: $runner" >&2
   rc=0

@@ -3,7 +3,7 @@
 # Android smoke journey runner for Couch Tour beta APK.
 #
 # Usage:
-#   scripts/smoke/run-android.sh [--apk <path>] [--serial <adb-serial>] [--journey <id>]... \
+#   scripts/smoke/run-android.sh [--apk <path>] [--serial <adb-serial>] [--avd <name>] [--journey <id>]... \
 #       [--tag <tag>] [--out <file>] [--no-input] [--timeout <s>] [--keep-installed]
 #
 # Drives journeys defined in scripts/smoke/JOURNEYS.md against the side-installed beta APK
@@ -21,6 +21,8 @@ MAIN_ACTIVITY="dev.mike.couchtour.MainActivity"
 
 APK_PATH=""
 SERIAL="${CCTV_SMOKE_SERIAL:-}"
+AVD="${CCTV_SMOKE_AVD:-}"
+EMULATOR_PID=""
 RUN_JOURNEYS=()
 SYNC_STEP=""
 TAG=""
@@ -32,12 +34,14 @@ CURRENT_DUMP_FILE=""
 
 usage() {
   cat << 'EOF'
-Usage: scripts/smoke/run-android.sh [--apk <path>] [--serial <adb-serial>] [--journey <id>]... \
+Usage: scripts/smoke/run-android.sh [--apk <path>] [--serial <adb-serial>] [--avd <name>] [--journey <id>]... \
     [--tag <tag>] [--out <file>] [--no-input] [--timeout <s>] [--keep-installed]
 
 Options:
   --apk <path>        Path to Couch Tour Beta APK (defaults to newest *-beta*.apk under build output)
   --serial <serial>   ADB target device serial (defaults to $CCTV_SMOKE_SERIAL or single device)
+  --avd <name>        Use this AVD's emulator (or $CCTV_SMOKE_AVD). If no emulator-* is attached, boot it
+                      headless and kill it on exit; never falls back to a physical device
   --journey <id>      Specific journey ID from JOURNEYS.md to run (can be repeated)
   --tag <tag>         Release tag for screenshot reports (e.g. v0.87-beta)
   --out <file>        Output file for tab-separated result lines
@@ -225,6 +229,11 @@ while [[ $# -gt 0 ]]; do
       SERIAL="$2"
       shift 2
       ;;
+    --avd)
+      [[ -n "${2:-}" ]] || smoke::die 1 "--avd requires an AVD name"
+      AVD="$2"
+      shift 2
+      ;;
     --journey)
       smoke::require_journeys_file "$2"
       RUN_JOURNEYS+=("$2")
@@ -283,6 +292,48 @@ if ! command -v "$ADB_BIN" >/dev/null 2>&1; then
   fi
 fi
 
+# Kill the emulator only if this script started it.
+stop_emulator() {
+  if [[ -n "$EMULATOR_PID" ]]; then
+    kill "$EMULATOR_PID" 2>/dev/null || true
+    EMULATOR_PID=""
+  fi
+}
+trap stop_emulator EXIT
+
+first_emulator_serial() {
+  "$ADB_BIN" devices 2>&1 | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1; exit }'
+}
+
+# --avd: attach to a running emulator, else boot the AVD headless. Resolved before preflight so a
+# cold machine gets a device instead of exit 2.
+if [[ -n "$AVD" && -z "$SERIAL" ]]; then
+  SERIAL="$(first_emulator_serial)"
+  if [[ -z "$SERIAL" ]]; then
+    EMULATOR_BIN="${CCTV_SMOKE_EMULATOR:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator}"
+    [[ -x "$EMULATOR_BIN" ]] || smoke::die 2 "emulator binary not found or not executable: $EMULATOR_BIN (set CCTV_SMOKE_EMULATOR)"
+    BOOT_TIMEOUT="${CCTV_SMOKE_AVD_TIMEOUT:-180}"
+    smoke::log "Booting AVD '$AVD' headless (timeout ${BOOT_TIMEOUT}s)..."
+    "$EMULATOR_BIN" -avd "$AVD" -no-window -no-audio -no-snapshot-save >&2 </dev/null &
+    EMULATOR_PID=$!
+    deadline=$((SECONDS + BOOT_TIMEOUT))
+    while [[ $SECONDS -lt $deadline ]]; do
+      if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+        EMULATOR_PID=""
+        smoke::die 2 "emulator for AVD '$AVD' exited before booting"
+      fi
+      SERIAL="$(first_emulator_serial)"
+      if [[ -n "$SERIAL" && "$("$ADB_BIN" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+        break
+      fi
+      SERIAL=""
+      sleep 2
+    done
+    [[ -n "$SERIAL" ]] || smoke::die 2 "AVD '$AVD' did not finish booting within ${BOOT_TIMEOUT}s"
+    smoke::log "AVD '$AVD' booted as $SERIAL"
+  fi
+fi
+
 # Resolve serial if not explicitly provided (default to single attached device)
 if [[ -z "$SERIAL" ]]; then
   AUTO_SERIAL="$("$ADB_BIN" devices 2>&1 | awk '$2 == "device" { print $1; exit }')"
@@ -336,6 +387,7 @@ adb_cmd install -r -t "$APK_PATH" >&2
 CURRENT_DUMP_FILE="$(mktemp -t cctv_dump_XXXXXX.xml)"
 cleanup() {
   rm -f "$CURRENT_DUMP_FILE"
+  stop_emulator
   if [[ "$KEEP_INSTALLED" != "true" && "$WAS_ALREADY_INSTALLED" != "true" ]]; then
     smoke::log "Uninstalling $BETA_PKG..."
     adb_cmd uninstall "$BETA_PKG" >/dev/null 2>&1 || true
