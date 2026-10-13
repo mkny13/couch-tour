@@ -62,7 +62,7 @@ Three entry points, all run from the repo root:
 
 `run-smoke.sh` options: `--platform mac|android|both`, `--out <dir>`, `--waive <id> - <reason>`,
 `--no-file-bugs`, `--commit-screenshots`, `--keep-going`, `--allow-focus` (Mac; or
-`CCTV_SMOKE_ALLOW_FOCUS=1`), `--apk <path>`, `--serial <id>`, `--build-apk` (see `--help`).
+`CCTV_SMOKE_ALLOW_FOCUS=1`), `--apk <path>`, `--serial <id>`, `--avd <name>`, `--build-apk` (see `--help`).
 On Android a tag run downloads `couch-tour-<tag>.apk` from that release (`gh release download`) so it
 tests the tag; if the download fails the platform is not-run, never silently a local build. `--build-apk`
 uses the locally built APK instead (local dev runs); `--apk` and `--build-apk` are mutually exclusive. Exit codes: `0` = every
@@ -70,10 +70,15 @@ selected platform ran and a report was written, `1` = usage error, `2` = a platf
 run. If no platform could run, no report is written and no issue is filed. If some did, the
 report is written, says which platform didn't run, is `FAIL`, and the exit code is still `2`.
 
+`--avd <name>` (or `CCTV_SMOKE_AVD`) makes smoke runs use the `phishin_test` emulator instead of a phone: with no
+`emulator-*` attached, `run-android.sh` boots that AVD headless (`-no-window -no-audio -no-snapshot-save`,
+override the binary with `CCTV_SMOKE_EMULATOR`), waits up to 180 s for `sys.boot_completed` (exit 2 with an
+`ERROR:` line otherwise), and kills it on exit only if it started it. It never falls back to a physical device.
+
 Unattended / gated run (the desktop gate starts it while the beta is in the background):
 
 ```
-mahler desktop run -- scripts/smoke/run-smoke.sh --tag <tag> --platform both --allow-focus --serial emulator-5554
+mahler desktop run -- scripts/smoke/run-smoke.sh --tag <tag> --platform both --allow-focus --avd phishin_test
 ```
 
 Worked example, no device attached (`--build-apk` skips the release download):
