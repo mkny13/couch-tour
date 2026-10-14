@@ -107,6 +107,12 @@ if [ -n "$macos_url" ]; then
 else
     echo "macOS: dispatched but run URL not found — check: gh run list --workflow=macos-release.yml"
 fi
+echo ""
+echo "Next step: a smoke report must be committed at smoke-reports/$tag.md before promoting to production."
+if [ -f "scripts/smoke/run-smoke.sh" ]; then
+    echo "Run smoke: scripts/smoke/run-smoke.sh --tag $tag"
+fi
+echo "Promote:   scripts/promote-beta.sh $tag <next-tag> \"<release notes>\""
 
 # A dispatched run that later fails used to go unnoticed (v0.85-v0.87 shipped Android-only),
 # so block on each run and make a failure impossible to miss.
@@ -161,3 +167,7 @@ if [ "$failed" != 0 ]; then
 fi
 echo ""
 echo "Beta $tag shipped on Android and macOS."
+echo "Next step: commit smoke-reports/$tag.md before promotion (scripts/promote-beta.sh)."
+if [ -f "scripts/smoke/run-smoke.sh" ]; then
+    echo "Run smoke: scripts/smoke/run-smoke.sh --tag $tag"
+fi
