@@ -122,6 +122,7 @@ struct ThreePaneRootView: View {
                 PublicPlaylistView(summary: playlist)
             case .search:
                 SearchView()
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier(AXIdentifiers.searchScreen)
             case .artist(let artist):
                 PeriodsView(artist: artist)

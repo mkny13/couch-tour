@@ -1,5 +1,6 @@
 package dev.mike.couchtour
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,9 +50,20 @@ fun SearchScreen(vm: PlayerViewModel, nav: NavHostController) {
     LaunchedEffect(term) {
         if (term.length >= 3) {
             isSearching = true
-            delay(300)
-            searchHits = searchAll(term)
-            isSearching = false
+            try {
+                delay(300)
+                searchHits = searchAll(term)
+                // Diagnostic for the search-result-sections smoke journey (#616): says which
+                // section was empty or which backend failed when search.results never renders.
+                Log.d(
+                    "CouchTourSearch",
+                    "term=$term artists=${searchHits?.artists?.size} shows=${searchHits?.shows?.size} " +
+                        "tracks=${searchHits?.tracks?.size} failed=${searchHits?.failed}",
+                )
+            } finally {
+                // A cancelled or thrown search must not leave Loading() up forever.
+                isSearching = false
+            }
         } else {
             searchHits = null
             isSearching = false
@@ -104,7 +116,12 @@ fun SearchScreen(vm: PlayerViewModel, nav: NavHostController) {
                 },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }, modifier = Modifier.size(24.dp)) {
+                        IconButton(
+                            onClick = { query = "" },
+                            modifier = Modifier
+                                .size(24.dp)
+                                .testTag(A11yTags.SEARCH_CLEAR),
+                        ) {
                             Icon(Icons.Default.Close, contentDescription = "Clear", tint = ledger.textSubtle, modifier = Modifier.size(16.dp))
                         }
                     }

@@ -32,6 +32,7 @@ object A11yTags {
     fun artistFavorite(artistKey: String) = "artists.favorite.$artistKey"
 
     const val SEARCH_FIELD = "search.field"
+    const val SEARCH_CLEAR = "search.clear"
     const val SEARCH_SECTION_ARTISTS = "search.section.artists"
     const val SEARCH_SECTION_SHOWS = "search.section.shows"
     const val SEARCH_SECTION_TRACKS = "search.section.tracks"

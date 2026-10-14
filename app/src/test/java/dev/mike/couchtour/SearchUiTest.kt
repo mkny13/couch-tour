@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -90,6 +91,16 @@ class SearchUiTest {
     @Test
     fun `short queries prompt for more instead of searching`() {
         search("tw")
+        ui.compose.onNodeWithText(
+            "Type 3 or more characters to search across Phish and Relisten artists, shows, and tracks."
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `clicking clear button clears query and results`() {
+        search("tweezer")
+        awaitResults()
+        ui.compose.onNodeWithTag(A11yTags.SEARCH_CLEAR).performClick()
         ui.compose.onNodeWithText(
             "Type 3 or more characters to search across Phish and Relisten artists, shows, and tracks."
         ).assertIsDisplayed()
