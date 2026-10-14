@@ -513,6 +513,28 @@ android::scroll() {
   adb_cmd shell input swipe "$x1" "$y1" "$x2" "$y2" 300 >/dev/null 2>&1
 }
 
+android::row_present() { android::dump >/dev/null || true; [[ "$(android::count "$1")" -gt 0 ]]; }
+android::row_absent() { android::dump >/dev/null || true; [[ "$(android::count "$1")" -eq 0 ]]; }
+
+# Swipe until <tag> is on screen. Lazy lists only compose visible rows, so an off-screen
+# row is missing from the dump entirely, not merely hidden. <list> (optional) is the tag whose
+# bounds the swipe stays inside. <first> (up|down, default down) is the direction tried first;
+# the other is tried after, because a retained scroll position (Home reselected, a prior
+# journey) can leave the row either above or below the viewport.
+android_scroll_to() {
+  local tag="$1" list="${2:-}" first="${3:-down}" dir i
+  local other=down; [[ "$first" == up ]] || other=up
+  android::row_present "$tag" && return 0
+  for dir in "$first" "$other"; do
+    for ((i = 0; i < ${CCTV_SMOKE_ANDROID_MAX_SCROLLS:-40}; i++)); do
+      android::scroll "$list" "$dir"
+      sleep 0.3
+      android::row_present "$tag" && return 0
+    done
+  done
+  return 1
+}
+
 android::relaunch() {
   smoke::log "Relaunching dev.mike.couchtour.beta..."
   adb_cmd shell am force-stop "$BETA_PKG"
@@ -816,16 +838,16 @@ android_run_search_result_sections() {
     return 0
   fi
 
+  # Dismiss keyboard so search results have full vertical room
+  android::back
+  sleep 0.5
+
   local missing=()
-  if [[ "$(android::count "search.section.artists")" -eq 0 ]]; then
-    missing+=("search.section.artists")
-  fi
-  if [[ "$(android::count "search.section.shows")" -eq 0 ]]; then
-    missing+=("search.section.shows")
-  fi
-  if [[ "$(android::count "search.section.tracks")" -eq 0 ]]; then
-    missing+=("search.section.tracks")
-  fi
+  for section in "search.section.artists" "search.section.shows" "search.section.tracks"; do
+    if ! android_scroll_to "$section" "search.results"; then
+      missing+=("$section")
+    fi
+  done
 
   if [[ ${#missing[@]} -eq 0 ]]; then
     smoke::result "android" "$id" "PASS" "artists, shows, and tracks result sections displayed"
@@ -852,29 +874,7 @@ android_run_live_data_not_mockup() {
 # round trip: an action on this client, or an assertion that the other client's change arrived.
 # Exit 0 satisfied, 3 assertion timed out, 4 needed control/fixture unavailable.
 
-android::row_present() { android::dump >/dev/null || true; [[ "$(android::count "$1")" -gt 0 ]]; }
-android::row_absent() { android::dump >/dev/null || true; [[ "$(android::count "$1")" -eq 0 ]]; }
-
 android_unavailable() { smoke::log "sync step unavailable: $*"; exit "$SMOKE_STEP_UNAVAILABLE"; }
-
-# Swipe until <tag> is on screen. Lazy lists only compose visible rows, so an off-screen
-# row is missing from the dump entirely, not merely hidden. <list> (optional) is the tag whose
-# bounds the swipe stays inside. <first> (up|down, default down) is the direction tried first;
-# the other is tried after, because a retained scroll position (Home reselected, a prior
-# journey) can leave the row either above or below the viewport.
-android_scroll_to() {
-  local tag="$1" list="${2:-}" first="${3:-down}" dir i
-  local other=down; [[ "$first" == up ]] || other=up
-  android::row_present "$tag" && return 0
-  for dir in "$first" "$other"; do
-    for ((i = 0; i < ${CCTV_SMOKE_ANDROID_MAX_SCROLLS:-40}; i++)); do
-      android::scroll "$list" "$dir"
-      sleep 0.3
-      android::row_present "$tag" && return 0
-    done
-  done
-  return 1
-}
 
 # Home -> Browse artists -> the star on <artistKey>'s row (artists.favorite.<key>, #533). Every
 # row has the star, favorited or not, so add and remove are the same tap.
