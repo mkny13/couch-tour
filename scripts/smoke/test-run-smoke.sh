@@ -9,8 +9,8 @@
 set -uo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "SKIP: jq is required for test-run-smoke.sh but is not installed"
-  exit 0
+  echo "FAIL: jq is required for test-run-smoke.sh but is not installed"
+  exit 1
 fi
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
