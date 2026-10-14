@@ -287,9 +287,8 @@ struct ExpandedNowPlayingView: View {
                                 }
                             }
 
-                            let jamChartTag = player.currentTrack?.tags.first { $0.name.localizedCaseInsensitiveContains("jam") }
-                            let isJamChart = jamChartTag != nil
-                            let jamChartNotes = jamChartTag?.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let jamChartNotes = player.currentTrack?.jamChartNote
+                            let isJamChart = jamChartNotes != nil
 
                             HStack(spacing: 8) {
                                 if isJamChart {

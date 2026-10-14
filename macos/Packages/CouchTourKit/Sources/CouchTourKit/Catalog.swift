@@ -971,6 +971,15 @@ extension Show {
 }
 
 extension PlayableTrack {
+    /// Trimmed notes of the jam-chart tag, or nil when there's no jam tag or its notes are blank.
+    /// The Now Playing badge shows only for non-nil, since a badge with nothing behind it is a dead
+    /// tap (#355).
+    public var jamChartNote: String? {
+        guard let tag = tags.first(where: { $0.name.localizedCaseInsensitiveContains("jam") }) else { return nil }
+        let trimmed = tag.notes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     public func clipped(startMs: Int64, endMs: Int64?) -> PlayableTrack {
         PlayableTrack(
             id: id, slug: slug, title: title, setName: setName, position: position, durationMs: durationMs,

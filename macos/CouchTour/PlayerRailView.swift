@@ -246,9 +246,8 @@ struct PlayerRailView: View {
                             .padding(.top, 4)
                             .lineLimit(1)
 
-                        let jamChartTag = player.currentTrack?.tags.first { $0.name.localizedCaseInsensitiveContains("jam") }
-                        let isJamChart = jamChartTag != nil
-                        let jamChartNotes = jamChartTag?.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let jamChartNotes = player.currentTrack?.jamChartNote
+                        let isJamChart = jamChartNotes != nil
 
                         HStack(spacing: 6) {
                             if isJamChart {

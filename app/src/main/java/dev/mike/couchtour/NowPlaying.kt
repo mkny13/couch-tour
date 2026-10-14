@@ -428,16 +428,12 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
-                    if (state.isJamChart) {
-                        val hasNotes = !state.jamChartNotes.isNullOrBlank()
+                    if (jamChartBadgeVisible(state.isJamChart, state.jamChartNotes)) {
                         Box(
                             modifier = Modifier
                                 .border(1.dp, Color(0x73B5ABFC), RoundedCornerShape(4.dp))
                                 .clip(RoundedCornerShape(4.dp))
-                                .then(
-                                    if (hasNotes) Modifier.clickable { showJamChartNote = !showJamChartNote }
-                                    else Modifier
-                                )
+                                .clickable { showJamChartNote = !showJamChartNote }
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Row(
@@ -451,14 +447,12 @@ fun NowPlayingScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     letterSpacing = 1.sp,
                                     color = ledger.accentTintText
                                 )
-                                if (hasNotes) {
-                                    Icon(
-                                        if (showJamChartNote) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = ledger.accentTintText,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                }
+                                Icon(
+                                    if (showJamChartNote) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = ledger.accentTintText,
+                                    modifier = Modifier.size(11.dp)
+                                )
                             }
                         }
                     }
@@ -777,3 +771,7 @@ internal fun audioFormatIsFlac(format: String): Boolean = format.trim().equals("
  * stream can't back up.
  */
 internal fun audioFormatLabel(format: String): String = format.trim().uppercase()
+
+/** A jam tag with no notes would render a badge that opens nothing, so notes gate it too (#355). */
+internal fun jamChartBadgeVisible(isJamChart: Boolean, notes: String?): Boolean =
+    isJamChart && !notes.isNullOrBlank()
