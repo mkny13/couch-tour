@@ -460,6 +460,10 @@ android::wait_for_tag() {
 # -----------------------------------------------------------------------------
 # Input Layer (Coordinates derived from node bounds at run time)
 # -----------------------------------------------------------------------------
+android::ime_shown() {
+  adb_cmd shell dumpsys input_method 2>/dev/null | grep -q "mInputShown=true"
+}
+
 android::tap() {
   local tag="$1"
   local center
@@ -838,9 +842,11 @@ android_run_search_result_sections() {
     return 0
   fi
 
-  # Dismiss keyboard so search results have full vertical room
-  android::back
-  sleep 0.5
+  # Dismiss keyboard so search results have full vertical room (only if IME is shown)
+  if android::ime_shown; then
+    android::back
+    sleep 0.5
+  fi
 
   local missing=()
   for section in "search.section.artists" "search.section.shows" "search.section.tracks"; do
