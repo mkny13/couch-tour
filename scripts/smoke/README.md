@@ -125,7 +125,9 @@ Each failing, unwaived journey is filed with `mahler add phish-in` and labelled 
 `gh issue edit --add-label`; falls back to `gh issue create` with a loud warning if `mahler`
 isn't on `PATH`). The body carries a `smoke-journey:<id>` marker; if an open issue with that
 marker exists, `run-smoke.sh` comments on it with the new tag instead of filing a duplicate.
-`--no-file-bugs` turns all of this off.
+`--no-file-bugs` turns all of this off. The orchestration and bug-filing test needs no hardware
+or network: `bash scripts/smoke/test-run-smoke.sh` (covers report grammar, `mahler add` bug filing,
+labeling, dedupe, `--no-file-bugs`, and preflight exits).
 
 ## Verifying shipped issues (#404)
 
