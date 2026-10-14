@@ -1,54 +1,238 @@
 #!/usr/bin/env bash
 # scripts/smoke/test-run-smoke.sh
-# Headless test of run-smoke.sh's flag pass-through to the platform runners (#610) and of the
-# release-APK download. Stub runners and a stub gh record their argv; no device, app or network.
+# Headless test of run-smoke.sh orchestration:
+# 1. Report generation and grammar (Tag:, Smoke: PASS|FAIL, preflight exits) (#357, #358)
+# 2. Bug filing via mahler add, labeling with gh, dedupe, and --no-file-bugs (#357)
+# 3. Flag pass-through to platform runners and release-APK download (#610, #640)
+# Uses stub runners and stub gh/mahler; no device, app or network.
 
 set -uo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "SKIP: jq is required for test-run-smoke.sh but is not installed"
+  exit 0
+fi
+
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-TAG="v9.99"
+TMP="$(mktemp -d)"
+TAG="v9.99-beta"
+trap 'rm -rf "$TMP" "smoke-reports/$TAG"' EXIT
 failures=0
 
 ok() { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
 
-# Stub runner: logs argv to $STUB_LOG.<plat>, writes one PASS line to --out.
+# Stub runners for mac and android:
+# - Logs argv to $CALLS_DIR/calls.<plat>
+# - Can exit non-zero via STUB_<PLAT>_RC
+# - Writes results from STUB_<PLAT>_RESULTS, or defaults to 1 PASS row
+# - For each FAIL row, creates the local screenshot png on disk
 for plat in mac android; do
-  cat > "$TMP/run-$plat" << STUB
+  cat > "$TMP/run-$plat" << 'STUB'
 #!/usr/bin/env bash
-echo "\$*" >> "$TMP/calls.$plat"
-out=""; while [[ \$# -gt 0 ]]; do [[ "\$1" == --out ]] && out="\$2"; shift; done
-printf '$plat\tlaunch-cold-start\tPASS\tstub\n' > "\$out"
+plat="$(basename "$0" | sed 's/^run-//')"
+calls_dir="${CALLS_DIR:-$TMP}"
+echo "$*" >> "$calls_dir/calls.$plat"
+
+out=""
+tag=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --out) out="$2"; shift 2 ;;
+    --tag) tag="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+uc_plat="$(echo "$plat" | tr '[:lower:]' '[:upper:]')"
+rc_var="STUB_${uc_plat}_RC"
+results_var="STUB_${uc_plat}_RESULTS"
+err_var="STUB_${uc_plat}_ERR"
+
+rc="${!rc_var:-0}"
+if [[ "$rc" -ne 0 ]]; then
+  echo "${!err_var:-ERROR: preflight failed for $plat}" >&2
+  exit "$rc"
+fi
+
+if [[ -n "$out" ]]; then
+  mkdir -p "$(dirname "$out")"
+  if [[ -n "${!results_var:-}" ]]; then
+    printf '%s\n' "${!results_var}" > "$out"
+  else
+    printf '%s\tlaunch-cold-start\tPASS\tstub\n' "$plat" > "$out"
+  fi
+  while IFS=$'\t' read -r p id st ev; do
+    if [[ "$st" == "FAIL" && -n "$tag" && -n "$id" ]]; then
+      mkdir -p "smoke-reports/$tag" "$(dirname "$out")"
+      touch "smoke-reports/$tag/$p-$id.png"
+      touch "$(dirname "$out")/$p-$id.png"
+    fi
+  done < "$out"
+fi
+exit 0
 STUB
 done
-# Stub gh: logs argv; 'release download' creates the asset unless GH_FAIL=1; lists are empty.
-cat > "$TMP/gh" << STUB
+
+# Stub sync runner: logs argv, creates empty results file, exits 0.
+cat > "$TMP/run-sync" << 'STUB'
 #!/usr/bin/env bash
-echo "\$*" >> "$TMP/calls.gh"
-case "\$1 \$2" in
+calls_dir="${CALLS_DIR:-$TMP}"
+echo "$*" >> "$calls_dir/calls.sync"
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --out) out="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[[ -n "$out" ]] && : > "$out"
+exit 0
+STUB
+
+# Stub gh:
+# - Logs argv to $CALLS_DIR/calls.gh
+# - 'release download' touches the asset unless GH_FAIL=1
+# - 'issue list' returns STUB_GH_OPEN_ISSUES when queried for open issues, otherwise []
+# - 'issue edit' / 'issue comment' succeed silently
+# - 'issue create' returns a fake issue URL
+cat > "$TMP/gh" << 'STUB'
+#!/usr/bin/env bash
+calls_dir="${CALLS_DIR:-$TMP}"
+echo "$*" >> "$calls_dir/calls.gh"
+case "$1 $2" in
   "release download")
-    [[ "\${GH_FAIL:-}" == 1 ]] && { echo "release not found" >&2; exit 1; }
-    dir=""; while [[ \$# -gt 0 ]]; do [[ "\$1" == --dir ]] && dir="\$2"; shift; done
-    : > "\$dir/couch-tour-$TAG.apk" ;;
-  "issue list") echo '[]' ;;
+    [[ "${GH_FAIL:-}" == 1 ]] && { echo "release not found" >&2; exit 1; }
+    tag="$3"
+    dir=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --dir) dir="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    [[ -n "$dir" ]] && : > "$dir/couch-tour-$tag.apk"
+    ;;
+  "issue list")
+    has_state_open=false
+    for arg in "$@"; do
+      [[ "$arg" == "open" ]] && has_state_open=true
+    done
+    if [[ "$has_state_open" == true && -n "${STUB_GH_OPEN_ISSUES:-}" ]]; then
+      echo "$STUB_GH_OPEN_ISSUES"
+    else
+      echo '[]'
+    fi
+    ;;
+  "issue edit")
+    exit 0
+    ;;
+  "issue comment")
+    exit 0
+    ;;
+  "issue create")
+    echo "https://github.com/mkny13/couch-tour/issues/9001"
+    exit 0
+    ;;
 esac
 STUB
-chmod +x "$TMP"/run-mac "$TMP"/run-android "$TMP"/gh
+
+# Stub mahler: logs argv to $CALLS_DIR/calls.mahler, returns fake issue URL for add phish-in.
+cat > "$TMP/mahler" << 'STUB'
+#!/usr/bin/env bash
+calls_dir="${CALLS_DIR:-$TMP}"
+echo "$*" >> "$calls_dir/calls.mahler"
+case "$1 $2" in
+  "add phish-in")
+    echo "https://github.com/mkny13/couch-tour/issues/9001"
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+STUB
+
+chmod +x "$TMP"/run-mac "$TMP"/run-android "$TMP"/run-sync "$TMP"/gh "$TMP"/mahler
 
 # run <name> [VAR=val...] -- <run-smoke args...>; exit code in $RC, calls in $TMP/<name>/calls.*
 run() {
   local name="$1"; shift; local envs=()
   while [[ "$1" != -- ]]; do envs+=("$1"); shift; done; shift
   mkdir -p "$TMP/$name"; rm -f "$TMP"/calls.*
-  env CCTV_SMOKE_RUN_MAC="$TMP/run-mac" CCTV_SMOKE_RUN_ANDROID="$TMP/run-android" CCTV_SMOKE_GH="$TMP/gh" \
-      ${envs[@]+"${envs[@]}"} "$DIR/run-smoke.sh" --tag "$TAG" --no-file-bugs --no-sync --out "$TMP/$name/out" "$@" \
+  CALLS_DIR="$TMP" \
+  env CCTV_SMOKE_RUN_MAC="$TMP/run-mac" \
+      CCTV_SMOKE_RUN_ANDROID="$TMP/run-android" \
+      CCTV_SMOKE_RUN_SYNC="$TMP/run-sync" \
+      CCTV_SMOKE_GH="$TMP/gh" \
+      CCTV_SMOKE_MAHLER="$TMP/mahler" \
+      ${envs[@]+"${envs[@]}"} \
+      "$DIR/run-smoke.sh" --tag "$TAG" --no-sync --out "$TMP/$name/out" "$@" \
       >"$TMP/$name/stdout" 2>"$TMP/$name/stderr"
   RC=$?
   for f in "$TMP"/calls.*; do [[ -e "$f" ]] && mv "$f" "$TMP/$name/$(basename "$f")"; done
 }
 called() { [[ -s "$TMP/$1/calls.$2" ]]; }
 argv() { cat "$TMP/$1/calls.$2" 2>/dev/null; }
+
+# ==============================================================================
+# 1-5. Core orchestrator & bug filing contract (#357, #358)
+# ==============================================================================
+
+# Case 1: all-pass, both platforms
+run all-pass -- --platform both
+check "1. all-pass: exit 0" test "$RC" = 0
+check "1. all-pass: report exists" test -f "$TMP/all-pass/out/$TAG.md"
+check "1. all-pass: mac runner invoked" called all-pass mac
+check "1. all-pass: android runner invoked" called all-pass android
+check "1. all-pass: exactly one Tag: line" test "$(grep -c "^Tag: $TAG\$" "$TMP/all-pass/out/$TAG.md")" = 1
+check "1. all-pass: exactly one Smoke: line" test "$(grep -c '^Smoke: ' "$TMP/all-pass/out/$TAG.md")" = 1
+check "1. all-pass: Smoke: PASS" grep -q '^Smoke: PASS$' "$TMP/all-pass/out/$TAG.md"
+check "1. all-pass: no mahler add in log" bash -c "! grep -q 'add phish-in' '$TMP/all-pass/calls.mahler' 2>/dev/null"
+
+# Case 2: one FAIL, first run
+fail_tsv=$'mac\tsearch-artist-hit\tFAIL\tartist not found'
+run one-fail STUB_MAC_RESULTS="$fail_tsv" -- --platform both
+check "2. one-fail: exit 0" test "$RC" = 0
+check "2. one-fail: exactly one Smoke: line" test "$(grep -c '^Smoke: ' "$TMP/one-fail/out/$TAG.md")" = 1
+check "2. one-fail: Smoke: FAIL" grep -q '^Smoke: FAIL$' "$TMP/one-fail/out/$TAG.md"
+check "2. one-fail: report mentions screenshot" grep -q "smoke-reports/$TAG/mac-search-artist-hit.png" "$TMP/one-fail/out/$TAG.md"
+check "2. one-fail: screenshot exists on disk" test -f "smoke-reports/$TAG/mac-search-artist-hit.png"
+check "2. one-fail: exactly one mahler add call" test "$(grep -c 'add phish-in' "$TMP/one-fail/calls.mahler" 2>/dev/null)" = 1
+check "2. one-fail: mahler body contains marker" grep -q 'smoke-journey:search-artist-hit' "$TMP/one-fail/calls.mahler"
+check "2. one-fail: gh issue edit labels mahler" grep -Eq 'issue edit 9001 .*--add-label mahler' "$TMP/one-fail/calls.gh"
+
+# Case 3: same FAIL, repeat run (dedupe)
+existing_issue='[{"number":9001,"url":"https://github.com/mkny13/couch-tour/issues/9001","title":"Smoke journey failing: search-artist-hit","body":"<!-- smoke-journey:search-artist-hit -->"}]'
+run repeat-fail STUB_MAC_RESULTS="$fail_tsv" STUB_GH_OPEN_ISSUES="$existing_issue" -- --platform both
+check "3. repeat-fail: exit 0" test "$RC" = 0
+check "3. repeat-fail: exactly one Smoke: line" test "$(grep -c '^Smoke: ' "$TMP/repeat-fail/out/$TAG.md")" = 1
+check "3. repeat-fail: Smoke: FAIL" grep -q '^Smoke: FAIL$' "$TMP/repeat-fail/out/$TAG.md"
+check "3. repeat-fail: no mahler add call" bash -c "! grep -q 'add phish-in' '$TMP/repeat-fail/calls.mahler' 2>/dev/null"
+check "3. repeat-fail: gh issue comment called" grep -q 'issue comment 9001' "$TMP/repeat-fail/calls.gh"
+
+# Case 4: --no-file-bugs
+run no-file-bugs STUB_MAC_RESULTS="$fail_tsv" -- --platform both --no-file-bugs
+check "4. no-file-bugs: exit 0" test "$RC" = 0
+check "4. no-file-bugs: exactly one Smoke: line" test "$(grep -c '^Smoke: ' "$TMP/no-file-bugs/out/$TAG.md")" = 1
+check "4. no-file-bugs: Smoke: FAIL" grep -q '^Smoke: FAIL$' "$TMP/no-file-bugs/out/$TAG.md"
+check "4. no-file-bugs: no mahler add" bash -c "! grep -q 'add phish-in' '$TMP/no-file-bugs/calls.mahler' 2>/dev/null"
+check "4. no-file-bugs: no gh issue edit/comment/create" bash -c "! grep -Eq 'issue (edit|comment|create)' '$TMP/no-file-bugs/calls.gh' 2>/dev/null"
+
+# Case 5: one platform preflight-fails (stub exits 2)
+run preflight-fail STUB_ANDROID_RC=2 STUB_ANDROID_ERR="ERROR: emulator boot timeout" -- --platform both
+check "5. preflight-fail: exit 2" test "$RC" = 2
+check "5. preflight-fail: report exists" test -f "$TMP/preflight-fail/out/$TAG.md"
+check "5. preflight-fail: exactly one Tag: line" test "$(grep -c "^Tag: $TAG\$" "$TMP/preflight-fail/out/$TAG.md")" = 1
+check "5. preflight-fail: exactly one Smoke: line" test "$(grep -c '^Smoke: ' "$TMP/preflight-fail/out/$TAG.md")" = 1
+check "5. preflight-fail: Smoke: FAIL" grep -q '^Smoke: FAIL$' "$TMP/preflight-fail/out/$TAG.md"
+check "5. preflight-fail: never Smoke: PASS" bash -c "! grep -q '^Smoke: PASS' '$TMP/preflight-fail/out/$TAG.md'"
+check "5. preflight-fail: report names runner error" grep -q "emulator boot timeout" "$TMP/preflight-fail/out/$TAG.md"
+
+# ==============================================================================
+# Flag pass-through, download, and AVD logic (#610, #640)
+# ==============================================================================
 
 # (a) --allow-focus reaches mac only when given
 run a1 -- --platform mac --allow-focus
