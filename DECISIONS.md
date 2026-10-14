@@ -611,6 +611,17 @@ Since `main` requires the `test` check (D336), `macos-release.yml`'s direct push
 
 **Supersedes** D198's commit-to-`main` step. `main`'s legacy `appcast*.xml` stay frozen after a one-time bootstrap (#639), because installs with the old `SUFeedURL` baked in still read them.
 
+### D341: Pin GRDB.swift to 7.8.x in CouchTourKit (Swift tools 6.1 / Xcode 16.2 CI constraint) (#636, #649)
+
+Dependabot proposed updating GRDB.swift from 6.29.3 to 7.11.1 (#635, #636) for the macOS `CouchTourKit` package, which backs the macOS listening-history database (`phishin.db`).
+
+**Decision:**
+1. **Major bump & pin:** Bump GRDB.swift to major version 7, but constrain the dependency in `macos/Packages/CouchTourKit/Package.swift` to `"7.8.0"..<"7.9.0"` instead of tracking latest 7.x (`7.11.x`). GRDB 7.9+ requires `swift-tools-version: 6.1` (Xcode 16.3+), whereas CI (`macos-tests.yml`) runs on GitHub Actions runners pinned to Xcode 16.2 (Swift 6.0 tools).
+2. **CI Xcode toolchain selection:** In `.github/workflows/macos-tests.yml`, explicitly select Xcode 16.2 (`/Applications/Xcode_16.2.app`) because the runner's default toolchain is Swift 5.10, while GRDB 7 requires Swift 6.0 tools.
+3. **Database compatibility:** All existing SQLite schema, table names, migrations, and `phishin.db` on-disk layout are preserved without requiring source adaptations in `CouchTourKit`.
+
+**Rejected:** Updating to GRDB 7.9+ / 7.11.1 immediately, which would require upgrading the project swift-tools-version to 6.1 and breaking CI until GitHub Actions runners provide Xcode 16.3.
+
 ### D342: Smoke report gates production promotion; weekly smoke staleness nudge and runner (#358)
 
 Prod 0.83 passed every unit test and still shipped five glaring user-visible regressions (mockup favorites, no path to Artists, favorites lost on relaunch, blank Home sections, miswired Next Stop chips) because unit tests do not exercise the real running app. Previously, `scripts/promote-beta.sh` would dispatch a production release for any tag without checking whether smoke journeys were run.
