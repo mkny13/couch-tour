@@ -237,4 +237,27 @@ final class TagTests: XCTestCase {
         let sortedDateAsc = shows.sorted(by: .dateAsc)
         XCTAssertEqual(["1997-11-17", "1997-11-22", "1997-12-30"], sortedDateAsc.map { $0.date })
     }
+
+    // ------------------------------------------------------ jamChartNote (#355)
+
+    private func track(_ tags: [Tag]) -> PlayableTrack {
+        PlayableTrack(id: "1", title: "Tweezer", url: "https://phish.in/t.mp3", tags: tags)
+    }
+
+    func testJamChartNoteReturnsTrimmedNotes() {
+        let t = track([Tag(name: "Jamcharts", notes: "  Top tier\n")])
+        XCTAssertEqual(t.jamChartNote, "Top tier")
+    }
+
+    func testJamChartNoteNilForNilNotes() {
+        XCTAssertNil(track([Tag(name: "Jamcharts")]).jamChartNote)
+    }
+
+    func testJamChartNoteNilForWhitespaceNotes() {
+        XCTAssertNil(track([Tag(name: "Jamcharts", notes: " \n ")]).jamChartNote)
+    }
+
+    func testJamChartNoteNilWithoutJamTag() {
+        XCTAssertNil(track([Tag(name: "Tease", notes: "x")]).jamChartNote)
+    }
 }
