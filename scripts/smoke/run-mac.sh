@@ -505,6 +505,14 @@ function run(argv) {
 
     if (!targetElement) return "NOT_FOUND";
 
+    // Text fields need keyboard focus set rather than a default action click
+    if (targetElement.role() === "AXTextField") {
+        try {
+            targetElement.attributes.byName("AXFocused").value = true;
+            return "FOCUSED";
+        } catch (e) {}
+    }
+
     // 1. Dispatch click directly through System Events
     try {
         targetElement.click();
@@ -536,7 +544,7 @@ function run(argv) {
 JXA
 )"
 
-  if [[ "$result" == "CLICKED" || "$result" == "PRESSED" ]]; then
+  if [[ "$result" == "CLICKED" || "$result" == "PRESSED" || "$result" == "FOCUSED" ]]; then
     return 0
   elif [[ "$result" =~ ^COORDS:([0-9]+):([0-9]+)$ ]]; then
     # Coordinates derived at runtime from the located element's frame.
@@ -794,10 +802,12 @@ mac_run_search_artist_hit() {
     return 0
   fi
 
-  mac::click "search.field" || true
+  mac::click "search.field" "$DEEP" || true
   # Clear existing query if clear button is present
   if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
-    mac::click "search.clear" || true
+    mac::click "search.clear" "$DEEP" || true
+    sleep 0.3
+    mac::click "search.field" "$DEEP" || true
   fi
 
   mac::type "moe"
@@ -1114,9 +1124,11 @@ mac_run_search_result_sections() {
     return 0
   fi
 
-  mac::click "search.field" || true
+  mac::click "search.field" "$DEEP" || true
   if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
-    mac::click "search.clear" || true
+    mac::click "search.clear" "$DEEP" || true
+    sleep 0.3
+    mac::click "search.field" "$DEEP" || true
   fi
 
   mac::type "ghost"
