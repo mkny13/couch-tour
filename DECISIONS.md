@@ -610,3 +610,17 @@ Since `main` requires the `test` check (D336), `macos-release.yml`'s direct push
 **Rejected:** a bypass actor (admin setup plus a new secret, weakens D336); a PR merged by the conductor (`GITHUB_TOKEN` PRs don't trigger `test.yml`, so the required check never reports); a rolling GitHub release (fires `macos-release.yml` and counts in `beta_guard.py`); Pages (admin setting).
 
 **Supersedes** D198's commit-to-`main` step. `main`'s legacy `appcast*.xml` stay frozen after a one-time bootstrap (#639), because installs with the old `SUFeedURL` baked in still read them.
+
+### D342: Smoke report gates production promotion; weekly smoke staleness nudge and runner (#358)
+
+Prod 0.83 passed every unit test and still shipped five glaring user-visible regressions (mockup favorites, no path to Artists, favorites lost on relaunch, blank Home sections, miswired Next Stop chips) because unit tests do not exercise the real running app. Previously, `scripts/promote-beta.sh` would dispatch a production release for any tag without checking whether smoke journeys were run.
+
+**Decision:**
+1. **Smoke report gate:** `scripts/promote-beta.sh` requires committed evidence at `smoke-reports/<tag>.md`. The grammar read by the gate:
+   - `Tag: <tag>` (must match the tag being promoted)
+   - `Smoke: PASS` (exactly one verdict line; `Smoke: FAIL` or missing/ambiguous verdict refuses promotion)
+   - `Waived: <journey-id> - <reason>` (optional; allows a PASS with documented waived journey failures, while any unwaived FAIL journey is refused)
+2. **Forced promotion log:** When a report cannot be produced, `--force-no-smoke` bypasses the gate, prints a loud warning banner, and appends a timestamped line to `smoke-reports/.forced-promotions.log` (`<ISO-8601 UTC> forced <confirmed-tag> -> <next-tag> by <actor>`). A passing report makes `--force-no-smoke` a no-op that writes nothing to the log.
+3. **Weekly CI staleness check:** GitHub Actions cannot execute GUI smoke journeys (which require a real logged-in Mac with a display for AX accessibility tree inspection and an attached Android device for `adb`). Rather than pretending to run tests headlessly and passing vacuously, `.github/workflows/weekly-smoke.yml` runs `scripts/smoke-nudge.sh` weekly to check whether the latest beta has a passing report. If stale, it opens or updates a rolling `Smoke run due: <tag>` issue and exits non-zero so the red run serves as notification (matching `sync-deploy.yml`).
+4. **Weekly mini runner:** `scripts/smoke/weekly-smoke.sh` schedules execution on the Mac mini between 00:00 and 06:00 local time through Mahler's desktop gate (`mahler desktop run --scheduled`). If app code changed (`app/`, `macos/`, `sync/`) since the last `vX.Y` tag, it cuts a beta first (`scripts/cut-beta.sh`) and tests current `main`; otherwise it tests the existing latest beta.
+

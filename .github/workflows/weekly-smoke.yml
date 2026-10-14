@@ -1,0 +1,49 @@
+name: Weekly smoke check
+
+# Weekly staleness check: flags when the newest beta tag has no passing smoke report in
+# smoke-reports/<tag>.md (issue #358). Smoke journeys cannot execute in a GitHub Actions
+# runner because they require a logged-in Mac with a real display for accessibility-tree
+# input and an attached Android device for adb install/launch; a GitHub runner cannot do
+# either, and pretending otherwise would make this a green no-op. Instead, this weekly
+# check verifies that the latest beta has been smoked, opens or updates a rolling
+# "Smoke run due: <tag>" issue if not, and exits non-zero so the red run is the notification
+# (matching the precedent in sync-deploy.yml).
+on:
+  schedule:
+    - cron: "17 10 * * 1"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to check (default: newest v* tag)"
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run (print intended actions without modifying issues)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check smoke report staleness and nudge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=()
+          if [ -n "${{ inputs.tag }}" ]; then
+            args+=(--tag "${{ inputs.tag }}")
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          bash scripts/smoke-nudge.sh "${args[@]}"
