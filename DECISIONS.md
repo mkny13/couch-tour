@@ -635,3 +635,12 @@ Prod 0.83 passed every unit test and still shipped five glaring user-visible reg
 3. **Weekly CI staleness check:** GitHub Actions cannot execute GUI smoke journeys (which require a real logged-in Mac with a display for AX accessibility tree inspection and an attached Android device for `adb`). Rather than pretending to run tests headlessly and passing vacuously, `.github/workflows/weekly-smoke.yml` runs `scripts/smoke-nudge.sh` weekly to check whether the latest beta has a passing report. If stale, it opens or updates a rolling `Smoke run due: <tag>` issue and exits non-zero so the red run serves as notification (matching `sync-deploy.yml`).
 4. **Weekly mini runner:** `scripts/smoke/weekly-smoke.sh` schedules execution on the Mac mini between 00:00 and 06:00 local time through Mahler's desktop gate (`mahler desktop run --scheduled`). If app code changed (`app/`, `macos/`, `sync/`) since the last `vX.Y` tag, it cuts a beta first (`scripts/cut-beta.sh`) and tests current `main`; otherwise it tests the existing latest beta.
 
+### D345: Decline vitest 5.0.3 bump in /sync pending @cloudflare/vitest-pool-workers support (#631, #637)
+
+Dependabot proposed updating vitest from 4.1.11 to 5.0.3 in `sync/` (#631).
+
+**Decision:**
+Decline the vitest 5.0.3 major update and retain `vitest = "^4.1.11"` in `sync/package.json`.
+The latest `@cloudflare/vitest-pool-workers` release (0.23.0) declares peer dependency `vitest: "^4.1.0"`. Upgrading vitest to 5.0.3 breaks the Miniflare D1 test runner with worker startup errors (`[vitest-pool]: Failed to start cloudflare-pool worker ... SyntaxError: Unexpected identifier 'file'`). The pool-workers package does not yet provide vitest 5 compatibility on any release or dist-tag. Do not force incompatible peers with `--legacy-peer-deps` or npm `overrides`. Revisit the vitest major update once `@cloudflare/vitest-pool-workers` publishes support for vitest 5.
+
+
