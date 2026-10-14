@@ -329,6 +329,9 @@ struct SearchView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
+        // The smoke journeys read the hit count off the tab; a plain-style Button over a
+        // VStack exposes an empty AXTitle, so publish the count as the AXValue.
+        .accessibilityValue("\(count)")
     }
 
     private func filterPill(_ title: String, isSelected: Bool = false) -> some View {
