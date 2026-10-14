@@ -75,6 +75,7 @@ TAG_TO_CONTENT_DESC = {
     "nav.library": "Library",
     "nav.settings": "Settings",
     "nav.history": "History",
+    "search.clear": "Clear",
 }
 
 try:
@@ -652,6 +653,11 @@ android_run_search_artist_hit() {
   # Focus the field first so typed text lands in it, not on whatever had focus.
   android::tap "search.field" 2>/dev/null || true
   sleep 0.3
+  android::dump >/dev/null || true
+  if [[ "$(android::count "search.clear")" -gt 0 ]]; then
+    android::tap "search.clear" 2>/dev/null || true
+    sleep 0.3
+  fi
   android::text "moe"
 
   if android::wait_for_tag "search.section.artists" "$TIMEOUT"; then
@@ -797,6 +803,11 @@ android_run_search_result_sections() {
   # Focus the field first so typed text lands in it, not on whatever had focus.
   android::tap "search.field" 2>/dev/null || true
   sleep 0.3
+  android::dump >/dev/null || true
+  if [[ "$(android::count "search.clear")" -gt 0 ]]; then
+    android::tap "search.clear" 2>/dev/null || true
+    sleep 0.3
+  fi
   android::text "ghost"
 
   if ! android::wait_for_tag "search.results" "$TIMEOUT"; then
