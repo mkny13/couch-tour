@@ -513,13 +513,7 @@ function run(argv) {
         } catch (e) {}
     }
 
-    // 1. Dispatch click directly through System Events
-    try {
-        targetElement.click();
-        return "CLICKED";
-    } catch (e) {}
-
-    // 2. Perform AXPress action
+    // 1. Perform AXPress action if supported
     try {
         var actions = targetElement.actions();
         for (var a = 0; a < actions.length; a++) {
@@ -528,6 +522,12 @@ function run(argv) {
                 return "PRESSED";
             }
         }
+    } catch (e) {}
+
+    // 2. Dispatch click directly through System Events
+    try {
+        targetElement.click();
+        return "CLICKED";
     } catch (e) {}
 
     // 3. Fallback: Derive center coordinates at runtime from located element frame
