@@ -8,6 +8,21 @@ struct ArtistsView: View {
     @State private var sortMode: ArtistSortMode = .popular
     @State private var query: String = ""
 
+    private let fetchArtists: () async throws -> [ArtistRef]
+
+    init(fetchArtists: @escaping () async throws -> [ArtistRef] = ArtistsView.defaultFetch) {
+        self.fetchArtists = fetchArtists
+    }
+
+    /// CI has no route to Relisten, and the screen only renders `artists.list` once the fetch
+    /// succeeds, so the XCUITest swaps in a fixed catalog rather than depending on the network.
+    static func defaultFetch() async throws -> [ArtistRef] {
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_ARTISTS"] == "1" {
+            return [ArtistRef(backend: .relisten, id: "moe", name: "moe.")]
+        }
+        return try await RelistenCatalogSource.shared.artists()
+    }
+
     /// The phish-pinned / favorited / everyone-else split (#116) — kept apart, rather than
     /// flattened via `mergeArtists`, so favorites can render as their own pinned section and
     /// each group can be filtered and sorted independently while Phish, whose position-1 slot
@@ -73,6 +88,15 @@ struct ArtistsView: View {
                 }
             }
         }
+        // The screen id can't wrap the content: a container (or plain modifier) around a lone
+        // List collapses into it and overwrites `artists.list`, so it rides on a marker
+        // sibling instead.
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier(AXIdentifiers.artistsScreen)
+        }
         .searchable(text: $query, prompt: "Filter artists…")
         .toolbar {
             ToolbarItem {
@@ -124,7 +148,7 @@ struct ArtistsView: View {
     private func load() async {
         loadState = .loading
         do {
-            relistenArtists = try await RelistenCatalogSource.shared.artists()
+            relistenArtists = try await fetchArtists()
             loadState = .loaded
         } catch {
             loadState = .failed("Couldn't load artists: \(error.localizedDescription)")
