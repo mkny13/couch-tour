@@ -88,6 +88,15 @@ struct ArtistsView: View {
                 }
             }
         }
+        // The screen id can't wrap the content: a container (or plain modifier) around a lone
+        // List collapses into it and overwrites `artists.list`, so it rides on a marker
+        // sibling instead.
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier(AXIdentifiers.artistsScreen)
+        }
         .searchable(text: $query, prompt: "Filter artists…")
         .toolbar {
             ToolbarItem {

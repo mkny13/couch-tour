@@ -110,8 +110,6 @@ struct ThreePaneRootView: View {
             switch route {
             case .artists:
                 ArtistsView()
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier(AXIdentifiers.artistsScreen)
             case .listening:
                 ListeningView()
             case .playlists:
