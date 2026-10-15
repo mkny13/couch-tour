@@ -505,13 +505,15 @@ function run(argv) {
 
     if (!targetElement) return "NOT_FOUND";
 
-    // 1. Dispatch click directly through System Events
-    try {
-        targetElement.click();
-        return "CLICKED";
-    } catch (e) {}
+    // Text fields need keyboard focus set rather than a default action click
+    if (targetElement.role() === "AXTextField") {
+        try {
+            targetElement.attributes.byName("AXFocused").value = true;
+            return "FOCUSED";
+        } catch (e) {}
+    }
 
-    // 2. Perform AXPress action
+    // 1. Perform AXPress action if supported
     try {
         var actions = targetElement.actions();
         for (var a = 0; a < actions.length; a++) {
@@ -520,6 +522,12 @@ function run(argv) {
                 return "PRESSED";
             }
         }
+    } catch (e) {}
+
+    // 2. Dispatch click directly through System Events
+    try {
+        targetElement.click();
+        return "CLICKED";
     } catch (e) {}
 
     // 3. Fallback: Derive center coordinates at runtime from located element frame
@@ -536,7 +544,7 @@ function run(argv) {
 JXA
 )"
 
-  if [[ "$result" == "CLICKED" || "$result" == "PRESSED" ]]; then
+  if [[ "$result" == "CLICKED" || "$result" == "PRESSED" || "$result" == "FOCUSED" ]]; then
     return 0
   elif [[ "$result" =~ ^COORDS:([0-9]+):([0-9]+)$ ]]; then
     # Coordinates derived at runtime from the located element's frame.
@@ -627,6 +635,39 @@ mac_screenshot() {
   local journey_id="$1"
   local screenshot_path="smoke-reports/${TAG}/mac-${journey_id}.png"
   mac::screenshot "$screenshot_path"
+}
+
+# Closes any auxiliary windows (e.g. Settings/Preferences) so the main Couch Tour window is frontmost.
+mac::close_auxiliary_windows() {
+  osascript -l JavaScript - "$BUNDLE_ID" "$APP_NAME" << 'JXA' >/dev/null 2>&1 || true
+function run(argv) {
+    var bundleId = argv[0];
+    var appName = argv[1];
+    var app = Application('System Events');
+    var proc = null;
+    var processes = app.applicationProcesses();
+    for (var i = 0; i < processes.length; i++) {
+        try {
+            if (processes[i].bundleIdentifier() === bundleId || processes[i].name() === appName) {
+                proc = processes[i];
+                break;
+            }
+        } catch (e) {}
+    }
+    if (!proc) return;
+    var wins = proc.windows();
+    for (var i = 0; i < wins.length; i++) {
+        if (wins[i].name() !== "Couch Tour") {
+            try {
+                var closeBtn = wins[i].buttons.whose({subrole: "AXCloseButton"})[0];
+                if (closeBtn && closeBtn.exists()) {
+                    closeBtn.click();
+                }
+            } catch(e) {}
+        }
+    }
+}
+JXA
 }
 
 # Quits and reopens Couch Tour Beta by bundle id, then waits for sidebar.nav.home.
@@ -794,10 +835,12 @@ mac_run_search_artist_hit() {
     return 0
   fi
 
-  mac::click "search.field" || true
+  mac::click "search.field" "$DEEP" || true
   # Clear existing query if clear button is present
   if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
-    mac::click "search.clear" || true
+    mac::click "search.clear" "$DEEP" || true
+    sleep 0.3
+    mac::click "search.field" "$DEEP" || true
   fi
 
   mac::type "moe"
@@ -1084,6 +1127,11 @@ mac_run_nav_reaches_every_destination() {
     fi
   done
 
+  # Close auxiliary windows (like Settings) opened during destination checks
+  # and return to home so subsequent journeys operate cleanly on the main window.
+  mac::close_auxiliary_windows
+  mac::click "sidebar.nav.home" 2>/dev/null || true
+
   if [[ ${#failed[@]} -eq 0 ]]; then
     smoke::result "mac" "$id" "PASS" "all six sidebar destinations reached and showed their screen identifier"
   else
@@ -1102,6 +1150,8 @@ mac_run_search_result_sections() {
     return 0
   fi
 
+  mac::close_auxiliary_windows
+
   if ! mac::click "sidebar.nav.search"; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.search"
@@ -1114,9 +1164,11 @@ mac_run_search_result_sections() {
     return 0
   fi
 
-  mac::click "search.field" || true
+  mac::click "search.field" "$DEEP" || true
   if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
-    mac::click "search.clear" || true
+    mac::click "search.clear" "$DEEP" || true
+    sleep 0.3
+    mac::click "search.field" "$DEEP" || true
   fi
 
   mac::type "ghost"
