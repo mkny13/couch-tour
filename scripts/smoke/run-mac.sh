@@ -124,18 +124,23 @@ DEEP=14
 # Output format per line: <identifier>\t<role>\t<title-or-value>
 # Note: "entire contents" is banned because it hangs on Couch Tour Beta.
 # The walk is strictly bounded by max depth (default 6) and timeout (ms).
+# A fourth argument "first" returns as soon as one element matches.
+# When the time budget cuts the walk short, a line "ax_query: walk timed out ..." goes to
+# stderr so a partial walk is not mistaken for an absent element; stdout is unchanged.
 mac::ax_query() {
   local target_id="${1:-}"
   local max_depth="${2:-6}"
   local timeout_ms="${3:-5000}"
+  local mode="${4:-all}"
 
-  osascript -l JavaScript - "$target_id" "$max_depth" "$timeout_ms" "$BUNDLE_ID" "$APP_NAME" << 'JXA'
+  osascript -l JavaScript - "$target_id" "$max_depth" "$timeout_ms" "$BUNDLE_ID" "$APP_NAME" "$mode" << 'JXA'
 function run(argv) {
     var targetId = argv[0] || "";
     var maxDepth = parseInt(argv[1] || "6", 10);
     var timeoutMs = parseInt(argv[2] || "5000", 10);
     var bundleId = argv[3];
     var appName = argv[4];
+    var firstOnly = argv[5] === "first";
 
     var app = Application('System Events');
     var proc = null;
@@ -163,9 +168,13 @@ function run(argv) {
 
     var startTime = Date.now();
     var matches = [];
+    var timedOut = false;
+    var visited = 0;
 
     function walk(element, depth) {
-        if (Date.now() - startTime > timeoutMs) return;
+        if (firstOnly && matches.length > 0) return;
+        if (Date.now() - startTime > timeoutMs) { timedOut = true; return; }
+        visited++;
 
         var axId = null;
         try {
@@ -219,6 +228,10 @@ function run(argv) {
         walk(windows[i], 0);
     }
 
+    if (timedOut && !(firstOnly && matches.length > 0)) {
+        console.log("ax_query: walk timed out after " + timeoutMs + "ms at " + visited +
+            " elements (target " + (targetId || "*") + ")");
+    }
     return matches.join("\n");
 }
 JXA
@@ -333,23 +346,46 @@ JXA
 
 
 # Poll mac::ax_query until the identifier appears or timeout fires.
+# Budget for one AX walk at depth >= $DEEP; a full Home walk costs ~40-45 ms per element.
+AX_DEEP_TIMEOUT_MS="${AX_DEEP_TIMEOUT_MS:-15000}"
+
+# Set to 1 when the last mac::wait_for_id gave up after an AX walk that ran out of time,
+# so callers can report "AX walk timed out" instead of "missing".
+MAC_AX_TIMED_OUT=0
+
 mac::wait_for_id() {
   local id="$1"
   local to="${2:-$TIMEOUT}"
   local depth="${3:-6}"
-  local start_time
-  start_time="$(date +%s)"
+  local start_ms now_ms remaining_ms walk_ms
+  start_ms="$(( $(date +%s) * 1000 ))"
+  MAC_AX_TIMED_OUT=0
 
   while true; do
-    local matches
-    matches="$(mac::ax_query "$id" "$depth")"
+    now_ms="$(( $(date +%s) * 1000 ))"
+    remaining_ms=$(( start_ms + to * 1000 - now_ms ))
+    walk_ms=5000
+    if (( depth >= ${DEEP:-14} )); then walk_ms="$AX_DEEP_TIMEOUT_MS"; fi
+    # One walk must not run past the overall deadline (but always gets a usable minimum).
+    if (( remaining_ms < walk_ms )); then walk_ms=$(( remaining_ms > 1000 ? remaining_ms : 1000 )); fi
+
+    local matches errfile
+    errfile="$(mktemp)"
+    matches="$(mac::ax_query "$id" "$depth" "$walk_ms" first 2>"$errfile")"
+    if [[ -s "$errfile" ]]; then cat "$errfile" >&2; fi
+    if grep -q "ax_query: walk timed out" "$errfile"; then
+      MAC_AX_TIMED_OUT=1
+    else
+      MAC_AX_TIMED_OUT=0
+    fi
+    rm -f "$errfile"
     if [[ -n "$matches" ]]; then
+      MAC_AX_TIMED_OUT=0
       echo "$matches"
       return 0
     fi
-    local now
-    now="$(date +%s)"
-    if (( now - start_time >= to )); then
+    now_ms="$(( $(date +%s) * 1000 ))"
+    if (( now_ms - start_ms >= to * 1000 )); then
       return 1
     fi
     sleep 0.25
@@ -753,18 +789,24 @@ mac_run_home_sections_after_relaunch() {
     fi
   fi
 
-  local missing=()
+  local missing=() timed_out=false
   local section
-  for section in home.in_progress home.next_tour_stops home.on_this_date; do
-    mac::wait_for_id "$section" "$TIMEOUT" "$DEEP" >/dev/null || missing+=("$section")
+  for section in home.in_progress home.next_tour_stops home.on_this_date home.in_progress.card; do
+    if ! mac::wait_for_id "$section" "$TIMEOUT" "$DEEP" >/dev/null; then
+      missing+=("$section")
+      [[ "$MAC_AX_TIMED_OUT" == 1 ]] && timed_out=true
+    fi
   done
-  mac::wait_for_id "home.in_progress.card" "$TIMEOUT" "$DEEP" >/dev/null || missing+=("home.in_progress.card")
 
   if [[ ${#missing[@]} -eq 0 ]]; then
     smoke::result "mac" "$id" "PASS" "all three Home sections and an in-progress card present"
   else
     mac_screenshot "$id"
-    smoke::result "mac" "$id" "FAIL" "missing after relaunch: ${missing[*]}"
+    if [[ "$timed_out" == true ]]; then
+      smoke::result "mac" "$id" "FAIL" "AX walk timed out (harness limit, not a confirmed app regression); missing after relaunch: ${missing[*]}"
+    else
+      smoke::result "mac" "$id" "FAIL" "missing after relaunch: ${missing[*]}"
+    fi
   fi
 }
 
