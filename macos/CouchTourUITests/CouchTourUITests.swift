@@ -132,7 +132,11 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(screen.waitForExistence(timeout: 10))
 
         let list = app.descendants(matching: .any)["artists.list"].firstMatch
-        XCTAssertTrue(list.waitForExistence(timeout: 10))
+        if !list.waitForExistence(timeout: 10) {
+            // CI keeps no xcresult, so put the AX tree in the log for triage.
+            print("AXDUMP-BEGIN\n\(app.debugDescription)\nAXDUMP-END")
+            XCTFail("artists.list not found")
+        }
     }
 }
 
