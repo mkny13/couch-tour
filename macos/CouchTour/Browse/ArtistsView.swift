@@ -66,13 +66,13 @@ struct ArtistsView: View {
                             }
                         }
                     }
-                    // A bare List can drop its identifier from the AX tree, so put it on a
-                    // container (as History does, #613).
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier(AXIdentifiers.artistsList)
                 }
             }
         }
+        // A bare List (or a transparent Group) drops its identifier from the AX tree, so it
+        // sits on a container around the whole load-state switch (as History does, #613).
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(AXIdentifiers.artistsList)
         .searchable(text: $query, prompt: "Filter artists…")
         .toolbar {
             ToolbarItem {
