@@ -66,6 +66,7 @@ jobs:
         run: |
           bash scripts/smoke/test_sync_roundtrip.sh
           bash scripts/smoke/test_mac_library_phishin_playlists.sh
+          bash scripts/smoke/test_home_sections_after_relaunch.sh
           bash scripts/smoke/check-journeys.sh
           bash scripts/smoke/test-report.sh
           bash scripts/smoke/test-run-smoke.sh

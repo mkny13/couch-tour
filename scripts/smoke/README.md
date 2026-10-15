@@ -99,6 +99,15 @@ $ echo $?
 against stubbed accessibility lookups (no app needed) and checks that local-only `library.row.*` ids
 yield `SKIP` while a `library.row.account-playlist-*` id yields `PASS`.
 
+### Home sections journey
+
+`bash scripts/smoke/test_home_sections_after_relaunch.sh` runs the real `home-sections-after-relaunch`
+journeys (mac and android) against stubbed query layers. `mac::ax_query` prints
+`ax_query: walk timed out ...` to stderr when its time budget cuts a walk short, and the mac journey then
+fails with "AX walk timed out" instead of "missing". Deep walks (`$DEEP`) get `AX_DEEP_TIMEOUT_MS`
+(default 15000; override via the environment). The JXA walk itself is not covered headlessly: it needs a
+live Accessibility tree, which CI does not have.
+
 ### Report grammar
 
 `report.sh --results <file>... --tag <tag> --out <report.md> [--waive ...] [--not-run ...] [--issue ...]`

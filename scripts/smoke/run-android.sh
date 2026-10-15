@@ -601,17 +601,14 @@ android_run_home_sections_after_relaunch() {
   fi
 
   android::relaunch
-  android::dump >/dev/null || true
-  local missing=()
-  if [[ "$(android::count "home.section.in-progress")" -eq 0 ]]; then
-    missing+=("home.section.in-progress")
-  fi
-  if [[ "$(android::count "home.section.next-tour-stops")" -eq 0 ]]; then
-    missing+=("home.section.next-tour-stops")
-  fi
-  if [[ "$(android::count "home.section.on-this-date")" -eq 0 ]]; then
-    missing+=("home.section.on-this-date")
-  fi
+  # Top to bottom: the sections load asynchronously and sit in a LazyColumn, so a section
+  # below the fold is absent from the dump until it is scrolled into view.
+  local missing=() section
+  for section in home.section.in-progress home.section.next-tour-stops home.section.on-this-date; do
+    android::wait_for_tag "$section" 3 && continue
+    android_scroll_to "$section" "" down && continue
+    missing+=("$section")
+  done
 
   if [[ ${#missing[@]} -eq 0 ]]; then
     smoke::result "android" "$id" "PASS" "all home sections present after relaunch"
