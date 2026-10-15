@@ -118,5 +118,21 @@ final class CouchTourUITests: XCTestCase {
         let unplayableTrackActual = (unplayableTrackText.value as? String) ?? unplayableTrackText.label
         XCTAssertEqual(unplayableTrackActual, "ResumeError.unresumable")
     }
+
+    func testArtistsScreenExposesArtistsList() {
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launch()
+
+        let nav = app.descendants(matching: .any)["sidebar.nav.artists"].firstMatch
+        XCTAssertTrue(nav.waitForExistence(timeout: 10))
+        nav.click()
+
+        let screen = app.descendants(matching: .any)["artists.screen"].firstMatch
+        XCTAssertTrue(screen.waitForExistence(timeout: 10))
+
+        let list = app.descendants(matching: .any)["artists.list"].firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 10))
+    }
 }
 
