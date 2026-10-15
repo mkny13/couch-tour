@@ -122,6 +122,7 @@ final class CouchTourUITests: XCTestCase {
     func testArtistsScreenExposesArtistsList() {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launchEnvironment["COUCHTOUR_UI_TEST_ARTISTS"] = "1"
         app.launch()
 
         let nav = app.descendants(matching: .any)["sidebar.nav.artists"].firstMatch
@@ -133,7 +134,6 @@ final class CouchTourUITests: XCTestCase {
 
         let list = app.descendants(matching: .any)["artists.list"].firstMatch
         if !list.waitForExistence(timeout: 10) {
-            // CI keeps no xcresult, so put the AX tree in the log for triage.
             print("AXDUMP-BEGIN\n\(app.debugDescription)\nAXDUMP-END")
             XCTFail("artists.list not found")
         }

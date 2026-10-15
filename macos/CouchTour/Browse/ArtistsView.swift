@@ -8,6 +8,21 @@ struct ArtistsView: View {
     @State private var sortMode: ArtistSortMode = .popular
     @State private var query: String = ""
 
+    private let fetchArtists: () async throws -> [ArtistRef]
+
+    init(fetchArtists: @escaping () async throws -> [ArtistRef] = ArtistsView.defaultFetch) {
+        self.fetchArtists = fetchArtists
+    }
+
+    /// CI has no route to Relisten, and the screen only renders `artists.list` once the fetch
+    /// succeeds, so the XCUITest swaps in a fixed catalog rather than depending on the network.
+    static func defaultFetch() async throws -> [ArtistRef] {
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_ARTISTS"] == "1" {
+            return [ArtistRef(backend: .relisten, id: "moe", name: "moe.")]
+        }
+        return try await RelistenCatalogSource.shared.artists()
+    }
+
     /// The phish-pinned / favorited / everyone-else split (#116) — kept apart, rather than
     /// flattened via `mergeArtists`, so favorites can render as their own pinned section and
     /// each group can be filtered and sorted independently while Phish, whose position-1 slot
@@ -66,13 +81,13 @@ struct ArtistsView: View {
                             }
                         }
                     }
+                    // A bare List can drop its identifier from the AX tree, so put it on a
+                    // container (as History does, #613).
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier(AXIdentifiers.artistsList)
                 }
             }
         }
-        // A bare List (or a transparent Group) drops its identifier from the AX tree, so it
-        // sits on a container around the whole load-state switch (as History does, #613).
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(AXIdentifiers.artistsList)
         .searchable(text: $query, prompt: "Filter artists…")
         .toolbar {
             ToolbarItem {
@@ -124,7 +139,7 @@ struct ArtistsView: View {
     private func load() async {
         loadState = .loading
         do {
-            relistenArtists = try await RelistenCatalogSource.shared.artists()
+            relistenArtists = try await fetchArtists()
             loadState = .loaded
         } catch {
             loadState = .failed("Couldn't load artists: \(error.localizedDescription)")
