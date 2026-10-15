@@ -609,7 +609,7 @@ Since `main` requires the `test` check (D336), `macos-release.yml`'s direct push
 
 **Rejected:** a bypass actor (admin setup plus a new secret, weakens D336); a PR merged by the conductor (`GITHUB_TOKEN` PRs don't trigger `test.yml`, so the required check never reports); a rolling GitHub release (fires `macos-release.yml` and counts in `beta_guard.py`); Pages (admin setting).
 
-**Supersedes** D198's commit-to-`main` step. `main`'s legacy `appcast*.xml` stay frozen after a one-time bootstrap (#639), because installs with the old `SUFeedURL` baked in still read them.
+**Supersedes** D198's commit-to-`main` step. `main`'s legacy `appcast*.xml` stay frozen after a one-time bootstrap (#639), because installs with the old `SUFeedURL` baked in still read them. Legacy `appcast-beta.xml` was bootstrapped to `v0.90` (0.90-beta) in #639; legacy `appcast.xml` bootstrap follows the next production promotion (#684).
 
 ### D341: Pin GRDB.swift to 7.8.x in CouchTourKit (Swift tools 6.1 / Xcode 16.2 CI constraint) (#636, #649)
 
