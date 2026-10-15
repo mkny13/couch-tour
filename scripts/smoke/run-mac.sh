@@ -637,6 +637,39 @@ mac_screenshot() {
   mac::screenshot "$screenshot_path"
 }
 
+# Closes any auxiliary windows (e.g. Settings/Preferences) so the main Couch Tour window is frontmost.
+mac::close_auxiliary_windows() {
+  osascript -l JavaScript - "$BUNDLE_ID" "$APP_NAME" << 'JXA' >/dev/null 2>&1 || true
+function run(argv) {
+    var bundleId = argv[0];
+    var appName = argv[1];
+    var app = Application('System Events');
+    var proc = null;
+    var processes = app.applicationProcesses();
+    for (var i = 0; i < processes.length; i++) {
+        try {
+            if (processes[i].bundleIdentifier() === bundleId || processes[i].name() === appName) {
+                proc = processes[i];
+                break;
+            }
+        } catch (e) {}
+    }
+    if (!proc) return;
+    var wins = proc.windows();
+    for (var i = 0; i < wins.length; i++) {
+        if (wins[i].name() !== "Couch Tour") {
+            try {
+                var closeBtn = wins[i].buttons.whose({subrole: "AXCloseButton"})[0];
+                if (closeBtn && closeBtn.exists()) {
+                    closeBtn.click();
+                }
+            } catch(e) {}
+        }
+    }
+}
+JXA
+}
+
 # Quits and reopens Couch Tour Beta by bundle id, then waits for sidebar.nav.home.
 mac::relaunch() {
   # Quitting Beta interrupts the owner's live session, so only do it when
@@ -1094,6 +1127,11 @@ mac_run_nav_reaches_every_destination() {
     fi
   done
 
+  # Close auxiliary windows (like Settings) opened during destination checks
+  # and return to home so subsequent journeys operate cleanly on the main window.
+  mac::close_auxiliary_windows
+  mac::click "sidebar.nav.home" 2>/dev/null || true
+
   if [[ ${#failed[@]} -eq 0 ]]; then
     smoke::result "mac" "$id" "PASS" "all six sidebar destinations reached and showed their screen identifier"
   else
@@ -1111,6 +1149,8 @@ mac_run_search_result_sections() {
     smoke::result "mac" "$id" "SKIP" "input disabled"
     return 0
   fi
+
+  mac::close_auxiliary_windows
 
   if ! mac::click "sidebar.nav.search"; then
     mac_screenshot "$id"
