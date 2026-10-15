@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "CouchTourKit", targets: ["CouchTourKit"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", "7.8.0"..<"7.9.0"), // 7.9+ needs Swift tools 6.1; CI pins Xcode 16.2 (Swift 6.0)
+        .package(url: "https://github.com/groue/GRDB.swift.git", "7.8.0"..<"8.0.0"), // 7.9+ needs Swift tools 6.1; CI pins Xcode 16.2 (Swift 6.0)
     ],
     targets: [
         .target(
