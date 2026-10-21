@@ -666,6 +666,7 @@ Following the owner's directive (2026-10-21), migrate macOS CI (`.github/workflo
 2. **Remove Xcode 16.2 selection:** Remove the hardcoded `/Applications/Xcode_16.2.app` selection steps in both workflows; `macos-15` runners default to Xcode 16.3+ / 16.4+, satisfying Swift tools 6.1 requirements without manual toolchain switching.
 3. **Lift GRDB dependency constraint:** In `macos/Packages/CouchTourKit/Package.swift`, update the GRDB.swift dependency to `.package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1")` and remove the obsolete Xcode 16.2 toolchain pin comments.
 4. **Database compatibility:** Retains existing database schema, table names, migrations, and `phishin.db` on-disk format.
+5. **MTAudioProcessingTap compatibility:** Correct the toolchain guard in `macos/CouchTour/Player.swift` to `#if compiler(>=6.4)` so that `MTAudioProcessingTapCreate` correctly provides `UnsafeMutablePointer<Unmanaged<MTAudioProcessingTap>?>` on Xcode 16.4 / Swift 6.1 (`macos-15` runner) while retaining `UnsafeMutablePointer<MTAudioProcessingTap?>` on Swift 6.4+ (Xcode 27.1).
 
 **Supersedes:** D341 (which pinned GRDB to 7.8.x and selected Xcode 16.2 on `macos-14`).
 
