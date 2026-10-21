@@ -643,4 +643,17 @@ Dependabot proposed updating vitest from 4.1.11 to 5.0.3 in `sync/` (#631).
 Decline the vitest 5.0.3 major update and retain `vitest = "^4.1.11"` in `sync/package.json`.
 The latest `@cloudflare/vitest-pool-workers` release (0.23.0) declares peer dependency `vitest: "^4.1.0"`. Upgrading vitest to 5.0.3 breaks the Miniflare D1 test runner with worker startup errors (`[vitest-pool]: Failed to start cloudflare-pool worker ... SyntaxError: Unexpected identifier 'file'`). The pool-workers package does not yet provide vitest 5 compatibility on any release or dist-tag. Do not force incompatible peers with `--legacy-peer-deps` or npm `overrides`. Revisit the vitest major update once `@cloudflare/vitest-pool-workers` publishes support for vitest 5.
 
+### D348: Drop manual beta-promotion gate; auto-promote strictly gated on smoke report (#251)
+
+Previously, promoting a beta to production required explicit owner confirmation (CLAUDE.md: "Never automatic; requires explicit owner confirmation").
+
+**Decision:**
+1. **Drop manual owner confirmation gate:** Promotion from beta to production is automated without human approval steps.
+2. **Strict smoke report gate:** In accordance with the owner's 2026-10-21 directive, auto-promotion is strictly gated on a passing smoke report for that exact tag (`smoke-reports/<tag>.md` with `Smoke: PASS`, exactly matching `promote-beta.sh`'s check). With no passing report (missing, FAIL, or unwaived failures), nothing is promoted and the beta stays a beta, even when CI is green.
+3. **`scripts/promote-beta.sh`:** Enhanced with `--auto` to discover the latest beta tag and promote if its smoke report passes. Positional usage supports 1 argument (`<beta-tag>`), automatically deriving `next_tag` by incrementing the highest tag and populating default release notes. In automated mode, `--force-no-smoke` is rejected.
+4. **`scripts/smoke/weekly-smoke.sh`:** When the weekly unattended overnight smoke suite runs on the Mac mini, it now auto-promotes to production immediately if `smoke-reports/<tag>.md` has `Smoke: PASS`. When macOS journeys cannot run (such as when the screen is locked, #686) or journeys fail, promotion does not fire and the beta stays a beta.
+5. **CI auto-promotion (`build-debug-apk.yml`):** On push to `main`, `scripts/promote-beta.sh --auto` runs to promote any un-promoted beta tag that has a committed passing smoke report.
+6. **Workflow updates:** Retires "cut a beta at the end of every batch" and "stop at the beta". Cutting a beta is no longer required at batch end and is used for ad hoc side-install testing or automated weekly smoke runs. UAT is reframed as post-ship review rather than a pre-ship gate.
+
+
 
