@@ -70,3 +70,5 @@ jobs:
           bash scripts/smoke/check-journeys.sh
           bash scripts/smoke/test-report.sh
           bash scripts/smoke/test-run-smoke.sh
+          bash scripts/test_promote_beta.sh
+          bash scripts/smoke/test_weekly_smoke.sh

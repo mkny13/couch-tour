@@ -9,8 +9,13 @@
 # - If app code changed (app/, macos/, sync/) since the latest vX.Y tag, cuts a beta first
 #   via scripts/cut-beta.sh and tests the new tag.
 # - If no app code changed, tests the existing latest beta.
-# - Never promotes. Promotion stays owner-only via scripts/promote-beta.sh.
+# - Auto-promotes to production if and only if the smoke suite passes (smoke-reports/<tag>.md
+#   has Smoke: PASS, issue #251). With no passing report, nothing is promoted and the beta stays a beta.
 set -euo pipefail
+
+RUN_SMOKE="${CCTV_WEEKLY_RUN_SMOKE:-./scripts/smoke/run-smoke.sh}"
+PROMOTE_BIN="${CCTV_WEEKLY_PROMOTE:-./scripts/promote-beta.sh}"
+CUT_BETA_BIN="${CCTV_WEEKLY_CUT_BETA:-./scripts/cut-beta.sh}"
 
 dry_run=0
 use_gate=1
@@ -135,7 +140,7 @@ else
             exit 0
         fi
         echo "Cutting beta for weekly smoke run..."
-        ./scripts/cut-beta.sh "Weekly smoke automated beta cut"
+        "$CUT_BETA_BIN" "Weekly smoke automated beta cut"
         new_tag="$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -1)"
         target_tag="$new_tag"
     else
@@ -146,8 +151,23 @@ fi
 
 if [ "$dry_run" -eq 1 ]; then
     echo "[dry-run] Would run: scripts/smoke/run-smoke.sh --tag $target_tag --platform both --allow-focus --avd phishin_test"
+    echo "[dry-run] Would auto-promote $target_tag to production if smoke report passes."
     exit 0
 fi
 
 echo "Running smoke tests for $target_tag..."
-exec ./scripts/smoke/run-smoke.sh --tag "$target_tag" --platform both --allow-focus --avd phishin_test
+smoke_rc=0
+"$RUN_SMOKE" --tag "$target_tag" --platform both --allow-focus --avd phishin_test || smoke_rc=$?
+
+if [ "$smoke_rc" -ne 0 ]; then
+    echo "Smoke run failed or incomplete for $target_tag (exit $smoke_rc); beta stays a beta."
+    exit "$smoke_rc"
+fi
+
+# Auto-promote if and only if the smoke report passes (D342, issue #251)
+if "$PROMOTE_BIN" --check-only "$target_tag" 2>/dev/null; then
+    echo "Smoke report for $target_tag passed: auto-promoting to production (issue #251)..."
+    "$PROMOTE_BIN" "$target_tag"
+else
+    echo "Smoke report for $target_tag did not pass (or had unwaived failures); beta stays a beta."
+fi

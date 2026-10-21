@@ -1,8 +1,11 @@
 # UAT — manual verification owed
 
-Things that can only be confirmed by a human using the app. Automated suites now cover Android
-Robolectric/Compose flows and a deterministic macOS XCUITest surface, but many real-device and
-real-network behaviors below are still human-only. A green build is not a verified feature.
+Things that can only be confirmed by a human using the app. Automated suites cover Android
+Robolectric/Compose flows, macOS XCUITest, and smoke user journeys, but real-device and
+real-network behaviors below benefit from human verification.
+
+UAT is post-ship review, not a pre-ship gate (issue #251). Findings marked `[!]` become follow-up
+bug issues rather than blocking releases that already shipped.
 
 **Check items off in the local board** rather than editing this file by hand:
 
