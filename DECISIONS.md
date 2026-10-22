@@ -670,6 +670,24 @@ Following the owner's directive (2026-10-21), migrate macOS CI (`.github/workflo
 
 **Supersedes:** D341 (which pinned GRDB to 7.8.x and selected Xcode 16.2 on `macos-14`).
 
+### D351: Adopt vitest 5.0.5 and migrate to @cloudflare/vitest-plugin in /sync (#691, #692)
+
+Supersedes D345.
+
+Dependabot PR #691 bumped `vitest` from 4.1.11 to 5.0.5 in `sync/`. Previously, D345 declined Vitest 5.0.3 because `@cloudflare/vitest-pool-workers@0.23.0` was capped at Vitest 4.1.x and failed at worker runtime startup with `SyntaxError: Unexpected identifier 'file'`.
+
+Cloudflare officially deprecated `@cloudflare/vitest-pool-workers` and released `@cloudflare/vitest-plugin` with support for `vitest: ^4.1.0 || ^5.0.0`.
+
+**Decision:**
+1. **Adopt Vitest 5.0.5:** Update `vitest` to `^5.0.5` in `sync/package.json`.
+2. **Migrate to `@cloudflare/vitest-plugin`:** Replace `@cloudflare/vitest-pool-workers` with `@cloudflare/vitest-plugin: "^1.4.6"` in `sync/package.json`.
+3. **Update config:** In `sync/vitest.config.ts`, import `cloudflareTest` from `@cloudflare/vitest-plugin` instead of `@cloudflare/vitest-pool-workers`.
+4. **Clean lockfile:** Regenerate `sync/package-lock.json` via clean `npm install` without `--legacy-peer-deps` or forced overrides.
+5. **Preserve runtime and schema:** Retain all runtime code in `sync/src/` and database migrations unchanged. All 31 tests against Miniflare D1 continue to pass cleanly.
+
+**Supersedes:** D345.
+
+
 
 
 
