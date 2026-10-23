@@ -6,6 +6,15 @@
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
+            <title>0.92-beta</title>
+            <pubDate>Fri, 23 Oct 2026 17:12:23 +0000</pubDate>
+            <sparkle:version>46</sparkle:version>
+            <sparkle:shortVersionString>0.92-beta</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.92/CouchTourBeta-v0.92.zip" length="8524706" type="application/octet-stream" sparkle:edSignature="t7+auiA5WswyPPE0ioyXh8y0bs+/1QcPqAkjMC9qgi1fQQ88S2QbYX9BwDSM1Obw4mkx0lEa/u5NPawAzUc0BQ=="/>
+        </item>
+        <item>
             <title>0.91-beta</title>
             <pubDate>Tue, 20 Oct 2026 11:50:40 +0000</pubDate>
             <sparkle:version>45</sparkle:version>
@@ -22,15 +31,6 @@
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.90/CouchTourBeta-v0.90.zip" length="8454023" type="application/octet-stream" sparkle:edSignature="GsHE6wiTP8+e8tC2gTAwxMyhqFaiEO7+GM2h31L/RRN5IrQFObMjyDeZ80zZCI6tYRdz9Rr7xcBYJzu34ZmpAA=="/>
-        </item>
-        <item>
-            <title>0.84-beta</title>
-            <pubDate>Sun, 20 Sep 2026 00:33:49 +0000</pubDate>
-            <sparkle:version>39</sparkle:version>
-            <sparkle:shortVersionString>0.84-beta</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.84/CouchTourBeta-v0.84.zip" length="7865437" type="application/octet-stream" sparkle:edSignature="L9R6U7MN9w6Hrh9zLCR4BLVyPjVVzrh/5edzrYxRHvb4GcJlDls0tJbVOMRCvSQJ7gPvcIFyXQcxW2JX/YlXCQ=="/>
         </item>
         <item>
             <title>0.82-beta</title>
