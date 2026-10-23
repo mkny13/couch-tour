@@ -577,6 +577,8 @@ function run(argv) {
 
     return "ACTION_FAILED";
 }
+JXA
+)"
 
 # A single press can race the window still animating in or the app registering its handler
 # (v0.91 search-artist-hit failed once, then passed unchanged), so retry before failing.
@@ -589,8 +591,6 @@ mac::click_retry() {
   done
   return 1
 }
-JXA
-)"
 
   if [[ "$result" == "CLICKED" || "$result" == "PRESSED" || "$result" == "FOCUSED" ]]; then
     return 0
