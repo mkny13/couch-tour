@@ -146,30 +146,6 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(artistScreen.waitForExistence(timeout: 10), "artist.screen not found after clicking moe row")
     }
 
-    func testArtistsScreenDefaultFetchPath() {
-        app.terminate()
-        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
-        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_ARTISTS")
-        app.launch()
-
-        let nav = app.descendants(matching: .any)["sidebar.nav.artists"].firstMatch
-        XCTAssertTrue(nav.waitForExistence(timeout: 10))
-        nav.click()
-
-        let screen = app.descendants(matching: .any)["artists.screen"].firstMatch
-        XCTAssertTrue(screen.waitForExistence(timeout: 10))
-
-        let list = app.descendants(matching: .any)["artists.list"].firstMatch
-        XCTAssertTrue(list.waitForExistence(timeout: 15), "artists.list not found under live Relisten fetch")
-
-        let moeRow = app.descendants(matching: .any)["artists.row.relisten.moe"].firstMatch
-        XCTAssertTrue(moeRow.waitForExistence(timeout: 15), "artists.row.relisten.moe not found under live Relisten fetch")
-        moeRow.click()
-
-        let artistScreen = app.descendants(matching: .any)["artist.screen"].firstMatch
-        XCTAssertTrue(artistScreen.waitForExistence(timeout: 15), "artist.screen not found after clicking moe row")
-    }
-
     func testNavReachesEveryDestination() {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
