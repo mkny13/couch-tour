@@ -341,6 +341,12 @@ click_retry_run() { rm -f "$TMP/click.count"; env FN="$(awk '/^mac::click_retry\
 check "k1: click fails once then succeeds -> ok on attempt 2" test "$(click_retry_run 1)" = "0 2"
 check "k2: click always fails -> gives up after 3 attempts" test "$(click_retry_run 99)" = "1 3"
 check "k3: both journeys use mac::click_retry for the search nav" bash -c "! grep -q 'if ! mac::click \"sidebar.nav.search\"' '$DIR/run-mac.sh'"
+check "k4: mac::click_retry is callable without calling mac::click first" bash -c '
+  eval "$(sed -n "/^mac::click()/,/^mac::type()/p" "'"$DIR"'/run-mac.sh" | sed "/^mac::type()/d")"
+  smoke::log() { :; }
+  mac::click() { return 0; }
+  mac::click_retry test_id
+'
 
 # --help lists the new flags
 help="$("$DIR/run-smoke.sh" --help)"
