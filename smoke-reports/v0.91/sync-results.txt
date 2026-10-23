@@ -1,0 +1,4 @@
+sync	favorite-syncs-android-to-mac	SKIP	precondition android 'favorite-ensure-absent' not met (ABORT); starting state unknown
+sync	favorite-syncs-mac-to-android	SKIP	not run: android runner failed preflight during sync step 'favorite-ensure-absent'
+sync	in-progress-syncs-android-to-mac	SKIP	not run: android runner failed preflight during sync step 'favorite-ensure-absent'
+sync	in-progress-syncs-mac-to-android	SKIP	not run: android runner failed preflight during sync step 'favorite-ensure-absent'

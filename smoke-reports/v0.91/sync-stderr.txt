@@ -1,0 +1,5 @@
+[2026-10-23 06:50:09] Teardown: resetting the staging sync group
+Resetting staging sync database: couch-tour-sync-staging...
+Need to install the following packages:
+wrangler@4.152.0
+Ok to proceed? (y) ERROR: staging reset failed; the staging group may hold test rows
