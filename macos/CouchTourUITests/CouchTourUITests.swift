@@ -189,5 +189,20 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(homeNav.waitForExistence(timeout: 10), "sidebar.nav.home not present after fresh launch")
         XCTAssertTrue(homeNav.isHittable, "sidebar.nav.home not hittable after fresh launch")
     }
-}
 
+    func testHomeSectionsPresentAfterRelaunch() {
+        // Home renders each section's identifier even when empty, so a relaunch must expose all three.
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launch()
+
+        let homeNav = app.descendants(matching: .any)["sidebar.nav.home"].firstMatch
+        XCTAssertTrue(homeNav.waitForExistence(timeout: 10))
+        homeNav.click()
+
+        for id in ["home.in_progress", "home.next_tour_stops", "home.on_this_date"] {
+            XCTAssertTrue(app.descendants(matching: .any)[id].firstMatch.waitForExistence(timeout: 15),
+                          "\(id) missing after relaunch")
+        }
+    }
+}
