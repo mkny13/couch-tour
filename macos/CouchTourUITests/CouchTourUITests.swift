@@ -208,6 +208,10 @@ final class CouchTourUITests: XCTestCase {
     func testClearingQueryKeepsSidebarSearchOpen() {
         // Clearing the query used to pop `.search` even when the sidebar opened it, so the
         // in-page clear button threw the user (and the smoke journeys) off the Search screen (#730).
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launch()
+
         let nav = app.descendants(matching: .any)["sidebar.nav.search"].firstMatch
         XCTAssertTrue(nav.waitForExistence(timeout: 10))
         nav.click()
