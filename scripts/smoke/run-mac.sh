@@ -577,6 +577,18 @@ function run(argv) {
 
     return "ACTION_FAILED";
 }
+
+# A single press can race the window still animating in or the app registering its handler
+# (v0.91 search-artist-hit failed once, then passed unchanged), so retry before failing.
+mac::click_retry() {
+  local attempt max=3
+  for ((attempt = 1; attempt <= max; attempt++)); do
+    mac::click "$@" && return 0
+    smoke::log "click $1 failed (attempt $attempt/$max)"
+    ((attempt < max)) && sleep "${SMOKE_CLICK_RETRY_DELAY:-1}"
+  done
+  return 1
+}
 JXA
 )"
 
@@ -865,7 +877,7 @@ mac_run_search_artist_hit() {
     return 0
   fi
 
-  if ! mac::click "sidebar.nav.search"; then
+  if ! mac::click_retry "sidebar.nav.search"; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.search"
     return 0
@@ -1194,7 +1206,7 @@ mac_run_search_result_sections() {
 
   mac::close_auxiliary_windows
 
-  if ! mac::click "sidebar.nav.search"; then
+  if ! mac::click_retry "sidebar.nav.search"; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.search"
     return 0
