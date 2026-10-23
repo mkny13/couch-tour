@@ -225,7 +225,10 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(clear.waitForExistence(timeout: 10))
         clear.click()
 
-        XCTAssertFalse(clear.waitForExistence(timeout: 2), "query was not cleared")
+        // search.clear only exists while the query is non-empty. waitForExistence returns as soon
+        // as it exists, so wait for it to go away instead.
+        let cleared = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: clear)
+        wait(for: [cleared], timeout: 10)
         XCTAssertTrue(app.descendants(matching: .any)["search.screen"].firstMatch.exists,
                       "clearing the query closed the Search screen opened from the sidebar")
     }
