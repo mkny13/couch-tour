@@ -48,9 +48,7 @@ struct SidebarView: View {
                     isSelected: appModel.path.last == .search,
                     identifier: AXIdentifiers.sidebarNavSearch
                 ) {
-                    if appModel.path.last != .search {
-                        appModel.path.append(.search)
-                    }
+                    appModel.jump(to: .search)
                 }
 
                 SidebarNavItem(
@@ -59,9 +57,7 @@ struct SidebarView: View {
                     isSelected: appModel.path.last == .playlists,
                     identifier: AXIdentifiers.sidebarNavLibrary
                 ) {
-                    if appModel.path.last != .playlists {
-                        appModel.path.append(.playlists)
-                    }
+                    appModel.jump(to: .playlists)
                 }
 
                 SidebarNavItem(
@@ -70,9 +66,7 @@ struct SidebarView: View {
                     isSelected: appModel.path.last == .listening,
                     identifier: AXIdentifiers.sidebarNavHistory
                 ) {
-                    if appModel.path.last != .listening {
-                        appModel.path.append(.listening)
-                    }
+                    appModel.jump(to: .listening)
                 }
 
                 SidebarNavItem(

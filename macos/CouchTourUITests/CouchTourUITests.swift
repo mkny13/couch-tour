@@ -138,5 +138,39 @@ final class CouchTourUITests: XCTestCase {
             XCTFail("artists.list not found")
         }
     }
+
+    func testNavReachesEveryDestination() {
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launchEnvironment["COUCHTOUR_UI_TEST_ARTISTS"] = "1"
+        app.launch()
+
+        let destinations: [(nav: String, screen: String)] = [
+            ("sidebar.nav.home", "home.screen"),
+            ("sidebar.nav.artists", "artists.screen"),
+            ("sidebar.nav.search", "search.screen"),
+            ("sidebar.nav.library", "library.screen"),
+            ("sidebar.nav.history", "history.screen"),
+            ("sidebar.nav.settings", "settings.screen"),
+        ]
+
+        for dest in destinations {
+            let nav = app.descendants(matching: .any)[dest.nav].firstMatch
+            XCTAssertTrue(nav.waitForExistence(timeout: 10), "Sidebar nav item \(dest.nav) not found")
+            nav.click()
+
+            let screen = app.descendants(matching: .any)[dest.screen].firstMatch
+            XCTAssertTrue(screen.waitForExistence(timeout: 10), "Screen identifier \(dest.screen) not found after clicking \(dest.nav)")
+
+            if dest.screen == "settings.screen" {
+                app.typeKey("w", modifierFlags: .command)
+            }
+        }
+
+        let homeNav = app.descendants(matching: .any)["sidebar.nav.home"].firstMatch
+        XCTAssertTrue(homeNav.waitForExistence(timeout: 10))
+        homeNav.click()
+        XCTAssertTrue(app.descendants(matching: .any)["home.screen"].firstMatch.waitForExistence(timeout: 10))
+    }
 }
 
