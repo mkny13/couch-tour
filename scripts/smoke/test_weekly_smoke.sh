@@ -82,7 +82,8 @@ check "3. explicit tag runs smoke for that tag" grep -q "run-smoke.sh --tag v0.8
 # 4. Gate busy with --no-retry exits 75
 touch "$STATE_DIR/gate_busy"
 rc=0
-bash "$WEEKLY_SCRIPT" --no-retry >/dev/null 2>&1 || rc=$?
+# --end-hour 12 pins the retry window: otherwise a run between 06:00 and 12:00 skips the gate and exits 0.
+bash "$WEEKLY_SCRIPT" --no-retry --end-hour 12 >/dev/null 2>&1 || rc=$?
 check "4. gate busy with --no-retry exits 75" [ "$rc" -eq 75 ]
 
 # 5. Non-dry-run with passing smoke suite: triggers auto-promotion
