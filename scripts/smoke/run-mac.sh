@@ -153,22 +153,22 @@ function run(argv) {
     var app = Application('System Events');
     var proc = null;
 
-    var processes = app.applicationProcesses();
-    for (var i = 0; i < processes.length; i++) {
-        try {
-            if (processes[i].bundleIdentifier() === bundleId) {
-                proc = processes[i];
-                break;
-            }
-        } catch (e) {}
-    }
+    try {
+        var byName = app.applicationProcesses.byName(appName);
+        if (byName.exists()) {
+            proc = byName;
+        }
+    } catch(e) {}
     if (!proc) {
-        try {
-            var byName = app.applicationProcesses.byName(appName);
-            if (byName.exists()) {
-                proc = byName;
-            }
-        } catch(e) {}
+        var processes = app.applicationProcesses();
+        for (var i = 0; i < processes.length; i++) {
+            try {
+                if (processes[i].bundleIdentifier() === bundleId) {
+                    proc = processes[i];
+                    break;
+                }
+            } catch (e) {}
+        }
     }
     if (!proc) {
         return "";
@@ -260,22 +260,22 @@ function run(argv) {
 
     var app = Application('System Events');
     var proc = null;
-    var processes = app.applicationProcesses();
-    for (var i = 0; i < processes.length; i++) {
-        try {
-            if (processes[i].bundleIdentifier() === bundleId) {
-                proc = processes[i];
-                break;
-            }
-        } catch (e) {}
-    }
+    try {
+        var byName = app.applicationProcesses.byName(appName);
+        if (byName.exists()) {
+            proc = byName;
+        }
+    } catch(e) {}
     if (!proc) {
-        try {
-            var byName = app.applicationProcesses.byName(appName);
-            if (byName.exists()) {
-                proc = byName;
-            }
-        } catch(e) {}
+        var processes = app.applicationProcesses();
+        for (var i = 0; i < processes.length; i++) {
+            try {
+                if (processes[i].bundleIdentifier() === bundleId) {
+                    proc = processes[i];
+                    break;
+                }
+            } catch (e) {}
+        }
     }
     if (!proc) return "";
 
@@ -311,7 +311,9 @@ function run(argv) {
     var windows = [];
     try {
         windows = proc.windows();
-    } catch (e) {}
+    } catch (e) {
+        console.log("ax_query: proc.windows() threw: " + e);
+    }
 
     for (var i = 0; i < windows.length; i++) {
         findParent(windows[i], 0);
@@ -392,6 +394,7 @@ mac::wait_for_id() {
       echo "$matches"
       return 0
     fi
+    smoke::log "wait_for_id: target=$id depth=$depth matches='$matches' remaining=${remaining_ms}ms"
     now_ms="$(( $(date +%s) * 1000 ))"
     if (( now_ms - start_ms >= to * 1000 )); then
       return 1
@@ -474,7 +477,15 @@ JXA
 mac::click() {
   local target_id="$1"
   local max_depth="${2:-6}"
-  local timeout_ms="${3:-5000}"
+  local timeout_ms="${3:-}"
+
+  if [[ -z "$timeout_ms" ]]; then
+    if (( max_depth >= ${DEEP:-14} )); then
+      timeout_ms="${AX_DEEP_TIMEOUT_MS:-15000}"
+    else
+      timeout_ms=5000
+    fi
+  fi
 
   mac::focus
 
@@ -489,30 +500,36 @@ function run(argv) {
 
     var app = Application('System Events');
     var proc = null;
-    var processes = app.applicationProcesses();
-    for (var i = 0; i < processes.length; i++) {
-        try {
-            if (processes[i].bundleIdentifier() === bundleId) {
-                proc = processes[i];
-                break;
-            }
-        } catch (e) {}
-    }
+    var procSource = "";
+    try {
+        var byName = app.applicationProcesses.byName(appName);
+        if (byName.exists()) {
+            proc = byName;
+            procSource = "byName";
+        }
+    } catch(e) {}
     if (!proc) {
-        try {
-            var byName = app.applicationProcesses.byName(appName);
-            if (byName.exists()) {
-                proc = byName;
-            }
-        } catch(e) {}
+        var processes = app.applicationProcesses();
+        for (var i = 0; i < processes.length; i++) {
+            try {
+                if (processes[i].bundleIdentifier() === bundleId) {
+                    proc = processes[i];
+                    procSource = "byBundle[" + i + "]";
+                    break;
+                }
+            } catch (e) {}
+        }
     }
-    if (!proc) return "NOT_FOUND";
+    if (!proc) return "NOT_FOUND:proc_null";
 
     var startTime = Date.now();
     var targetElement = null;
+    var visited = 0;
+    var uiError = "";
 
     function walk(element, depth) {
         if (targetElement || Date.now() - startTime > timeoutMs) return;
+        visited++;
 
         var axId = null;
         try {
@@ -529,7 +546,9 @@ function run(argv) {
         var children = [];
         try {
             children = element.uiElements();
-        } catch(e) {}
+        } catch(e) {
+            if (!uiError) uiError = "" + e;
+        }
 
         for (var i = 0; i < children.length; i++) {
             walk(children[i], depth + 1);
@@ -540,14 +559,16 @@ function run(argv) {
     var windows = [];
     try {
         windows = proc.windows();
-    } catch (e) {}
+    } catch (e) {
+        console.log("ax_query: proc.windows() threw: " + e);
+    }
 
     for (var i = 0; i < windows.length; i++) {
         walk(windows[i], 0);
         if (targetElement) break;
     }
 
-    if (!targetElement) return "NOT_FOUND";
+    if (!targetElement) return "NOT_FOUND:proc=" + procSource + ":wins=" + windows.length + ":visited=" + visited + ":maxDepth=" + maxDepth + ":timeoutMs=" + timeoutMs + ":timedOut=" + (Date.now() - startTime > timeoutMs) + ":err=" + uiError;
 
     // Text fields need keyboard focus set rather than a default action click
     if (targetElement.role() === "AXTextField") {
@@ -557,7 +578,13 @@ function run(argv) {
         } catch (e) {}
     }
 
-    // 1. Perform AXPress action if supported
+    // 1. Dispatch click directly through System Events
+    try {
+        targetElement.click();
+        return "CLICKED";
+    } catch (e) {}
+
+    // 2. Fallback: Perform AXPress action if supported
     try {
         var actions = targetElement.actions();
         for (var a = 0; a < actions.length; a++) {
@@ -566,12 +593,6 @@ function run(argv) {
                 return "PRESSED";
             }
         }
-    } catch (e) {}
-
-    // 2. Dispatch click directly through System Events
-    try {
-        targetElement.click();
-        return "CLICKED";
     } catch (e) {}
 
     // 3. Fallback: Derive center coordinates at runtime from located element frame
@@ -587,18 +608,6 @@ function run(argv) {
 }
 JXA
 )"
-
-# A single press can race the window still animating in or the app registering its handler
-# (v0.91 search-artist-hit failed once, then passed unchanged), so retry before failing.
-mac::click_retry() {
-  local attempt max=3
-  for ((attempt = 1; attempt <= max; attempt++)); do
-    mac::click "$@" && return 0
-    smoke::log "click $1 failed (attempt $attempt/$max)"
-    ((attempt < max)) && sleep "${SMOKE_CLICK_RETRY_DELAY:-1}"
-  done
-  return 1
-}
 
   if [[ "$result" == "CLICKED" || "$result" == "PRESSED" || "$result" == "FOCUSED" ]]; then
     return 0
@@ -634,6 +643,18 @@ SWIFTEOF
     smoke::log "mac::click could not locate or click element '$target_id' (status: $result)"
     return 1
   fi
+}
+
+# A single press can race the window still animating in or the app registering its handler
+# (v0.91 search-artist-hit failed once, then passed unchanged), so retry before failing.
+mac::click_retry() {
+  local attempt max=3
+  for ((attempt = 1; attempt <= max; attempt++)); do
+    mac::click "$@" && return 0
+    smoke::log "click $1 failed (attempt $attempt/$max)"
+    ((attempt < max)) && sleep "${SMOKE_CLICK_RETRY_DELAY:-1}"
+  done
+  return 1
 }
 
 # Type text into currently focused element.
