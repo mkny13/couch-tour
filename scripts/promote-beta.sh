@@ -238,4 +238,10 @@ gh workflow run build-debug-apk.yml \
     -f prerelease=false \
     -f side_install=false
 
-echo "Dispatched from ref $confirmed_ref. Check: gh run list --workflow=build-debug-apk.yml --limit 3"
+# Without this the Mac stays on whatever production build it last got (v0.89 shipped Android-only, #735).
+gh workflow run macos-release.yml \
+    --ref "$confirmed_ref" \
+    -f release_tag="$next_tag" \
+    -f is_beta=false
+
+echo "Dispatched Android and macOS from ref $confirmed_ref. Check: gh run list --workflow=build-debug-apk.yml --limit 3; gh run list --workflow=macos-release.yml --limit 3"
