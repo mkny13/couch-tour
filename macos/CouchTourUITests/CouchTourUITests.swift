@@ -205,6 +205,37 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["home.screen"].firstMatch.waitForExistence(timeout: 10))
     }
 
+    func testClearingQueryKeepsSidebarSearchOpen() {
+        // Clearing the query used to pop `.search` even when the sidebar opened it, so the
+        // in-page clear button threw the user (and the smoke journeys) off the Search screen (#730).
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launch()
+
+        let nav = app.descendants(matching: .any)["sidebar.nav.search"].firstMatch
+        XCTAssertTrue(nav.waitForExistence(timeout: 10))
+        nav.click()
+
+        let field = app.descendants(matching: .any)["search.field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.click()
+        field.typeText("moe")
+
+        let clear = app.descendants(matching: .any)["search.clear"].firstMatch
+        XCTAssertTrue(clear.waitForExistence(timeout: 10))
+        // Clear from the keyboard: at the default window width search.clear sits under the
+        // player rail and a mouse click doesn't reach it (#739).
+        field.typeKey("a", modifierFlags: .command)
+        field.typeKey(.delete, modifierFlags: [])
+
+        // search.clear only exists while the query is non-empty. waitForExistence returns as soon
+        // as it exists, so wait for it to go away instead.
+        let cleared = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: clear)
+        wait(for: [cleared], timeout: 10)
+        XCTAssertTrue(app.descendants(matching: .any)["search.screen"].firstMatch.exists,
+                      "clearing the query closed the Search screen opened from the sidebar")
+    }
+
     func testColdStartPresentsSidebarNavHome() {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")

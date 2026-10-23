@@ -17,6 +17,10 @@ struct ThreePaneRootView: View {
     @State private var favoritesLoaded = false
     @State private var favoritedArtists: [ArtistRef] = []
     @State private var relistenArtists: [ArtistRef] = []
+    /// Whether the `.search` on top of the path was pushed by typing, so only that one closes
+    /// when the field empties. Search opened from the sidebar stays put while its query is
+    /// cleared (#730).
+    @State private var searchOpenedByTyping = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -84,6 +88,9 @@ struct ThreePaneRootView: View {
             Task { await loadFavorites() }
         }
         .onChange(of: appModel.searchQuery) { _, _ in syncSearchRoute() }
+        .onChange(of: appModel.path) { _, path in
+            if path.last != .search { searchOpenedByTyping = false }
+        }
         .onChange(of: appModel.focusSearchField) { _, shouldFocus in
             guard shouldFocus else { return }
             searchFieldFocused = true
@@ -168,14 +175,15 @@ struct ThreePaneRootView: View {
 
     /// Typing opens the results screen; clearing the field closes it again. Only when `.search`
     /// is the *top* of the path, so a search made before drilling into a hit doesn't yank the
-    /// user back out of the show they opened.
+    /// user back out of the show they opened, and only when typing opened it.
     private func syncSearchRoute() {
         let term = appModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         if term.count >= 3 {
             if appModel.path.last != .search {
                 appModel.path.append(.search)
+                searchOpenedByTyping = true
             }
-        } else if term.isEmpty, appModel.path.last == .search {
+        } else if term.isEmpty, appModel.path.last == .search, searchOpenedByTyping {
             appModel.path.removeLast()
         }
     }
