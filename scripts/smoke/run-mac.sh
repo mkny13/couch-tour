@@ -117,6 +117,14 @@ smoke::preflight_macos_beta
 # Rows nested in List/ScrollView content sit deeper than the default walk depth.
 DEEP=14
 
+# Native AX walker (#730): System Events walks ran ~150 ms/element and timed out on busy
+# screens. Built once per source revision; swiftc ships with the Xcode the beta needs anyway.
+AX_WALK_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ax-walk.swift"
+AX_WALK="${TMPDIR:-/tmp}/couchtour-ax-walk-$(shasum "$AX_WALK_SRC" | cut -c1-12)"
+if [[ ! -x "$AX_WALK" ]]; then
+  swiftc -O "$AX_WALK_SRC" -o "$AX_WALK" >&2 || smoke::die 2 "could not build $AX_WALK_SRC with swiftc"
+fi
+
 # -----------------------------------------------------------------------------
 # Query Layer
 # -----------------------------------------------------------------------------
@@ -141,108 +149,7 @@ mac::ax_query() {
     fi
   fi
 
-  osascript -l JavaScript - "$target_id" "$max_depth" "$timeout_ms" "$BUNDLE_ID" "$APP_NAME" "$mode" << 'JXA'
-function run(argv) {
-    var targetId = argv[0] || "";
-    var maxDepth = parseInt(argv[1] || "6", 10);
-    var timeoutMs = parseInt(argv[2] || "5000", 10);
-    var bundleId = argv[3];
-    var appName = argv[4];
-    var firstOnly = argv[5] === "first";
-
-    var app = Application('System Events');
-    var proc = null;
-
-    try {
-        var byName = app.applicationProcesses.byName(appName);
-        if (byName.exists()) {
-            proc = byName;
-        }
-    } catch(e) {}
-    if (!proc) {
-        var processes = app.applicationProcesses();
-        for (var i = 0; i < processes.length; i++) {
-            try {
-                if (processes[i].bundleIdentifier() === bundleId) {
-                    proc = processes[i];
-                    break;
-                }
-            } catch (e) {}
-        }
-    }
-    if (!proc) {
-        return "";
-    }
-
-    var startTime = Date.now();
-    var matches = [];
-    var timedOut = false;
-    var visited = 0;
-
-    function walk(element, depth) {
-        if (firstOnly && matches.length > 0) return;
-        if (Date.now() - startTime > timeoutMs) { timedOut = true; return; }
-        visited++;
-
-        var axId = null;
-        try {
-            axId = element.attributes.byName("AXIdentifier").value();
-        } catch (e) {}
-
-        if (axId) {
-            var matched = false;
-            if (!targetId || targetId === "*") {
-                matched = true;
-            } else if (axId === targetId || axId.startsWith(targetId + ".")) {
-                matched = true;
-            }
-            if (matched) {
-                var role = "";
-                var val = "";
-                try { role = element.role(); } catch(e) {}
-                try {
-                    val = element.title();
-                    if (!val) {
-                        val = element.value();
-                    }
-                } catch(e) {}
-                if (val) {
-                    val = ("" + val).replace(/[\r\n\t]+/g, " ").trim();
-                } else {
-                    val = "";
-                }
-                matches.push(axId + "\t" + role + "\t" + val);
-            }
-        }
-
-        if (depth >= maxDepth) return;
-
-        var children = [];
-        try {
-            children = element.uiElements();
-        } catch(e) {}
-
-        for (var i = 0; i < children.length; i++) {
-            walk(children[i], depth + 1);
-        }
-    }
-
-    var windows = [];
-    try {
-        windows = proc.windows();
-    } catch (e) {}
-
-    for (var i = 0; i < windows.length; i++) {
-        walk(windows[i], 0);
-    }
-
-    if (timedOut && !(firstOnly && matches.length > 0)) {
-        console.log("ax_query: walk timed out after " + timeoutMs + "ms at " + visited +
-            " elements (target " + (targetId || "*") + ")");
-    }
-    return matches.join("\n");
-}
-JXA
+  "$AX_WALK" query "$BUNDLE_ID" "$target_id" "$max_depth" "$timeout_ms" "$mode"
 }
 
 # Query direct children of element matching AXIdentifier.
@@ -251,107 +158,7 @@ mac::ax_children() {
   local target_id="${1:-}"
   local timeout_ms="${2:-5000}"
 
-  osascript -l JavaScript - "$target_id" "$timeout_ms" "$BUNDLE_ID" "$APP_NAME" << 'JXA'
-function run(argv) {
-    var targetId = argv[0];
-    var timeoutMs = parseInt(argv[1] || "5000", 10);
-    var bundleId = argv[2];
-    var appName = argv[3];
-
-    var app = Application('System Events');
-    var proc = null;
-    try {
-        var byName = app.applicationProcesses.byName(appName);
-        if (byName.exists()) {
-            proc = byName;
-        }
-    } catch(e) {}
-    if (!proc) {
-        var processes = app.applicationProcesses();
-        for (var i = 0; i < processes.length; i++) {
-            try {
-                if (processes[i].bundleIdentifier() === bundleId) {
-                    proc = processes[i];
-                    break;
-                }
-            } catch (e) {}
-        }
-    }
-    if (!proc) return "";
-
-    var startTime = Date.now();
-    var parentElement = null;
-
-    function findParent(element, depth) {
-        if (parentElement || Date.now() - startTime > timeoutMs) return;
-
-        var axId = null;
-        try {
-            axId = element.attributes.byName("AXIdentifier").value();
-        } catch (e) {}
-
-        if (axId === targetId) {
-            parentElement = element;
-            return;
-        }
-
-        if (depth >= 6) return;
-
-        var children = [];
-        try {
-            children = element.uiElements();
-        } catch (e) {}
-
-        for (var i = 0; i < children.length; i++) {
-            findParent(children[i], depth + 1);
-            if (parentElement) return;
-        }
-    }
-
-    var windows = [];
-    try {
-        windows = proc.windows();
-    } catch (e) {
-        console.log("ax_query: proc.windows() threw: " + e);
-    }
-
-    for (var i = 0; i < windows.length; i++) {
-        findParent(windows[i], 0);
-        if (parentElement) break;
-    }
-
-    if (!parentElement) return "";
-
-    var items = [];
-    var uiChildren = [];
-    try {
-        uiChildren = parentElement.uiElements();
-    } catch (e) {}
-
-    for (var i = 0; i < uiChildren.length; i++) {
-        var child = uiChildren[i];
-        var axId = "";
-        try {
-            axId = child.attributes.byName("AXIdentifier").value() || "";
-        } catch (e) {}
-        var role = "";
-        try { role = child.role() || ""; } catch (e) {}
-        var val = "";
-        try {
-            val = child.title();
-            if (!val) val = child.value();
-        } catch (e) {}
-        if (val) {
-            val = ("" + val).replace(/[\r\n\t]+/g, " ").trim();
-        } else {
-            val = "";
-        }
-        items.push(axId + "\t" + role + "\t" + val);
-    }
-
-    return items.join("\n");
-}
-JXA
+  "$AX_WALK" children "$BUNDLE_ID" "$target_id" "$timeout_ms"
 }
 
 
@@ -490,124 +297,7 @@ mac::click() {
   mac::focus
 
   local result
-  result="$(osascript -l JavaScript - "$target_id" "$max_depth" "$timeout_ms" "$BUNDLE_ID" "$APP_NAME" << 'JXA'
-function run(argv) {
-    var targetId = argv[0];
-    var maxDepth = parseInt(argv[1] || "6", 10);
-    var timeoutMs = parseInt(argv[2] || "5000", 10);
-    var bundleId = argv[3];
-    var appName = argv[4];
-
-    var app = Application('System Events');
-    var proc = null;
-    var procSource = "";
-    try {
-        var byName = app.applicationProcesses.byName(appName);
-        if (byName.exists()) {
-            proc = byName;
-            procSource = "byName";
-        }
-    } catch(e) {}
-    if (!proc) {
-        var processes = app.applicationProcesses();
-        for (var i = 0; i < processes.length; i++) {
-            try {
-                if (processes[i].bundleIdentifier() === bundleId) {
-                    proc = processes[i];
-                    procSource = "byBundle[" + i + "]";
-                    break;
-                }
-            } catch (e) {}
-        }
-    }
-    if (!proc) return "NOT_FOUND:proc_null";
-
-    var startTime = Date.now();
-    var targetElement = null;
-    var visited = 0;
-    var uiError = "";
-
-    function walk(element, depth) {
-        if (targetElement || Date.now() - startTime > timeoutMs) return;
-        visited++;
-
-        var axId = null;
-        try {
-            axId = element.attributes.byName("AXIdentifier").value();
-        } catch (e) {}
-
-        if (axId && (axId === targetId || axId.startsWith(targetId + "."))) {
-            targetElement = element;
-            return;
-        }
-
-        if (depth >= maxDepth) return;
-
-        var children = [];
-        try {
-            children = element.uiElements();
-        } catch(e) {
-            if (!uiError) uiError = "" + e;
-        }
-
-        for (var i = 0; i < children.length; i++) {
-            walk(children[i], depth + 1);
-            if (targetElement) return;
-        }
-    }
-
-    var windows = [];
-    try {
-        windows = proc.windows();
-    } catch (e) {
-        console.log("ax_query: proc.windows() threw: " + e);
-    }
-
-    for (var i = 0; i < windows.length; i++) {
-        walk(windows[i], 0);
-        if (targetElement) break;
-    }
-
-    if (!targetElement) return "NOT_FOUND:proc=" + procSource + ":wins=" + windows.length + ":visited=" + visited + ":maxDepth=" + maxDepth + ":timeoutMs=" + timeoutMs + ":timedOut=" + (Date.now() - startTime > timeoutMs) + ":err=" + uiError;
-
-    // Text fields need keyboard focus set rather than a default action click
-    if (targetElement.role() === "AXTextField") {
-        try {
-            targetElement.attributes.byName("AXFocused").value = true;
-            return "FOCUSED";
-        } catch (e) {}
-    }
-
-    // 1. Dispatch click directly through System Events
-    try {
-        targetElement.click();
-        return "CLICKED";
-    } catch (e) {}
-
-    // 2. Fallback: Perform AXPress action if supported
-    try {
-        var actions = targetElement.actions();
-        for (var a = 0; a < actions.length; a++) {
-            if (actions[a].name() === "AXPress") {
-                actions[a].perform();
-                return "PRESSED";
-            }
-        }
-    } catch (e) {}
-
-    // 3. Fallback: Derive center coordinates at runtime from located element frame
-    try {
-        var pos = targetElement.position();
-        var sz = targetElement.size();
-        var cx = Math.round(pos[0] + sz[0] / 2);
-        var cy = Math.round(pos[1] + sz[1] / 2);
-        return "COORDS:" + cx + ":" + cy;
-    } catch (e) {}
-
-    return "ACTION_FAILED";
-}
-JXA
-)"
+  result="$("$AX_WALK" press "$BUNDLE_ID" "$target_id" "$max_depth" "$timeout_ms")"
 
   if [[ "$result" == "CLICKED" || "$result" == "PRESSED" || "$result" == "FOCUSED" ]]; then
     return 0
@@ -670,6 +360,27 @@ function run(argv) {
     se.keystroke(text);
 }
 JXA
+}
+
+# Clear search.field and type a query, checking the field actually holds it. With the fast
+# native walk the field can be focused before it is ready and the keystrokes go nowhere (#730).
+mac::search_for() {
+  local query="$1" attempt value
+  for ((attempt = 1; attempt <= 3; attempt++)); do
+    mac::click "search.field" "$DEEP" || true
+    if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
+      mac::click "search.clear" "$DEEP" || true
+      sleep 0.3
+      mac::click "search.field" "$DEEP" || true
+    fi
+    sleep 0.3
+    mac::type "$query"
+    value="$(mac::ax_query "search.field" "$DEEP" "" first | cut -f3)"
+    [[ "$value" == "$query" ]] && return 0
+    smoke::log "search.field holds '$value' after typing '$query' (attempt $attempt/3)"
+    sleep 1
+  done
+  return 1
 }
 
 # -----------------------------------------------------------------------------
@@ -932,15 +643,11 @@ mac_run_search_artist_hit() {
     return 0
   fi
 
-  mac::click "search.field" "$DEEP" || true
-  # Clear existing query if clear button is present
-  if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
-    mac::click "search.clear" "$DEEP" || true
-    sleep 0.3
-    mac::click "search.field" "$DEEP" || true
+  if ! mac::search_for "moe"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "query 'moe' did not reach search.field"
+    return 0
   fi
-
-  mac::type "moe"
 
   # Wait for search tab artists to appear with positive count
   local start_time
@@ -1261,14 +968,11 @@ mac_run_search_result_sections() {
     return 0
   fi
 
-  mac::click "search.field" "$DEEP" || true
-  if [[ -n "$(mac::ax_query "search.clear" "$DEEP")" ]]; then
-    mac::click "search.clear" "$DEEP" || true
-    sleep 0.3
-    mac::click "search.field" "$DEEP" || true
+  if ! mac::search_for "ghost"; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "query 'ghost' did not reach search.field"
+    return 0
   fi
-
-  mac::type "ghost"
 
   local start_time
   start_time="$(date +%s)"
