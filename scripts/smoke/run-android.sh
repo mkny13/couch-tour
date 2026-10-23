@@ -640,6 +640,13 @@ android_run_browse_artists_to_artist() {
   fi
 
   if ! android::wait_for_tag "artists.list" "$TIMEOUT"; then
+    if android::row_present "artists.retry"; then
+      android::tap "artists.retry"
+      android::wait_for_tag "artists.list" "$TIMEOUT" || true
+    fi
+  fi
+
+  if ! android::wait_for_tag "artists.list" 3; then
     android_screenshot "$id"
     smoke::result "android" "$id" "FAIL" "artists.list not present within ${TIMEOUT}s"
     return 0

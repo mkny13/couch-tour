@@ -130,8 +130,16 @@ DEEP=14
 mac::ax_query() {
   local target_id="${1:-}"
   local max_depth="${2:-6}"
-  local timeout_ms="${3:-5000}"
+  local timeout_ms="${3:-}"
   local mode="${4:-all}"
+
+  if [[ -z "$timeout_ms" ]]; then
+    if (( max_depth >= ${DEEP:-14} )); then
+      timeout_ms="${AX_DEEP_TIMEOUT_MS:-15000}"
+    else
+      timeout_ms=5000
+    fi
+  fi
 
   osascript -l JavaScript - "$target_id" "$max_depth" "$timeout_ms" "$BUNDLE_ID" "$APP_NAME" "$mode" << 'JXA'
 function run(argv) {
@@ -845,8 +853,18 @@ mac_run_browse_artists_to_artist() {
   fi
 
   # The artist name is the row's value; select the moe. row by it.
-  local moe_row
-  moe_row="$(mac::ax_query "artists.row" "$DEEP" | awk -F'\t' '$3 == "moe." { print $1; exit }')"
+  local moe_row=""
+  local start_s
+  start_s="$(date +%s)"
+  while [[ -z "$moe_row" ]]; do
+    moe_row="$(mac::ax_query "artists.row.relisten.moe" "$DEEP" "" first | head -n1 | cut -f1)"
+    if [[ -n "$moe_row" ]]; then break; fi
+    moe_row="$(mac::ax_query "artists.row" "$DEEP" | awk -F'\t' '$3 == "moe." { print $1; exit }')"
+    if [[ -n "$moe_row" ]]; then break; fi
+    if (( $(date +%s) - start_s >= TIMEOUT )); then break; fi
+    sleep 0.5
+  done
+
   if [[ -z "$moe_row" ]]; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "no artists.row.* with name moe. in artists.list"

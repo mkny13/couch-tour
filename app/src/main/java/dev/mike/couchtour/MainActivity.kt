@@ -1140,7 +1140,7 @@ internal fun Loading() {
 }
 
 @Composable
-private fun ErrorText(t: Throwable) {
+internal fun ErrorText(t: Throwable) {
     Text(
         "Couldn't load: ${t.message}",
         color = MaterialTheme.colorScheme.error,

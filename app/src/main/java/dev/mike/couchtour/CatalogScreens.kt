@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -148,7 +150,8 @@ fun ShowsScreen(period: String, nav: NavHostController) {
 /** Full list of artists across all backends. */
 @Composable
 fun ArtistsScreen(nav: NavHostController) {
-    val rawArtists = loadOnce { loadArtistsByBackend() }
+    var retryKey by remember { mutableIntStateOf(0) }
+    val rawArtists = loadOnce(retryKey) { loadArtistsByBackend() }
     val favoriteKeys by Favorites.keys.collectAsState()
     val groups = remember(rawArtists.value, favoriteKeys) {
         rawArtists.value?.map { groupArtistsForBrowse(it, favoriteKeys) }
@@ -183,56 +186,78 @@ fun ArtistsScreen(nav: NavHostController) {
                 )
             }
         }
-        Loaded(groups) { g ->
-            val phishMatches = g.phish?.takeIf { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
-            val favorited = g.favorited.filterByName(query).sortedByMode(sortMode)
-            val others = g.others.filterByName(query).sortedByMode(sortMode)
-
-            if (phishMatches == null && favorited.isEmpty() && others.isEmpty()) {
-                Text(
-                    "No artists match \"$query\".",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
-                )
-                return@Loaded
+        when {
+            groups == null -> Loading()
+            groups.isFailure -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    ErrorText(groups.exceptionOrNull() ?: Exception("Unknown error"))
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            RelistenCatalogSource.resetCache()
+                            PhishInSource.resetCache()
+                            retryKey++
+                        },
+                        modifier = Modifier.testTag(A11yTags.ARTISTS_RETRY),
+                    ) {
+                        Text("Retry")
+                    }
+                }
             }
+            else -> {
+                val g = groups.getOrThrow()
+                val phishMatches = g.phish?.takeIf { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+                val favorited = g.favorited.filterByName(query).sortedByMode(sortMode)
+                val others = g.others.filterByName(query).sortedByMode(sortMode)
 
-            LazyColumn(Modifier.testTag(A11yTags.ARTISTS_LIST)) {
-                phishMatches?.let { phish ->
-                    item(key = "${phish.backend.id}-${phish.id}") {
-                        RowItem(
-                            title = phish.name,
-                            subtitle = "${phish.showCount} ${plural(phish.showCount, "show")}",
-                            artUrl = null,
-                            trailingContent = { FavoriteButton(phish) },
-                            modifier = Modifier.testTag(A11yTags.artistRow(phish.backend.id, phish.id)),
-                            onClick = { nav.navigate("artist/${phish.backend.id}/${phish.id}") }
-                        )
-                    }
-                }
-                if (favorited.isNotEmpty()) {
-                    item { SectionHeader("Favorites") }
-                    items(favorited, key = { "fav-${it.backend.id}-${it.id}" }) { artist ->
-                        RowItem(
-                            title = artist.name,
-                            subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                            artUrl = null,
-                            trailingContent = { FavoriteButton(artist) },
-                            modifier = Modifier.testTag(A11yTags.artistRow(artist.backend.id, artist.id)),
-                            onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
-                        )
-                    }
-                    item { SectionHeader("Artists") }
-                }
-                items(others, key = { "${it.backend.id}-${it.id}" }) { artist ->
-                    RowItem(
-                        title = artist.name,
-                        subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
-                        artUrl = null,
-                        trailingContent = { FavoriteButton(artist) },
-                        modifier = Modifier.testTag(A11yTags.artistRow(artist.backend.id, artist.id)),
-                        onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                if (phishMatches == null && favorited.isEmpty() && others.isEmpty()) {
+                    Text(
+                        "No artists match \"$query\".",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
                     )
+                } else {
+                    LazyColumn(Modifier.testTag(A11yTags.ARTISTS_LIST)) {
+                        phishMatches?.let { phish ->
+                            item(key = "${phish.backend.id}-${phish.id}") {
+                                RowItem(
+                                    title = phish.name,
+                                    subtitle = "${phish.showCount} ${plural(phish.showCount, "show")}",
+                                    artUrl = null,
+                                    trailingContent = { FavoriteButton(phish) },
+                                    modifier = Modifier.testTag(A11yTags.artistRow(phish.backend.id, phish.id)),
+                                    onClick = { nav.navigate("artist/${phish.backend.id}/${phish.id}") }
+                                )
+                            }
+                        }
+                        if (favorited.isNotEmpty()) {
+                            item { SectionHeader("Favorites") }
+                            items(favorited, key = { "fav-${it.backend.id}-${it.id}" }) { artist ->
+                                RowItem(
+                                    title = artist.name,
+                                    subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                                    artUrl = null,
+                                    trailingContent = { FavoriteButton(artist) },
+                                    modifier = Modifier.testTag(A11yTags.artistRow(artist.backend.id, artist.id)),
+                                    onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                                )
+                            }
+                            item { SectionHeader("Artists") }
+                        }
+                        items(others, key = { "${it.backend.id}-${it.id}" }) { artist ->
+                            RowItem(
+                                title = artist.name,
+                                subtitle = "${artist.showCount} ${plural(artist.showCount, "show")}",
+                                artUrl = null,
+                                trailingContent = { FavoriteButton(artist) },
+                                modifier = Modifier.testTag(A11yTags.artistRow(artist.backend.id, artist.id)),
+                                onClick = { nav.navigate("artist/${artist.backend.id}/${artist.id}") }
+                            )
+                        }
+                    }
                 }
             }
         }

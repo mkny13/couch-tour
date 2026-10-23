@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.navigation.NavHostController
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,7 +44,8 @@ class ArtistsScreenUiTest {
                 {"uuid":"a1","slug":"aqueous","name":"Aqueous","show_count":50},
                 {"uuid":"a2","slug":"grateful-dead","name":"Grateful Dead","show_count":2000},
                 {"uuid":"a3","slug":"billy-strings","name":"Billy Strings","show_count":300},
-                {"uuid":"a4","slug":"phish","name":"Phish","show_count":1700}
+                {"uuid":"a4","slug":"phish","name":"Phish","show_count":1700},
+                {"uuid":"a5","slug":"moe","name":"moe.","show_count":1900}
             ]""",
         ),
     )
@@ -148,5 +150,34 @@ class ArtistsScreenUiTest {
         ui.compose.waitForIdle()
         assertEquals("artist/{backend}/{id}", nav().currentRoute)
         assertEquals("grateful-dead", nav().arg("id"))
+    }
+
+    @Test
+    fun `artists list renders moe row and tapping it opens moe artist screen`() {
+        val nav = render()
+        ui.compose.onNodeWithTag(A11yTags.ARTISTS_LIST).assertExists()
+        ui.compose.onNodeWithTag(A11yTags.artistRow("relisten", "moe")).assertExists().performClick()
+        ui.compose.waitForIdle()
+        assertEquals("artist/{backend}/{id}", nav().currentRoute)
+        assertEquals("moe", nav().arg("id"))
+    }
+
+    @Test
+    fun `when loading artists fails, retry button is shown and retrying loads artists list`() {
+        val badUrl = "http://127.0.0.1:1/".toHttpUrl()
+        PhishInApi.baseUrl = badUrl
+        RelistenApi.baseUrl = badUrl
+        RelistenCatalogSource.resetCache()
+        PhishInSource.resetCache()
+
+        val nav = ui.setScreen { ArtistsScreen(it) }
+        ui.compose.waitUntil(5_000) { ui.compose.onNodeWithTag(A11yTags.ARTISTS_RETRY).exists() }
+        ui.compose.onNodeWithTag(A11yTags.ARTISTS_RETRY).assertExists()
+
+        // Restore server and click retry
+        servers.start()
+        ui.compose.onNodeWithTag(A11yTags.ARTISTS_RETRY).performClick()
+        ui.compose.waitUntil(5_000) { ui.compose.onNodeWithTag(A11yTags.ARTISTS_LIST).exists() }
+        ui.compose.onNodeWithTag(A11yTags.ARTISTS_LIST).assertExists()
     }
 }

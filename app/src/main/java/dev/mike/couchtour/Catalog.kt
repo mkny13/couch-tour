@@ -500,18 +500,20 @@ internal fun groupArtistsForBrowse(
  * needs the favorited set, which is a [Favorites]-backed [kotlinx.coroutines.flow.StateFlow]
  * callers recompose on, not something to fetch once and cache alongside the network data.
  */
-internal suspend fun loadArtistsByBackend(): Map<Backend, List<ArtistRef>> {
+internal suspend fun loadArtistsByBackend(): Map<Backend, List<ArtistRef>> = coroutineScope {
     // Routed through PhishInSource.periods() (#61) rather than PhishInApi.years() directly,
     // so the Home screen's artist list shares the same cached years fetch ShowsScreen's
     // period picker uses instead of a second, uncached round trip for the same data. The
     // synthetic "Popular" period contributes 0 to the sum, so this totals the same as before.
-    val phishShows = runCatching { PhishInSource.periods(PHISH).sumOf { it.showCount } }
-    val relistenArtists = runCatching { RelistenCatalogSource.artists() }
+    val phishDeferred = async { runCatching { PhishInSource.periods(PHISH).sumOf { it.showCount } } }
+    val relistenDeferred = async { runCatching { RelistenCatalogSource.artists() } }
+    val phishShows = phishDeferred.await()
+    val relistenArtists = relistenDeferred.await()
     if (phishShows.isFailure && relistenArtists.isFailure) {
         throw relistenArtists.exceptionOrNull() ?: phishShows.exceptionOrNull()!!
     }
     val phish = PHISH.copy(showCount = phishShows.getOrDefault(0))
-    return mapOf(
+    mapOf(
         Backend.PHISHIN to listOf(phish),
         Backend.RELISTEN to relistenArtists.getOrDefault(emptyList()),
     )
