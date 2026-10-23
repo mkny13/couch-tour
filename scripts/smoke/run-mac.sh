@@ -809,10 +809,14 @@ mac_run_home_sections_after_relaunch() {
     fi
   fi
 
+  # A first-match walk reaches the later Home sections only after visiting the sidebar, top
+  # bar and every in-progress card (~40 ms each), which overran the 20 s default budget on
+  # v0.91 even though the identifiers were present. Give this journey a larger walk budget.
   local missing=() timed_out=false
-  local section
+  local section home_timeout="${HOME_SECTIONS_TIMEOUT:-60}"
+  local AX_DEEP_TIMEOUT_MS="${AX_DEEP_TIMEOUT_MS_HOME:-55000}"
   for section in home.in_progress home.next_tour_stops home.on_this_date home.in_progress.card; do
-    if ! mac::wait_for_id "$section" "$TIMEOUT" "$DEEP" >/dev/null; then
+    if ! mac::wait_for_id "$section" "$home_timeout" "$DEEP" >/dev/null; then
       missing+=("$section")
       [[ "$MAC_AX_TIMED_OUT" == 1 ]] && timed_out=true
     fi

@@ -28,6 +28,7 @@ TIMEOUT=1 DEEP=14 NO_INPUT=false MAC_AX_TIMED_OUT=0
 mac::relaunch() { return 0; }
 mac::ax_query() { [[ " $IDS " == *" $1 "* ]] && echo "$1"; }
 mac::wait_for_id() {
+  WAIT_TIMEOUTS+=" $2"
   MAC_AX_TIMED_OUT=0
   [[ " $IDS " == *" $1 "* ]] && return 0
   [[ " ${TIMED_OUT_IDS:-} " == *" $1 "* ]] && MAC_AX_TIMED_OUT=1
@@ -44,6 +45,9 @@ mrun() { # <name> <want status> <want evidence substring> <ids> [timed-out ids]
 mrun "mac all present" PASS "" "$all"
 mrun "mac missing on_this_date" FAIL "home.on_this_date" "home.in_progress home.next_tour_stops home.in_progress.card"
 mrun "mac timed-out walk says so" FAIL "AX walk timed out" "home.in_progress home.in_progress.card" "home.next_tour_stops home.on_this_date"
+# Walk budget: every section lookup gets the larger Home budget, not the 20 s default (#716)
+WAIT_TIMEOUTS="" mrun "mac budget" PASS "" "$all"
+[[ " ${WAIT_TIMEOUTS# } " != *" 1 "* && "$WAIT_TIMEOUTS" == *" 60"* ]] && ok "mac home walk budget >= 60s" || bad "mac home walk budget: '$WAIT_TIMEOUTS'"
 # SKIP path: no in-progress card before relaunch
 mrun "mac no fixture" SKIP "seeded-favorite" ""
 
