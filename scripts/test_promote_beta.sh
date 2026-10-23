@@ -28,6 +28,14 @@ echo "$@" >> "$GIT_LOG"
 case "$1" in
     fetch) exit 0 ;;
     rev-parse) exit 0 ;;
+    tag)
+        if [ -f "$TMP/mock_tags" ]; then
+            cat "$TMP/mock_tags"
+        else
+            echo "v0.90"
+        fi
+        exit 0
+        ;;
     *) exit 0 ;;
 esac
 EOF
@@ -38,13 +46,21 @@ cat > "$BIN_DIR/gh" << 'EOF'
 echo "$@" >> "$GH_LOG"
 case "$1 $2" in
     "workflow run") exit 0 ;;
+    "release view")
+        if [ -f "$TMP/mock_release_prerelease" ]; then
+            cat "$TMP/mock_release_prerelease"
+        else
+            echo "true"
+        fi
+        exit 0
+        ;;
     *) exit 0 ;;
 esac
 EOF
 chmod +x "$BIN_DIR/gh"
 
 export PATH="$BIN_DIR:$PATH"
-export GIT_LOG GH_LOG
+export GIT_LOG GH_LOG TMP
 
 # Helper to run promote-beta.sh in a clean test harness
 run_promote() {
@@ -190,6 +206,89 @@ check "9. --check-only exits 0 for valid report" [ "$rc_good" -eq 0 ]
 rc_bad=0
 SMOKE_REPORTS_DIR="$T4/smoke-reports" bash "$PROMOTE_SCRIPT" --check-only "$TAG" >/dev/null 2>&1 || rc_bad=$?
 check "9. --check-only exits non-zero for FAIL report" [ "$rc_bad" -ne 0 ]
+
+# 10. Single argument (beta tag only): auto-computes next tag and notes, dispatches on PASS
+T10="$TMP/t10"
+mkdir -p "$T10/smoke-reports"
+cat > "$T10/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: PASS
+EOF
+echo "v0.90" > "$TMP/mock_tags"
+rc=0
+run_promote "$T10" "$TAG" >/dev/null 2>&1 || rc=$?
+check "10. single-arg promote exits 0 on PASS" [ "$rc" -eq 0 ]
+check "10. single-arg promote dispatches with next tag v0.91" grep -q "release_tag=v0.91" "$GH_LOG"
+check "10. single-arg promote dispatches with ref v0.90" grep -q "workflow run build-debug-apk.yml --ref v0.90" "$GH_LOG"
+check "10. single-arg promote sets prerelease=false" grep -q "prerelease=false" "$GH_LOG"
+check "10. single-arg promote sets side_install=false" grep -q "side_install=false" "$GH_LOG"
+
+# 11. --auto with passing smoke report: auto-detects beta and promotes
+T11="$TMP/t11"
+mkdir -p "$T11/smoke-reports"
+cat > "$T11/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: PASS
+EOF
+echo "v0.90" > "$TMP/mock_tags"
+echo "true" > "$TMP/mock_release_prerelease"
+rc=0
+run_promote "$T11" --auto >/dev/null 2>&1 || rc=$?
+check "11. --auto exits 0 on PASS" [ "$rc" -eq 0 ]
+check "11. --auto dispatches promotion" grep -q "workflow run build-debug-apk.yml --ref v0.90" "$GH_LOG"
+check "11. --auto passes bumped release_tag v0.91" grep -q "release_tag=v0.91" "$GH_LOG"
+
+# 12. --auto with failing smoke report: does not promote, beta stays a beta, exits 0
+T12="$TMP/t12"
+mkdir -p "$T12/smoke-reports"
+cat > "$T12/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: FAIL
+EOF
+echo "v0.90" > "$TMP/mock_tags"
+echo "true" > "$TMP/mock_release_prerelease"
+rc=0
+out12="$T12/out.log"
+run_promote "$T12" --auto >"$out12" 2>&1 || rc=$?
+check "12. --auto exits 0 when report fails" [ "$rc" -eq 0 ]
+check "12. --auto records NO dispatch on FAIL" bash -c "! grep -q 'workflow run' '$GH_LOG'"
+check "12. --auto message notes beta stays a beta" grep -q "stays a beta" "$out12"
+
+# 13. --auto with no smoke report: does not promote, beta stays a beta, exits 0
+T13="$TMP/t13"
+mkdir -p "$T13/smoke-reports"
+echo "v0.90" > "$TMP/mock_tags"
+echo "true" > "$TMP/mock_release_prerelease"
+rc=0
+out13="$T13/out.log"
+run_promote "$T13" --auto >"$out13" 2>&1 || rc=$?
+check "13. --auto exits 0 when report missing" [ "$rc" -eq 0 ]
+check "13. --auto records NO dispatch when report missing" bash -c "! grep -q 'workflow run' '$GH_LOG'"
+check "13. --auto message notes report not found / beta stays a beta" grep -q "stays a beta" "$out13"
+
+# 14. --auto when latest release is already production: does nothing, exits 0
+T14="$TMP/t14"
+mkdir -p "$T14/smoke-reports"
+cat > "$T14/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: PASS
+EOF
+echo "v0.90" > "$TMP/mock_tags"
+echo "false" > "$TMP/mock_release_prerelease"
+rc=0
+out14="$T14/out.log"
+run_promote "$T14" --auto >"$out14" 2>&1 || rc=$?
+check "14. --auto exits 0 when release already prod" [ "$rc" -eq 0 ]
+check "14. --auto records NO dispatch when release already prod" bash -c "! grep -q 'workflow run' '$GH_LOG'"
+
+# 15. --auto rejects --force-no-smoke: auto-promotion MUST NOT bypass smoke gate
+T15="$TMP/t15"
+mkdir -p "$T15/smoke-reports"
+rc=0
+err15="$T15/err.log"
+run_promote "$T15" --auto --force-no-smoke >/dev/null 2>"$err15" || rc=$?
+check "15. --auto rejects --force-no-smoke" [ "$rc" -ne 0 ]
+check "15. --auto rejection error mentions cannot be combined" grep -q "cannot be combined" "$err15"
 
 if [ "$failures" -gt 0 ]; then
     echo "$failures test(s) failed." >&2

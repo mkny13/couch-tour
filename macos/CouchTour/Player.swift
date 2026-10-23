@@ -1052,7 +1052,7 @@ final class Player: NSObject, ObservableObject {
         )
         let tap: MTAudioProcessingTap?
         let status: OSStatus
-        #if compiler(>=6.1)
+        #if compiler(>=6.4)
         var tapOut: MTAudioProcessingTap?
         status = MTAudioProcessingTapCreate(
             kCFAllocatorDefault,

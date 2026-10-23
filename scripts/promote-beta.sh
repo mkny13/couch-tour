@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Promotes an already-confirmed beta to production, per CLAUDE.md's "Promoting a beta to
-# production is Mike's call, never automatic": rebuilds from that beta's *own* tag (not
-# whatever's on main now — later betas may have shipped since) as a non-beta, non-prerelease
-# release. This script only wraps the mechanics; the decision to run it is unchanged — invoke
-# it only after Mike has explicitly confirmed a specific beta tag.
+# Promotes a beta release to production by rebuilding from that beta's tag as a non-beta,
+# non-prerelease release.
 #
-# Promotion requires a passing smoke report at smoke-reports/<tag>.md (issue #358).
-# Bypass with --force-no-smoke; all bypasses are logged in smoke-reports/.forced-promotions.log.
+# Production promotion is gated on a passing smoke report at smoke-reports/<tag>.md (D342, issue #251).
+# Auto-promotion runs without human approval when smoke tests pass; with no passing report,
+# the beta stays a beta.
+# Manual bypass with --force-no-smoke is recorded in smoke-reports/.forced-promotions.log.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -74,8 +73,20 @@ check_smoke_report() {
     return 0
 }
 
+compute_next_tag() {
+    local highest
+    highest="$(git tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+$' | head -1 || true)"
+    if [ -z "$highest" ]; then
+        highest="${1:-v0.0}"
+    fi
+    local major="${highest%.*}"
+    local minor="${highest##*.}"
+    echo "${major}.$((minor + 1))"
+}
+
 force_no_smoke=0
 check_only=0
+auto_mode=0
 args=()
 
 while [ $# -gt 0 ]; do
@@ -88,9 +99,22 @@ while [ $# -gt 0 ]; do
             check_only=1
             shift
             ;;
+        --auto)
+            auto_mode=1
+            shift
+            ;;
         -h|--help)
-            echo "Usage: $0 [--force-no-smoke] <confirmed-beta-tag> <next-tag> <release notes>" >&2
-            echo "       $0 --check-only <tag>" >&2
+            cat << 'EOF'
+Usage: scripts/promote-beta.sh [OPTIONS] [<beta-tag>] [<next-tag>] [<release notes>]
+       scripts/promote-beta.sh --auto
+       scripts/promote-beta.sh --check-only <tag>
+
+Options:
+  --auto              Find latest beta tag and auto-promote if its smoke report passed
+  --check-only <tag>  Check whether smoke report for <tag> passes without promoting
+  --force-no-smoke    Bypass smoke report gate (escape hatch, logged to .forced-promotions.log)
+  -h, --help          Show this help message
+EOF
             exit 0
             ;;
         *)
@@ -99,6 +123,11 @@ while [ $# -gt 0 ]; do
             ;;
     esac
 done
+
+if [ "$auto_mode" -eq 1 ] && [ "$force_no_smoke" -eq 1 ]; then
+    echo "ERROR: --auto and --force-no-smoke cannot be combined. Auto-promotion strictly requires a passing smoke report." >&2
+    exit 1
+fi
 
 if [ "$check_only" -eq 1 ]; then
     if [ "${#args[@]}" -lt 1 ]; then
@@ -115,15 +144,57 @@ if [ "$check_only" -eq 1 ]; then
     fi
 fi
 
-if [ "${#args[@]}" -lt 3 ]; then
-    echo "Usage: $0 [--force-no-smoke] <confirmed-beta-tag> <next-tag> <release notes>" >&2
-    echo "Example: $0 v0.31 v0.32 \"Promoting v0.31 after Mike confirmed it on device.\"" >&2
-    exit 1
-fi
+if [ "$auto_mode" -eq 1 ]; then
+    git fetch --tags -q 2>/dev/null || true
+    latest_tag="$(git tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+$' | head -1 || true)"
+    if [ -z "$latest_tag" ]; then
+        latest_tag="$(git tag --list 'v*' --sort=-v:refname 2>/dev/null | head -1 || true)"
+    fi
+    if [ -z "$latest_tag" ]; then
+        echo "No tags found; nothing to auto-promote."
+        exit 0
+    fi
 
-confirmed_ref="${args[0]}"
-next_tag="${args[1]}"
-notes="${args[2]}"
+    # Check if latest release is already production
+    if command -v gh >/dev/null 2>&1; then
+        gh_prerelease="$(gh release view "$latest_tag" --json isPrerelease -q .isPrerelease 2>/dev/null || true)"
+        if [ "$gh_prerelease" = "false" ]; then
+            echo "Latest release $latest_tag is already production; nothing to auto-promote."
+            exit 0
+        fi
+    fi
+
+    confirmed_ref="$latest_tag"
+    if ! check_err="$(check_smoke_report "$confirmed_ref")"; then
+        echo "Smoke report for $confirmed_ref did not pass ($check_err); beta stays a beta."
+        exit 0
+    fi
+
+    next_tag="$(compute_next_tag "$confirmed_ref")"
+    notes="Production release $next_tag: auto-promoted from $confirmed_ref after passing smoke report."
+else
+    if [ "${#args[@]}" -lt 1 ]; then
+        echo "Usage: $0 [--force-no-smoke] <beta-tag> [<next-tag>] [<release notes>]" >&2
+        echo "       $0 --auto" >&2
+        echo "       $0 --check-only <tag>" >&2
+        exit 1
+    fi
+
+    confirmed_ref="${args[0]}"
+    git fetch --tags -q 2>/dev/null || true
+
+    if [ "${#args[@]}" -ge 2 ]; then
+        next_tag="${args[1]}"
+    else
+        next_tag="$(compute_next_tag "$confirmed_ref")"
+    fi
+
+    if [ "${#args[@]}" -ge 3 ]; then
+        notes="${args[2]}"
+    else
+        notes="Production release $next_tag: auto-promoted from $confirmed_ref after passing smoke report."
+    fi
+fi
 
 report_file="$reports_dir/$confirmed_ref.md"
 smoke_err=""
@@ -153,7 +224,7 @@ if ! smoke_err="$(check_smoke_report "$confirmed_ref")"; then
     fi
 fi
 
-git fetch --tags -q
+git fetch --tags -q 2>/dev/null || true
 if ! git rev-parse "$confirmed_ref" >/dev/null 2>&1; then
     echo "Tag $confirmed_ref not found locally or on origin — check the tag name." >&2
     exit 1

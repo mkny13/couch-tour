@@ -64,6 +64,7 @@ out1="$TMP/out1.log"
 bash "$WEEKLY_SCRIPT" --no-gate --dry-run >"$out1" 2>&1
 check "1. no app changes mentions existing beta" grep -q "No app code changes since v0.88" "$out1"
 check "1. no app changes runs smoke on existing beta" grep -q "run-smoke.sh --tag v0.88" "$out1"
+check "1. dry run mentions auto-promote on pass" grep -q "Would auto-promote v0.88 to production" "$out1"
 
 # 2. App code changed: detects change, cuts beta
 touch "$STATE_DIR/app_changed"
@@ -83,6 +84,75 @@ touch "$STATE_DIR/gate_busy"
 rc=0
 bash "$WEEKLY_SCRIPT" --no-retry >/dev/null 2>&1 || rc=$?
 check "4. gate busy with --no-retry exits 75" [ "$rc" -eq 75 ]
+
+# 5. Non-dry-run with passing smoke suite: triggers auto-promotion
+rm -f "$STATE_DIR/gate_busy"
+rm -f "$STATE_DIR/app_changed"
+SMOKE_LOG="$TMP/smoke.log"
+PROMOTE_LOG="$TMP/promote.log"
+MOCK_SMOKE="$BIN_DIR/mock-run-smoke.sh"
+cat > "$MOCK_SMOKE" << 'EOF'
+#!/bin/sh
+echo "smoke: $@" >> "$SMOKE_LOG"
+exit 0
+EOF
+chmod +x "$MOCK_SMOKE"
+
+MOCK_PROMOTE="$BIN_DIR/mock-promote-beta.sh"
+cat > "$MOCK_PROMOTE" << 'EOF'
+#!/bin/sh
+case "$1" in
+    --check-only)
+        if [ -f "$STATE_DIR/smoke_fails" ]; then
+            exit 1
+        fi
+        exit 0
+        ;;
+    *)
+        echo "promote: $@" >> "$PROMOTE_LOG"
+        exit 0
+        ;;
+esac
+EOF
+chmod +x "$MOCK_PROMOTE"
+
+export SMOKE_LOG PROMOTE_LOG
+rm -f "$STATE_DIR/smoke_fails"
+: > "$SMOKE_LOG"
+: > "$PROMOTE_LOG"
+out5="$TMP/out5.log"
+CCTV_WEEKLY_RUN_SMOKE="$MOCK_SMOKE" CCTV_WEEKLY_PROMOTE="$MOCK_PROMOTE" \
+    bash "$WEEKLY_SCRIPT" --no-gate >"$out5" 2>&1
+check "5. passing smoke triggers auto-promotion" grep -q "promote: v0.88" "$PROMOTE_LOG"
+check "5. passing smoke logs auto-promote message" grep -q "auto-promoting to production" "$out5"
+
+# 6. Non-dry-run with failing smoke suite: does NOT trigger promotion, beta stays a beta
+touch "$STATE_DIR/smoke_fails"
+: > "$SMOKE_LOG"
+: > "$PROMOTE_LOG"
+out6="$TMP/out6.log"
+CCTV_WEEKLY_RUN_SMOKE="$MOCK_SMOKE" CCTV_WEEKLY_PROMOTE="$MOCK_PROMOTE" \
+    bash "$WEEKLY_SCRIPT" --no-gate >"$out6" 2>&1
+check "6. failing smoke does NOT promote" [ ! -s "$PROMOTE_LOG" ]
+check "6. failing smoke logs beta stays a beta" grep -q "beta stays a beta" "$out6"
+
+# 7. Non-dry-run when runner exits non-zero (e.g. screen locked #686): does NOT promote
+MOCK_SMOKE_FAIL="$BIN_DIR/mock-run-smoke-fail.sh"
+cat > "$MOCK_SMOKE_FAIL" << 'EOF'
+#!/bin/sh
+echo "smoke failed (screen locked / preflight)" >&2
+exit 2
+EOF
+chmod +x "$MOCK_SMOKE_FAIL"
+
+: > "$PROMOTE_LOG"
+rc7=0
+out7="$TMP/out7.log"
+CCTV_WEEKLY_RUN_SMOKE="$MOCK_SMOKE_FAIL" CCTV_WEEKLY_PROMOTE="$MOCK_PROMOTE" \
+    bash "$WEEKLY_SCRIPT" --no-gate >"$out7" 2>&1 || rc7=$?
+check "7. runner error (exit 2) propagates exit code" [ "$rc7" -eq 2 ]
+check "7. runner error does NOT promote" [ ! -s "$PROMOTE_LOG" ]
+check "7. runner error logs beta stays a beta" grep -q "beta stays a beta" "$out7"
 
 if [ "$failures" -gt 0 ]; then
     echo "$failures test(s) failed." >&2

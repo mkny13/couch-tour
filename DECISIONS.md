@@ -643,4 +643,51 @@ Dependabot proposed updating vitest from 4.1.11 to 5.0.3 in `sync/` (#631).
 Decline the vitest 5.0.3 major update and retain `vitest = "^4.1.11"` in `sync/package.json`.
 The latest `@cloudflare/vitest-pool-workers` release (0.23.0) declares peer dependency `vitest: "^4.1.0"`. Upgrading vitest to 5.0.3 breaks the Miniflare D1 test runner with worker startup errors (`[vitest-pool]: Failed to start cloudflare-pool worker ... SyntaxError: Unexpected identifier 'file'`). The pool-workers package does not yet provide vitest 5 compatibility on any release or dist-tag. Do not force incompatible peers with `--legacy-peer-deps` or npm `overrides`. Revisit the vitest major update once `@cloudflare/vitest-pool-workers` publishes support for vitest 5.
 
+### D348: Drop manual beta-promotion gate; auto-promote strictly gated on smoke report (#251)
+
+Previously, promoting a beta to production required explicit owner confirmation (CLAUDE.md: "Never automatic; requires explicit owner confirmation").
+
+**Decision:**
+1. **Drop manual owner confirmation gate:** Promotion from beta to production is automated without human approval steps.
+2. **Strict smoke report gate:** In accordance with the owner's 2026-10-21 directive, auto-promotion is strictly gated on a passing smoke report for that exact tag (`smoke-reports/<tag>.md` with `Smoke: PASS`, exactly matching `promote-beta.sh`'s check). With no passing report (missing, FAIL, or unwaived failures), nothing is promoted and the beta stays a beta, even when CI is green.
+3. **`scripts/promote-beta.sh`:** Enhanced with `--auto` to discover the latest beta tag and promote if its smoke report passes. Positional usage supports 1 argument (`<beta-tag>`), automatically deriving `next_tag` by incrementing the highest tag and populating default release notes. In automated mode, `--force-no-smoke` is rejected.
+4. **`scripts/smoke/weekly-smoke.sh`:** When the weekly unattended overnight smoke suite runs on the Mac mini, it now auto-promotes to production immediately if `smoke-reports/<tag>.md` has `Smoke: PASS`. When macOS journeys cannot run (such as when the screen is locked, #686) or journeys fail, promotion does not fire and the beta stays a beta.
+5. **CI auto-promotion (`build-debug-apk.yml`):** On push to `main`, `scripts/promote-beta.sh --auto` runs to promote any un-promoted beta tag that has a committed passing smoke report.
+6. **Workflow updates:** Retires "cut a beta at the end of every batch" and "stop at the beta". Cutting a beta is no longer required at batch end and is used for ad hoc side-install testing or automated weekly smoke runs. UAT is reframed as post-ship review rather than a pre-ship gate.
+
+### D349: Migrate macOS CI/release runners to macos-15 and unpin GRDB 7.x (`from: "7.11.1"`) (#650)
+
+Supersedes D341.
+
+Following the owner's directive (2026-10-21), migrate macOS CI (`.github/workflows/macos-tests.yml`) and release (`.github/workflows/macos-release.yml`) workflows from GitHub Actions `macos-14` runners with pinned Xcode 16.2 to `macos-15` runners (providing Xcode 16.3+ / 16.4+ default toolchains supporting Swift tools 6.1).
+
+**Decision:**
+1. **Runner migration:** Update `.github/workflows/macos-tests.yml` (`macos-test` and `macos-build` jobs) and `.github/workflows/macos-release.yml` (`build-macos` job) to `runs-on: macos-15`.
+2. **Remove Xcode 16.2 selection:** Remove the hardcoded `/Applications/Xcode_16.2.app` selection steps in both workflows; `macos-15` runners default to Xcode 16.3+ / 16.4+, satisfying Swift tools 6.1 requirements without manual toolchain switching.
+3. **Lift GRDB dependency constraint:** In `macos/Packages/CouchTourKit/Package.swift`, update the GRDB.swift dependency to `.package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1")` and remove the obsolete Xcode 16.2 toolchain pin comments.
+4. **Database compatibility:** Retains existing database schema, table names, migrations, and `phishin.db` on-disk format.
+5. **MTAudioProcessingTap compatibility:** Correct the toolchain guard in `macos/CouchTour/Player.swift` to `#if compiler(>=6.4)` so that `MTAudioProcessingTapCreate` correctly provides `UnsafeMutablePointer<Unmanaged<MTAudioProcessingTap>?>` on Xcode 16.4 / Swift 6.1 (`macos-15` runner) while retaining `UnsafeMutablePointer<MTAudioProcessingTap?>` on Swift 6.4+ (Xcode 27.1).
+
+**Supersedes:** D341 (which pinned GRDB to 7.8.x and selected Xcode 16.2 on `macos-14`).
+
+### D351: Adopt vitest 5.0.5 and migrate to @cloudflare/vitest-plugin in /sync (#691, #692)
+
+Supersedes D345.
+
+Dependabot PR #691 bumped `vitest` from 4.1.11 to 5.0.5 in `sync/`. Previously, D345 declined Vitest 5.0.3 because `@cloudflare/vitest-pool-workers@0.23.0` was capped at Vitest 4.1.x and failed at worker runtime startup with `SyntaxError: Unexpected identifier 'file'`.
+
+Cloudflare officially deprecated `@cloudflare/vitest-pool-workers` and released `@cloudflare/vitest-plugin` with support for `vitest: ^4.1.0 || ^5.0.0`.
+
+**Decision:**
+1. **Adopt Vitest 5.0.5:** Update `vitest` to `^5.0.5` in `sync/package.json`.
+2. **Migrate to `@cloudflare/vitest-plugin`:** Replace `@cloudflare/vitest-pool-workers` with `@cloudflare/vitest-plugin: "^1.4.6"` in `sync/package.json`.
+3. **Update config:** In `sync/vitest.config.ts`, import `cloudflareTest` from `@cloudflare/vitest-plugin` instead of `@cloudflare/vitest-pool-workers`.
+4. **Clean lockfile:** Regenerate `sync/package-lock.json` via clean `npm install` without `--legacy-peer-deps` or forced overrides.
+5. **Preserve runtime and schema:** Retain all runtime code in `sync/src/` and database migrations unchanged. All 31 tests against Miniflare D1 continue to pass cleanly.
+
+**Supersedes:** D345.
+
+
+
+
 
