@@ -22,7 +22,7 @@ okhttp = "5.5.0"
 serialization = "1.11.0"
 coil = "2.7.0"
 palette = "1.0.0"
-securityCrypto = "1.1.0-alpha06"
+securityCrypto = "1.1.0"
 workManager = "2.12.0"
 zxingCore = "3.5.4"
 # YouTube stream resolution (#232): the planning note's recommended choice — no API key,
