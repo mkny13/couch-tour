@@ -223,7 +223,10 @@ final class CouchTourUITests: XCTestCase {
 
         let clear = app.descendants(matching: .any)["search.clear"].firstMatch
         XCTAssertTrue(clear.waitForExistence(timeout: 10))
-        clear.click()
+        // Clear from the keyboard: at the default window width search.clear sits under the
+        // player rail and a mouse click doesn't reach it (#739).
+        field.typeKey("a", modifierFlags: .command)
+        field.typeKey(.delete, modifierFlags: [])
 
         // search.clear only exists while the query is non-empty. waitForExistence returns as soon
         // as it exists, so wait for it to go away instead.
