@@ -330,6 +330,18 @@ check "j4: emulator dying exits 2" bash -c "[[ $RC == 2 ]] && grep -q 'ERROR:.*e
 avd_run j5 CCTV_SMOKE_EMULATOR=/nonexistent -- --avd phishin_test
 check "j5: missing emulator binary exits 2" bash -c "[[ $RC == 2 ]] && grep -q 'ERROR:.*emulator binary not found' '$TMP/j5.err'"
 
+# (k) mac::click_retry: a click that fails once then succeeds must not fail the journey (#712)
+click_retry_run() { rm -f "$TMP/click.count"; env FN="$(awk '/^mac::click_retry\(\)/{p=1} p{print} p&&/^}/{exit}' "$DIR/run-mac.sh")" COUNT="$TMP/click.count" FAILS="$1" bash -c '
+    smoke::log() { :; }
+    mac::click() { n=$(( $(cat "$COUNT" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$COUNT"; (( n > FAILS )); }
+    eval "$FN"
+    SMOKE_CLICK_RETRY_DELAY=0
+    mac::click_retry sidebar.nav.search; echo "$? $(cat "$COUNT")"
+  ' 2>/dev/null; }
+check "k1: click fails once then succeeds -> ok on attempt 2" test "$(click_retry_run 1)" = "0 2"
+check "k2: click always fails -> gives up after 3 attempts" test "$(click_retry_run 99)" = "1 3"
+check "k3: both journeys use mac::click_retry for the search nav" bash -c "! grep -q 'if ! mac::click \"sidebar.nav.search\"' '$DIR/run-mac.sh'"
+
 # --help lists the new flags
 help="$("$DIR/run-smoke.sh" --help)"
 for flag in --allow-focus --apk --serial --avd --build-apk; do
