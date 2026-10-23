@@ -79,6 +79,7 @@ struct SidebarView: View {
                 }
             }
             .padding(.horizontal, 8)
+            .accessibilityElement(children: .contain)
 
             // FAVORITE ARTISTS Section
             Text("FAVORITE ARTISTS")
@@ -187,6 +188,7 @@ struct SidebarView: View {
         }
         .frame(width: 236)
         .background(colors.elevated)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -221,6 +223,7 @@ private struct SidebarNavItem: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
         .accessibilityIdentifier(identifier)
     }
 }

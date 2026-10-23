@@ -172,5 +172,15 @@ final class CouchTourUITests: XCTestCase {
         homeNav.click()
         XCTAssertTrue(app.descendants(matching: .any)["home.screen"].firstMatch.waitForExistence(timeout: 10))
     }
+
+    func testColdStartPresentsSidebarNavHome() {
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launch()
+
+        let homeNav = app.descendants(matching: .any)["sidebar.nav.home"].firstMatch
+        XCTAssertTrue(homeNav.waitForExistence(timeout: 10), "sidebar.nav.home not present after fresh launch")
+        XCTAssertTrue(homeNav.isHittable, "sidebar.nav.home not hittable after fresh launch")
+    }
 }
 
