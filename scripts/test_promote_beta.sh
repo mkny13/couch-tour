@@ -139,6 +139,8 @@ check "5. verdict PASS dispatches workflow" grep -q "workflow run build-debug-ap
 check "5. verdict PASS passes release_tag" grep -q "release_tag=v0.91" "$GH_LOG"
 check "5. verdict PASS passes prerelease=false" grep -q "prerelease=false" "$GH_LOG"
 check "5. verdict PASS passes side_install=false" grep -q "side_install=false" "$GH_LOG"
+check "5. verdict PASS dispatches macOS release from beta tag" grep -q "workflow run macos-release.yml --ref v0.90" "$GH_LOG"
+check "5. verdict PASS macOS release targets next tag as non-beta" grep -q "macos-release.yml.*release_tag=v0.91 -f is_beta=false" "$GH_LOG"
 
 # 6. PASS plus Waived: lines -> dispatches
 T6="$TMP/t6"
@@ -237,6 +239,7 @@ run_promote "$T11" --auto >/dev/null 2>&1 || rc=$?
 check "11. --auto exits 0 on PASS" [ "$rc" -eq 0 ]
 check "11. --auto dispatches promotion" grep -q "workflow run build-debug-apk.yml --ref v0.90" "$GH_LOG"
 check "11. --auto passes bumped release_tag v0.91" grep -q "release_tag=v0.91" "$GH_LOG"
+check "11. --auto dispatches macOS release" grep -q "workflow run macos-release.yml --ref v0.90 -f release_tag=v0.91 -f is_beta=false" "$GH_LOG"
 
 # 12. --auto with failing smoke report: does not promote, beta stays a beta, exits 0
 T12="$TMP/t12"
