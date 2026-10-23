@@ -59,6 +59,12 @@ struct PeriodsView: View {
                 .accessibilityIdentifier(AXIdentifiers.artistScreen)
             }
         }
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier(AXIdentifiers.artistScreen)
+        }
         .task {
             await load()
             await loadVideos()
@@ -102,6 +108,11 @@ struct PeriodsView: View {
 
     private func load() async {
         loadState = .loading
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_ARTISTS"] == "1" {
+            periods = [PeriodRef(id: "2024", label: "2024", showCount: 1)]
+            loadState = .loaded
+            return
+        }
         do {
             periods = try await sourceFor(artist.backend).periods(artist: artist)
             loadState = .loaded
@@ -112,6 +123,10 @@ struct PeriodsView: View {
 
     private func loadVideos() async {
         guard let channelId = youtubeChannelId else { return }
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_ARTISTS"] == "1" {
+            youtubeState = .loaded
+            return
+        }
         youtubeState = .loading
         do {
             videos = try await YouTubeAPI.search(channelId: channelId).filter { !$0.id.isEmpty }

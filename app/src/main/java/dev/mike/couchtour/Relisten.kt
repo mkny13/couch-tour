@@ -1,6 +1,8 @@
 package dev.mike.couchtour
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -470,6 +472,7 @@ object RelistenCatalogSource : MusicSource {
     // Not private: tests reset it between runs, the same way PhishInApi exposes baseUrl.
     @Volatile internal var cachedArtists: List<ArtistRef>? = null
     @Volatile private var cachedArtistsAt: Long = 0L
+    private val artistsMutex = Mutex()
 
     // Periods, shows, and show detail (#61) — O4's deliberate scope cut on everything below
     // the artist list. Keyed by [ArtistRef.key], which already embeds the backend, so there's
@@ -480,9 +483,12 @@ object RelistenCatalogSource : MusicSource {
 
     override suspend fun artists(): List<ArtistRef> {
         cachedArtists?.let { if (System.currentTimeMillis() - cachedArtistsAt < CATALOG_CACHE_TTL_MS) return it }
-        return RelistenApi.artists().map { it.toArtistRef() }.also {
-            cachedArtists = it
-            cachedArtistsAt = System.currentTimeMillis()
+        return artistsMutex.withLock {
+            cachedArtists?.let { if (System.currentTimeMillis() - cachedArtistsAt < CATALOG_CACHE_TTL_MS) return it }
+            RelistenApi.artists().map { it.toArtistRef() }.also {
+                cachedArtists = it
+                cachedArtistsAt = System.currentTimeMillis()
+            }
         }
     }
 

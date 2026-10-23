@@ -183,8 +183,10 @@ class LikeButtonTest {
 
         compose.onNodeWithContentDescription("Unlike").performTouchInput { click() }
         compose.waitUntil { server.requestCount >= 1 }
-        compose.waitUntil { compose.onAllNodesWithContentDescription("Unlike").fetchSemanticsNodes().isNotEmpty() }
-
+        // "Unlike" is already showing before the optimistic flip, so waiting on it alone is vacuous;
+        // wait for the rolled-back count itself.
+        compose.waitUntil { compose.onAllNodesWithText("12").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Unlike").assertExists()
         compose.onNodeWithText("12").assertExists()
         assertEquals(baseline + 1, server.requestCount)
     }

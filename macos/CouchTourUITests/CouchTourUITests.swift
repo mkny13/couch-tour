@@ -137,6 +137,13 @@ final class CouchTourUITests: XCTestCase {
             print("AXDUMP-BEGIN\n\(app.debugDescription)\nAXDUMP-END")
             XCTFail("artists.list not found")
         }
+
+        let moeRow = app.descendants(matching: .any)["artists.row.relisten.moe"].firstMatch
+        XCTAssertTrue(moeRow.waitForExistence(timeout: 10), "artists.row.relisten.moe not found in artists.list")
+        moeRow.click()
+
+        let artistScreen = app.descendants(matching: .any)["artist.screen"].firstMatch
+        XCTAssertTrue(artistScreen.waitForExistence(timeout: 10), "artist.screen not found after clicking moe row")
     }
 
     func testNavReachesEveryDestination() {

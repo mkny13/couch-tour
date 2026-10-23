@@ -113,35 +113,41 @@ struct ArtistsView: View {
 
     @ViewBuilder
     private func artistRow(_ artist: ArtistRef) -> some View {
-        NavigationLink(value: Route.artist(artist)) {
-            HStack {
+        HStack {
+            NavigationLink(value: Route.artist(artist)) {
                 VStack(alignment: .leading) {
                     Text(artist.name)
-                        .accessibilityIdentifier("\(AXIdentifiers.artistsRow).\(artist.backend.rawValue).\(artist.id)")
                     if artist.showCount > 0 {
                         Text("\(artist.showCount) \(plural(artist.showCount, "show"))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-                Spacer()
-                // A star, not a heart — favoriting is local-only, works signed out, and
-                // applies to both backends, so it shouldn't look like the phish.in-account
-                // "like" it has nothing to do with (matches Android's FavoriteButton).
-                Button {
-                    favorites.toggle(artist.key)
-                } label: {
-                    Image(systemName: favorites.keys.contains(artist.key) ? "star.fill" : "star")
-                        .foregroundStyle(favorites.keys.contains(artist.key) ? .yellow : .secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    favorites.keys.contains(artist.key)
-                        ? "Remove \(artist.name) from favorites"
-                        : "Add \(artist.name) to favorites"
-                )
-                .accessibilityIdentifier("\(AXIdentifiers.artistsFavorite).\(artist.backend.rawValue).\(artist.id)")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(artist.name)
+            .accessibilityIdentifier("\(AXIdentifiers.artistsRow).\(artist.backend.rawValue).\(artist.id)")
+
+            Spacer()
+
+            // A star, not a heart — favoriting is local-only, works signed out, and
+            // applies to both backends, so it shouldn't look like the phish.in-account
+            // "like" it has nothing to do with (matches Android's FavoriteButton).
+            Button {
+                favorites.toggle(artist.key)
+            } label: {
+                Image(systemName: favorites.keys.contains(artist.key) ? "star.fill" : "star")
+                    .foregroundStyle(favorites.keys.contains(artist.key) ? .yellow : .secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                favorites.keys.contains(artist.key)
+                    ? "Remove \(artist.name) from favorites"
+                    : "Add \(artist.name) to favorites"
+            )
+            .accessibilityIdentifier("\(AXIdentifiers.artistsFavorite).\(artist.backend.rawValue).\(artist.id)")
         }
     }
 
