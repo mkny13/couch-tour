@@ -152,13 +152,23 @@ final class CouchTourUITests: XCTestCase {
         app.launchEnvironment["COUCHTOUR_UI_TEST_ARTISTS"] = "1"
         app.launch()
 
-        let destinations: [(nav: String, screen: String)] = [
-            ("sidebar.nav.home", "home.screen"),
-            ("sidebar.nav.artists", "artists.screen"),
-            ("sidebar.nav.search", "search.screen"),
-            ("sidebar.nav.library", "library.screen"),
-            ("sidebar.nav.history", "history.screen"),
-            ("sidebar.nav.settings", "settings.screen"),
+        // Each sidebar nav item is a top-level destination. Clicking one must REPLACE the
+        // path with exactly that route (AppModel.jump(to:)), not append it on top of
+        // whatever was already on the stack. The toolbar breadcrumb exposes the full
+        // path as its accessibility label ("Breadcrumb: Couch Tour, Artists, Search"),
+        // so it is the discriminating signal: after a top-level jump the trail must name
+        // exactly one destination. An append implementation would leave prior
+        // destinations on the stack and the trail would grow, which these assertions
+        // catch (#721). Reachability of each screen is kept below.
+        let destinations: [(nav: String, screen: String, crumb: String?)] = [
+            ("sidebar.nav.home", "home.screen", "Couch Tour"),
+            ("sidebar.nav.artists", "artists.screen", "Couch Tour, Artists"),
+            ("sidebar.nav.search", "search.screen", "Couch Tour, Search"),
+            ("sidebar.nav.library", "library.screen", "Couch Tour, Playlists"),
+            ("sidebar.nav.history", "history.screen", "Couch Tour, Listening"),
+            // Settings opens its own window (openSettings()) rather than pushing onto
+            // the NavigationStack, so there is no path depth to assert there.
+            ("sidebar.nav.settings", "settings.screen", nil),
         ]
 
         for dest in destinations {
@@ -167,7 +177,22 @@ final class CouchTourUITests: XCTestCase {
             nav.click()
 
             let screen = app.descendants(matching: .any)[dest.screen].firstMatch
-            XCTAssertTrue(screen.waitForExistence(timeout: 10), "Screen identifier \(dest.screen) not found after clicking \(dest.nav)")
+            XCTAssertTrue(screen.waitForExistence(timeout: 10),
+                          "Screen identifier \(dest.screen) not found after clicking \(dest.nav)")
+
+            if let crumb = dest.crumb {
+                let expected = "Breadcrumb: \(crumb)"
+                // Re-query inside the predicate: SwiftUI rebuilds the breadcrumb on
+                // each path change, so a stale element reference would otherwise read
+                // exists=false and mask the trail we are checking.
+                let trail = expectation(for: NSPredicate { _, _ in
+                    let breadcrumb = self.app.descendants(matching: .any)
+                        .matching(NSPredicate(format: "label BEGINSWITH[cd] 'Breadcrumb:'"))
+                        .firstMatch
+                    return breadcrumb.exists && breadcrumb.label == expected
+                }, evaluatedWith: nil)
+                wait(for: [trail], timeout: 10)
+            }
 
             if dest.screen == "settings.screen" {
                 app.typeKey("w", modifierFlags: .command)
