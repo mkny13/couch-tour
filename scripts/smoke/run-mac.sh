@@ -924,7 +924,7 @@ mac_run_nav_reaches_every_destination() {
     sidebar.nav.settings:settings.screen; do
     nav="${pair%%:*}"
     screen="${pair##*:}"
-    if ! mac::click "$nav"; then
+    if ! mac::click_retry "$nav"; then
       failed+=("$nav (click)")
     elif ! mac::wait_for_id "$screen" "$TIMEOUT" "$DEEP" >/dev/null; then
       failed+=("$nav -> $screen")

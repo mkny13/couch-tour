@@ -358,6 +358,19 @@ check "k4: mac::click_retry is callable without calling mac::click first" bash -
   mac::click_retry test_id
 '
 
+# k5: nav-reaches-every-destination uses mac::click_retry for the six sidebar
+# nav destinations (a single-attempt click can race window animation, #727).
+check "k5: nav-reaches-every-destination uses click_retry in the loop" bash -c '
+  block="$(sed -n "/^mac_run_nav_reaches_every_destination()/,/^}/p" "'"$DIR"'/run-mac.sh")"
+  # The loop body must click each nav via the retrying helper.
+  grep -q "mac::click_retry \"\$nav\"" <<< "$block" || { echo "no click_retry in nav loop"; exit 1; }
+  # No single-attempt click of a literal sidebar.nav.* inside the loop body.
+  loop_body="$(sed -n "/for pair in/,/done/p" <<< "$block")"
+  if grep -q "mac::click \"sidebar\.nav\." <<< "$loop_body"; then
+    echo "single-attempt click of a literal sidebar.nav.* in the loop"; exit 1
+  fi
+'
+
 # (l) Sync round trip forwards --serial and --avd, and keeps emulator alive across both (#741)
 run l1 -- --platform both --serial emu-123 --sync
 check "l1: sync gets --serial" grep -q -- '--serial emu-123' "$TMP/l1/calls.sync"
