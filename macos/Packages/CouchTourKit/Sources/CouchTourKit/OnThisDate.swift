@@ -170,9 +170,33 @@ public func showsOnDateChecked(
     return (pickAnniversaryShows(matches: perArtist.0), perArtist.1)
 }
 
+/// One-entry cache behind `OnThisDate.load`. Injectable so tests don't share process-wide state.
+public final class OnThisDateCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entry: (key: String, shows: [ShowSummary])?
+
+    public init() {}
+
+    func get(_ key: String) -> [ShowSummary]? {
+        lock.lock(); defer { lock.unlock() }
+        if let entry = entry, entry.key == key { return entry.shows }
+        return nil
+    }
+
+    func set(_ key: String, _ shows: [ShowSummary]) {
+        lock.lock(); defer { lock.unlock() }
+        entry = (key, shows)
+    }
+
+    public func reset() {
+        lock.lock(); defer { lock.unlock() }
+        entry = nil
+    }
+}
+
 /// The Home screen's entry point: `showsOnDate` behind a one-entry in-memory cache.
 public enum OnThisDate {
-    private static var cached: (key: String, shows: [ShowSummary])?
+    public static let sharedCache = OnThisDateCache()
 
     public static func cacheKey(favorites: [ArtistRef], today: String) -> String {
         let favPart = favorites.map { $0.key }.sorted().joined(separator: ",")
@@ -182,22 +206,21 @@ public enum OnThisDate {
     public static func load(
         favorites: [ArtistRef],
         today: String,
+        cache: OnThisDateCache = sharedCache,
         source: @escaping (Backend) -> MusicSource = sourceFor
     ) async throws -> [ShowSummary] {
         if favorites.isEmpty { return [] }
         let key = cacheKey(favorites: favorites, today: today)
-        if let cached = cached, cached.key == key {
-            return cached.shows
-        }
+        if let hit = cache.get(key) { return hit }
         let (shows, complete) = try await showsOnDateChecked(favorites: favorites, today: today, source: source)
         // A partial list cached here would hide the failed artists/periods until tomorrow.
         if complete && !shows.isEmpty {
-            cached = (key, shows)
+            cache.set(key, shows)
         }
         return shows
     }
 
     public static func resetCache() {
-        cached = nil
+        sharedCache.reset()
     }
 }

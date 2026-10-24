@@ -241,12 +241,12 @@ final class OnThisDateTests: XCTestCase {
     }
 
     func testOnThisDateCacheInvalidation() async throws {
-        OnThisDate.resetCache()
+        let cache = OnThisDateCache()
 
-        var phishFetchCount = 0
+        let phishFetchCount = Counter()
         let mock = MockMusicSource(backend: .phishin)
         mock.periodsHandler = { _ in
-            phishFetchCount += 1
+            phishFetchCount.increment()
             return [PeriodRef(id: "1997", label: "1997", showCount: 50)]
         }
         mock.showsHandler = { artist, _ in
@@ -254,81 +254,80 @@ final class OnThisDateTests: XCTestCase {
         }
 
         let favs = [PHISH]
-        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
         XCTAssertEqual(1, res1.count)
-        XCTAssertEqual(1, phishFetchCount)
+        XCTAssertEqual(1, phishFetchCount.value)
 
         // Cached call
-        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
         XCTAssertEqual(1, res2.count)
-        XCTAssertEqual(1, phishFetchCount)
+        XCTAssertEqual(1, phishFetchCount.value)
 
         // Reset cache
-        OnThisDate.resetCache()
-        let res3 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        cache.reset()
+        let res3 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
         XCTAssertEqual(1, res3.count)
-        XCTAssertEqual(2, phishFetchCount)
+        XCTAssertEqual(2, phishFetchCount.value)
     }
 
     func testOnThisDateEmptyNotCached() async throws {
-        OnThisDate.resetCache()
-        
-        var phishFetchCount = 0
+        let cache = OnThisDateCache()
+        let phishFetchCount = Counter()
         let mock = MockMusicSource(backend: .phishin)
         mock.periodsHandler = { _ in
-            phishFetchCount += 1
+            phishFetchCount.increment()
             return [PeriodRef(id: "1997", label: "1997", showCount: 50)]
         }
         mock.showsHandler = { _, _ in [] } // Empty result
         
         let favs = [PHISH]
-        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
         XCTAssertEqual(0, res1.count)
-        XCTAssertEqual(1, phishFetchCount)
+        XCTAssertEqual(1, phishFetchCount.value)
         
         // Not cached, so should fetch again
-        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
         XCTAssertEqual(0, res2.count)
-        XCTAssertEqual(2, phishFetchCount)
+        XCTAssertEqual(2, phishFetchCount.value)
     }
 
     func testOnThisDatePartialArtistFailureReturnedButNotCached() async throws {
-        OnThisDate.resetCache()
+        let cache = OnThisDateCache()
         let ok = ArtistRef(backend: .relisten, id: "ok", name: "Ok")
         let bad = ArtistRef(backend: .relisten, id: "bad", name: "Bad")
         var badFails = true
-        var calls = 0
+        let calls = Counter()
         let mock = MockMusicSource(backend: .relisten)
         mock.showsOnDateHandler = { artist, _, _ in
-            calls += 1
+            calls.increment()
             if artist.id == "bad" && badFails { throw APIException("500", code: 500) }
             return [ShowSummary(artist: artist, date: "1999-09-29")]
         }
         let favs = [ok, bad]
 
-        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", source: { _ in mock })
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", cache: cache, source: { _ in mock })
         XCTAssertEqual(["ok"], res1.map { $0.artist.id })
-        XCTAssertEqual(2, calls)
+        XCTAssertEqual(2, calls.value)
 
         // Not cached: the failed artist is retried.
         badFails = false
-        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", source: { _ in mock })
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", cache: cache, source: { _ in mock })
         XCTAssertEqual(2, res2.count)
-        XCTAssertEqual(4, calls)
+        XCTAssertEqual(4, calls.value)
 
         // Complete result is cached.
-        let res3 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", source: { _ in mock })
+        let res3 = try await OnThisDate.load(favorites: favs, today: "2026-09-29", cache: cache, source: { _ in mock })
         XCTAssertEqual(2, res3.count)
-        XCTAssertEqual(4, calls)
+        XCTAssertEqual(4, calls.value)
     }
 
     func testOnThisDatePartialPeriodFailureReturnedButNotCached() async throws {
-        OnThisDate.resetCache()
+        let cache = OnThisDateCache()
         var failLater = true
-        var periodsCalls = 0
+        let periodsCalls = Counter()
         let mock = MockMusicSource(backend: .phishin)
         mock.periodsHandler = { _ in
-            periodsCalls += 1
+            periodsCalls.increment()
             // Two ranges: the cap forces separate requests.
             return [
                 PeriodRef(id: "1990", label: "1990", showCount: 800),
@@ -342,16 +341,24 @@ final class OnThisDateTests: XCTestCase {
         }
         let favs = [PHISH]
 
-        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res1 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
         XCTAssertEqual(["1990-11-17"], res1.map { $0.date })
-        XCTAssertEqual(1, periodsCalls)
+        XCTAssertEqual(1, periodsCalls.value)
 
         failLater = false
-        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
+        let res2 = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
         XCTAssertEqual(["1997-11-17", "1990-11-17"], res2.map { $0.date })
-        XCTAssertEqual(2, periodsCalls)
+        XCTAssertEqual(2, periodsCalls.value)
 
-        _ = try await OnThisDate.load(favorites: favs, today: "2026-11-17", source: { _ in mock })
-        XCTAssertEqual(2, periodsCalls)
+        _ = try await OnThisDate.load(favorites: favs, today: "2026-11-17", cache: cache, source: { _ in mock })
+        XCTAssertEqual(2, periodsCalls.value)
     }
+}
+
+/// Lock-guarded counter: the mock handlers run from concurrent child tasks.
+private final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var n = 0
+    func increment() { lock.lock(); n += 1; lock.unlock() }
+    var value: Int { lock.lock(); defer { lock.unlock() }; return n }
 }
