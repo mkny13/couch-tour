@@ -24,6 +24,26 @@ COMMIT_SCREENSHOTS=false; KEEP_GOING=false; AUTO_VERIFY=false
 WAIVE_ARGS=(); WAIVE_IDS=(); RUN_SYNC_JOURNEYS=true
 ALLOW_FOCUS=false; [[ "${CCTV_SMOKE_ALLOW_FOCUS:-}" == 1 ]] && ALLOW_FOCUS=true
 APK=""; SERIAL=""; AVD="${CCTV_SMOKE_AVD:-}"; BUILD_APK=false
+EMULATOR_PID=""
+
+ADB_BIN="${CCTV_SMOKE_ADB:-adb}"
+if ! command -v "$ADB_BIN" >/dev/null 2>&1; then
+  if [[ -x "${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb" ]]; then
+    ADB_BIN="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
+  fi
+fi
+
+stop_emulator() {
+  if [[ -n "$EMULATOR_PID" ]]; then
+    kill "$EMULATOR_PID" 2>/dev/null || true
+    EMULATOR_PID=""
+  fi
+}
+trap stop_emulator EXIT INT TERM
+
+first_emulator_serial() {
+  "$ADB_BIN" devices 2>&1 | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1; exit }'
+}
 
 usage() {
   cat << 'EOF2'
@@ -132,6 +152,53 @@ for plat in "${PLATFORMS[@]}"; do
       NOTRUN_ARGS+=(--not-run "android - could not download couch-tour-$TAG.apk from release $TAG (pass --apk or --build-apk)")
       notrun=$((notrun + 1)); continue
     fi
+    if [[ -n "$AVD" && -z "$SERIAL" ]]; then
+      SERIAL="$(first_emulator_serial)"
+      if [[ -z "$SERIAL" ]]; then
+        EMULATOR_BIN="${CCTV_SMOKE_EMULATOR:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator}"
+        if [[ ! -x "$EMULATOR_BIN" ]]; then
+          reason="emulator binary not found or not executable: $EMULATOR_BIN (set CCTV_SMOKE_EMULATOR)"
+          echo "ERROR: $reason" >&2
+          NOTRUN_ARGS+=(--not-run "android - $reason")
+          notrun=$((notrun + 1)); continue
+        fi
+        BOOT_TIMEOUT="${CCTV_SMOKE_AVD_TIMEOUT:-180}"
+        echo "Booting AVD '$AVD' headless (timeout ${BOOT_TIMEOUT}s)..." >&2
+        "$EMULATOR_BIN" -avd "$AVD" -no-window -no-audio -no-snapshot-save >&2 </dev/null &
+        EMULATOR_PID=$!
+        disown "$EMULATOR_PID" 2>/dev/null || true
+        deadline=$((SECONDS + BOOT_TIMEOUT))
+        while [[ $SECONDS -lt $deadline ]]; do
+          if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+            EMULATOR_PID=""
+            break
+          fi
+          SERIAL="$(first_emulator_serial)"
+          if [[ -n "$SERIAL" && "$("$ADB_BIN" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+            break
+          fi
+          SERIAL=""
+          sleep 2
+        done
+        if [[ -z "$SERIAL" ]]; then
+          if [[ -z "$EMULATOR_PID" ]]; then
+            reason="emulator for AVD '$AVD' exited before booting"
+          else
+            stop_emulator
+            reason="AVD '$AVD' did not finish booting within ${BOOT_TIMEOUT}s"
+          fi
+          echo "ERROR: $reason" >&2
+          NOTRUN_ARGS+=(--not-run "android - $reason")
+          notrun=$((notrun + 1)); continue
+        fi
+        echo "AVD '$AVD' booted as $SERIAL" >&2
+      fi
+    elif [[ -z "$SERIAL" && -z "$AVD" ]]; then
+      auto_serial="$("$ADB_BIN" devices 2>&1 | awk '$2 == "device" { print $1; exit }')"
+      if [[ -n "$auto_serial" ]]; then
+        SERIAL="$auto_serial"
+      fi
+    fi
     [[ -z "$APK" ]] || extra+=(--apk "$APK")
     [[ -z "$SERIAL" ]] || extra+=(--serial "$SERIAL")
     [[ -z "$AVD" ]] || extra+=(--avd "$AVD")
@@ -162,7 +229,10 @@ if [[ "$PLATFORM" == both && "$RUN_SYNC_JOURNEYS" == true && $notrun -eq 0 ]]; t
   results="$RUN_DIR/sync-results.txt"; errlog="$RUN_DIR/sync-stderr.txt"
   echo "== sync: $RUN_SYNC" >&2
   rc=0
-  "$RUN_SYNC" --tag "$TAG" --out "$results" 2> >(tee "$errlog" >&2) >/dev/null || rc=$?
+  sync_extra=()
+  [[ -z "$SERIAL" ]] || sync_extra+=(--serial "$SERIAL")
+  [[ -z "$AVD" ]] || sync_extra+=(--avd "$AVD")
+  "$RUN_SYNC" --tag "$TAG" --out "$results" ${sync_extra[@]+"${sync_extra[@]}"} 2> >(tee "$errlog" >&2) >/dev/null || rc=$?
   wait 2>/dev/null || true
   if [[ $rc -eq 0 ]]; then
     ran=$((ran + 1)); RESULT_ARGS+=(--results "$results"); RESULT_FILES+=("$results")
