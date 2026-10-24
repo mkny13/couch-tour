@@ -217,6 +217,7 @@ private struct SidebarNavItem: View {
             }
             .frame(height: 34)
             .padding(.horizontal, 10)
+            .contentShape(Rectangle())
             .background(
                 isSelected ? (colors.isDark ? colors.accent.opacity(0.16) : colors.accentTintText.opacity(0.12)) : Color.clear,
                 in: RoundedRectangle(cornerRadius: 7)

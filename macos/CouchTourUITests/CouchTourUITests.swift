@@ -246,6 +246,16 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(homeNav.isHittable, "sidebar.nav.home not hittable after fresh launch")
     }
 
+    func testColdStartPresentsSidebarNavSearch() {
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launch()
+
+        let searchNav = app.descendants(matching: .any)["sidebar.nav.search"].firstMatch
+        XCTAssertTrue(searchNav.waitForExistence(timeout: 10), "sidebar.nav.search not present after fresh launch")
+        XCTAssertTrue(searchNav.isHittable, "sidebar.nav.search not hittable after fresh launch")
+    }
+
     func testHomeSectionsPresentAfterRelaunch() {
         // Home renders each section's identifier even when empty, so a relaunch must expose all three.
         app.terminate()
