@@ -362,7 +362,16 @@ SEARCH_PATHS=(
   "."
 )
 
-if [[ -n "$APK_PATH" ]]; then
+WAS_ALREADY_INSTALLED=false
+if adb_cmd shell pm list packages 2>/dev/null | grep -q "^package:${BETA_PKG}$"; then
+  WAS_ALREADY_INSTALLED=true
+fi
+
+# A sync step drives the beta the journey run already installed; it never had an APK to find,
+# so the lookup below made every sync step die in preflight (#740).
+if [[ -n "$SYNC_STEP" ]]; then
+  [[ "$WAS_ALREADY_INSTALLED" == true ]] || smoke::die 2 "$BETA_PKG is not installed; run the journeys first"
+elif [[ -n "$APK_PATH" ]]; then
   if [[ ! -f "$APK_PATH" ]]; then
     smoke::die 2 "APK not found at path: $APK_PATH"
   fi
@@ -377,13 +386,12 @@ else
   fi
 fi
 
-WAS_ALREADY_INSTALLED=false
-if adb_cmd shell pm list packages 2>/dev/null | grep -q "^package:${BETA_PKG}$"; then
-  WAS_ALREADY_INSTALLED=true
+if [[ -z "$SYNC_STEP" ]]; then
+  smoke::log "Installing $APK_PATH on device ($SERIAL)..."
+  # -g pre-grants runtime permissions: on a fresh install the notifications prompt otherwise sits
+  # over the app and swallows every tap (#740).
+  adb_cmd install -r -t -g "$APK_PATH" >&2
 fi
-
-smoke::log "Installing $APK_PATH on device ($SERIAL)..."
-adb_cmd install -r -t "$APK_PATH" >&2
 
 CURRENT_DUMP_FILE="$(mktemp -t cctv_dump_XXXXXX.xml)"
 cleanup() {
