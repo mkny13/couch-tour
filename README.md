@@ -183,7 +183,7 @@ Or just `./gradlew testDebugUnitTest` if `JAVA_HOME` is already set. Full HTML r
 cd macos/Packages/CouchTourKit && swift test
 ```
 
-And a deterministic macOS app-target XCUITest suite (13 tests):
+And a deterministic macOS app-target XCUITest suite (14 tests):
 
 ```bash
 cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme CouchTour -destination 'platform=macOS' test -only-testing:CouchTourUITests

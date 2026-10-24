@@ -236,6 +236,49 @@ final class CouchTourUITests: XCTestCase {
                       "clearing the query closed the Search screen opened from the sidebar")
     }
 
+    func testClearButtonClearsQueryWithMouseClick() {
+        // At default and minimum window widths, search.screen must fit the center pane with
+        // search.clear clickable via mouse (not drawn under PlayerRailView, #739).
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launch()
+
+        let nav = app.descendants(matching: .any)["sidebar.nav.search"].firstMatch
+        XCTAssertTrue(nav.waitForExistence(timeout: 10))
+        nav.click()
+
+        let field = app.descendants(matching: .any)["search.field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.click()
+        field.typeText("moe")
+
+        let clear = app.descendants(matching: .any)["search.clear"].firstMatch
+        XCTAssertTrue(clear.waitForExistence(timeout: 10))
+
+        // Assert search.screen fits inside the center pane:
+        // Window width is sidebar (236 pt) + center pane + player rail (392 pt).
+        // The center pane ends at window.frame.maxX - 392 (plus divider), so search.screen
+        // and search.clear must not extend beyond the left edge of PlayerRailView.
+        let window = app.windows.firstMatch
+        let searchScreen = app.descendants(matching: .any)["search.screen"].firstMatch
+        XCTAssertTrue(searchScreen.waitForExistence(timeout: 10))
+        let railLeftEdge = window.frame.maxX - 392
+        XCTAssertLessThanOrEqual(searchScreen.frame.maxX, railLeftEdge + 1,
+                                 "search.screen extends under PlayerRailView: screen maxX \(searchScreen.frame.maxX) > rail left edge \(railLeftEdge)")
+        XCTAssertLessThanOrEqual(clear.frame.maxX, railLeftEdge + 1,
+                                 "search.clear extends under PlayerRailView: clear maxX \(clear.frame.maxX) > rail left edge \(railLeftEdge)")
+
+        clear.click()
+
+        // search.clear only exists while the query is non-empty. Assert it disappears after the click
+        // and that the query field is cleared.
+        let cleared = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: clear)
+        wait(for: [cleared], timeout: 10)
+        XCTAssertEqual((field.value as? String) ?? "", "", "search.field was not empty after clicking clear button")
+        XCTAssertTrue(searchScreen.exists,
+                      "clearing the query closed the Search screen opened from the sidebar")
+    }
+
     func testColdStartPresentsSidebarNavHome() {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")

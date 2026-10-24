@@ -114,7 +114,7 @@ struct SearchView: View {
                 .frame(height: 1)
 
             // Tabs with counts and underline
-            HStack(spacing: 22) {
+            HStack(spacing: 12) {
                 let artistCount = activeHits?.artists.count ?? 0
                 let trackCount = activeHits?.tracks.count ?? 0
                 let showCount = activeHits?.shows.count ?? 0
@@ -198,17 +198,22 @@ struct SearchView: View {
             // Table Column Headers
             HStack(spacing: 10) {
                 Text("ARTIST")
-                    .frame(width: 110, alignment: .leading)
+                    .frame(minWidth: 50, maxWidth: 110, alignment: .leading)
+                    .lineLimit(1)
                 Text("DATE")
-                    .frame(width: 100, alignment: .leading)
+                    .frame(minWidth: 60, maxWidth: 100, alignment: .leading)
+                    .lineLimit(1)
                 Text("TITLE / TRACK")
-                    .frame(width: 150, alignment: .leading)
+                    .frame(minWidth: 70, maxWidth: 150, alignment: .leading)
+                    .lineLimit(1)
                 Text("VENUE")
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(1)
                 Text("TIME · LIKES")
-                    .frame(width: 90, alignment: .trailing)
+                    .frame(minWidth: 50, maxWidth: 90, alignment: .trailing)
+                    .lineLimit(1)
                 Spacer()
-                    .frame(width: 34)
+                    .frame(minWidth: 0, maxWidth: 34)
             }
             .font(.system(size: 11, weight: .semibold))
             .tracking(1.4)
@@ -301,6 +306,7 @@ struct SearchView: View {
                 .padding(.horizontal, 24)
             }
         }
+        .frame(maxWidth: .infinity)
         .background(colors.background)
         .task(id: term) {
             guard term.count >= 3 else {
@@ -351,18 +357,19 @@ struct SearchView: View {
             Text(ArtistAbbreviations.label(for: "Phish"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 110, alignment: .leading)
+                .frame(minWidth: 50, maxWidth: 110, alignment: .leading)
                 .lineLimit(1)
 
             Text(formatShowDate(track.showDate ?? ""))
                 .font(.system(size: 15))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 100, alignment: .leading)
+                .frame(minWidth: 60, maxWidth: 100, alignment: .leading)
+                .lineLimit(1)
 
             Text(track.title)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 150, alignment: .leading)
+                .frame(minWidth: 70, maxWidth: 150, alignment: .leading)
                 .lineLimit(1)
                 
             ForEach(track.tags.sorted(by: { $0.priority > $1.priority }).prefix(2), id: \.name) { tag in
@@ -400,7 +407,8 @@ struct SearchView: View {
                     }
                 }
             }
-            .frame(width: 90, alignment: .trailing)
+            .frame(minWidth: 50, maxWidth: 90, alignment: .trailing)
+            .lineLimit(1)
 
             Button {
                 guard let showDate = track.showDate else { return }
@@ -424,7 +432,7 @@ struct SearchView: View {
                     )
             }
             .buttonStyle(.plain)
-            .frame(width: 34, alignment: .trailing)
+            .frame(minWidth: 0, maxWidth: 34, alignment: .trailing)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -442,18 +450,19 @@ struct SearchView: View {
             Text(ArtistAbbreviations.label(for: show.artist.name))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 110, alignment: .leading)
+                .frame(minWidth: 50, maxWidth: 110, alignment: .leading)
                 .lineLimit(1)
 
             Text(formatShowDate(show.date))
                 .font(.system(size: 15))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 100, alignment: .leading)
+                .frame(minWidth: 60, maxWidth: 100, alignment: .leading)
+                .lineLimit(1)
 
             Text(show.tourName ?? "Show")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 150, alignment: .leading)
+                .frame(minWidth: 70, maxWidth: 150, alignment: .leading)
                 .lineLimit(1)
                 
             ForEach(show.tags.sorted(by: { $0.priority > $1.priority }).prefix(2), id: \.name) { tag in
@@ -493,7 +502,8 @@ struct SearchView: View {
                     }
                 }
             }
-            .frame(width: 90, alignment: .trailing)
+            .frame(minWidth: 50, maxWidth: 90, alignment: .trailing)
+            .lineLimit(1)
 
             Button {
                 Task {
@@ -514,7 +524,7 @@ struct SearchView: View {
                     )
             }
             .buttonStyle(.plain)
-            .frame(width: 34, alignment: .trailing)
+            .frame(minWidth: 0, maxWidth: 34, alignment: .trailing)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -529,14 +539,14 @@ struct SearchView: View {
             Text(artist.name)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 110, alignment: .leading)
+                .frame(minWidth: 50, maxWidth: 110, alignment: .leading)
                 .lineLimit(1)
 
             Spacer()
-                .frame(width: 100)
+                .frame(minWidth: 0, maxWidth: 100)
 
             Spacer()
-                .frame(width: 150)
+                .frame(minWidth: 0, maxWidth: 150)
 
             Spacer()
                 .frame(maxWidth: .infinity)
@@ -549,12 +559,12 @@ struct SearchView: View {
                         .lineLimit(1)
                 }
             }
-            .frame(width: 90, alignment: .trailing)
+            .frame(minWidth: 50, maxWidth: 90, alignment: .trailing)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 12))
                 .foregroundStyle(colors.textMuted)
-                .frame(width: 34, alignment: .trailing)
+                .frame(minWidth: 0, maxWidth: 34, alignment: .trailing)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -603,7 +613,7 @@ struct SearchView: View {
                     )
             }
             .buttonStyle(.plain)
-            .frame(width: 34, alignment: .trailing)
+            .frame(minWidth: 0, maxWidth: 34, alignment: .trailing)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -618,16 +628,16 @@ struct SearchView: View {
             Text(ArtistAbbreviations.label(for: slice.artist.name))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 110, alignment: .leading)
+                .frame(minWidth: 50, maxWidth: 110, alignment: .leading)
                 .lineLimit(1)
 
             Spacer()
-                .frame(width: 100)
+                .frame(minWidth: 0, maxWidth: 100)
 
             Text(slice.period.label)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
-                .frame(width: 150, alignment: .leading)
+                .frame(minWidth: 70, maxWidth: 150, alignment: .leading)
                 .lineLimit(1)
 
             Spacer()
@@ -641,12 +651,12 @@ struct SearchView: View {
                         .lineLimit(1)
                 }
             }
-            .frame(width: 90, alignment: .trailing)
+            .frame(minWidth: 50, maxWidth: 90, alignment: .trailing)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 12))
                 .foregroundStyle(colors.textMuted)
-                .frame(width: 34, alignment: .trailing)
+                .frame(minWidth: 0, maxWidth: 34, alignment: .trailing)
         }
         .contentShape(Rectangle())
         .onTapGesture {
