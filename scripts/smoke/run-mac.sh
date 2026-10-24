@@ -802,12 +802,24 @@ mac_run_next_stop_chip_focus() {
     return 0
   fi
 
-  if ! mac::click "sidebar.nav.home"; then
+  # Settle the app: close any auxiliary windows from previous journeys so the main window is frontmost
+  mac::close_auxiliary_windows
+
+  # Confirm the sidebar is present before attempting to click
+  if ! mac::wait_for_id "sidebar.nav.home" "$TIMEOUT" >/dev/null; then
+    mac_screenshot "$id"
+    smoke::result "mac" "$id" "FAIL" "sidebar.nav.home not present within ${TIMEOUT}s"
+    return 0
+  fi
+
+  # Retry the click: a single click can race window animation or focus settling
+  if ! mac::click_retry "sidebar.nav.home"; then
     mac_screenshot "$id"
     smoke::result "mac" "$id" "FAIL" "could not click sidebar.nav.home"
     return 0
   fi
 
+  mac::wait_for_id "home.screen" "$TIMEOUT" "$DEEP" >/dev/null || true
   mac::wait_for_id "home.next_tour_stops" "$TIMEOUT" "$DEEP" >/dev/null || true
   local chip
   chip="$(mac::ax_query "home.next_tour_stops.chip" "$DEEP" | head -n1 | cut -f1)"

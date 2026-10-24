@@ -44,6 +44,12 @@ struct ShowDetailView: View {
             }
         }
         .background(colors.background)
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier(AXIdentifiers.showDetail)
+        }
         .task {
             await load()
             checkSavedAndProgress()
@@ -464,6 +470,11 @@ struct ShowDetailView: View {
     }
 
     private func load(recordingID: String? = nil) async {
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_NEXT_STOP"] == "1" {
+            detail = ShowDetail(summary: show)
+            loadState = .loaded
+            return
+        }
         loadState = .loading
         do {
             detail = try await sourceFor(show.artist.backend).show(

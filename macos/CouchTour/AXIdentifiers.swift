@@ -16,6 +16,7 @@ public enum AXIdentifiers {
     public static let homeNextTourStops = "home.next_tour_stops"
     public static let homeOnThisDate = "home.on_this_date"
     public static let homeTrackTour = "home.track_tour"
+    public static let tourPickerSheet = "tour_picker.sheet"
     public static let homeBrowsePlaylists = "home.browse_playlists"
 
     // Destination screens (#520)

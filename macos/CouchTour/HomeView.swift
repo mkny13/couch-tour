@@ -425,14 +425,15 @@ struct HomeView: View {
 
     private func tourStopRow(show: ShowSummary) -> some View {
         HStack(spacing: 16) {
-            NavigationLink(value: Route.show(show)) {
+            Button {
+                appModel.path.append(.show(show))
+            } label: {
                 HStack(spacing: 16) {
                     Text(ArtistAbbreviations.label(for: show.artist.name))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(colors.textPrimary)
                         .frame(width: 140, alignment: .leading)
                         .lineLimit(1)
-                        .accessibilityIdentifier("\(AXIdentifiers.homeNextStopChip).\(show.artist.backend.rawValue).\(show.artist.id)")
 
                     Text(formatShowDate(show.date))
                         .font(.system(size: 15))
@@ -457,8 +458,10 @@ struct HomeView: View {
                         Spacer().frame(width: 64)
                     }
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("\(AXIdentifiers.homeNextStopChip).\(show.artist.backend.rawValue).\(show.artist.id)")
 
             // Target resolution for "Track tour…" is direct (`show.artist`) since the control lives
             // directly on the per-artist `tourStopRow`, unlike Android's header action which resolves
@@ -746,6 +749,18 @@ struct HomeView: View {
     }
 
     private func reloadDiscovery() async {
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_NEXT_STOP"] == "1" {
+            let sample = ShowSummary(
+                artist: ArtistRef(backend: .phishin, id: "phish", name: "Phish"),
+                date: "2024-10-25",
+                venue: "Madison Square Garden",
+                location: "New York, NY",
+                tourName: "Fall 2024"
+            )
+            nextStopShows = [sample]
+            return
+        }
+
         let favs = favoritedArtists
         let dateStr = today
 

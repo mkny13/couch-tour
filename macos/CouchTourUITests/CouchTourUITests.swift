@@ -271,4 +271,29 @@ final class CouchTourUITests: XCTestCase {
                           "\(id) missing after relaunch")
         }
     }
+
+    func testNextStopChipNavigatesToShowDetailWithoutOpeningTourPicker() {
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "COUCHTOUR_UI_TEST_MODE")
+        app.launchEnvironment["COUCHTOUR_UI_TEST_NEXT_STOP"] = "1"
+        app.launch()
+
+        let homeNav = app.descendants(matching: .any)["sidebar.nav.home"].firstMatch
+        XCTAssertTrue(homeNav.waitForExistence(timeout: 10), "sidebar.nav.home not present after launch")
+        homeNav.click()
+
+        let chip = app.descendants(matching: .any)["home.next_tour_stops.chip.phishin.phish"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "Next stop chip not found in home.next_tour_stops")
+        chip.click()
+
+        let showDetail = app.descendants(matching: .any)["show.detail"].firstMatch
+        if !showDetail.waitForExistence(timeout: 10) {
+            print("AXDUMP-BEGIN\n\(app.debugDescription)\nAXDUMP-END")
+            XCTFail("show.detail not present after clicking next stop chip")
+        }
+
+        let tourPicker = app.descendants(matching: .any)["tour_picker.sheet"].firstMatch
+        XCTAssertFalse(tourPicker.exists, "tour picker sheet was presented")
+        XCTAssertFalse(app.sheets.firstMatch.exists, "a sheet was presented")
+    }
 }
