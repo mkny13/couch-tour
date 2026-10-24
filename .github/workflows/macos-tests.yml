@@ -33,6 +33,14 @@ jobs:
       - name: Run CouchTourKit tests
         run: swift test --package-path macos/Packages/CouchTourKit
 
+      # Guard: Package.resolved must contain only pins for dependencies declared in
+      # Package.swift. `swift package resolve` must not add/remove pins (e.g. an
+      # incidental Sparkle pin) when the package is built in isolation.
+      - name: Verify Package.resolved has no unreferenced pins
+        run: |
+          swift package resolve --package-path macos/Packages/CouchTourKit
+          git -C macos/Packages/CouchTourKit diff --exit-code -- Package.resolved
+
   macos-build:
     runs-on: macos-15
     timeout-minutes: 30
