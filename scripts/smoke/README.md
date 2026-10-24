@@ -71,9 +71,9 @@ run. If no platform could run, no report is written and no issue is filed. If so
 report is written, says which platform didn't run, is `FAIL`, and the exit code is still `2`.
 
 `--avd <name>` (or `CCTV_SMOKE_AVD`) makes smoke runs use the `phishin_test` emulator instead of a phone: with no
-`emulator-*` attached, `run-android.sh` boots that AVD headless (`-no-window -no-audio -no-snapshot-save`,
+`emulator-*` attached, `run-smoke.sh` (or `run-android.sh` when run alone) boots that AVD headless (`-no-window -no-audio -no-snapshot-save`,
 override the binary with `CCTV_SMOKE_EMULATOR`), waits up to 180 s for `sys.boot_completed` (exit 2 with an
-`ERROR:` line otherwise), and kills it on exit only if it started it. It never falls back to a physical device.
+`ERROR:` line otherwise), keeps it running across Android journeys and the sync round trip, and kills it on exit only if it started it. It never falls back to a physical device.
 
 Unattended / gated run (the desktop gate starts it while the beta is in the background):
 
@@ -160,7 +160,7 @@ verification comment on each `covered` issue.
 
 `sync-roundtrip.sh` runs the four `sync` journeys in `JOURNEYS.md` (favorites and In Progress, each
 android→mac and mac→android). `run-smoke.sh --platform both` runs it after both platform runners; skip it
-with `--no-sync`. Run it alone: `scripts/smoke/sync-roundtrip.sh --tag <tag> --out <file> [--timeout 30] [--no-reset]`.
+with `--no-sync`. Run it alone: `scripts/smoke/sync-roundtrip.sh --tag <tag> --out <file> [--timeout 30] [--no-reset] [--serial <id>] [--avd <name>]`.
 
 Prerequisites:
 - Couch Tour Beta (macOS) running and an Android device with the beta attached, **both already paired to the

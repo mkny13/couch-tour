@@ -156,19 +156,53 @@ STUB
 
 chmod +x "$TMP"/run-mac "$TMP"/run-android "$TMP"/run-sync "$TMP"/gh "$TMP"/mahler
 
+# Stub adb and emulator
+mkdir -p "$TMP/bin"
+cat > "$TMP/bin/adb" << STUB
+#!/usr/bin/env bash
+if [[ "\$1" == devices ]]; then
+  echo "List of devices attached"
+  [[ -e "$TMP/booted" ]] && printf 'emulator-5554\tdevice\n'
+  [[ -n "\${PHONE:-}" ]] && printf 'R5CT123\tdevice\n'
+  exit 0
+fi
+[[ "\$1" == -s ]] && shift 2
+case "\$1 \$2" in
+  "shell getprop") [[ -e "$TMP/bootprop" ]] && echo 1 ;;
+esac
+exit 0
+STUB
+cat > "$TMP/emulator" << STUB
+#!/usr/bin/env bash
+echo "\$*" > "$TMP/emulator.args"
+echo "\$\$" > "$TMP/emulator.pid"
+[[ "\${EMU_EXIT:-}" == 1 ]] && exit 1
+touch "$TMP/booted"; [[ "\${EMU_NOBOOT:-}" == 1 ]] || touch "$TMP/bootprop"
+exec sleep 300
+STUB
+chmod +x "$TMP/bin/adb" "$TMP/emulator"
+
 # run <name> [VAR=val...] -- <run-smoke args...>; exit code in $RC, calls in $TMP/<name>/calls.*
 run() {
-  local name="$1"; shift; local envs=()
+  local name="$1"; shift; local envs=() sync_args=(--no-sync)
   while [[ "$1" != -- ]]; do envs+=("$1"); shift; done; shift
+  local args=()
+  for a in "$@"; do
+    if [[ "$a" == --sync ]]; then sync_args=(); else args+=("$a"); fi
+  done
   mkdir -p "$TMP/$name"; rm -f "$TMP"/calls.*
+  rm -f "$TMP/booted" "$TMP/bootprop" "$TMP/emulator.args" "$TMP/emulator.pid"
   CALLS_DIR="$TMP" \
   env CCTV_SMOKE_RUN_MAC="$TMP/run-mac" \
       CCTV_SMOKE_RUN_ANDROID="$TMP/run-android" \
       CCTV_SMOKE_RUN_SYNC="$TMP/run-sync" \
       CCTV_SMOKE_GH="$TMP/gh" \
       CCTV_SMOKE_MAHLER="$TMP/mahler" \
+      PATH="$TMP/bin:$PATH" \
+      CCTV_SMOKE_EMULATOR="$TMP/emulator" \
+      CCTV_SMOKE_AVD_TIMEOUT=6 \
       ${envs[@]+"${envs[@]}"} \
-      "$DIR/run-smoke.sh" --tag "$TAG" --no-sync --out "$TMP/$name/out" "$@" \
+      "$DIR/run-smoke.sh" --tag "$TAG" ${sync_args[@]+"${sync_args[@]}"} --out "$TMP/$name/out" "${args[@]}" \
       >"$TMP/$name/stdout" 2>"$TMP/$name/stderr"
   RC=$?
   for f in "$TMP"/calls.*; do [[ -e "$f" ]] && mv "$f" "$TMP/$name/$(basename "$f")"; done
@@ -284,30 +318,6 @@ run i3 -- --platform android --apk /x/a.apk
 check "i: absent without the flag" bash -c "! grep -q -- --avd '$TMP/i3/calls.android'"
 
 # (j) run-android.sh --avd boot logic with stub adb + emulator
-mkdir -p "$TMP/bin"
-cat > "$TMP/bin/adb" << STUB
-#!/usr/bin/env bash
-if [[ "\$1" == devices ]]; then
-  echo "List of devices attached"
-  [[ -e "$TMP/booted" ]] && printf 'emulator-5554\tdevice\n'
-  [[ -n "\${PHONE:-}" ]] && printf 'R5CT123\tdevice\n'
-  exit 0
-fi
-[[ "\$1" == -s ]] && shift 2
-case "\$1 \$2" in
-  "shell getprop") [[ -e "$TMP/bootprop" ]] && echo 1 ;;
-esac
-exit 0
-STUB
-cat > "$TMP/emulator" << STUB
-#!/usr/bin/env bash
-echo "\$*" > "$TMP/emulator.args"
-echo "\$\$" > "$TMP/emulator.pid"
-[[ "\${EMU_EXIT:-}" == 1 ]] && exit 1
-touch "$TMP/booted"; [[ "\${EMU_NOBOOT:-}" == 1 ]] || touch "$TMP/bootprop"
-exec sleep 300
-STUB
-chmod +x "$TMP/bin/adb" "$TMP/emulator"
 avd_run() { # name [VAR=val...] -- args; stderr in $TMP/<name>.err
   local name="$1"; shift; local envs=()
   while [[ "$1" != -- ]]; do envs+=("$1"); shift; done; shift
@@ -347,6 +357,19 @@ check "k4: mac::click_retry is callable without calling mac::click first" bash -
   mac::click() { return 0; }
   mac::click_retry test_id
 '
+
+# (l) Sync round trip forwards --serial and --avd, and keeps emulator alive across both (#741)
+run l1 -- --platform both --serial emu-123 --sync
+check "l1: sync gets --serial" grep -q -- '--serial emu-123' "$TMP/l1/calls.sync"
+check "l1: android gets --serial" grep -q -- '--serial emu-123' "$TMP/l1/calls.android"
+
+run l2 -- --platform both --avd phishin_test --sync
+check "l2: android gets --serial" grep -q -- '--serial emulator-5554' "$TMP/l2/calls.android"
+check "l2: android gets --avd" grep -q -- '--avd phishin_test' "$TMP/l2/calls.android"
+check "l2: sync gets --serial" grep -q -- '--serial emulator-5554' "$TMP/l2/calls.sync"
+check "l2: sync gets --avd" grep -q -- '--avd phishin_test' "$TMP/l2/calls.sync"
+check "l2: emulator was running during run" test -f "$TMP/l2/calls.sync"
+check "l2: emulator killed on exit" bash -c "! kill -0 \$(cat '$TMP/emulator.pid') 2>/dev/null"
 
 # --help lists the new flags
 help="$("$DIR/run-smoke.sh" --help)"

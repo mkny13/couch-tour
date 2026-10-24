@@ -4,7 +4,7 @@
 # client, an assertion on the other, in both directions, for favorites and listening progress.
 # Emits one result line per direction (platform "sync") in the lib.sh contract format.
 #
-# Usage: scripts/smoke/sync-roundtrip.sh [--tag <tag>] [--out <file>] [--timeout <s>] [--no-reset]
+# Usage: scripts/smoke/sync-roundtrip.sh [--tag <tag>] [--out <file>] [--timeout <s>] [--no-reset] [--serial <id>] [--avd <name>]
 #
 # Assumes both betas are already installed and paired to the staging group (pairing is not
 # automated). Teardown always runs scripts/smoke-sync-reset.sh --yes, even when a step fails,
@@ -24,6 +24,7 @@ RUN_ANDROID="${CCTV_SMOKE_RUN_ANDROID:-$SCRIPT_DIR/run-android.sh}"
 RESET="${CCTV_SMOKE_SYNC_RESET:-$SCRIPT_DIR/../smoke-sync-reset.sh}"
 
 TAG=""; OUT_FILE=""; TIMEOUT=30; DO_RESET=true
+SERIAL="${CCTV_SMOKE_SERIAL:-}"; AVD="${CCTV_SMOKE_AVD:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,6 +32,8 @@ while [[ $# -gt 0 ]]; do
     --out) [[ -n "${2:-}" ]] || smoke::die 1 "--out requires a file"; OUT_FILE="$2"; CCTV_SMOKE_RESULTS="$2"; export CCTV_SMOKE_RESULTS; shift 2 ;;
     --timeout) [[ "${2:-}" =~ ^[0-9]+$ ]] || smoke::die 1 "--timeout requires seconds"; TIMEOUT="$2"; shift 2 ;;
     --no-reset) DO_RESET=false; shift ;;
+    --serial) [[ -n "${2:-}" ]] || smoke::die 1 "--serial requires an id"; SERIAL="$2"; shift 2 ;;
+    --avd) [[ -n "${2:-}" ]] || smoke::die 1 "--avd requires a name"; AVD="$2"; shift 2 ;;
     -h|--help) sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) smoke::die 1 "Unknown argument: $1" ;;
   esac
@@ -57,9 +60,14 @@ trap teardown EXIT
 # step <mac|android> <step> -> echoes OK | TIMEOUT | UNAVAILABLE | ABORT (runner exit 2) | ERROR.
 # Runs in a subshell, so the caller (not step) records the abort.
 step() {
-  local plat="$1" name="$2" runner rc=0
-  runner="$RUN_MAC"; [[ "$plat" == android ]] && runner="$RUN_ANDROID"
-  "$runner" --tag "${TAG:-dev}" --timeout "$TIMEOUT" --sync-step "$name" >/dev/null 2>&1 || rc=$?
+  local plat="$1" name="$2" runner rc=0 extra=()
+  runner="$RUN_MAC"
+  if [[ "$plat" == android ]]; then
+    runner="$RUN_ANDROID"
+    [[ -z "$SERIAL" ]] || extra+=(--serial "$SERIAL")
+    [[ -z "$AVD" ]] || extra+=(--avd "$AVD")
+  fi
+  "$runner" --tag "${TAG:-dev}" --timeout "$TIMEOUT" --sync-step "$name" ${extra[@]+"${extra[@]}"} >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0) echo OK ;;
     "$SMOKE_STEP_TIMEOUT") echo TIMEOUT ;;

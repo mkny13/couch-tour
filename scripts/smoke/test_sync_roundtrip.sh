@@ -16,9 +16,11 @@ check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi
 for plat in mac android; do
   cat > "$TMP/run-$plat.sh" << STUB
 #!/usr/bin/env bash
+raw_args="\$*"
 step=""; while [[ \$# -gt 0 ]]; do [[ "\$1" == --sync-step ]] && step="\$2"; shift; done
 [[ -z "\${STUB_PREFLIGHT_$plat:-}" ]] || { echo "ERROR: $plat not ready" >&2; exit 2; }
 echo "$plat \$step" >> "$TMP/calls"
+echo "$plat \$raw_args" >> "$TMP/calls.args"
 v="STUB_RC_${plat}_\${step//-/_}"; exit "\${!v:-0}"
 STUB
   chmod +x "$TMP/run-$plat.sh"
@@ -29,12 +31,17 @@ echo "reset \$*" >> "$TMP/calls"; exit "\${STUB_RESET_RC:-0}"
 STUB
 chmod +x "$TMP/reset.sh"
 
-# run <name> [VAR=val...] -> exit code in $RC, results in $TMP/<name>.tsv, calls in $TMP/calls
+# run <name> [VAR=val...] [args...] -> exit code in $RC, results in $TMP/<name>.tsv, calls in $TMP/calls
 run() {
-  local name="$1"; shift; : > "$TMP/calls"
+  local name="$1"; shift; local envs=() args=()
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == *"="* ]]; then envs+=("$1"); else args+=("$1"); fi
+    shift
+  done
+  : > "$TMP/calls"
   env CCTV_SMOKE_RUN_MAC="$TMP/run-mac.sh" CCTV_SMOKE_RUN_ANDROID="$TMP/run-android.sh" \
-      CCTV_SMOKE_SYNC_RESET="$TMP/reset.sh" "$@" \
-      "$DIR/sync-roundtrip.sh" --tag t --out "$TMP/$name.tsv" --timeout 5 >/dev/null 2>"$TMP/$name.err"
+      CCTV_SMOKE_SYNC_RESET="$TMP/reset.sh" ${envs[@]+"${envs[@]}"} \
+      "$DIR/sync-roundtrip.sh" --tag t --out "$TMP/$name.tsv" --timeout 5 ${args[@]+"${args[@]}"} >/dev/null 2>"$TMP/$name.err"
   RC=$?
 }
 status() { awk -F'\t' -v id="$2" '$2==id{print $3}' "$TMP/$1.tsv"; }
@@ -108,5 +115,14 @@ check "usage: reset not called" test ! -s "$TMP/calls"
 # 9. Result lines are accepted by the report writer.
 "$DIR/report.sh" --results "$TMP/happy.tsv" --tag t --out "$TMP/report.md" --commit testsha >/dev/null 2>&1
 check "report.sh accepts sync result lines" grep -q '^Smoke: PASS$' "$TMP/report.md"
+
+# 10. Flag forwarding: --serial and --avd reach the android runner only (#741)
+: > "$TMP/calls.args"
+run flags --serial dev-123 --avd avd-test
+check "flags: exit 0" test "$RC" = 0
+check "flags: android gets --serial" grep -q -- '--serial dev-123' "$TMP/calls.args"
+check "flags: android gets --avd" grep -q -- '--avd avd-test' "$TMP/calls.args"
+check "flags: mac does not get --serial" bash -c "! grep '^mac ' '$TMP/calls.args' | grep -q -- '--serial'"
+check "flags: mac does not get --avd" bash -c "! grep '^mac ' '$TMP/calls.args' | grep -q -- '--avd'"
 
 if [[ $failures -eq 0 ]]; then echo "All sync-roundtrip tests passed."; else echo "$failures failure(s)."; exit 1; fi
