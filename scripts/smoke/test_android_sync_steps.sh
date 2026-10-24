@@ -62,6 +62,7 @@ case "$1" in
             else echo "tap miss $xy" >> "$S/log"; fi ;;
         esac ;;
       am) ;;
+      pm) echo "package:dev.mike.couchtour.beta" ;;
     esac ;;
 esac
 exit 0
@@ -74,10 +75,11 @@ step() {
   rm -f "$TMP/state/"*; echo home > "$TMP/state/screen"; : > "$TMP/state/log"
   [[ "$fav" == yes ]] && : > "$TMP/state/fav"
   [[ -n "${H0:-}" ]] && echo "$H0" > "$TMP/state/hscroll"
+  # No --apk, as sync-roundtrip.sh calls it: a sync step must not need one (#740).
   PATH="$TMP/bin:$PATH" STUB_STATE="$TMP/state" STUB_KEY=moe CCTV_SMOKE_SERIAL=stub \
     CCTV_SMOKE_SYNC_ARTIST_ANDROID=moe CCTV_SMOKE_ANDROID_MAX_SCROLLS=6 \
     env -u CCTV_SMOKE_ANDROID_FAVORITE_TOGGLE -u CCTV_SMOKE_ANDROID_ARTIST_ENTRY_TAG \
-    "$DIR/run-android.sh" --apk "$TMP/apk.apk" --timeout 3 --sync-step "$syncstep" >/dev/null 2>"$TMP/$name.err"
+    "$DIR/run-android.sh" --timeout 3 --sync-step "$syncstep" >/dev/null 2>"$TMP/$name.err"
   RC=$?
 }
 faved() { [[ -e "$TMP/state/fav" ]]; }

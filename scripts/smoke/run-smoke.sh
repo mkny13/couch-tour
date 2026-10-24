@@ -135,6 +135,8 @@ for plat in "${PLATFORMS[@]}"; do
     [[ -z "$APK" ]] || extra+=(--apk "$APK")
     [[ -z "$SERIAL" ]] || extra+=(--serial "$SERIAL")
     [[ -z "$AVD" ]] || extra+=(--avd "$AVD")
+    # The sync round trip below drives the same install, so don't let the journey run remove it.
+    [[ "$PLATFORM" != both || "$RUN_SYNC_JOURNEYS" != true ]] || extra+=(--keep-installed)
   fi
   echo "== $plat: $runner" >&2
   rc=0
