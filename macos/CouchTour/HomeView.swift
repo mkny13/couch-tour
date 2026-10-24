@@ -746,6 +746,18 @@ struct HomeView: View {
     }
 
     private func reloadDiscovery() async {
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_NEXT_STOP"] == "1" {
+            let sample = ShowSummary(
+                artist: ArtistRef(backend: .phishin, id: "phish", name: "Phish"),
+                date: "2024-10-25",
+                venue: "Madison Square Garden",
+                location: "New York, NY",
+                tourName: "Fall 2024"
+            )
+            nextStopShows = [sample]
+            return
+        }
+
         let favs = favoritedArtists
         let dateStr = today
 

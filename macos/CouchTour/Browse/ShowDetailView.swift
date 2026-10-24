@@ -464,6 +464,11 @@ struct ShowDetailView: View {
     }
 
     private func load(recordingID: String? = nil) async {
+        if ProcessInfo.processInfo.environment["COUCHTOUR_UI_TEST_NEXT_STOP"] == "1" {
+            detail = ShowDetail(summary: show)
+            loadState = .loaded
+            return
+        }
         loadState = .loading
         do {
             detail = try await sourceFor(show.artist.backend).show(

@@ -371,6 +371,18 @@ check "k5: nav-reaches-every-destination uses click_retry in the loop" bash -c '
   fi
 '
 
+# k6: next-stop-chip-focus settles the app, waits for sidebar.nav.home, and uses
+# mac::click_retry so it reliably reaches Home mid-suite (#728).
+check "k6: next-stop-chip-focus reliably reaches Home" bash -c '
+  block="$(sed -n "/^mac_run_next_stop_chip_focus()/,/^}/p" "'"$DIR"'/run-mac.sh")"
+  grep -q "mac::close_auxiliary_windows" <<< "$block" || { echo "no close_auxiliary_windows"; exit 1; }
+  grep -q "mac::wait_for_id \"sidebar\.nav\.home\"" <<< "$block" || { echo "no wait_for_id sidebar.nav.home"; exit 1; }
+  grep -q "mac::click_retry \"sidebar\.nav\.home\"" <<< "$block" || { echo "no click_retry for sidebar.nav.home"; exit 1; }
+  if grep -q "if ! mac::click \"sidebar\.nav\.home\"" <<< "$block"; then
+    echo "single-attempt click of sidebar.nav.home in next-stop-chip-focus"; exit 1
+  fi
+'
+
 # (l) Sync round trip forwards --serial and --avd, and keeps emulator alive across both (#741)
 run l1 -- --platform both --serial emu-123 --sync
 check "l1: sync gets --serial" grep -q -- '--serial emu-123' "$TMP/l1/calls.sync"

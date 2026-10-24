@@ -157,6 +157,7 @@ struct TourPickerSheet: View {
             }
         }
         .frame(minWidth: 420, minHeight: 380)
+        .accessibilityIdentifier(AXIdentifiers.tourPickerSheet)
     }
 
     private func initialize() async {
