@@ -287,7 +287,10 @@ final class CouchTourUITests: XCTestCase {
         chip.click()
 
         let showDetail = app.descendants(matching: .any)["show.detail"].firstMatch
-        XCTAssertTrue(showDetail.waitForExistence(timeout: 10), "show.detail not present after clicking next stop chip")
+        if !showDetail.waitForExistence(timeout: 10) {
+            print("AXDUMP-BEGIN\n\(app.debugDescription)\nAXDUMP-END")
+            XCTFail("show.detail not present after clicking next stop chip")
+        }
 
         let tourPicker = app.descendants(matching: .any)["tour_picker.sheet"].firstMatch
         XCTAssertFalse(tourPicker.exists, "tour picker sheet was presented")

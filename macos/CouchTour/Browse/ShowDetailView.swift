@@ -44,6 +44,12 @@ struct ShowDetailView: View {
             }
         }
         .background(colors.background)
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier(AXIdentifiers.showDetail)
+        }
         .task {
             await load()
             checkSavedAndProgress()
