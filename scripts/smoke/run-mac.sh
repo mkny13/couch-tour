@@ -470,7 +470,7 @@ mac::relaunch() {
 
   local quit_started
   quit_started="$(date +%s)"
-  while pgrep -f "$APP_NAME" >/dev/null 2>&1; do
+  while pgrep -x "$APP_NAME" >/dev/null 2>&1; do
     if (( $(date +%s) - quit_started >= 15 )); then
       smoke::log "$APP_NAME did not exit within 15s after quit"
       return 1
