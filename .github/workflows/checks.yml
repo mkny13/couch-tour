@@ -34,3 +34,12 @@ jobs:
       - uses: actions/checkout@v7
       - name: Verify hook paths resolve via $CLAUDE_PROJECT_DIR from any cwd
         run: scripts/check_hook_paths.sh
+  xcuitest-count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Self-test the xcuitest-count check
+        run: scripts/checks/test_check_xcuitest_count.sh
+      - name: Check README XCUITest count matches CouchTourUITests.swift
+        run: scripts/checks/check-xcuitest-count.sh
