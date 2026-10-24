@@ -56,7 +56,7 @@ smoke::preflight_macos_beta() {
   fi
 
   if [[ -z "$running" ]]; then
-    if ! pgrep -f "Couch Tour Beta" >/dev/null 2>&1; then
+    if ! pgrep -x "Couch Tour Beta" >/dev/null 2>&1; then
       smoke::die 2 "Couch Tour Beta is not running. Launch it from /Applications or run: macos/scripts/install-beta.sh && open -a 'Couch Tour Beta'"
     fi
   fi
