@@ -59,6 +59,8 @@ struct PlayerRailView: View {
         .frame(width: 392)
         .background(colors.elevated)
         .border(width: 1, edges: [.leading], color: colors.panelBorder)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(AXIdentifiers.playerRail)
     }
 
     private var ambientWash: some View {

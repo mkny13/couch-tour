@@ -74,4 +74,7 @@ public enum AXIdentifiers {
     // Jam Chart
     public static let jamChartNote = "jam_chart.note"
     public static let jamChartSource = "jam_chart.source"
+
+    // Player
+    public static let playerRail = "player.rail"
 }
