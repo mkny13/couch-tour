@@ -75,10 +75,19 @@ android {
 
     buildTypes {
         debug {
+            // Staging by default (D314) so betas and local builds never touch real sync
+            // history. The production APK is also an assembleDebug build, so CI passes
+            // -PsyncProd=true for it; without that it paired against staging while the Mac
+            // app used prod ("incorrect code", #757).
+            val syncHost = if (project.findProperty("syncProd") == "true") {
+                "couch-tour-sync"
+            } else {
+                "couch-tour-sync-staging"
+            }
             buildConfigField(
                 "String",
                 "SYNC_BASE_URL",
-                "\"https://couch-tour-sync-staging.mkastellec.workers.dev\""
+                "\"https://$syncHost.mkastellec.workers.dev\""
             )
             // Opt-in only (-PsideInstall=true): a distinct applicationId so this build
             // installs alongside the regular debug sideload rather than updating over it —

@@ -691,3 +691,12 @@ Cloudflare officially deprecated `@cloudflare/vitest-pool-workers` and released 
 
 
 
+
+### D352: Production Android APK must sync against prod, not staging (#757)
+
+Amends D314. The production APK is an `assembleDebug` build (`build-debug-apk.yml`, `side_install=false`), and D314 made the debug buildType default to the staging Worker, so v0.94 shipped pointing at staging while the prod Mac app used prod. A Mac pairing code is unknown to staging ("incorrect code"), and the host change made `SyncSession.sync()` clear the stored token, so the app showed unpaired (local favorites untouched).
+
+- `app/build.gradle.kts`: the debug buildType uses the prod URL when `-PsyncProd=true`, staging otherwise.
+- `build-debug-apk.yml` passes `-PsyncProd=true` for non-side-install builds; betas (`side_install=true`) and local builds stay on staging.
+- Check: `scripts/test_prod_apk_sync_url.sh` (wired into `test.yml`) fails if either half is missing.
+- Devices already on a staging-pointed build re-pair once after updating; the token host changes again, so the token is cleared again.

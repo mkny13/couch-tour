@@ -96,6 +96,10 @@ jobs:
           args=()
           if [ "$SIDE_INSTALL" = "true" ]; then
             args+=(-PsideInstall=true)
+          else
+            # The production APK is an assembleDebug build too; without this it syncs
+            # against staging and a Mac pairing code is "incorrect" (#757).
+            args+=(-PsyncProd=true)
           fi
           # Threads the release tag into BuildConfig.VERSION_NAME (app/build.gradle.kts) so a
           # build cut for e.g. v0.23 actually reports v0.23 in the app, not the static
