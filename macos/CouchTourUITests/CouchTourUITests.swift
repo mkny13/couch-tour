@@ -256,13 +256,12 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(clear.waitForExistence(timeout: 10))
 
         // Assert search.screen fits inside the center pane:
-        // Window width is sidebar (236 pt) + center pane + player rail (392 pt).
-        // The center pane ends at window.frame.maxX - 392 (plus divider), so search.screen
-        // and search.clear must not extend beyond the left edge of PlayerRailView.
-        let window = app.windows.firstMatch
+        // search.screen and search.clear must not extend beyond the left edge of PlayerRailView.
         let searchScreen = app.descendants(matching: .any)["search.screen"].firstMatch
         XCTAssertTrue(searchScreen.waitForExistence(timeout: 10))
-        let railLeftEdge = window.frame.maxX - 392
+        let playerRail = app.descendants(matching: .any)["player.rail"].firstMatch
+        XCTAssertTrue(playerRail.waitForExistence(timeout: 10), "player.rail not found in accessibility hierarchy")
+        let railLeftEdge = playerRail.frame.minX
         XCTAssertLessThanOrEqual(searchScreen.frame.maxX, railLeftEdge + 1,
                                  "search.screen extends under PlayerRailView: screen maxX \(searchScreen.frame.maxX) > rail left edge \(railLeftEdge)")
         XCTAssertLessThanOrEqual(clear.frame.maxX, railLeftEdge + 1,
