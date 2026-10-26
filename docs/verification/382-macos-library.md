@@ -86,3 +86,11 @@ No app, test, or doc files other than this report were modified; no code was
 changed; nothing was fixed that the report found; no checkboxes were ticked on
 #382, #539, #540, or `UAT.md`; no live UI or smoke journey was run against a
 signed-in account.
+
+## Manual check
+
+The owner waived the on-device `uat-087`/`uat-088` run on #626 (comment 6406978919):
+
+> "Skip the manual check. Owner authorizes skipping the manual UAT for uat-087/uat-088; the automated evidence in docs/verification/382-macos-library.md stands."
+
+Criteria 1, 2, and 4 rest on the automated evidence above.
