@@ -70,6 +70,10 @@ data class PlayerState(
  * assert a format the stream never had. Blank means "show no format", and every surface
  * that displays one already hides itself on blank.
  */
+// The extra is only ever written with putBoolean; a getString fallback made Bundle log a
+// ClassCastException on every refresh.
+internal fun playerIsJamChart(extras: Bundle?): Boolean = extras?.getBoolean(Keys.IS_JAM_CHART, false) == true
+
 internal fun playerAudioFormat(isFlac: Boolean, youTubeMode: YouTubePlaybackMode?): String = when {
     youTubeMode != null -> ""
     isFlac -> "FLAC"
@@ -202,7 +206,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             setName = extras?.getString(Keys.SET_NAME).orEmpty(),
             trackPosition = extras?.getInt(Keys.TRACK_POSITION, 0) ?: 0,
             youTubeMode = youTubeMode,
-            isJamChart = extras?.getBoolean(Keys.IS_JAM_CHART, false) == true || extras?.getString(Keys.IS_JAM_CHART) == "true",
+            isJamChart = playerIsJamChart(extras),
             trackSlug = extras?.getString(Keys.TRACK_SLUG),
             jamChartNotes = extras?.getString(Keys.JAM_CHART_NOTES),
             queue = queueTracks(c),
