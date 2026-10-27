@@ -700,3 +700,13 @@ Amends D314. The production APK is an `assembleDebug` build (`build-debug-apk.ym
 - `build-debug-apk.yml` passes `-PsyncProd=true` for non-side-install builds; betas (`side_install=true`) and local builds stay on staging.
 - Check: `scripts/test_prod_apk_sync_url.sh` (wired into `test.yml`) fails if either half is missing.
 - Devices already on a staging-pointed build re-pair once after updating; the token host changes again, so the token is cleared again.
+
+### D353: Smoke emulator `phishin_test` moves from Android 15 (API 35) to Android 17 (API 37) (#765)
+
+The v0.95 playback hang (#763) reproduced on the Pixel (Android 17) and on the emulator, but the smoke journeys passed anyway, and the AVD didn't match the phone's OS. `phishin_test` now runs `system-images;android-37.0;google_apis;arm64-v8a` (Android 17, the newest non-16KB, non-beta google_apis arm64 image; 37.1/37.2 are ps16k-only or beta).
+
+- The AVD is machine-local: only `image.sysdir.1` and `target` in `~/.android/avd/phishin_test.avd/config.ini` (and `target` in `phishin_test.ini`) changed. Name, `pixel_7` profile, 2G RAM, 6G data, 512 MB sdcard and 4 cores are unchanged, then wiped on first boot. Re-create on another machine with `sdkmanager "system-images;android-37.0;google_apis;arm64-v8a"` plus those edits.
+- Nothing in `scripts/smoke/*`, README.md or the smoke-android skill hard-coded API 35 (they only name the AVD), so the repo change is this entry and a README note.
+- Verified on the new AVD: v0.96 debug APK plays a show to `PLAYING(3)` in `dumpsys media_session`, and the Android smoke journeys pass (6 pass, 0 fail, 6 skip) via `--serial emulator-5554`.
+- Gap: no smoke journey asserts `PLAYING` (`progress-start` only taps and sleeps). Tracked in #766.
+- Note: `mahler next-id phish-in D` returned 247 here, not the next ID after D352; D353 was allocated by hand from the log.
