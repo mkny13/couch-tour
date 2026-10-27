@@ -14,7 +14,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TMP="$(mktemp -d)"
+export TMP="$(mktemp -d)"
 TAG="v9.99-beta"
 trap 'rm -rf "$TMP" "smoke-reports/$TAG"' EXIT
 failures=0
@@ -395,6 +395,113 @@ check "l2: sync gets --serial" grep -q -- '--serial emulator-5554' "$TMP/l2/call
 check "l2: sync gets --avd" grep -q -- '--avd phishin_test' "$TMP/l2/calls.sync"
 check "l2: emulator was running during run" test -f "$TMP/l2/calls.sync"
 check "l2: emulator killed on exit" bash -c "! kill -0 \$(cat '$TMP/emulator.pid') 2>/dev/null"
+
+# ==============================================================================
+# (m) playback-reaches-playing Android journey wiring and media_session polling (#766)
+# ==============================================================================
+check "m1: playback-reaches-playing present in run-android.sh ALL_JOURNEYS" bash -c '
+  awk "/^ALL_JOURNEYS=\\(/, /^\\)/" "'"$DIR"'/run-android.sh" | grep -q "playback-reaches-playing"
+'
+check "m2: android_run_playback_reaches_playing defined in run-android.sh" grep -q "^android_run_playback_reaches_playing()" "$DIR/run-android.sh"
+check "m3: JOURNEYS.md specifies playback-reaches-playing referencing media_session state=3" bash -c '
+  awk "/^### \`playback-reaches-playing\`/, /^---/" "'"$DIR"'/JOURNEYS.md" | grep -Eq "media_session.*state=3"
+'
+check "m4: check-journeys.sh agrees on playback-reaches-playing for android" bash -c '
+  "'"$DIR"'/check-journeys.sh" >/dev/null 2>&1
+'
+check "m5: android_media_session_state parses PLAYING and BUFFERING" bash -c '
+  source "'"$DIR"'/lib.sh"
+  FN="$(awk "/^android_media_session_state\\(\\)/{p=1} p{print} p&&/^}/{exit}" "'"$DIR"'/run-android.sh")"
+  eval "$FN"
+  BETA_PKG="dev.mike.couchtour.beta"
+  adb_cmd() {
+    cat << "EOF"
+MEDIA SESSION SERVICE (dumpsys media_session)
+  Sessions Stack - have 1 sessions:
+    androidx.media3.session.id. dev.mike.couchtour.beta/androidx.media3.session.id./4 (userId=0)
+      ownerPid=123, ownerUid=1000, userId=0
+      package=dev.mike.couchtour.beta
+      state=PlaybackState {state=PLAYING(3), position=1000, speed=1.0}
+EOF
+  }
+  st="$(android_media_session_state)"
+  [[ "$st" == "PLAYING 3" ]] || { echo "expected PLAYING 3, got $st"; exit 1; }
+
+  adb_cmd() {
+    cat << "EOF"
+MEDIA SESSION SERVICE (dumpsys media_session)
+  Sessions Stack - have 1 sessions:
+    androidx.media3.session.id. dev.mike.couchtour.beta/androidx.media3.session.id./4 (userId=0)
+      ownerPid=123, ownerUid=1000, userId=0
+      package=dev.mike.couchtour.beta
+      state=PlaybackState {state=BUFFERING(6), position=0, speed=0.0}
+EOF
+  }
+  st="$(android_media_session_state)"
+  [[ "$st" == "BUFFERING 6" ]] || { echo "expected BUFFERING 6, got $st"; exit 1; }
+'
+check "m6: android_run_playback_reaches_playing passes on state=3" bash -c '
+  mkdir -p "'"$TMP"'/m6"
+  touch "'"$TMP"'/m6/fake.apk"
+  cat > "'"$TMP"'/m6/adb" << STUB_ADB
+#!/usr/bin/env bash
+case "\$*" in
+  devices*) printf "List of devices attached\nstub-emu\tdevice\n" ;;
+  *"install"*) echo "Success" ;;
+  *"shell pm list packages"*) echo "package:dev.mike.couchtour.beta" ;;
+  *"dumpsys media_session"*)
+    cat << "DUMP"
+MEDIA SESSION SERVICE (dumpsys media_session)
+  Sessions Stack - have 1 sessions:
+    androidx.media3.session.id. dev.mike.couchtour.beta/androidx.media3.session.id./4 (userId=0)
+      package=dev.mike.couchtour.beta
+      state=PlaybackState {state=PLAYING(3), position=1000}
+DUMP
+    ;;
+  *"exec-out cat /sdcard/cctv-ui.xml"*)
+    echo "<hierarchy><node index=\"0\" resource-id=\"dev.mike.couchtour.beta:id/nav.home\" bounds=\"[0,0][100,100]\" /></hierarchy>"
+    ;;
+  *) exit 0 ;;
+esac
+exit 0
+STUB_ADB
+  chmod +x "'"$TMP"'/m6/adb"
+  PATH="'"$TMP"'/m6:$PATH" CCTV_SMOKE_ANDROID_PROGRESS_SEED_TAG="nav.home" \
+    "'"$DIR"'/run-android.sh" --serial stub-emu --apk "'"$TMP"'/m6/fake.apk" --journey playback-reaches-playing --out "'"$TMP"'/m6/out.tsv" --timeout 2 >/dev/null 2>&1
+  grep -q "playback-reaches-playing	PASS" "'"$TMP"'/m6/out.tsv"
+'
+check "m7: android_run_playback_reaches_playing fails with logcat on buffering timeout" bash -c '
+  mkdir -p "'"$TMP"'/m7"
+  touch "'"$TMP"'/m7/fake.apk"
+  cat > "'"$TMP"'/m7/adb" << STUB_ADB
+#!/usr/bin/env bash
+case "\$*" in
+  devices*) printf "List of devices attached\nstub-emu\tdevice\n" ;;
+  *"install"*) echo "Success" ;;
+  *"shell pm list packages"*) echo "package:dev.mike.couchtour.beta" ;;
+  *"dumpsys media_session"*)
+    cat << "DUMP"
+  Sessions Stack - have 1 sessions:
+    androidx.media3.session.id. dev.mike.couchtour.beta/androidx.media3.session.id./4 (userId=0)
+      package=dev.mike.couchtour.beta
+      state=PlaybackState {state=BUFFERING(6), position=0}
+DUMP
+    ;;
+  *"logcat"*)
+    echo "stub_logcat_called" >> "'"$TMP"'/m7/logcat.invoked"
+    ;;
+  *"exec-out cat /sdcard/cctv-ui.xml"*)
+    echo "<hierarchy><node index=\"0\" resource-id=\"dev.mike.couchtour.beta:id/nav.home\" bounds=\"[0,0][100,100]\" /></hierarchy>"
+    ;;
+  *) exit 0 ;;
+esac
+exit 0
+STUB_ADB
+  chmod +x "'"$TMP"'/m7/adb"
+  PATH="'"$TMP"'/m7:$PATH" CCTV_SMOKE_ANDROID_PROGRESS_SEED_TAG="nav.home" \
+    "'"$DIR"'/run-android.sh" --serial stub-emu --apk "'"$TMP"'/m7/fake.apk" --journey playback-reaches-playing --out "'"$TMP"'/m7/out.tsv" --timeout 1 >/dev/null 2>&1
+  grep -q "playback-reaches-playing	FAIL" "'"$TMP"'/m7/out.tsv" && test -f "'"$TMP"'/m7/logcat.invoked"
+'
 
 # --help lists the new flags
 help="$("$DIR/run-smoke.sh" --help)"
