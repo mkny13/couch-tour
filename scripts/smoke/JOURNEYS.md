@@ -35,6 +35,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 | `nav-reaches-every-destination` | mac, android | none | all five `nav.*` destinations reachable and show their section identifier |
 | `search-result-sections` | mac, android | none | artists/shows/tracks sections render for a query that has all three |
 | `live-data-not-mockup` | mac, android | signed-in | a known current artist resolves to a real phish.in show — the #345 mockup-favorites regression guard |
+| `playback-reaches-playing` | android | none | starts playback and media session reaches PLAYING (state=3) |
 
 ---
 
@@ -186,6 +187,14 @@ round trip: an action on one client (`--sync-step <action>`), then an assertion 
 - **fixture**: `signed-in`
 - **steps**: From the favorites list, select a favorited artist (e.g. Phish) and navigate into the shows list.
 - **pass condition**: On macOS, selecting the artist from `sidebar.favorites.list` opens `artist.screen`; a period (`artist.period.row.*`) lists loaded `shows.row.<date>` entries and opening one shows `show.detail` (live data, not hardcoded mockup shows); on Android, selecting the artist from `favorites.list` loads live show data from the backend (regression guard for #345).
+
+### `playback-reaches-playing`
+
+- **id**: `playback-reaches-playing`
+- **platforms**: `android`
+- **fixture**: `none`
+- **steps**: Navigate to Home or search, initiate playback of a track or show (or via seed track tag), and poll media session state.
+- **pass condition**: After starting playback, `adb shell dumpsys media_session` for the app reports playback state `state=PLAYING` (`state=3`) within the timeout.
 
 ---
 

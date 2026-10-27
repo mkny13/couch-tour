@@ -94,11 +94,14 @@ def match_node(node, target_tag):
 
 def match_node_fallback(node, target_tag):
     cd = node.attrib.get("content-desc", "")
-    if not cd:
-        return False
-    cd_target = TAG_TO_CONTENT_DESC.get(target_tag, target_tag)
-    if cd == cd_target or cd == target_tag or cd.startswith(cd_target):
-        return True
+    if cd:
+        cd_target = TAG_TO_CONTENT_DESC.get(target_tag, target_tag)
+        if cd == cd_target or cd == target_tag or cd.startswith(cd_target):
+            return True
+    txt = node.attrib.get("text", "")
+    if txt:
+        if txt == target_tag or txt.startswith(target_tag):
+            return True
     return False
 
 if cmd == "center_class":
@@ -211,6 +214,13 @@ EOF
   count_stops="$(android_parse "count" "home.section.next-tour-stops.row.")"
   if [[ "$count_stops" -ne 1 ]]; then
     smoke::die 1 "Self-test failed: expected 1 match for next tour stop row, got $count_stops"
+  fi
+
+  # 6. Fallback to text when resource-id and content-desc are empty
+  local count_text
+  count_text="$(android_parse "count" "moe.")"
+  if [[ "$count_text" -ne 1 ]]; then
+    smoke::die 1 "Self-test failed: expected 1 match for moe. via text, got $count_text"
   fi
 
   smoke::log "All android::dump parser fixture tests passed."
@@ -575,6 +585,44 @@ android_is_signed_in() {
   return 0
 }
 
+android_media_session_state() {
+  local output
+  output="$(adb_cmd shell dumpsys media_session 2>/dev/null || true)"
+  python3 - "$output" "$BETA_PKG" << 'PYEOF'
+import sys, re
+
+output = sys.argv[1]
+pkg_target = sys.argv[2]
+pkg_pattern = re.escape(pkg_target) if pkg_target else r"dev\.mike\.couchtour"
+if "dev.mike.couchtour" not in pkg_pattern:
+    pkg_pattern = f"(?:{pkg_pattern}|dev\\.mike\\.couchtour)"
+
+current_pkg = None
+session_state = ""
+session_code = ""
+
+for line in output.splitlines():
+    line_s = line.strip()
+    if line_s.startswith("package="):
+        current_pkg = line_s.split("=", 1)[1].strip()
+    elif line_s.startswith("state="):
+        if current_pkg and re.search(pkg_pattern, current_pkg):
+            m = re.search(r"state=(\w+)\((\d+)\)", line_s)
+            if m:
+                session_state, session_code = m.group(1), m.group(2)
+                break
+            m2 = re.search(r"state=(\d+)", line_s)
+            if m2:
+                session_code = m2.group(1)
+                names = {"0": "NONE", "1": "STOPPED", "2": "PAUSED", "3": "PLAYING", "4": "FAST_FORWARDING", "5": "REWINDING", "6": "BUFFERING", "7": "ERROR", "8": "CONNECTING"}
+                session_state = names.get(session_code, session_code)
+                break
+
+if session_code:
+    print(f"{session_state} {session_code}")
+PYEOF
+}
+
 # -----------------------------------------------------------------------------
 # Journey Implementations
 # -----------------------------------------------------------------------------
@@ -888,6 +936,82 @@ android_run_live_data_not_mockup() {
   smoke::result "android" "$id" "SKIP" "unimplemented live data verification"
 }
 
+android_run_playback_reaches_playing() {
+  local id="playback-reaches-playing"
+  smoke::require_journeys_file "$id"
+  smoke::log "Executing journey $id..."
+
+  if [[ "$NO_INPUT" == "true" ]]; then
+    smoke::result "android" "$id" "SKIP" "--no-input active"
+    return 0
+  fi
+
+  local seed="${CCTV_SMOKE_ANDROID_PROGRESS_SEED_TAG:-}"
+  if [[ -z "$seed" ]]; then
+    android::tap "nav.home" 2>/dev/null || true
+    sleep 0.5
+    android::dump >/dev/null || true
+    if [[ "$(android::count "home.section.in-progress.row.")" -gt 0 ]]; then
+      seed="home.section.in-progress.row."
+    fi
+  fi
+
+  if [[ -z "$seed" ]]; then
+    smoke::result "android" "$id" "SKIP" "no seed track or in-progress row available (set CCTV_SMOKE_ANDROID_PROGRESS_SEED_TAG)"
+    return 0
+  fi
+
+  # Pause if already playing so we assert reaching PLAYING from start
+  adb_cmd shell input keyevent KEYCODE_MEDIA_PAUSE >/dev/null 2>&1 || true
+  sleep 0.5
+
+  smoke::log "Starting playback via seed row $seed..."
+  android::dump >/dev/null || true
+  if ! android::tap "$seed"; then
+    android_screenshot "$id"
+    smoke::result "android" "$id" "FAIL" "cannot tap seed row $seed"
+    return 0
+  fi
+
+  # If tapping the row opened a show/recording screen, tap Resume or Play if shown
+  sleep 1
+  android::dump >/dev/null || true
+  if [[ "$(android::count "Resume")" -gt 0 ]]; then
+    android::tap "Resume" 2>/dev/null || true
+  elif [[ "$(android::count "Play")" -gt 0 ]]; then
+    android::tap "Play" 2>/dev/null || true
+  fi
+
+  local deadline=$(( $(date +%s) + TIMEOUT ))
+  local state_info="" last_state="" state_code=""
+  local reached_playing=false
+
+  while [[ $(date +%s) -le $deadline ]]; do
+    state_info="$(android_media_session_state)"
+    if [[ -n "$state_info" ]]; then
+      last_state="$(awk '{print $1}' <<< "$state_info")"
+      state_code="$(awk '{print $2}' <<< "$state_info")"
+      if [[ "$state_code" == "3" || "$last_state" == "PLAYING" ]]; then
+        reached_playing=true
+        break
+      fi
+    fi
+    sleep 1
+  done
+
+  if [[ "$reached_playing" == true ]]; then
+    adb_cmd shell input keyevent KEYCODE_MEDIA_PAUSE >/dev/null 2>&1 || true
+    smoke::result "android" "$id" "PASS" "media session reached state=3 (PLAYING)"
+  else
+    android_screenshot "$id"
+    smoke::log "Playback failed to reach state=3 (PLAYING) within ${TIMEOUT}s. Last state: ${last_state:-unknown}(${state_code:-?})"
+    smoke::log "========================= logcat tail ========================="
+    adb_cmd logcat -d -t 50 >&2 || true
+    smoke::log "==============================================================="
+    smoke::result "android" "$id" "FAIL" "media session did not reach state=3 (PLAYING) within ${TIMEOUT}s (last state: ${last_state:-unknown})"
+  fi
+}
+
 # Sync steps (--sync-step), driven by sync-roundtrip.sh. Each step is one half of a cross-client
 # round trip: an action on this client, or an assertion that the other client's change arrived.
 # Exit 0 satisfied, 3 assertion timed out, 4 needed control/fixture unavailable.
@@ -972,6 +1096,7 @@ ALL_JOURNEYS=(
   nav-reaches-every-destination
   search-result-sections
   live-data-not-mockup
+  playback-reaches-playing
 )
 
 if [[ -n "$SYNC_STEP" ]]; then
