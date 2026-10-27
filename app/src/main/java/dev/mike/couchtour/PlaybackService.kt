@@ -14,6 +14,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -357,7 +358,23 @@ class PlaybackService : MediaLibraryService() {
             updateLeveling(item)
         }
 
+        // Without this a stream that never starts (stuck buffering) leaves no trace in
+        // Diagnostics: the only evidence was in logcat, which a sideloaded user can't reach.
+        override fun onPlayerError(error: PlaybackException) {
+            val uri = session?.player?.currentMediaItem?.localConfiguration?.uri
+            DiagnosticsLog.log(
+                "playback.error",
+                DiagnosticsLog.Level.ERROR,
+                *playbackErrorFields(error, uri?.host, uri?.lastPathSegment?.substringAfterLast('.')).toTypedArray()
+            )
+        }
+
         override fun onPlaybackStateChanged(state: Int) {
+            DiagnosticsLog.log(
+                "playback.state",
+                "state" to playbackStateName(state),
+                "playWhenReady" to session?.player?.playWhenReady
+            )
             saveNow()
             SyncSession.requestDebouncedPush(progressDao())
         }
@@ -794,3 +811,20 @@ class PlaybackService : MediaLibraryService() {
         super.onDestroy()
     }
 }
+
+internal fun playbackStateName(state: Int): String = when (state) {
+    Player.STATE_IDLE -> "idle"
+    Player.STATE_BUFFERING -> "buffering"
+    Player.STATE_READY -> "ready"
+    Player.STATE_ENDED -> "ended"
+    else -> "unknown($state)"
+}
+
+/** Host and extension only: stream URLs can carry tokens, and the host + format is what diagnoses a bad source. */
+internal fun playbackErrorFields(error: PlaybackException, host: String?, ext: String?): List<Pair<String, Any?>> = listOf(
+    "code" to error.errorCodeName,
+    "message" to error.message,
+    "cause" to error.cause?.let { "${it.javaClass.simpleName}: ${it.message}" },
+    "host" to host,
+    "ext" to ext
+)
