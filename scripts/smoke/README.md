@@ -70,6 +70,7 @@ selected platform ran and a report was written, `1` = usage error, `2` = a platf
 run. If no platform could run, no report is written and no issue is filed. If some did, the
 report is written, says which platform didn't run, is `FAIL`, and the exit code is still `2`.
 
+`phishin_test` runs the Android 17 / API 37 `google_apis` arm64-v8a image (D353); the AVD is machine-local.
 `--avd <name>` (or `CCTV_SMOKE_AVD`) makes smoke runs use the `phishin_test` emulator instead of a phone: with no
 `emulator-*` attached, `run-smoke.sh` (or `run-android.sh` when run alone) boots that AVD headless (`-no-window -no-audio -no-snapshot-save`,
 override the binary with `CCTV_SMOKE_EMULATOR`), waits up to 180 s for `sys.boot_completed` (exit 2 with an
