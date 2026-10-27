@@ -56,6 +56,9 @@ jobs:
       - name: Source guard — production APK must build against the prod sync backend
         run: scripts/test_prod_apk_sync_url.sh
 
+      - name: Source guard — sandboxed macOS app must be able to launch the Sparkle installer
+        run: scripts/test_sparkle_sandbox_config.sh
+
       - name: Sync deploy schema-change detection (headless)
         run: scripts/test_sync_schema_changed.sh
 

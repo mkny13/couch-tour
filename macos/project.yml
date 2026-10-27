@@ -53,12 +53,18 @@ targets:
         SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/appcast/appcast.xml"
         SUPublicEDKey: "yWmYH/MYjiHVgfRTWDz1QQH39t+upIPeK1Dkh8eqcbA="
         SUEnableAutomaticChecks: true
+        # Sandboxed apps launch the Sparkle installer through its XPC service (#774); without
+        # this key and the mach-lookup entitlements below, updates fail with "error launching the installer".
+        SUEnableInstallerLauncherService: true
     entitlements:
       path: Generated/CouchTour.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.cs.disable-library-validation: true
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
         # Read-only, for the one-time unsandboxed -> container merge (#345, Migration.swift).
         com.apple.security.temporary-exception.files.home-relative-path.read-only:
           - /Library/Preferences/dev.mike.couchtour.mac.plist
@@ -102,12 +108,18 @@ targets:
         SUFeedURL: "https://raw.githubusercontent.com/mkny13/couch-tour/appcast/appcast-beta.xml"
         SUPublicEDKey: "yWmYH/MYjiHVgfRTWDz1QQH39t+upIPeK1Dkh8eqcbA="
         SUEnableAutomaticChecks: true
+        # Sandboxed apps launch the Sparkle installer through its XPC service (#774); without
+        # this key and the mach-lookup entitlements below, updates fail with "error launching the installer".
+        SUEnableInstallerLauncherService: true
     entitlements:
       path: Generated/CouchTourBeta/CouchTour.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.cs.disable-library-validation: true
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
         # Read-only, for the one-time unsandboxed -> container merge (#345, Migration.swift).
         com.apple.security.temporary-exception.files.home-relative-path.read-only:
           - /Library/Preferences/dev.mike.couchtour.mac.beta.plist
