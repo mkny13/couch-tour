@@ -88,6 +88,10 @@ class LevelingAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun queueInput(input: ByteBuffer) {
+        // An empty input (a drain pass) arrives as the shared EMPTY_BUFFER, which
+        // replaceOutputBuffer(0) also hands back as our output; copying it onto itself
+        // throws "The source buffer is this buffer" and kills playback.
+        if (!input.hasRemaining()) return
         val out = replaceOutputBuffer(input.remaining())
         out.order(input.order())
         when (encoding) {

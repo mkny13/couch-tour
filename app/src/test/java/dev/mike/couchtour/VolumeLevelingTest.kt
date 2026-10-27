@@ -114,6 +114,16 @@ class VolumeLevelingTest {
     // -----------------------------------------------------------------------
 
     @Test
+    fun `processor accepts the shared empty buffer without throwing`() {
+        // The sink drains with AudioProcessor.EMPTY_BUFFER; this used to throw
+        // "The source buffer is this buffer" and leave every track stuck buffering.
+        val p = configuredProcessor(44100, 2)
+        p.queueInput(java.nio.ByteBuffer.allocateDirect(0))
+        p.queueInput(androidx.media3.common.audio.AudioProcessor.EMPTY_BUFFER)
+        assertEquals(0, p.getOutput().remaining())
+    }
+
+    @Test
     fun `processor boosts a quiet signal by +6 dB`() {
         val p = configuredProcessor(48_000, 2)
         p.setGainDb(6.0)
