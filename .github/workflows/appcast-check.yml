@@ -1,0 +1,61 @@
+name: Check and repair Sparkle appcasts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/checks/check_appcast.py"
+      - ".github/workflows/appcast-check.yml"
+  schedule:
+    # Daily at 06:15 UTC
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch appcasts, repair duplicates, and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin appcast:refs/remotes/origin/appcast || true
+          work_dir="$RUNNER_TEMP/appcasts"
+          mkdir -p "$work_dir"
+
+          for feed in appcast.xml appcast-beta.xml; do
+            if git show origin/appcast:"$feed" > "$work_dir/$feed" 2>/dev/null; then
+              cp "$work_dir/$feed" "$work_dir/$feed.orig"
+              python3 -I scripts/checks/check_appcast.py repair "$work_dir/$feed" --repo "${{ github.repository }}"
+              if ! cmp -s "$work_dir/$feed.orig" "$work_dir/$feed"; then
+                echo "Changes detected in $feed after repair; publishing..."
+                scripts/publish-appcast.sh "$work_dir/$feed" "$feed" "repair-781"
+              else
+                echo "No repairs needed for $feed."
+              fi
+            fi
+          done
+
+          # Verify feeds on appcast branch are clean
+          git fetch origin appcast:refs/remotes/origin/appcast
+          check_files=()
+          for feed in appcast.xml appcast-beta.xml; do
+            if git show origin/appcast:"$feed" > "$work_dir/$feed.verify" 2>/dev/null; then
+              check_files+=("$work_dir/$feed.verify")
+            fi
+          done
+
+          if [ "${#check_files[@]}" -gt 0 ]; then
+            python3 -I scripts/checks/check_appcast.py check "${check_files[@]}"
+          fi

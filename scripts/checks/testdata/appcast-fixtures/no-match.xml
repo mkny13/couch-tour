@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+    <channel>
+        <title>Couch Tour Changelog</title>
+        <link>https://raw.githubusercontent.com/mkny13/couch-tour/main/appcast.xml</link>
+        <description>Most recent changes with links to updates.</description>
+        <language>en</language>
+        <item>
+            <title>0.99</title>
+            <pubDate>Wed, 28 Oct 2026 14:25:28 +0000</pubDate>
+            <sparkle:version>54</sparkle:version>
+            <sparkle:shortVersionString>0.99</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.99/CouchTour-v0.99.zip" length="99999999" type="application/octet-stream" sparkle:edSignature="DJBLUQe0MJuzD7sIF/i47PciCQhdr1+gZ6GtL9dGoJiuVtLXUjnAf4MKT5GHhU9/E+DDnNFId39T0leqeTJoAg=="/>
+        </item>
+        <item>
+            <title>0.99</title>
+            <pubDate>Wed, 28 Oct 2026 14:25:49 +0000</pubDate>
+            <sparkle:version>53</sparkle:version>
+            <sparkle:shortVersionString>0.99</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.99/CouchTour-v0.99.zip" length="88888888" type="application/octet-stream" sparkle:edSignature="lV6nTOAxq/5j7Pb63s2M/NUZMDXGjn6/TwBE+vFE+PWk//i9O6Eq4Zd/TJEiW24vSAv1L1sKLsDb/nEHrundBQ=="/>
+        </item>
+    </channel>
+</rss>
