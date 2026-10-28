@@ -225,9 +225,37 @@ if ! smoke_err="$(check_smoke_report "$confirmed_ref")"; then
 fi
 
 git fetch --tags -q 2>/dev/null || true
-if ! git rev-parse "$confirmed_ref" >/dev/null 2>&1; then
+if ! commit="$(git rev-parse "$confirmed_ref^{commit}" 2>/dev/null)"; then
     echo "Tag $confirmed_ref not found locally or on origin — check the tag name." >&2
     exit 1
+fi
+
+# Already-promoted guard: if another vX.Y tag already points at this commit, skip.
+promoted_tag=""
+while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    if [ "$t" != "$confirmed_ref" ] && echo "$t" | grep -qE '^v[0-9]+\.[0-9]+$'; then
+        promoted_tag="$t"
+        break
+    fi
+done < <(git tag --points-at "$commit" 2>/dev/null || true)
+
+if [ -n "$promoted_tag" ]; then
+    echo "$confirmed_ref already promoted as $promoted_tag; nothing to do."
+    exit 0
+fi
+
+# Atomic lock: create the production tag on the remote first.
+# If rejected because the tag already exists, another promoter is running.
+if ! push_out="$(git push origin "$commit:refs/tags/$next_tag" 2>&1)"; then
+    if echo "$push_out" | grep -qi "already exists"; then
+        echo "$next_tag is already being promoted; skipping dispatch."
+        exit 0
+    else
+        echo "ERROR: Failed to push tag $next_tag to origin:" >&2
+        echo "$push_out" >&2
+        exit 1
+    fi
 fi
 
 echo "Promoting $confirmed_ref -> $next_tag (regular release, updates the daily-driver install)..."

@@ -21,18 +21,38 @@ mkdir -p "$BIN_DIR"
 
 GH_LOG="$TMP/gh.log"
 GIT_LOG="$TMP/git.log"
+CALL_LOG="$TMP/calls.log"
 
 cat > "$BIN_DIR/git" << 'EOF'
 #!/bin/sh
 echo "$@" >> "$GIT_LOG"
+echo "git $@" >> "$CALL_LOG"
 case "$1" in
     fetch) exit 0 ;;
-    rev-parse) exit 0 ;;
+    rev-parse)
+        echo "mockcommit1234"
+        exit 0
+        ;;
     tag)
-        if [ -f "$TMP/mock_tags" ]; then
+        if [ -f "$TMP/mock_points_at" ] && echo "$@" | grep -q -- "--points-at"; then
+            cat "$TMP/mock_points_at"
+            exit 0
+        elif echo "$@" | grep -q -- "--points-at"; then
+            exit 0
+        elif [ -f "$TMP/mock_tags" ]; then
             cat "$TMP/mock_tags"
         else
             echo "v0.90"
+        fi
+        exit 0
+        ;;
+    push)
+        if [ -f "$TMP/mock_push_reject" ]; then
+            cat "$TMP/mock_push_reject" >&2
+            exit 1
+        elif [ -f "$TMP/mock_push_fail" ]; then
+            echo "fatal: network failure" >&2
+            exit 1
         fi
         exit 0
         ;;
@@ -44,6 +64,7 @@ chmod +x "$BIN_DIR/git"
 cat > "$BIN_DIR/gh" << 'EOF'
 #!/bin/sh
 echo "$@" >> "$GH_LOG"
+echo "gh $@" >> "$CALL_LOG"
 case "$1 $2" in
     "workflow run") exit 0 ;;
     "release view")
@@ -60,7 +81,7 @@ EOF
 chmod +x "$BIN_DIR/gh"
 
 export PATH="$BIN_DIR:$PATH"
-export GIT_LOG GH_LOG TMP
+export GIT_LOG GH_LOG CALL_LOG TMP
 
 # Helper to run promote-beta.sh in a clean test harness
 run_promote() {
@@ -69,6 +90,7 @@ run_promote() {
     mkdir -p "$reports_dir"
     : > "$GH_LOG"
     : > "$GIT_LOG"
+    : > "$CALL_LOG"
     SMOKE_REPORTS_DIR="$reports_dir" bash "$PROMOTE_SCRIPT" "$@"
 }
 
@@ -292,6 +314,70 @@ err15="$T15/err.log"
 run_promote "$T15" --auto --force-no-smoke >/dev/null 2>"$err15" || rc=$?
 check "15. --auto rejects --force-no-smoke" [ "$rc" -ne 0 ]
 check "15. --auto rejection error mentions cannot be combined" grep -q "cannot be combined" "$err15"
+
+# 16a. Push rejected because tag exists: no gh workflow run logged, exit 0
+T16a="$TMP/t16a"
+mkdir -p "$T16a/smoke-reports"
+cat > "$T16a/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: PASS
+EOF
+echo "! [rejected]        mockcommit1234 -> v0.91 (already exists)" > "$TMP/mock_push_reject"
+rc=0
+out16a="$T16a/out.log"
+run_promote "$T16a" "$TAG" "$NEXT" "$NOTES" >"$out16a" 2>&1 || rc=$?
+rm -f "$TMP/mock_push_reject"
+check "16a. tag exists push rejection exits 0" [ "$rc" -eq 0 ]
+check "16a. tag exists records no dispatch" [ ! -s "$GH_LOG" ]
+check "16a. tag exists logs already being promoted" grep -q "v0.91 is already being promoted; skipping dispatch." "$out16a"
+
+# 16b. Another vX.Y tag already points at the beta commit: no dispatch, exit 0
+T16b="$TMP/t16b"
+mkdir -p "$T16b/smoke-reports"
+cat > "$T16b/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: PASS
+EOF
+echo "v0.91" > "$TMP/mock_points_at"
+rc=0
+out16b="$T16b/out.log"
+run_promote "$T16b" "$TAG" "$NEXT" "$NOTES" >"$out16b" 2>&1 || rc=$?
+rm -f "$TMP/mock_points_at"
+check "16b. already promoted tag points-at exits 0" [ "$rc" -eq 0 ]
+check "16b. already promoted tag records no dispatch" [ ! -s "$GH_LOG" ]
+check "16b. already promoted tag logs nothing to do" grep -q "v0.90 already promoted as v0.91; nothing to do." "$out16b"
+
+# 16c. Happy path: tag push happens before both gh workflow run lines
+T16c="$TMP/t16c"
+mkdir -p "$T16c/smoke-reports"
+cat > "$T16c/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: PASS
+EOF
+rc=0
+run_promote "$T16c" "$TAG" "$NEXT" "$NOTES" >/dev/null 2>&1 || rc=$?
+check "16c. happy path exits 0" [ "$rc" -eq 0 ]
+check "16c. happy path dispatches APK" grep -q "workflow run build-debug-apk.yml" "$GH_LOG"
+check "16c. happy path dispatches macos" grep -q "workflow run macos-release.yml" "$GH_LOG"
+check "16c. happy path pushed tag" grep -q "push origin mockcommit1234:refs/tags/v0.91" "$GIT_LOG"
+push_line="$(grep -n "git push origin" "$CALL_LOG" | head -1 | cut -d: -f1 || echo 9999)"
+first_gh_line="$(grep -n "gh workflow run" "$CALL_LOG" | head -1 | cut -d: -f1 || echo 0)"
+check "16c. tag push precedes first gh workflow run" [ "$push_line" -lt "$first_gh_line" ]
+
+# 16d. Any other push failure exits non-zero with no dispatch
+T16d="$TMP/t16d"
+mkdir -p "$T16d/smoke-reports"
+cat > "$T16d/smoke-reports/$TAG.md" << 'EOF'
+Tag: v0.90
+Smoke: PASS
+EOF
+echo "fatal: unable to access 'https://github.com/mkny13/couch-tour': Could not resolve host" > "$TMP/mock_push_fail"
+rc=0
+err16d="$T16d/err.log"
+run_promote "$T16d" "$TAG" "$NEXT" "$NOTES" >/dev/null 2>"$err16d" || rc=$?
+rm -f "$TMP/mock_push_fail"
+check "16d. generic push failure exits non-zero" [ "$rc" -ne 0 ]
+check "16d. generic push failure records no dispatch" [ ! -s "$GH_LOG" ]
 
 if [ "$failures" -gt 0 ]; then
     echo "$failures test(s) failed." >&2
