@@ -195,7 +195,7 @@ cd macos && xcodegen generate && xcodebuild -project CouchTour.xcodeproj -scheme
 cd sync && npm test
 ```
 
-The `checks` workflow (`.github/workflows/checks.yml`) runs `scripts/checks/check-mockup-data.sh` on every PR; it fails when mockup/placeholder data (lorem ipsum, hardcoded artist names) shows up in shipping code outside previews. Exceptions go in `scripts/checks/mockup-allowlist.txt`, each with a reason. Self-test: `scripts/checks/test_check_mockup_data.sh`.
+The `checks` workflow (`.github/workflows/checks.yml`) runs `scripts/checks/check-mockup-data.sh` on every PR; it fails when mockup/placeholder data (lorem ipsum, hardcoded artist names) shows up in shipping code outside previews. Exceptions go in `scripts/checks/mockup-allowlist.txt`, each with a reason. Self-test: `scripts/checks/test_check_mockup_data.sh`. It also runs `scripts/checks/test_check_appcast.sh`, verifying `scripts/checks/check_appcast.py` which guards against duplicate versions in Sparkle appcast feeds (`appcast.xml`/`appcast-beta.xml`) and powers the daily feed repair workflow (`.github/workflows/appcast-check.yml`, D354).
 
 The `test` job also runs `scripts/test_publish_appcast.sh` (headless, local bare repo): it checks the Sparkle appcast publish to the `appcast` branch (D340).
 
