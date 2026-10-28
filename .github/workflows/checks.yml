@@ -43,3 +43,10 @@ jobs:
         run: scripts/checks/test_check_xcuitest_count.sh
       - name: Check README XCUITest count matches CouchTourUITests.swift
         run: scripts/checks/check-xcuitest-count.sh
+  appcast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Self-test the appcast check
+        run: scripts/checks/test_check_appcast.sh
