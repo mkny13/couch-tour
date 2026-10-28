@@ -15,6 +15,10 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: release-${{ inputs.release_tag || github.event.release.tag_name || github.run_id }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -108,6 +112,7 @@ jobs:
           echo "ZIP_PATH=macos/build/Build/Products/Release/$zip_name" >> $GITHUB_ENV
           echo "ZIP_NAME=$zip_name" >> $GITHUB_ENV
           echo "TAG_NAME=$tag" >> $GITHUB_ENV
+          echo "APP_VERSION=$version" >> $GITHUB_ENV
           if [ "$IS_BETA" = "true" ]; then
             echo "APPCAST_NAME=appcast-beta.xml" >> $GITHUB_ENV
           else
@@ -136,11 +141,17 @@ jobs:
             cp "$APPCAST_NAME" "$stage/" 2>/dev/null || true
           fi
 
+          if [ -f "$stage/$APPCAST_NAME" ]; then
+            python3 -I scripts/checks/check_appcast.py drop-version "$stage/$APPCAST_NAME" "$APP_VERSION"
+          fi
+
           echo "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
             --ed-key-file - \
             -o "$stage/$APPCAST_NAME" \
             --download-url-prefix "https://github.com/mkny13/couch-tour/releases/download/$TAG_NAME/" \
             "$stage"
+
+          python3 -I scripts/checks/check_appcast.py check "$stage/$APPCAST_NAME"
 
           echo "APPCAST_STAGE=$stage" >> $GITHUB_ENV
 
