@@ -6,6 +6,14 @@
         <description>Most recent changes with links to updates.</description>
         <language>en</language>
         <item>
+            <title>0.99</title>
+            <pubDate>Wed, 28 Oct 2026 14:25:28 +0000</pubDate>
+            <sparkle:version>54</sparkle:version>
+            <sparkle:shortVersionString>0.99</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.99/CouchTour-v0.99.zip" length="12614160" type="application/octet-stream" sparkle:edSignature="DJBLUQe0MJuzD7sIF/i47PciCQhdr1+gZ6GtL9dGoJiuVtLXUjnAf4MKT5GHhU9/E+DDnNFId39T0leqeTJoAg=="/>
+        </item>
+        <item>
             <title>0.97</title>
             <pubDate>Tue, 27 Oct 2026 13:12:34 +0000</pubDate>
             <sparkle:version>51</sparkle:version>
@@ -20,14 +28,6 @@
             <sparkle:shortVersionString>0.97</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.97/CouchTour-v0.97.zip" length="12614066" type="application/octet-stream" sparkle:edSignature="Od34tIlVafIzItTIvvR0XPfv7OyUXUhXE/sg8JCZEd/lkEoPQyc8mWh9jwGCMxIhOFvAJeXExqq5PYMGIXt4Aw=="/>
-        </item>
-        <item>
-            <title>0.94</title>
-            <pubDate>Sat, 24 Oct 2026 03:10:19 +0000</pubDate>
-            <sparkle:version>48</sparkle:version>
-            <sparkle:shortVersionString>0.94</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/mkny13/couch-tour/releases/download/v0.94/CouchTour-v0.94.zip" length="12580943" type="application/octet-stream" sparkle:edSignature="tX0hjfGEEmVl18Nbfc5AHEFhqTKopaalM8HxST8G+IFshBE100WREXfbzzBCHAkgk1DXf/roPMSuuH+Om+8vAw=="/>
         </item>
         <item>
             <title>Version 0.51</title>
