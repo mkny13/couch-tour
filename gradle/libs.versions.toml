@@ -15,7 +15,7 @@ navigation = "2.10.2"
 media3 = "1.11.1"
 # Kept in step with what media3-cast itself depends on, so the declared versions are the
 # ones that actually resolve.
-castFramework = "22.3.1"
+castFramework = "23.0.0"
 mediarouter = "1.8.1"
 room = "2.8.5"
 okhttp = "5.5.0"
