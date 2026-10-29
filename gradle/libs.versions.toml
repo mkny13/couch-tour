@@ -3,7 +3,7 @@
 # room 2.8.5, androidx-security-crypto 1.1.0-alpha06, workManager 2.11.2,
 # coil 2.7.0, camerax 1.4.1, mlkitBarcode 17.3.0, zxingCore 3.5.3
 [versions]
-agp = "9.4.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 ksp = "2.3.12"
 coreKtx = "1.19.1"
@@ -18,10 +18,10 @@ media3 = "1.11.1"
 castFramework = "22.3.1"
 mediarouter = "1.8.1"
 room = "2.8.5"
-okhttp = "5.5.0"
-serialization = "1.11.0"
+okhttp = "5.5.1"
+serialization = "1.12.0"
 coil = "2.7.0"
-palette = "1.0.0"
+palette = "1.1.0"
 securityCrypto = "1.1.0-alpha06"
 workManager = "2.12.0"
 zxingCore = "3.5.4"
