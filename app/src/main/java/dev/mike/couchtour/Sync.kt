@@ -344,6 +344,7 @@ class SyncTokenStore(context: Context) {
     private var memoryLastFavoritesPushWatermark: Long = 0L
     private var memoryLastSyncedAt: Long = 0L
 
+    @Suppress("DEPRECATION")
     private fun open(context: Context): SharedPreferences? = try {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
         EncryptedSharedPreferences.create(
