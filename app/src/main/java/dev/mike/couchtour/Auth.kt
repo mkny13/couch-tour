@@ -47,6 +47,7 @@ class TokenStore(context: Context) {
     private var memoryJwt: String? = null
     private var memoryUsername: String? = null
 
+    @Suppress("DEPRECATION")
     private fun open(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)

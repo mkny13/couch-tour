@@ -1,6 +1,6 @@
 # Audited baseline versions (no open CVEs as of Sept 2026):
 # okhttp 5.5.0, media3 1.10.1, play-services-cast-framework 22.1.0,
-# room 2.8.5, androidx-security-crypto 1.1.0-alpha06, workManager 2.11.2,
+# room 2.8.5, androidx-security-crypto 1.1.0, workManager 2.11.2,
 # coil 2.7.0, camerax 1.4.1, mlkitBarcode 17.3.0, zxingCore 3.5.3
 [versions]
 agp = "9.5.0"
@@ -22,7 +22,7 @@ okhttp = "5.5.1"
 serialization = "1.12.0"
 coil = "2.7.0"
 palette = "1.1.0"
-securityCrypto = "1.1.0-alpha06"
+securityCrypto = "1.1.0"
 workManager = "2.12.0"
 zxingCore = "3.5.4"
 # YouTube stream resolution (#232): the planning note's recommended choice — no API key,
