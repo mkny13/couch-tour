@@ -337,6 +337,8 @@ struct HomeView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(colors.accentTintText)
                     )
+                    // A stroke-only circle under .plain has no hit area inside the ring (#802).
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Play \(item.trackTitle)")
