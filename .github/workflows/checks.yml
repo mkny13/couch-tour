@@ -27,6 +27,15 @@ jobs:
         run: scripts/checks/test_check_workflow_permissions.sh
       - name: Check every workflow declares top-level permissions
         run: scripts/checks/check-workflow-permissions.sh
+  workflow-injection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Self-test the workflow-injection check
+        run: scripts/checks/test_check_workflow_injection.sh
+      - name: Check workflows do not interpolate untrusted expressions directly in run blocks
+        run: scripts/checks/check-workflow-injection.sh
   hook-paths:
     runs-on: ubuntu-latest
     timeout-minutes: 5

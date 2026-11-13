@@ -63,7 +63,7 @@ check_smoke_report() {
     local fail_id
     while IFS= read -r fail_id; do
         [ -z "$fail_id" ] && continue
-        if ! grep -q -E "^Waived:[[:space:]]*$fail_id[[:space:]]*-" "$report_file"; then
+        if ! grep -q -E "^Waived:[[:space:]]*${fail_id}[[:space:]]*-" "$report_file"; then
             echo "report at $report_file claims Smoke: PASS but contains unwaived FAIL journey: $fail_id"
             return 1
         fi
