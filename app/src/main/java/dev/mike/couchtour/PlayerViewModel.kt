@@ -414,18 +414,22 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (items.isEmpty()) return
         
-        val modifiedItems = if (isResume && startIndex in items.indices) {
-            val list = items.toMutableList()
-            val item = list[startIndex]
-            val extras = android.os.Bundle(item.mediaMetadata.extras ?: android.os.Bundle()).apply {
-                putBoolean(Keys.IS_RESUME, true)
+        val effectiveResume = isResume || startPositionMs > 0L
+        val safeIndex = startIndex.coerceIn(0, items.lastIndex)
+
+        val modifiedItems = if (effectiveResume) {
+            items.mapIndexed { _, item ->
+                val extras = android.os.Bundle(item.mediaMetadata.extras ?: android.os.Bundle()).apply {
+                    putBoolean(Keys.IS_RESUME, true)
+                    putInt(Keys.START_INDEX, safeIndex)
+                    putLong(Keys.START_POSITION_MS, startPositionMs)
+                }
+                val meta = item.mediaMetadata.buildUpon().setExtras(extras).build()
+                item.buildUpon().setMediaMetadata(meta).build()
             }
-            val meta = item.mediaMetadata.buildUpon().setExtras(extras).build()
-            list[startIndex] = item.buildUpon().setMediaMetadata(meta).build()
-            list
         } else items
 
-        c.setMediaItems(modifiedItems, startIndex.coerceIn(0, modifiedItems.lastIndex), startPositionMs)
+        c.setMediaItems(modifiedItems, safeIndex, startPositionMs)
         c.prepare()
         c.play()
     }
