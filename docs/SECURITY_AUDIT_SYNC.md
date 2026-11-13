@@ -1,40 +1,52 @@
-# Security audit: sync backend (#475, part of #473)
+# Security audit: sync backend (#804, part of #801)
 
-Previous pass: #220 (commit 73a7564, which only touched `package-lock.json`; no report was written).
-Diff the next pass against this file. Scope: `sync/` Worker, re-checked against D120 and D150–D154 after `git diff 73a7564..HEAD -- sync/` (changes in `src/index.ts`, `schema.sql`, tests, lockfile).
+Previous pass: #475 (commit `c314a1e2`, 2026-10-02).
+Diff this pass against commit `c314a1e2` (`git diff c314a1e2..HEAD -- sync/`).
+Scope: `sync/` Cloudflare Worker backend, re-checked against D120 and D150–D154 across changes in `src/index.ts`, `schema.sql`, `types.ts`, test suite, and lockfile.
 Line numbers refer to `sync/src/index.ts` at this PR.
 
 ## Findings fixed in this PR
 | # | Finding | Fix | Test (fails without the fix) |
 |---|---|---|---|
-| 1 | `POST /pair/start` (unauthenticated) and `/pair/claim` stored `deviceName`/`platform` with no length cap and parsed an unbounded body, so one unauthenticated request could write a very large row. | `deviceLabels()` caps name at 128 / platform at 32 chars (400); `/pair/*` bodies capped at 4 KiB (413). | `/pair/start rejects an oversized body…`, `…over-long deviceName…`, `/pair/claim rejects an over-long platform` |
-| 2 | `/sync` only enforced `MAX_SYNC_BODY_BYTES` through `Content-Length`; a chunked upload (no header) was read in full. | `readJson(request, maxBytes)` counts streamed bytes and cancels past the cap (413); the header check stays as a fast path. | `/sync enforces the body cap on a chunked upload…` |
-| 3 | `.gitignore` covered only `sync/.dev.vars`. | Added `sync/.dev.vars.*`, `sync/.env`, `sync/.env.*`. | `git check-ignore sync/.env.local sync/.dev.vars.staging` (no repo check; low value) |
-| 4 | Top-level `wrangler` pulled undici 7.29.0 / sharp 0.35.2 (advisories). | `npm update wrangler` (non-breaking): 4.134 → 4.146, lockfile only. | `npm audit` (see Dependencies) |
+| 1 | Dev-only `undici` dependency under `@cloudflare/vitest-plugin` / nested `miniflare` had 1 high severity vulnerability in version range 7.0.0–7.30.0 (GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c, GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx, GHSA-qrxm-fqhp-jwvm, GHSA-9fm3-97px-rjf6, GHSA-55wc-3pg8-jfw6). | `npm update undici` (non-breaking, lockfile only within existing `"undici": "^7.29.1"` override): 7.30.0 → 7.30.2. | `npm audit` (found 0 vulnerabilities, see Dependencies) |
+
+## Router at HEAD (routes & handlers)
+Every route in the router at HEAD (lines 836–853) and the scheduled purge entrypoint (line 883), verified for authentication, body/field limits, SQL binding, and cross-group isolation:
+
+| Route | Status / Change since `c314a1e2` | Auth | Size & Field Caps | SQL Binding & Group Isolation |
+|---|---|---|---|---|
+| `GET /health` | Unchanged | None (open by design) | N/A (no request body) | OK: Static query `SELECT 1` to test D1 connectivity for deploy gates. |
+| `POST /pair/start` | Unchanged | Optional (open for new group bootstrap, authenticated for adding to existing group) | `readJson` 4 KiB cap (`MAX_PAIR_BODY_BYTES`, 413). `deviceName` capped at 128 chars, `platform` at 32 chars (400). | OK: Rate-limited via `PAIR_START_LIMITER` (5/10s/IP) on unauthenticated bootstrap branch. All `INSERT` queries bound via `.prepare().bind()`. |
+| `POST /pair/claim` | Unchanged | None (unauthenticated; authenticated by single-use 8-char base32 code, 10-minute TTL) | `readJson` 4 KiB cap (`MAX_PAIR_BODY_BYTES`, 413). `code` capped at 64 chars, `deviceName` at 128, `platform` at 32 (400). | OK: `SELECT`, `UPDATE` and `INSERT` all bound with SHA-256 code hash. Raw token returned once. |
+| `POST /sync` | Changed: added `favoriteArtistChanges` push/pull handling (`parseFavoriteArtistFields`, `applyIncomingFavoriteArtistChanges`) | Required (401 without valid bearer token) | `readJson` 2 MiB cap (`MAX_SYNC_BODY_BYTES`, 413). `changes` <= 500 (413). `favoriteArtistChanges` <= 500 (413), must be array (400). Field caps: `queueKey` / `artistKey` <= 512 chars (non-empty); `title`, `subtitle`, `trackTitle`, `artist` <= 1024 chars; non-negative ints for `trackIndex`, `positionMs`, `deletedAt` (400). | OK: Strictly scoped to caller's `device.groupId`. Key existence queries chunked to 90 bound parameters (`KEY_LOOKUP_CHUNK` <= 100 D1 limit). Every query uses `.prepare().bind()`. |
+| `GET /devices` | Unchanged | Required (401 without valid bearer token) | N/A (no request body) | OK: Scoped to caller's `device.groupId` and `revokedAt IS NULL`. Never returns token hashes. |
+| `DELETE /devices/{id}` | Unchanged | Required (401 without valid bearer token) | N/A (no request body) | OK: Looks up target device and enforces `target.groupId === device.groupId` (403 if in another group, 404 if not found). Bound `UPDATE devices SET revokedAt`. Revocation takes immediate effect on subsequent calls. |
+| `scheduled` (`purgeOldTombstones`) | Changed: added `favorite_artists` tombstones to 180-day retention purge batch | Cron Trigger (internal event, not HTTP-facing) | N/A | OK: Queries candidate max seqs across `progress` and `favorite_artists` via index-backed `deletedAt < ?` range query. Bumps `retentionFloorSeq` in same batch before deleting tombstones. |
 
 ## Checks
 | Check | Result | Evidence |
 |---|---|---|
-| Token hashing at rest (D120) | OK | Tokens/codes are random (`crypto.getRandomValues`, 256-bit token, `src/crypto.ts`), stored only as SHA-256 (`auth.ts`, `handlePairStart/Claim`); raw token returned once. |
-| Two-slot rotation | OK | `authenticate` accepts `previousTokenHash` only while `previousTokenExpiresAt > now`; `handleSync` detects previous-token use. |
-| Revocation takes effect immediately | OK | `authenticate` rejects `revokedAt !== null` on every request. |
-| Routes needing auth | OK | `/sync`, `GET /devices`, `DELETE /devices/{id}` all 401 without a device; `DELETE` also checks same group (403). Open by design: `/health`, `/pair/start`, `/pair/claim`. |
-| Rate limit on `/pair/start` (D150) | OK | `PAIR_START_LIMITER`, 5/10s/IP on the unauthenticated branch only; declared for prod and staging in `wrangler.toml`. |
-| `/pair/claim` guessing | OK, noted | No attempt limiter; relies on 8 chars of a 32-symbol alphabet (~2^40) and a 10-minute TTL (D127). Accepted; a limiter would be a design change, not done here. Code input also length-capped now. |
-| Request-size caps | Fixed (#1, #2) | `MAX_SYNC_BODY_BYTES` 2 MiB, `MAX_CHANGES_PER_SYNC` 500, field caps via `text()`; pair routes now capped. |
-| Error bodies | OK | Top-level `catch` in `fetch` returns `{error:"internal error"}` and logs the exception; error messages are static strings or validation text, never tokens or stack traces. Tokens are never logged (`console.log` lines print counts/timings only). |
-| CORS absent (D154) | OK | No `Access-Control-*` anywhere in `src/`. |
-| Tracked `.env` / `.dev.vars` | OK | `git ls-files` finds none. |
-| Secrets in `wrangler.toml` | OK | Only D1 `database_id`s (identifiers, not credentials), rate-limit namespace ids, cron. No `[vars]`. Deploy credentials live in GitHub Actions secrets, not the repo. |
-| Outbound surface | OK | No `fetch(` call in `src/` apart from the `export default { fetch }` handler; no `connect()`/sockets. |
-| `Env` bindings | OK | `src/types.ts`: only `DB` (D1) and `PAIR_START_LIMITER`. |
-| SQL injection | OK | Every query uses `.prepare().bind()`; no string-built SQL. |
+| Token hashing at rest (D120) | OK | Tokens/codes generated via `crypto.getRandomValues` (256-bit token, `src/crypto.ts`), stored exclusively as SHA-256 hex digest (`auth.ts`, `handlePairStart`, `handlePairClaim`); raw token returned once over HTTPS. |
+| Two-slot rotation | OK | `authenticate` accepts `previousTokenHash` only while `previousTokenExpiresAt > now`; `rotateTokenIfDue` rotates tokens older than 90 days or when previous token was used, granting 48h grace. |
+| Revocation takes effect immediately | OK | `authenticate` verifies `revokedAt !== null` on every request. Revoking a device immediately causes 401 on next call (tested in `sync.test.ts`). |
+| Routes needing auth | OK | `/sync`, `GET /devices`, `DELETE /devices/{id}` all return 401 without a valid device token; `DELETE` enforces group boundary (403 for cross-group target). Open by design: `/health`, `/pair/start`, `/pair/claim`. |
+| Rate limit on `/pair/start` (D150) | OK | `PAIR_START_LIMITER`, 5/10s per `CF-Connecting-IP` on the unauthenticated bootstrap branch; declared for prod and staging in `wrangler.toml`. |
+| `/pair/claim` guessing | OK, noted | Code space: 8 chars of 32-symbol alphabet (~10^12 possibilities) against 10-minute TTL (D127). Code length capped at 64 chars before hashing. |
+| Request-size & field caps | OK | `MAX_SYNC_BODY_BYTES` (2 MiB), `MAX_CHANGES_PER_SYNC` (500) on both `changes` and `favoriteArtistChanges`; `MAX_PAIR_BODY_BYTES` (4 KiB); string and integer limits enforced via `text()`, `int()`, and `optionalNonNegativeInt()`. |
+| Error bodies | OK | Top-level catch in `fetch` logs unhandled exceptions and returns generic `{error:"internal error"}` (500). Validation errors return specific field diagnostic strings; credentials and internal traces never leak to client. |
+| Logging bounds | OK | `console.log` lines record timings and item counts only (`handleSync` line 518, `scheduled` line 886). Tokens, codes, and request bodies are never logged. |
+| CORS absent (D154) | OK | No `Access-Control-*` headers anywhere in `sync/src/`. Clients are native mobile and desktop apps. |
+| Tracked `.env` / `.dev.vars` | OK | `git ls-files sync` returns no `.env*` or `.dev.vars*` files. All variants ignored in `.gitignore`. |
+| Secrets in `wrangler.toml` | OK | Contains only D1 database IDs, rate-limit namespace IDs, cron triggers, and environment names. No `[vars]` or secrets. Deploy tokens managed in GitHub Actions secrets. |
+| Outbound surface | OK | No outbound `fetch(` or network calls in `sync/src/` (only the exported Worker `fetch` handler). |
+| `Env` bindings | OK | `sync/src/types.ts`: only `DB` (D1Database) and `PAIR_START_LIMITER` (RateLimit). |
+| SQL injection | OK | Every query in `sync/src/index.ts` and `sync/src/auth.ts` uses `.prepare().bind()`; dynamic `IN (?,?,...)` placeholders generated from chunk sizes with all parameters bound. |
 
 ## Dependencies
 | Check | Result | Evidence |
 |---|---|---|
-| `npm audit --omit=dev` | OK | `found 0 vulnerabilities` (the Worker has no runtime dependencies). |
-| `npm audit` (all) | Filed as #483 | 5 high, dev-only: undici <7.29.1 and sharp <0.35.4 under `@cloudflare/vitest-pool-workers@0.22.0` (latest), which pins its own nested miniflare. `npm audit fix --force` would downgrade it to 0.8.30; no fixed release exists. Top-level `wrangler` is already on patched versions after this PR. |
+| `npm audit --omit=dev` | OK | `found 0 vulnerabilities` (the Worker backend has 0 production runtime dependencies). |
+| `npm audit` (all) | OK | `found 0 vulnerabilities`. Previously reported 1 high severity advisory on `undici` (7.0.0–7.30.0) under nested `miniflare`. Updated `undici` to 7.30.2 via `npm update undici` in `package-lock.json` (lockfile only, within existing `"undici": "^7.29.1"` override). Prior advisory issue #483 remains resolved. |
 
 ## Not covered
-- Live prod/staging behaviour was not probed; this is a source and lockfile audit.
+- Live production and staging instances were not probed directly; this is a source, schema, query plan, and lockfile audit.
