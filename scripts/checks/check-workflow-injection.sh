@@ -15,6 +15,7 @@ import sys
 
 PATTERN = re.compile(r"\$\{\{\s*(?:github\.event\b|inputs\b|github\.head_ref\b)")
 RUN_KEY = re.compile(r"^(?:-\s+)?run\s*:\s*(.*)$")
+BLOCK_SCALAR = re.compile(r"^(?:[|>][0-9+-]*)?(?:\s*#.*)?$")
 
 dir_path = sys.argv[1]
 workflow_files = sorted(glob.glob(os.path.join(dir_path, "*.yml")) + glob.glob(os.path.join(dir_path, "*.yaml")))
@@ -51,13 +52,12 @@ for f in workflow_files:
             m = RUN_KEY.match(line.lstrip(" "))
             if m:
                 rest = m.group(1).strip()
-                if rest in ("|", ">", "|-", ">-", "|+", ">+", ""):
+                if PATTERN.search(rest):
+                    print(f"FAIL: {f}:{i}: workflow injection hazard in run block: {stripped}", file=sys.stderr)
+                    fail = True
+                if BLOCK_SCALAR.match(rest):
                     in_run = True
-                    run_indent = indent
-                else:
-                    if PATTERN.search(rest):
-                        print(f"FAIL: {f}:{i}: workflow injection hazard in run block: {stripped}", file=sys.stderr)
-                        fail = True
+                    run_indent = line.index("run")
 
 if fail:
     sys.exit(1)
