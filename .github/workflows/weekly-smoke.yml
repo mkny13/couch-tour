@@ -38,12 +38,14 @@ jobs:
       - name: Check smoke report staleness and nudge
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           args=()
-          if [ -n "${{ inputs.tag }}" ]; then
-            args+=(--tag "${{ inputs.tag }}")
+          if [ -n "$INPUT_TAG" ]; then
+            args+=(--tag "$INPUT_TAG")
           fi
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
+          if [ "$INPUT_DRY_RUN" = "true" ]; then
             args+=(--dry-run)
           fi
           bash scripts/smoke-nudge.sh "${args[@]}"

@@ -80,9 +80,9 @@ for f in "${RESULTS[@]}"; do [[ -f "$f" ]] || die "results file not found: $f"; 
 
 lookup() { # lookup <needle> <array-name-of-keys> <array-name-of-values>
   local needle="$1" keys="$2" vals="$3" i n
-  eval "n=\${#$keys[@]}"
+  eval "n=\${#${keys}[@]}"
   for ((i = 0; i < n; i++)); do
-    local k v; eval "k=\${$keys[$i]}; v=\${$vals[$i]}"
+    local k v; eval "k=\${${keys}[$i]}; v=\${${vals}[$i]}"
     if [[ "$k" == "$needle" ]]; then printf '%s' "$v"; return 0; fi
   done
   return 1

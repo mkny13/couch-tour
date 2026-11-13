@@ -88,9 +88,10 @@ if [ "$use_gate" -eq 1 ] && command -v mahler >/dev/null 2>&1; then
         fi
 
         gate_rc=0
-        mahler desktop run --scheduled -- "$0" --no-gate \
-            $([ "$dry_run" -eq 1 ] && echo "--dry-run") \
-            $([ -n "$explicit_tag" ] && echo "--tag $explicit_tag") || gate_rc=$?
+        extra_args=()
+        [ "$dry_run" -eq 1 ] && extra_args+=(--dry-run)
+        [ -n "$explicit_tag" ] && extra_args+=(--tag "$explicit_tag")
+        mahler desktop run --scheduled -- "$0" --no-gate ${extra_args[@]+"${extra_args[@]}"} || gate_rc=$?
 
         if [ "$gate_rc" -eq 0 ]; then
             exit 0

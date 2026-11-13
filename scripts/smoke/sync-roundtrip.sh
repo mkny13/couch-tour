@@ -53,7 +53,7 @@ teardown() {
     fi
   fi
   [[ -z "$ABORT" || $rc -ne 0 ]] || { echo "ERROR: $ABORT" >&2; rc=2; }
-  exit $rc
+  exit "$rc"
 }
 trap teardown EXIT
 
