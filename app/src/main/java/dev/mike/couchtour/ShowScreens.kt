@@ -109,7 +109,7 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                         isSaved = isSaved,
                         onResume = {
                             if (progress != null) {
-                                vm.playShow(s, progress.trackIndex, progress.positionMs)
+                                vm.playShow(s, progress.trackIndex, progress.positionMs, isResume = true)
                             } else {
                                 vm.playShow(s, 0, 0)
                             }
@@ -121,7 +121,7 @@ fun ShowScreen(date: String, vm: PlayerViewModel, nav: NavHostController) {
                 if (progress != null) {
                     item {
                         ResumeBanner(progress) {
-                            vm.playShow(s, progress.trackIndex, progress.positionMs)
+                            vm.playShow(s, progress.trackIndex, progress.positionMs, isResume = true)
                         }
                     }
                 }
@@ -178,7 +178,7 @@ fun RecordingScreen(
             // this fires once per switch rather than on every recomposition.
             LaunchedEffect(detail) {
                 if (resumeIndex != null && detail.tracks.isNotEmpty()) {
-                    vm.playRecording(detail, resumeIndex.coerceIn(0, detail.tracks.lastIndex), resumeMs ?: 0)
+                    vm.playRecording(detail, resumeIndex.coerceIn(0, detail.tracks.lastIndex), resumeMs ?: 0, isResume = true)
                 }
             }
             var addingToPlaylist by remember { mutableStateOf(false) }
@@ -217,7 +217,7 @@ fun RecordingScreen(
                         isSaved = isSaved,
                         onResume = {
                             if (progress != null) {
-                                vm.playRecording(detail, progress.trackIndex, progress.positionMs)
+                                vm.playRecording(detail, progress.trackIndex, progress.positionMs, isResume = true)
                             } else {
                                 vm.playRecording(detail, 0, 0)
                             }
@@ -229,7 +229,7 @@ fun RecordingScreen(
                 if (progress != null) {
                     item {
                         ResumeBanner(progress) {
-                            vm.playRecording(detail, progress.trackIndex, progress.positionMs)
+                            vm.playRecording(detail, progress.trackIndex, progress.positionMs, isResume = true)
                         }
                     }
                 }

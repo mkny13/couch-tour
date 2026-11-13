@@ -64,6 +64,8 @@ object Keys {
     const val DURATION_MS = "duration_ms"
     const val LEVELING_KEY = "leveling_key"
     const val IS_RESUME = "is_resume"
+    const val START_POSITION_MS = "start_position_ms"
+    const val START_INDEX = "start_index"
 
     /** YouTube playback (#234): the resolved stream URLs and the current playback mode. */
     const val YOUTUBE_AUDIO_URL = "youtube_audio_url"
@@ -80,6 +82,7 @@ object Keys {
         LIKED, LIKES_COUNT, FLAC_URL, MP3_URL, SHOW_DATE, VENUE_NAME, ARTIST_NAME, ARTIST_ID,
         SHOW_RATING, TAPE_LINEAGE, SET_NAME, TRACK_POSITION, DURATION_MS,
         LEVELING_KEY,
+        IS_RESUME, START_POSITION_MS, START_INDEX,
         YOUTUBE_AUDIO_URL, YOUTUBE_VIDEO_URL, YOUTUBE_MODE,
         IS_JAM_CHART, TRACK_SLUG, JAM_CHART_NOTES
     )
@@ -117,7 +120,8 @@ private const val GAPLESS_PRELOAD_US = 10_000_000L
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
 
-    private var session: MediaLibrarySession? = null
+    @androidx.annotation.VisibleForTesting
+    internal var session: MediaLibrarySession? = null
     private var localPlayer: ExoPlayer? = null
     private var castPlayer: RemoteCastPlayer? = null
     private var handoff: Handoff? = null
@@ -315,7 +319,8 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    private val playerListener = object : Player.Listener {
+    @androidx.annotation.VisibleForTesting
+    internal val playerListener = object : Player.Listener {
         private var wasPlaying = false
         private var currentTrackId: String? = null
         private var justChangedTracks = false
@@ -375,8 +380,10 @@ class PlaybackService : MediaLibraryService() {
                 "state" to playbackStateName(state),
                 "playWhenReady" to session?.player?.playWhenReady
             )
-            saveNow()
-            SyncSession.requestDebouncedPush(progressDao())
+            if (state == Player.STATE_READY || state == Player.STATE_ENDED) {
+                saveNow()
+                SyncSession.requestDebouncedPush(progressDao())
+            }
         }
 
         private fun logPlaybackStart(isUnpause: Boolean) {
@@ -385,7 +392,8 @@ class PlaybackService : MediaLibraryService() {
             val trackId = extras?.getString(Keys.TRACK_ID) ?: item.mediaId
             val show = extras?.getString(Keys.SHOW_DATE) ?: extras?.getString(Keys.QUEUE_KEY).orEmpty()
             val source = extras?.getString(Keys.BACKEND) ?: "phishin"
-            val isResume = isUnpause || (extras?.getBoolean(Keys.IS_RESUME, false) == true)
+            val targetIndex = extras?.getInt(Keys.START_INDEX, -1) ?: -1
+            val isResume = isUnpause || (extras?.getBoolean(Keys.IS_RESUME, false) == true && (targetIndex == -1 || targetIndex == session?.player?.currentMediaItemIndex))
             DiagnosticsLog.log(
                 "playback.start",
                 "track" to trackId,
@@ -504,13 +512,35 @@ class PlaybackService : MediaLibraryService() {
         val extras = item.mediaMetadata.extras ?: return
         val key = extras.getString(Keys.QUEUE_KEY) ?: return
 
+        // If player is idle (e.g. stopped/released), do not overwrite saved progress.
+        if (player.playbackState == Player.STATE_IDLE) return
+
+        val isResume = extras.getBoolean(Keys.IS_RESUME, false)
+        val requestedIdx = extras.getInt(Keys.START_INDEX, -1)
+        val requestedPos = extras.getLong(Keys.START_POSITION_MS, 0L)
+
+        // Protect against initial preparation/transition replacing the requested resume target:
+        // 1) If the player is on a track before the target track, retain the target index.
+        val trackIndex = if (isResume && requestedIdx >= 0 && player.currentMediaItemIndex < requestedIdx) {
+            requestedIdx
+        } else {
+            player.currentMediaItemIndex
+        }
+
+        // 2) If the player has not yet advanced past the requested start timestamp, retain the requested position.
+        val positionMs = if (isResume && requestedPos > 0L && trackIndex == requestedIdx && player.currentPosition < requestedPos) {
+            requestedPos
+        } else {
+            player.currentPosition.coerceAtLeast(0)
+        }
+
         val progress = Progress(
             queueKey = key,
             title = extras.getString(Keys.QUEUE_TITLE).orEmpty(),
             subtitle = extras.getString(Keys.QUEUE_SUBTITLE).orEmpty(),
             artUrl = extras.getString(Keys.QUEUE_ART),
-            trackIndex = player.currentMediaItemIndex,
-            positionMs = player.currentPosition.coerceAtLeast(0),
+            trackIndex = trackIndex,
+            positionMs = positionMs,
             trackTitle = item.mediaMetadata.title?.toString().orEmpty(),
             updatedAt = System.currentTimeMillis(),
             // Derived, never passed in: STATE_ENDED means the queue ran out, i.e. the show
