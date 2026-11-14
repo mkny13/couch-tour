@@ -126,6 +126,8 @@ class PlaybackServiceResumeTest {
         assertNotNull("Progress should be saved in DB", recorded)
         assertEquals("Track index must remain at the saved non-first track", 2, recorded!!.trackIndex)
         assertEquals("Position must remain at the saved nonzero timestamp", 45_000L, recorded.positionMs)
+        // Title must describe the retained track, not the track-0 item the player passed through.
+        assertEquals("Track title must match the retained track index", "Halley's Comet", recorded.trackTitle)
     }
 
     @Test
@@ -173,6 +175,8 @@ class PlaybackServiceResumeTest {
         assertNotNull("Progress should be saved in DB", recorded)
         assertEquals("Track index must remain at the saved non-first track", 2, recorded!!.trackIndex)
         assertEquals("Position must remain at the saved nonzero timestamp", 45_000L, recorded.positionMs)
+        // Title must describe the retained track, not the track-0 item the player passed through.
+        assertEquals("Track title must match the retained track index", "Halley's Comet", recorded.trackTitle)
     }
 
     @Test
