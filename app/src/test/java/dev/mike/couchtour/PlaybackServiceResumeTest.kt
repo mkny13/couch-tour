@@ -43,17 +43,19 @@ class PlaybackServiceResumeTest {
             }""",
         ),
         relisten = mapOf(
-            "/artists/widespread-panic" to """{"id":1,"name":"Widespread Panic","slug":"widespread-panic","featured":1,"show_count":100}""",
-            "/artists/widespread-panic/shows/2000-05-06" to """{
+            "/v3/artists" to """[{"uuid":"a-1","name":"Widespread Panic","slug":"widespread-panic","show_count":100}]""",
+            // The real RelistenApi.show path (v2) and the required track `uuid`: with either
+            // wrong the resume never loads a queue and the test passes without exercising it.
+            "/v2/artists/widespread-panic/shows/2000-05-06" to """{
                 "id":1001,"display_date":"2000-05-06",
                 "sources":[{
                     "id":2001,"uuid":"src-1234",
                     "sets":[{
                         "index":1,"name":"Set 1",
                         "tracks":[
-                            {"id":3001,"title":"Chilly Water","duration":400,"mp3_url":"https://example.invalid/rec1.mp3"},
-                            {"id":3002,"title":"Space Wrangler","duration":500,"mp3_url":"https://example.invalid/rec2.mp3"},
-                            {"id":3003,"title":"Pigeons","duration":600,"mp3_url":"https://example.invalid/rec3.mp3"}
+                            {"uuid":"t-3001","title":"Chilly Water","duration":400,"mp3_url":"https://example.invalid/rec1.mp3"},
+                            {"uuid":"t-3002","title":"Space Wrangler","duration":500,"mp3_url":"https://example.invalid/rec2.mp3"},
+                            {"uuid":"t-3003","title":"Pigeons","duration":600,"mp3_url":"https://example.invalid/rec3.mp3"}
                         ]
                     }]
                 }]
