@@ -662,3 +662,183 @@ describe("security audit #475: request-size and field caps", () => {
     expect(res.status).toBe(413);
   });
 });
+
+describe("security audit #804: route authorization, isolation, and favorite artist caps", () => {
+  test("/sync rejects favoriteArtistChanges exceeding 500 entries with 413", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const overSized = Array.from({ length: 501 }, (_, i) => ({
+      artistKey: `artist-${i}`,
+      updatedAt: 1000,
+    }));
+    const res = await sync(tokenA, 0, [], overSized);
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("favoriteArtistChanges exceeds 500 entries");
+  });
+
+  test("/sync rejects non-array favoriteArtistChanges with 400", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const res = await call(
+      req("/sync", {
+        method: "POST",
+        headers: { authorization: `Bearer ${tokenA}` },
+        body: JSON.stringify({ since: 0, changes: [], favoriteArtistChanges: "not-an-array" }),
+      })
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("favoriteArtistChanges must be an array when present");
+  });
+
+  test("/sync rejects an over-long artistKey with 400", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const res = await sync(tokenA, 0, [], [{ artistKey: "x".repeat(513), updatedAt: 1000 }]);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("favoriteArtistChanges[0].artistKey exceeds 512 characters");
+  });
+
+  test("/sync rejects an empty artistKey with 400", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const res = await sync(tokenA, 0, [], [{ artistKey: "", updatedAt: 1000 }]);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("favoriteArtistChanges[0].artistKey must not be empty");
+  });
+
+  test("/sync rejects negative deletedAt in favoriteArtistChanges with 400", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const res = await sync(tokenA, 0, [], [{ artistKey: "phish", updatedAt: 1000, deletedAt: -1 }]);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("favoriteArtistChanges[0].deletedAt must not be negative");
+  });
+
+  test("/sync rejects non-integer updatedAt in favoriteArtistChanges with 400", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const res = await sync(tokenA, 0, [], [{ artistKey: "phish", updatedAt: "invalid" as never }]);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("favoriteArtistChanges[0].updatedAt must be an integer");
+  });
+
+  test("GET /devices returns 401 when unauthenticated", async () => {
+    const res = await call(req("/devices", { method: "GET" }));
+    expect(res.status).toBe(401);
+  });
+
+  test("GET /devices lists group devices and respects group boundaries", async () => {
+    const group1 = await pairTwoDevices();
+    const group2 = await pairTwoDevices();
+
+    const res1 = await call(
+      req("/devices", { method: "GET", headers: { authorization: `Bearer ${group1.tokenA}` } })
+    );
+    expect(res1.status).toBe(200);
+    const body1 = (await res1.json()) as { devices: { deviceId: string; isSelf: boolean }[] };
+    expect(body1.devices).toHaveLength(2);
+    expect(body1.devices.filter((d) => d.isSelf)).toHaveLength(1);
+
+    // Group 2's devices are isolated from Group 1's device list
+    const res2 = await call(
+      req("/devices", { method: "GET", headers: { authorization: `Bearer ${group2.tokenA}` } })
+    );
+    const body2 = (await res2.json()) as { devices: { deviceId: string }[] };
+    const group1Ids = new Set(body1.devices.map((d) => d.deviceId));
+    for (const d of body2.devices) {
+      expect(group1Ids.has(d.deviceId)).toBe(false);
+    }
+  });
+
+  test("DELETE /devices/:id requires authentication and returns 401 without bearer token", async () => {
+    const res = await call(req("/devices/some-device-id", { method: "DELETE" }));
+    expect(res.status).toBe(401);
+  });
+
+  test("DELETE /devices/:id returns 404 for unknown device id", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const res = await call(
+      req("/devices/non-existent-device", {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${tokenA}` },
+      })
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test("DELETE /devices/:id rejects revoking a device in another group with 403", async () => {
+    const group1 = await pairTwoDevices();
+    const group2A = await pairStart("g2-dev-a");
+
+    const res = await call(
+      req(`/devices/${group2A.deviceId}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${group1.tokenA}` },
+      })
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("not in your group");
+  });
+
+  test("DELETE /devices/:id revokes a device in the same group and immediately rejects its sync requests with 401", async () => {
+    const a = await pairStart("dev-a");
+    const b = await pairClaim(a.code, "dev-b");
+
+    // Device B can sync before revocation
+    const beforeRes = await sync(b.deviceToken, 0, []);
+    expect(beforeRes.status).toBe(200);
+
+    // Device A revokes Device B
+    const revokeRes = await call(
+      req(`/devices/${b.deviceId}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${a.deviceToken}` },
+      })
+    );
+    expect(revokeRes.status).toBe(200);
+
+    // Device B is immediately rejected on next sync
+    const afterRes = await sync(b.deviceToken, 0, []);
+    expect(afterRes.status).toBe(401);
+
+    // Device B is omitted from GET /devices
+    const listRes = await call(
+      req("/devices", { method: "GET", headers: { authorization: `Bearer ${a.deviceToken}` } })
+    );
+    const listBody = (await listRes.json()) as { devices: { deviceId: string }[] };
+    expect(listBody.devices.map((d) => d.deviceId)).toEqual([a.deviceId]);
+  });
+
+  test("purgeOldTombstones purges favorite_artists tombstones and counts them", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const device = await deviceRowForToken(tokenA);
+    const now = Date.now();
+    const TOMBSTONE_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+    const oldEnough = now - TOMBSTONE_RETENTION_MS - 1000;
+
+    await env.DB.prepare(
+      `INSERT INTO favorite_artists
+         (groupId, artistKey, updatedAt, deletedAt, seq, lastWriterDeviceId)
+       VALUES (?, 'old-artist', ?, ?, 5, ?)`
+    )
+      .bind(device.groupId, oldEnough, oldEnough, device.id)
+      .run();
+
+    const stats = await purgeOldTombstones(env, now);
+    expect(stats.groupsPurged).toBe(1);
+    expect(stats.rowsPurged).toBe(1);
+
+    const remaining = await env.DB.prepare(
+      "SELECT COUNT(*) AS c FROM favorite_artists WHERE groupId = ? AND artistKey = 'old-artist'"
+    )
+      .bind(device.groupId)
+      .first<{ c: number }>();
+    expect(remaining!.c).toBe(0);
+
+    const floor = await env.DB.prepare("SELECT retentionFloorSeq FROM seqs WHERE groupId = ?")
+      .bind(device.groupId)
+      .first<{ retentionFloorSeq: number }>();
+    expect(floor!.retentionFloorSeq).toBe(5);
+  });
+});
