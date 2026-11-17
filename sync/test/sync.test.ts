@@ -725,6 +725,8 @@ describe("security audit #804: route authorization, isolation, and favorite arti
   test("GET /devices returns 401 when unauthenticated", async () => {
     const res = await call(req("/devices", { method: "GET" }));
     expect(res.status).toBe(401);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("unauthorized");
   });
 
   test("GET /devices lists group devices and respects group boundaries", async () => {
@@ -743,7 +745,9 @@ describe("security audit #804: route authorization, isolation, and favorite arti
     const res2 = await call(
       req("/devices", { method: "GET", headers: { authorization: `Bearer ${group2.tokenA}` } })
     );
+    expect(res2.status).toBe(200);
     const body2 = (await res2.json()) as { devices: { deviceId: string }[] };
+    expect(body2.devices).toHaveLength(2);
     const group1Ids = new Set(body1.devices.map((d) => d.deviceId));
     for (const d of body2.devices) {
       expect(group1Ids.has(d.deviceId)).toBe(false);
@@ -753,6 +757,8 @@ describe("security audit #804: route authorization, isolation, and favorite arti
   test("DELETE /devices/:id requires authentication and returns 401 without bearer token", async () => {
     const res = await call(req("/devices/some-device-id", { method: "DELETE" }));
     expect(res.status).toBe(401);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("unauthorized");
   });
 
   test("DELETE /devices/:id returns 404 for unknown device id", async () => {
@@ -764,6 +770,8 @@ describe("security audit #804: route authorization, isolation, and favorite arti
       })
     );
     expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("no such device");
   });
 
   test("DELETE /devices/:id rejects revoking a device in another group with 403", async () => {
@@ -779,6 +787,11 @@ describe("security audit #804: route authorization, isolation, and favorite arti
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain("not in your group");
+
+    const target = await env.DB.prepare("SELECT revokedAt FROM devices WHERE id = ?")
+      .bind(group2A.deviceId)
+      .first<{ revokedAt: number | null }>();
+    expect(target?.revokedAt).toBeNull();
   });
 
   test("DELETE /devices/:id revokes a device in the same group and immediately rejects its sync requests with 401", async () => {
