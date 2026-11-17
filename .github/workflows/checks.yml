@@ -59,3 +59,21 @@ jobs:
       - uses: actions/checkout@v7
       - name: Self-test the appcast check
         run: scripts/checks/test_check_appcast.sh
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Self-test the shellcheck check
+        run: scripts/checks/test_check_shellcheck.sh
+      - name: Run shellcheck over scripts
+        run: scripts/checks/check-shellcheck.sh
+  token-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Self-test the token-scope check
+        run: scripts/checks/test_check_token_scope.sh
+      - name: Check CLOUDFLARE_API_TOKEN is strictly step-scoped in sync-deploy.yml
+        run: scripts/checks/check-token-scope.sh

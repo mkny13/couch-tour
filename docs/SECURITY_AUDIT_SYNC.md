@@ -8,7 +8,7 @@ Line numbers refer to `sync/src/index.ts` at this PR.
 ## Findings fixed in this PR
 | # | Finding | Fix | Test (fails without the fix) |
 |---|---|---|---|
-| 1 | Dev-only `undici` dependency under `@cloudflare/vitest-plugin` / nested `miniflare` had 1 high severity vulnerability in version range 7.0.0–7.30.0 (GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c, GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx, GHSA-qrxm-fqhp-jwvm, GHSA-9fm3-97px-rjf6, GHSA-55wc-3pg8-jfw6). | `npm update undici` (non-breaking, lockfile only within existing `"undici": "^7.29.1"` override): 7.30.0 → 7.30.2. | `npm audit` (found 0 vulnerabilities, see Dependencies) |
+| 1 | Dev-only `undici` dependency under `@cloudflare/vitest-plugin` / nested `miniflare` had 1 high severity vulnerability in version range 7.0.0–7.30.0 (GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c, GHSA-4w7w-5xrc-9h26, GHSA-2m5v-pch6-74hx, GHSA-qrxm-fqhp-jwvm, GHSA-9fm3-97px-rjf6, GHSA-55wc-3pg8-jfw6). | `npm update undici` (non-breaking, lockfile only within existing `"undici": "^7.29.1"` override): 7.30.0 → 7.30.2. | `npm audit` (`sync-deploy.yml` CI step `npm audit --audit-level=high`, see Dependencies) |
 
 ## Router at HEAD (routes & handlers)
 Every route in the router at HEAD (lines 836–853) and the scheduled purge entrypoint (line 883), verified for authentication, body/field limits, SQL binding, and cross-group isolation:
