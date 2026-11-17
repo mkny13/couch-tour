@@ -663,6 +663,20 @@ describe("security audit #475: request-size and field caps", () => {
   });
 });
 
+// Guards pinned by each test in this describe block (security audit #804, issue #821 / #823):
+//  1. MAX_CHANGES_PER_SYNC cap on favoriteArtistChanges (sync/src/index.ts:384) -> 413
+//  2. Array.isArray(favoriteArtistChanges) validation (sync/src/index.ts:381) -> 400
+//  3. MAX_QUEUE_KEY_CHARS cap on artistKey (sync/src/index.ts:340) -> 400
+//  4. artistKey non-empty validation (sync/src/index.ts:341) -> 400
+//  5. deletedAt non-negative validation (sync/src/index.ts:345) -> 400
+//  6. updatedAt integer validation (sync/src/index.ts:344) -> 400
+//  7. Unauthenticated GET /devices route auth (sync/src/index.ts:796) -> 401
+//  8. Group boundary isolation in GET /devices query (sync/src/index.ts:799) -> returns only caller's group
+//  9. Unauthenticated DELETE /devices/:id route auth (sync/src/index.ts:818) -> 401
+// 10. Unknown device lookup in DELETE /devices/:id (sync/src/index.ts:823) -> 404
+// 11. Cross-group revocation prevention in DELETE /devices/:id (sync/src/index.ts:824) -> 403 & unmutated DB
+// 12. Device revocation in DELETE /devices/:id (sync/src/index.ts:826) -> immediate 401 on next sync & excluded from device list
+// 13. Favorite artists tombstone purge and count in purgeOldTombstones (sync/src/index.ts:783, 786) -> purges expired rows and counts them
 describe("security audit #804: route authorization, isolation, and favorite artist caps", () => {
   test("/sync rejects favoriteArtistChanges exceeding 500 entries with 413", async () => {
     const { tokenA } = await pairTwoDevices();
