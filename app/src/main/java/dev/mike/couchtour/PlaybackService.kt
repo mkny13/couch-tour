@@ -541,7 +541,10 @@ class PlaybackService : MediaLibraryService() {
             artUrl = extras.getString(Keys.QUEUE_ART),
             trackIndex = trackIndex,
             positionMs = positionMs,
-            trackTitle = item.mediaMetadata.title?.toString().orEmpty(),
+            // From the item at the saved index, not the current one: during resume preparation
+            // the player can sit on an earlier track while we retain the requested target.
+            trackTitle = (if (trackIndex in 0 until player.mediaItemCount) player.getMediaItemAt(trackIndex) else item)
+                .mediaMetadata.title?.toString().orEmpty(),
             updatedAt = System.currentTimeMillis(),
             // Derived, never passed in: STATE_ENDED means the queue ran out, i.e. the show
             // played through its encore. Deriving it here means the several listeners that
