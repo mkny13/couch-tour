@@ -748,7 +748,7 @@ Amends D324 and the CI audit gate in #828. PR #829 added `npm audit --audit-leve
 
 - **Two-tier audit policy:**
   1. Production runtime dependencies (`npm audit --omit=dev --audit-level=high`) must strictly have 0 high or critical vulnerabilities. No production exceptions or allowlists are permitted.
-  2. Dev dependencies are audited via `scripts/checks/check-sync-audit.sh`. It enforces that any reported vulnerability originates from an explicitly allowlisted, documented dev advisory (currently `GHSA-fc5q-39xc-vjpf`, safe in dev test runner). Any unapproved advisory or unresolved vulnerable package fails the check with an actionable error.
+  2. Dev dependencies are audited via `scripts/checks/check-sync-audit.sh`. It parses the npm audit JSON report, requiring a valid report with no audit errors (e.g. `ENOAUDIT` or missing payload) and enforces that any reported vulnerability originates from an explicitly allowlisted, documented dev advisory (currently `GHSA-fc5q-39xc-vjpf`, safe in dev test runner). Any unapproved advisory, unresolved vulnerable package, or audit failure fails the check with an actionable error.
 - **PR gate & test coverage:** `scripts/checks/check-sync-audit.sh` and its self-test `scripts/checks/test_check_sync_audit.sh` run under the `sync-audit` job in `.github/workflows/checks.yml`, catching regressions on PR branches before merge.
 - **Workflow & package integration:** `.github/workflows/sync-deploy.yml` and `sync/package.json`'s `"audit"` script invoke `scripts/checks/check-sync-audit.sh`, unblocking staging and production deploys on `main`.
 

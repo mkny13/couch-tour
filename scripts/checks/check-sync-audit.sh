@@ -67,8 +67,8 @@ allowed = {a.strip() for a in re.split(r'[, \t\n]+', allowed_input) if a.strip()
 raw_json = sys.argv[2]
 
 if not raw_json.strip():
-    print("Dev audit clean: empty audit output.", file=sys.stderr)
-    sys.exit(0)
+    print("FAIL: empty dev audit output (expected JSON audit report)", file=sys.stderr)
+    sys.exit(1)
 
 try:
     data = json.loads(raw_json)
@@ -76,7 +76,29 @@ except Exception as e:
     print(f"FAIL: could not parse npm audit JSON: {e}\nRaw output:\n{raw_json}", file=sys.stderr)
     sys.exit(1)
 
-vulnerabilities = data.get("vulnerabilities", {})
+if not isinstance(data, dict):
+    print(f"FAIL: npm audit JSON is not an object:\n{raw_json}", file=sys.stderr)
+    sys.exit(1)
+
+if "error" in data:
+    err = data["error"]
+    msg = data.get("message", "")
+    print(f"FAIL: npm audit returned error: {err} {msg}".strip(), file=sys.stderr)
+    sys.exit(1)
+
+if "errors" in data:
+    print(f"FAIL: npm audit returned errors: {data['errors']}", file=sys.stderr)
+    sys.exit(1)
+
+if "vulnerabilities" not in data:
+    print(f"FAIL: npm audit JSON missing 'vulnerabilities' field:\n{raw_json}", file=sys.stderr)
+    sys.exit(1)
+
+vulnerabilities = data["vulnerabilities"]
+if not isinstance(vulnerabilities, dict):
+    print(f"FAIL: npm audit 'vulnerabilities' field is not an object:\n{raw_json}", file=sys.stderr)
+    sys.exit(1)
+
 if not vulnerabilities:
     print("Dev audit clean: 0 dev vulnerabilities found.")
     sys.exit(0)

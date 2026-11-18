@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Self-test for check-sync-audit.sh:
-# 1. Real repository sync directory passes (clean prod, allowlisted dev advisory GHSA-fc5q-39xc-vjpf).
-# 2. Clean audit fixture (0 prod, 0 dev vulnerabilities) passes.
-# 3. Allowlisted dev advisory fixture passes.
-# 4. Unapproved dev advisory fixture fails.
-# 5. Production vulnerability failure causes check to fail immediately.
+# 1. Clean audit fixture (0 prod, 0 dev vulnerabilities) passes.
+# 2. Allowlisted dev advisory fixture passes.
+# 3. Unapproved dev advisory fixture fails.
+# 4. Production vulnerability failure causes check to fail immediately.
+# 5. Production vulnerability failure causes check to fail even if dev is allowlisted.
 # 6. Custom ALLOWED_ADVISORIES override is respected.
+# 7. Dev audit error JSON (e.g. ENOAUDIT) causes check to fail.
+# 8. Dev audit empty output causes check to fail.
+# 9. Dev audit payload missing vulnerabilities field causes check to fail.
+# 10. Real repository sync directory passes (clean prod, allowlisted dev advisory GHSA-fc5q-39xc-vjpf).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -98,6 +102,27 @@ cat > "$tmp/unapproved_dev.json" << 'EOF'
 }
 EOF
 
+# Fixture: error JSON (e.g. ENOAUDIT from npm registry / network error)
+cat > "$tmp/error_enoaudit.json" << 'EOF'
+{
+  "error": {
+    "code": "ENOAUDIT",
+    "summary": "Your fetch was not successful",
+    "detail": "audit endpoint returned error"
+  }
+}
+EOF
+
+# Fixture: empty output
+touch "$tmp/empty.json"
+
+# Fixture: missing vulnerabilities field
+cat > "$tmp/missing_vulnerabilities.json" << 'EOF'
+{
+  "message": "some registry warning or unexpected payload"
+}
+EOF
+
 # 1. Clean audit fixture must pass
 echo "Testing clean audit fixture..."
 AUDIT_PROD_EXIT=0 AUDIT_DEV_JSON_FILE="$tmp/clean.json" "$check" >/dev/null
@@ -134,7 +159,28 @@ if ALLOWED_ADVISORIES="GHSA-9999-9999-9999" AUDIT_PROD_EXIT=0 AUDIT_DEV_JSON_FIL
   exit 1
 fi
 
-# 7. Real repository sync directory must pass
+# 7. Dev audit error JSON (e.g. ENOAUDIT) must fail
+echo "Testing dev audit error payload (ENOAUDIT)..."
+if AUDIT_PROD_EXIT=0 AUDIT_DEV_JSON_FILE="$tmp/error_enoaudit.json" "$check" >/dev/null 2>&1; then
+  echo "FAIL: dev audit error JSON (ENOAUDIT) should have caused check to exit non-zero" >&2
+  exit 1
+fi
+
+# 8. Dev audit empty output must fail
+echo "Testing dev audit empty output..."
+if AUDIT_PROD_EXIT=0 AUDIT_DEV_JSON_FILE="$tmp/empty.json" "$check" >/dev/null 2>&1; then
+  echo "FAIL: dev audit empty output should have caused check to exit non-zero" >&2
+  exit 1
+fi
+
+# 9. Dev audit missing vulnerabilities field must fail
+echo "Testing dev audit missing vulnerabilities field..."
+if AUDIT_PROD_EXIT=0 AUDIT_DEV_JSON_FILE="$tmp/missing_vulnerabilities.json" "$check" >/dev/null 2>&1; then
+  echo "FAIL: dev audit payload without vulnerabilities field should have caused check to exit non-zero" >&2
+  exit 1
+fi
+
+# 10. Real repository sync directory must pass
 echo "Testing real sync backend directory..."
 "$check" >/dev/null
 
