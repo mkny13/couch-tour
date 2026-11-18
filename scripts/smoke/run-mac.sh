@@ -547,7 +547,7 @@ mac_run_home_sections_after_relaunch() {
   local missing=() timed_out=false
   local section home_timeout="${HOME_SECTIONS_TIMEOUT:-60}"
   local AX_DEEP_TIMEOUT_MS="${AX_DEEP_TIMEOUT_MS_HOME:-55000}"
-  for section in home.in_progress home.next_tour_stops home.on_this_date home.in_progress.card; do
+  for section in home.in_progress home.next_tour_stops home.discover home.in_progress.card; do
     if ! mac::wait_for_id "$section" "$home_timeout" "$DEEP" >/dev/null; then
       missing+=("$section")
       [[ "$MAC_AX_TIMED_OUT" == 1 ]] && timed_out=true

@@ -430,10 +430,9 @@ interface MusicSource {
      */
     suspend fun youtubeContent(artist: ArtistRef): List<YouTubeVideo> = emptyList()
 
-    /**
-     * All shows played on [month]/[day] across all years. Currently supported only by Relisten.
-     */
-    suspend fun showsOnDate(artist: ArtistRef, month: Int, day: Int): List<ShowSummary> = emptyList()
+    /** The artist's top-rated shows, as ranked by the backend itself (Home's Discover row,
+     *  #834). A backend with no ranking returns empty. */
+    suspend fun topShows(artist: ArtistRef): List<ShowSummary> = emptyList()
 }
 
 /** Shared by MainActivity's screens and PlaybackService's Auto browse tree — one seam, two callers. */
@@ -679,6 +678,9 @@ object PhishInSource : MusicSource {
     }
 
     override suspend fun search(term: String) = PhishInApi.search(term).toSearchHits()
+
+    override suspend fun topShows(artist: ArtistRef): List<ShowSummary> =
+        shows(artist, PeriodRef(POPULAR_PERIOD_ID, POPULAR_PERIOD_LABEL))
 
     /** Test-only hook: clears every cache above in one call, the way [RelistenCatalogSource] does. */
     internal fun resetCache() {

@@ -32,7 +32,7 @@ Historical implementation details and architectural choices are logged separatel
 - **Cross-Backend Local Playlists**: Local mixtape playlists mixing phish.in and Relisten tracks with parallelized track resolution on Android (#12, #41, D161, D175) and macOS (#59, #80, #81, D175).
 
 ### 3. Discovery & Browse Enhancements (Shipped)
-- **Home Screen "On This Date"**: Anniversary shows across favorited artists with backend-bounded request batching and caching (#13, #42, D162).
+- **Home Screen "Discover"**: A daily random pick of favorited artists' top-rated shows the user hasn't started, replacing "On This Date" (#834, D357).
 - **"Next Couch Tour Stop"**: Automatic discovery of unplayed shows on active tours for favorited artists (#22, #46, D164, D165).
 - **"Next Stop" Tour/Era Picker for Defunct Artists**: Lets users pick a past tour or era to track for bands that no longer tour, rather than a strict opt-out (#68, D190).
 - **Browse by Top Rated / Popular**: phish.in "Popular" synthetic period sorted by server likes; Relisten period-level `avg_rating` sort filter (#21, #33, D158–D159).

@@ -103,9 +103,13 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
         }
         val ledger = LocalLedgerColors.current
         val todayStr = remember(today) { today.toString() }
-        var onThisDateRetry by remember { mutableIntStateOf(0) }
-        val onThisDate = loadOnce(Triple(todayStr, favoritedArtists.map { it.key }, onThisDateRetry)) {
-            OnThisDate.load(favoritedArtists, todayStr)
+        var discoverRetry by remember { mutableIntStateOf(0) }
+        val discoverCandidates = loadOnce(Triple(todayStr, favoritedArtists.map { it.key }, discoverRetry)) {
+            Discover.load(favoritedArtists, todayStr)
+        }
+        val startedKeys by vm.progressDao.startedKeys().collectAsState(initial = emptyList())
+        val discover = remember(discoverCandidates.value, startedKeys, todayStr) {
+            discoverCandidates.value?.map { pickDiscoverShows(it, playedShowIds(startedKeys), todayStr) }
         }
         var nextStopRetry by remember { mutableIntStateOf(0) }
         val nextStopKey = remember(todayStr, favoritedArtists.map { it.key }, preferencesMap, nextStopRetry) {
@@ -375,11 +379,11 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                 }
             }
 
-            // ON THIS DATE section
-            loadedWithRetry(onThisDate.value, onRetry = { onThisDateRetry++ }) { shows ->
+            // DISCOVER section
+            loadedWithRetry(discover, onRetry = { discoverRetry++ }) { shows ->
                 if (shows.isNotEmpty()) {
                     item {
-                        Column(Modifier.testTag(A11yTags.HOME_SECTION_ON_THIS_DATE)) {
+                        Column(Modifier.testTag(A11yTags.HOME_SECTION_DISCOVER)) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -388,7 +392,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "ON THIS DATE",
+                                    text = "DISCOVER",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     letterSpacing = 1.2.sp,
@@ -406,7 +410,7 @@ fun HomeScreen(vm: PlayerViewModel, nav: NavHostController) {
                                     .padding(horizontal = 20.dp)
                             )
                             shows.forEach { show ->
-                                OnThisDateLedgerRow(show, nav, Modifier.testTag(A11yTags.homeOnThisDateRow("${show.artist.key}-${show.date}")))
+                                DiscoverLedgerRow(show, nav, Modifier.testTag(A11yTags.homeDiscoverRow("${show.artist.key}-${show.date}")))
                             }
                         }
                     }
@@ -752,7 +756,7 @@ internal fun InProgressLedgerRow(progress: Progress, vm: PlayerViewModel, nav: N
 }
 
 @Composable
-private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController, modifier: Modifier = Modifier) {
+private fun DiscoverLedgerRow(show: ShowSummary, nav: NavHostController, modifier: Modifier = Modifier) {
     val ledger = LocalLedgerColors.current
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -762,7 +766,7 @@ private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController, modif
                     when (show.artist.backend) {
                         Backend.PHISHIN -> nav.navigate("show/${show.date}")
                         Backend.RELISTEN -> nav.navigate("recording/relisten/${show.artist.id}/${show.date}")
-                        // On-this-date rows are tape shows; YouTube artists have none.
+                        // Discover rows are tape shows; YouTube artists have none.
                         Backend.YOUTUBE -> Unit
                     }
                 }
@@ -771,9 +775,8 @@ private fun OnThisDateLedgerRow(show: ShowSummary, nav: NavHostController, modif
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val year = show.date.take(4)
                     Text(
-                        text = year,
+                        text = show.date,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = ledger.textPrimary

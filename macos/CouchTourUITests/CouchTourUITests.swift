@@ -308,7 +308,7 @@ final class CouchTourUITests: XCTestCase {
         XCTAssertTrue(homeNav.waitForExistence(timeout: 10))
         homeNav.click()
 
-        for id in ["home.in_progress", "home.next_tour_stops", "home.on_this_date"] {
+        for id in ["home.in_progress", "home.next_tour_stops", "home.discover"] {
             XCTAssertTrue(app.descendants(matching: .any)[id].firstMatch.waitForExistence(timeout: 15),
                           "\(id) missing after relaunch")
         }

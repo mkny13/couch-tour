@@ -36,7 +36,7 @@ Launch "Couch Tour Beta" from `/Applications`.
 $ ./scripts/smoke/ax-tree.sh
 home.in_progress	AXGroup	In Progress
 home.next_tour_stops	AXGroup	Next Tour Stops
-home.on_this_date	AXGroup	On This Date
+home.discover	AXGroup	Discover
 sidebar.nav.artists	AXRow	Artists
 sidebar.nav.history	AXRow	History
 sidebar.nav.home	AXRow	Home

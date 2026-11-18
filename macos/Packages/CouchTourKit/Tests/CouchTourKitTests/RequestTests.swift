@@ -197,17 +197,16 @@ final class RequestTests: XCTestCase {
         )
     }
 
-    func testRelistenShowsOnDateRequestsPathWithMonthAndDayQueryParameters() async throws {
-        server.enqueue(#"[{"display_date":"1995-09-29"}]"#)
+    func testRelistenTopShowsRequestsPathWithLimit() async throws {
+        server.enqueue(#"[{"display_date":"1977-05-08","avg_rating":9.8}]"#)
 
-        let shows = try await RelistenAPI.showsOnDate(artistIdOrSlug: "moe", month: 9, day: 29)
+        let shows = try await RelistenAPI.topShows(artistIdOrSlug: "grateful-dead")
 
         let request = server.takeRequest()!
-        XCTAssertEqual(["api", "v2", "artists", "moe", "shows", "on-date"], request.pathSegments)
-        XCTAssertEqual("9", request.queryValue("month"))
-        XCTAssertEqual("29", request.queryValue("day"))
+        XCTAssertEqual(["api", "v2", "artists", "grateful-dead", "shows", "top"], request.pathSegments)
+        XCTAssertEqual("100", request.queryValue("limit"))
         XCTAssertEqual(1, shows.count)
-        XCTAssertEqual("1995-09-29", shows[0].displayDate)
+        XCTAssertEqual(9.8, shows[0].avgRating)
     }
 
     func testSendsNoAuthHeaderBecauseRelistenNeedsNone() async throws {

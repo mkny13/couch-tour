@@ -3,7 +3,7 @@ import SwiftUI
 
 /// One video in the artist page's YouTube section (#230). Matches `TrackTableRow`'s
 /// density — thumbnail, title, publish date — and the whole row is the play affordance,
-/// like Home's on-this-date cards. The tap goes to `Player.playYoutube(video:)`, which
+/// like Home's Discover cards. The tap goes to `Player.playYoutube(video:)`, which
 /// (#230 stub, #231 real) opens the Now Playing inspector.
 struct YouTubeVideoRow: View {
     let video: YouTubeVideo

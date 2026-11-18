@@ -16,8 +16,8 @@ object A11yTags {
     const val HOME_SECTION_NEXT_TOUR_STOPS = "home.section.next-tour-stops"
     fun homeNextTourStopRow(showKey: String) = "$HOME_SECTION_NEXT_TOUR_STOPS.row.$showKey"
 
-    const val HOME_SECTION_ON_THIS_DATE = "home.section.on-this-date"
-    fun homeOnThisDateRow(showKey: String) = "$HOME_SECTION_ON_THIS_DATE.row.$showKey"
+    const val HOME_SECTION_DISCOVER = "home.section.discover"
+    fun homeDiscoverRow(showKey: String) = "$HOME_SECTION_DISCOVER.row.$showKey"
 
     const val FAVORITES_LIST = "favorites.list"
     fun favoritesRow(artistKey: String) = "favorites.row.$artistKey"

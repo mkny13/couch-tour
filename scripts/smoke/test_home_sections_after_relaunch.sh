@@ -36,15 +36,15 @@ mac::wait_for_id() {
 }
 eval "$mac_fn"
 
-all="home.in_progress home.next_tour_stops home.on_this_date home.in_progress.card"
+all="home.in_progress home.next_tour_stops home.discover home.in_progress.card"
 mrun() { # <name> <want status> <want evidence substring> <ids> [timed-out ids]
   IDS="$4" TIMED_OUT_IDS="${5:-}" RESULT=""
   mac_run_home_sections_after_relaunch
   if [[ "$RESULT" == "mac|$2|"*"$3"* ]]; then ok "$1"; else bad "$1: got $RESULT"; fi
 }
 mrun "mac all present" PASS "" "$all"
-mrun "mac missing on_this_date" FAIL "home.on_this_date" "home.in_progress home.next_tour_stops home.in_progress.card"
-mrun "mac timed-out walk says so" FAIL "AX walk timed out" "home.in_progress home.in_progress.card" "home.next_tour_stops home.on_this_date"
+mrun "mac missing discover" FAIL "home.discover" "home.in_progress home.next_tour_stops home.in_progress.card"
+mrun "mac timed-out walk says so" FAIL "AX walk timed out" "home.in_progress home.in_progress.card" "home.next_tour_stops home.discover"
 # Walk budget: every section lookup gets the larger Home budget, not the 20 s default (#716)
 WAIT_TIMEOUTS="" mrun "mac budget" PASS "" "$all"
 [[ " ${WAIT_TIMEOUTS# } " != *" 1 "* && "$WAIT_TIMEOUTS" == *" 60"* ]] && ok "mac home walk budget >= 60s" || bad "mac home walk budget: '$WAIT_TIMEOUTS'"
@@ -70,8 +70,8 @@ arun() { # <name> <want status> <want evidence substring>
   android_run_home_sections_after_relaunch
   if [[ "$RESULT" == "android|$2|"*"$3"* ]]; then ok "$1"; else bad "$1: got $RESULT"; fi
 }
-ABSENT="" LATE="home.section.on-this-date"; arun "android appears after a scroll" PASS ""
-ABSENT="home.section.on-this-date" LATE=""; arun "android never appears" FAIL "home.section.on-this-date"
+ABSENT="" LATE="home.section.discover"; arun "android appears after a scroll" PASS ""
+ABSENT="home.section.discover" LATE=""; arun "android never appears" FAIL "home.section.discover"
 ABSENT="home.section.in-progress" LATE=""; arun "android no in-progress fixture" SKIP "fixture"
 
 (( failures == 0 )) || { echo "$failures failure(s)"; exit 1; }

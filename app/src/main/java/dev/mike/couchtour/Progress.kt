@@ -87,6 +87,11 @@ interface ProgressDao {
     @Query("SELECT queueKey FROM progress WHERE finished = 1 AND deletedAt IS NULL")
     fun finishedKeys(): Flow<List<String>>
 
+    /** Every queue key with any listening history — Home's Discover row (#834) hides a show
+     *  as soon as it's started, not only once it's finished. */
+    @Query("SELECT queueKey FROM progress WHERE deletedAt IS NULL")
+    fun startedKeys(): Flow<List<String>>
+
     @Query("SELECT * FROM progress WHERE queueKey = :key AND deletedAt IS NULL")
     suspend fun get(key: String): Progress?
 

@@ -420,6 +420,18 @@ public enum PhishInAPI {
         return page.shows
     }
 
+    /// The archive-wide top-by-likes list (Home's Discover shelf, #834), matching Android's
+    /// `PhishInApi.popularShows`.
+    public static func popularShows() async throws -> [Show] {
+        var components = path("shows")
+        components.queryItems = [
+            URLQueryItem(name: "audio_status", value: "complete_or_partial"),
+            URLQueryItem(name: "sort", value: "likes_count:desc"),
+            URLQueryItem(name: "per_page", value: "100"),
+        ]
+        return try decoder.decode(ShowsPage.self, from: try await get(components.url!)).shows
+    }
+
     public static func show(_ date: String) async throws -> Show {
         let url = path("shows", date).url!
         return try decoder.decode(Show.self, from: try await get(url))

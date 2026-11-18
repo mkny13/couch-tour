@@ -55,7 +55,7 @@ All smoke test scripts and runners adhere to the following exit-code convention:
 - **platforms**: `mac, android`
 - **fixture**: `seeded-favorite`
 - **steps**: With an active session having at least one track in progress and at least one favorited artist, terminate (force-quit) the application and relaunch it. Inspect the Home screen.
-- **pass condition**: All three Home sections are present: on macOS, `home.in_progress` (with at least one `home.in_progress.card.<queueKey>` card), `home.next_tour_stops`, and `home.on_this_date` are present; on Android, `home.section.in-progress`, `home.section.next-tour-stops`, and `home.section.on-this-date` are present.
+- **pass condition**: All three Home sections are present: on macOS, `home.in_progress` (with at least one `home.in_progress.card.<queueKey>` card), `home.next_tour_stops`, and `home.discover` are present; on Android, `home.section.in-progress`, `home.section.next-tour-stops`, and `home.section.discover` are present.
 
 ### `browse-artists-to-artist`
 
