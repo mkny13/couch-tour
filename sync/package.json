@@ -13,7 +13,7 @@
     "db:migrate:staging": "wrangler d1 execute couch-tour-sync-staging --remote --file=schema.sql",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "audit": "npm audit --audit-level=high"
+    "audit": "../scripts/checks/check-sync-audit.sh"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.6.0",
