@@ -725,3 +725,11 @@ Promoting a beta previously dispatched `build-debug-apk.yml` and `macos-release.
 Re-affirms D27 and D28. In commit `decc3ccbf` (#494), `android:allowBackup="false"` was dropped when adopting `android:dataExtractionRules` and `android:fullBackupContent="false"`. Because `android:allowBackup` defaults to true when omitted, `ApplicationInfo.FLAG_ALLOW_BACKUP` remained set on API < 31 devices or tools querying the flag. Restored `android:allowBackup="false"` to `<application>` in `AndroidManifest.xml` alongside `android:dataExtractionRules="@xml/data_extraction_rules"`. All 5 domains (`root`, `file`, `database`, `sharedpref`, `external`) remain excluded in `data_extraction_rules.xml` for both cloud-backup and device-transfer. Added `ManifestSecurityTest` (Robolectric) to permanently enforce `FLAG_ALLOW_BACKUP == 0`, `FLAG_USES_CLEARTEXT_TRAFFIC == 0`, exact matching of the three exported components (`MainActivity`, `TvMainActivity`, `PlaybackService`), and full storage-domain exclusions in `data_extraction_rules.xml`.
 
 
+
+### D356: Token rotation is conditional on the token hash the request read (#832)
+
+Amends the 90-day rotation in the archived token design. `rotateTokenIfDue` read the device row and then unconditionally overwrote `tokenHash`, so two concurrent `/sync` requests that both saw the token as due each rotated it. Both wrote `previousTokenHash = <old>`, and the second write orphaned the first request's new token. A client that kept that token got a 401 on its next sync and unlinked itself. Seen live on the prod Mac on 2026-11-18, whose two launch-time syncs overlapped on the day its pairing turned 90 days old. The phone still listed the Mac as paired.
+
+- The rotation `UPDATE` now adds `AND tokenHash = <hash read at auth>`. When it changes no row, another request already rotated, and this response carries no `X-Sync-Token-Rotated` header. The client keeps the token it has, which is still current or within the 48-hour grace window.
+- Server-only fix: clients are unchanged, and overlapping syncs stay harmless.
+- Check: `sync/test/sync.test.ts` "#832" parks both rotation `UPDATE`s until both requests reach them, then asserts every token a client could end up holding still authenticates. It fails against the old `UPDATE`.
