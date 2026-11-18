@@ -77,3 +77,15 @@ jobs:
         run: scripts/checks/test_check_token_scope.sh
       - name: Check CLOUDFLARE_API_TOKEN is strictly step-scoped in sync-deploy.yml
         run: scripts/checks/check-token-scope.sh
+  sync-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Self-test the sync-audit check
+        run: scripts/checks/test_check_sync_audit.sh
+      - name: Audit sync dependencies
+        run: scripts/checks/check-sync-audit.sh

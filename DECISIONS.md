@@ -741,3 +741,14 @@ Supersedes the Home-row parts of D162, D300, D307 and D334. The Home row/shelf n
 - **Reshuffles once a day:** the candidate list is cached in memory per date + favorites (incomplete results aren't cached). The pick shuffles with a seed derived from the date digits (`20261118`), not `hashCode`/`hashValue`, so it's stable all day and differs tomorrow. Candidates are put in canonical order first so fan-out order doesn't change the pick.
 - **Unplayed means never started:** any non-deleted `progress` row for the show excludes it (Android `ProgressDao.startedKeys()`, macOS `ProgressStore.history()`), applied live like Next Stop's finished filter. The shuffle runs before the filter, so starting one show swaps in the next pick without reshuffling the rest.
 - **Identifiers:** Android `home.section.discover`, macOS `home.discover`; smoke journeys updated.
+
+### D358: Production-clean sync audit gate with dev advisory allowlist (#839)
+
+Amends D324 and the CI audit gate in #828. PR #829 added `npm audit --audit-level=high` directly into `.github/workflows/sync-deploy.yml`, which runs on push to `main` for `sync/**`. The step immediately broke deployments because npm reported high-severity vulnerability GHSA-fc5q-39xc-vjpf on `picomatch` (a transitive devDependency of `vitest`). Although GitHub officially withdrew GHSA-fc5q-39xc-vjpf as an invalid AI-generated report, npm registry's audit endpoint continues to serve it with no upstream patch available. Because `sync-deploy.yml` had no PR-level counterpart, the failure was only discovered post-merge.
+
+- **Two-tier audit policy:**
+  1. Production runtime dependencies (`npm audit --omit=dev --audit-level=high`) must strictly have 0 high or critical vulnerabilities. No production exceptions or allowlists are permitted.
+  2. Dev dependencies are audited via `scripts/checks/check-sync-audit.sh`. It parses the npm audit JSON report, requiring a valid report with no audit errors (e.g. `ENOAUDIT` or missing payload) and enforces that any reported vulnerability originates from an explicitly allowlisted, documented dev advisory (currently `GHSA-fc5q-39xc-vjpf`, safe in dev test runner). Any unapproved advisory, unresolved vulnerable package, or audit failure fails the check with an actionable error.
+- **PR gate & test coverage:** `scripts/checks/check-sync-audit.sh` and its self-test `scripts/checks/test_check_sync_audit.sh` run under the `sync-audit` job in `.github/workflows/checks.yml`, catching regressions on PR branches before merge.
+- **Workflow & package integration:** `.github/workflows/sync-deploy.yml` and `sync/package.json`'s `"audit"` script invoke `scripts/checks/check-sync-audit.sh`, unblocking staging and production deploys on `main`.
+
