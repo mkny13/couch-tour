@@ -79,8 +79,8 @@ describe("query plans", () => {
     await expectIndexBacked("SELECT groupId FROM devices WHERE id = ?", "d0-0");
     await expectIndexBacked("UPDATE devices SET revokedAt = ? WHERE id = ?", 1, "d0-0");
     await expectIndexBacked(
-      "UPDATE devices SET previousTokenHash = ?, previousTokenExpiresAt = ?, tokenHash = ?, tokenIssuedAt = ? WHERE id = ?",
-      "a", 1, "b", 1, "d0-0"
+      "UPDATE devices SET previousTokenHash = ?, previousTokenExpiresAt = ?, tokenHash = ?, tokenIssuedAt = ? WHERE id = ? AND tokenHash = ?",
+      "a", 1, "b", 1, "d0-0", "th0-0"
     );
   });
 

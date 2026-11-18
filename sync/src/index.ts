@@ -416,14 +416,19 @@ async function rotateTokenIfDue(
 
   const newToken = randomToken();
   const newHash = await sha256Hex(newToken);
-  await env.DB.prepare(
+  // Conditional on the tokenHash this request read: two concurrent requests that both saw the
+  // row as due would otherwise both rotate, and the second write would orphan the token the
+  // first handed back — a client keeping that one is then unlinked (#832). The loser sends
+  // no header; whatever token its client holds is still current or in grace.
+  const result = await env.DB.prepare(
     `UPDATE devices
      SET previousTokenHash = ?, previousTokenExpiresAt = ?,
          tokenHash = ?, tokenIssuedAt = ?
-     WHERE id = ?`
+     WHERE id = ? AND tokenHash = ?`
   )
-    .bind(requestTokenHash, now + TOKEN_GRACE_MS, newHash, now, device.id)
+    .bind(requestTokenHash, now + TOKEN_GRACE_MS, newHash, now, device.id, device.tokenHash)
     .run();
+  if (result.meta.changes === 0) return {};
   return { "X-Sync-Token-Rotated": newToken };
 }
 

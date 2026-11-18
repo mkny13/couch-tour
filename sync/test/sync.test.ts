@@ -855,3 +855,68 @@ describe("security audit #804: route authorization, isolation, and favorite arti
     expect(floor!.retentionFloorSeq).toBe(5);
   });
 });
+
+describe("#832: token rotation under concurrent requests", () => {
+  test("every token handed back by racing rotations still authenticates", async () => {
+    const { tokenA } = await pairTwoDevices();
+    const device = await deviceRowForToken(tokenA);
+    // Past the 90-day rotation age, so the next /sync rotates.
+    await env.DB.prepare("UPDATE devices SET tokenIssuedAt = ? WHERE id = ?")
+      .bind(Date.now() - 91 * 24 * 60 * 60 * 1000, device.id)
+      .run();
+
+    // Park each rotation UPDATE until both requests have reached it, so both have already
+    // read the same pre-rotation device row — the interleaving seen live when a client fires
+    // two launch-time syncs at once. Same bind-patching approach as the F2 test above.
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    let arrived = 0;
+    let releaseBarrier: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      releaseBarrier = resolve;
+    });
+    env.DB.prepare = ((sql: string) => {
+      const stmt = originalPrepare(sql);
+      if (sql.includes("SET previousTokenHash")) {
+        const originalBind = stmt.bind.bind(stmt);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (stmt as any).bind = (...bindArgs: unknown[]) => {
+          const bound = originalBind(...bindArgs);
+          const originalRun = bound.run.bind(bound);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (bound as any).run = async (...args: unknown[]) => {
+            arrived += 1;
+            if (arrived >= 2) releaseBarrier!();
+            await barrier;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return (originalRun as any)(...args);
+          };
+          return bound;
+        };
+      }
+      return stmt;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+
+    let responses: Response[];
+    try {
+      responses = await Promise.all([sync(tokenA, 0, []), sync(tokenA, 0, [])]);
+    } finally {
+      releaseBarrier!();
+      env.DB.prepare = originalPrepare;
+    }
+    expect(arrived).toBe(2);
+
+    for (const response of responses) expect(response.status).toBe(200);
+    const handedBack = responses
+      .map((r) => r.headers.get("X-Sync-Token-Rotated"))
+      .filter((t): t is string => t !== null);
+    expect(handedBack.length).toBeGreaterThan(0);
+
+    // A client keeps whichever response it processed last, so each token it could end up
+    // holding — any rotated one, or the old one if no header came back — must still work.
+    for (const token of [...handedBack, tokenA]) {
+      const followUp = await sync(token, 0, []);
+      expect(followUp.status).toBe(200);
+    }
+  });
+});
