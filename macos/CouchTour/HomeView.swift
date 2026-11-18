@@ -20,6 +20,7 @@ struct HomeView: View {
 
     @State private var onThisDateError: Bool = false
     @State private var nextStopError: Bool = false
+    @State private var finishedKeys: Set<String> = []
 
     @State private var artistsError: String?
     @State private var progressError: String?
@@ -348,6 +349,11 @@ struct HomeView: View {
 
     // MARK: - Next Tour Stops Card
 
+    /// One row per favorite artist, each its next unplayed tour show (#833).
+    private var nextStopRows: [ShowSummary] {
+        nextStopPerArtist(candidates: nextStopShows, played: playedShowIds(from: finishedKeys))
+    }
+
     private var nextTourStopsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Top 2px Accent Bar: #f2a93b -> #f06bb0
@@ -402,8 +408,8 @@ struct HomeView: View {
                     }
                 }
                 .padding(.vertical, 24)
-            } else if !nextStopShows.isEmpty {
-                ForEach(nextStopShows.prefix(3), id: \.date) { show in
+            } else if !nextStopRows.isEmpty {
+                ForEach(nextStopRows, id: \.artist.key) { show in
                     tourStopRow(show: show)
                 }
             } else {
@@ -742,7 +748,9 @@ struct HomeView: View {
         }
         do {
             recent = try store.inProgress()
-            historyCount = try store.history().count
+            let history = try store.history()
+            historyCount = history.count
+            finishedKeys = Set(history.filter(\.finished).map(\.queueKey))
             tourPreferences = try store.getAllTourPreferences()
             progressError = nil
         } catch {

@@ -56,6 +56,42 @@ final class NextStopTests: XCTestCase {
 
     private let GRATEFUL_DEAD = ArtistRef(backend: .relisten, id: "grateful-dead", name: "Grateful Dead")
 
+    // #833: Phish's whole tour used to fill all three Home rows, hiding other favorites.
+    func testNextStopPerArtistGivesEachArtistOneRow() {
+        let goose = ArtistRef(backend: .relisten, id: "goose", name: "Goose")
+        let candidates = [
+            ShowSummary(artist: PHISH, date: "2026-10-02", tourName: "Fall Tour 2026"),
+            ShowSummary(artist: PHISH, date: "2026-10-03", tourName: "Fall Tour 2026"),
+            ShowSummary(artist: PHISH, date: "2026-10-04", tourName: "Fall Tour 2026"),
+            ShowSummary(artist: GRATEFUL_DEAD, date: "1995-07-08", tourName: "Summer 1995"),
+            ShowSummary(artist: GRATEFUL_DEAD, date: "1995-07-09", tourName: "Summer 1995"),
+            ShowSummary(artist: goose, date: "2026-10-02", tourName: "Fall 2026"),
+        ]
+        let played = playedShowIds(from: [showQueueKey("2026-10-02")])
+
+        let rows = nextStopPerArtist(candidates: candidates, played: played)
+
+        XCTAssertEqual(rows.map(\.artist.id), ["grateful-dead", "goose", "phish"])
+        XCTAssertEqual(rows.map(\.date), ["1995-07-08", "2026-10-02", "2026-10-03"])
+    }
+
+    func testNextStopPerArtistCapsAtLimitAndSkipsFullyPlayedArtists() {
+        let a = ArtistRef(backend: .relisten, id: "a", name: "A")
+        let b = ArtistRef(backend: .relisten, id: "b", name: "B")
+        let c = ArtistRef(backend: .relisten, id: "c", name: "C")
+        let candidates = [
+            ShowSummary(artist: PHISH, date: "2026-10-02", tourName: "T"),
+            ShowSummary(artist: a, date: "2026-01-01", tourName: "T"),
+            ShowSummary(artist: b, date: "2026-01-02", tourName: "T"),
+            ShowSummary(artist: c, date: "2026-01-03", tourName: "T"),
+        ]
+        let played = playedShowIds(from: [showQueueKey("2026-10-02")])
+
+        let rows = nextStopPerArtist(candidates: candidates, played: played, limit: 2)
+
+        XCTAssertEqual(rows.map(\.artist.id), ["a", "b"])
+    }
+
     func testCurrentTourShowsExcludesNotPartOfATourAndBlank() {
         let shows = [
             ShowSummary(artist: GRATEFUL_DEAD, date: "1995-07-09", tourName: notPartOfATour),

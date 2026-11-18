@@ -67,6 +67,23 @@ public func oldestUnplayed(candidates: [ShowSummary], played: Set<String>) -> Sh
     }
 }
 
+/// The macOS Home card's rows: each artist's `oldestUnplayed` show, oldest first, at most `limit`.
+/// One row per artist so a long tour can't crowd out the other favorites (#833, D298).
+public func nextStopPerArtist(
+    candidates: [ShowSummary],
+    played: Set<String>,
+    limit: Int = maxTourArtists
+) -> [ShowSummary] {
+    Dictionary(grouping: candidates, by: \.artist.key).values
+        .compactMap { oldestUnplayed(candidates: $0, played: played) }
+        .sorted { a, b in
+            if a.date != b.date { return a.date < b.date }
+            return a.artist.key < b.artist.key
+        }
+        .prefix(limit)
+        .map { $0 }
+}
+
 /// Fetches tour shows for an artist, supporting defunct artist resolution via `ArtistTourPreference` (#68, D190).
 public func tourFor(
     artist: ArtistRef,
