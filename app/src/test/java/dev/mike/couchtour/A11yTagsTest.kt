@@ -45,14 +45,14 @@ class A11yTagsTest {
             Column(Modifier.testTag(A11yTags.HOME_SECTION_NEXT_TOUR_STOPS)) {
                 Text("Next Tour Stops")
             }
-            Column(Modifier.testTag(A11yTags.HOME_SECTION_ON_THIS_DATE)) {
-                Text("On This Date")
+            Column(Modifier.testTag(A11yTags.HOME_SECTION_DISCOVER)) {
+                Text("Discover")
             }
         }
 
         compose.onNodeWithTag(A11yTags.HOME_SECTION_IN_PROGRESS, useUnmergedTree = true).assertExists()
         compose.onNodeWithTag(A11yTags.HOME_SECTION_NEXT_TOUR_STOPS, useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag(A11yTags.HOME_SECTION_ON_THIS_DATE, useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag(A11yTags.HOME_SECTION_DISCOVER, useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -93,7 +93,7 @@ class A11yTagsTest {
     fun `parameterized helpers produce the expected prefixes and values`() {
         assertEquals("home.section.in-progress.row.test1", A11yTags.homeInProgressRow("test1"))
         assertEquals("home.section.next-tour-stops.row.test2", A11yTags.homeNextTourStopRow("test2"))
-        assertEquals("home.section.on-this-date.row.test3", A11yTags.homeOnThisDateRow("test3"))
+        assertEquals("home.section.discover.row.test3", A11yTags.homeDiscoverRow("test3"))
         assertEquals("favorites.row.test4", A11yTags.favoritesRow("test4"))
     }
 }

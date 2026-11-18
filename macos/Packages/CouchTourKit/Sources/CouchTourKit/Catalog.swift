@@ -753,12 +753,12 @@ public protocol MusicSource {
     /// nothing to offer returns empty hits rather than throwing.
     func search(term: String) async throws -> SearchHits
 
-    /// All shows played on `month`/`day` across all years. Currently supported only by Relisten.
-    func showsOnDate(artist: ArtistRef, month: Int, day: Int) async throws -> [ShowSummary]
+    /// The artist's top-rated shows as the backend ranks them (Home's Discover shelf, #834).
+    func topShows(artist: ArtistRef) async throws -> [ShowSummary]
 }
 
 extension MusicSource {
-    public func showsOnDate(artist: ArtistRef, month: Int, day: Int) async throws -> [ShowSummary] {
+    public func topShows(artist: ArtistRef) async throws -> [ShowSummary] {
         []
     }
 }
@@ -909,6 +909,14 @@ public struct PhishInSource: MusicSource {
 
     public func search(term: String) async throws -> SearchHits {
         try await PhishInAPI.search(term).toSearchHits()
+    }
+
+    public func topShows(artist: ArtistRef) async throws -> [ShowSummary] {
+        let key = "top"
+        if let cached = await PhishInCatalogCache.shared.shows.get(key) { return cached }
+        let shows = try await PhishInAPI.popularShows().map { $0.toShowSummary() }
+        await PhishInCatalogCache.shared.shows.put(key, shows)
+        return shows
     }
 }
 

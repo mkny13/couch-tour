@@ -733,3 +733,11 @@ Amends the 90-day rotation in the archived token design. `rotateTokenIfDue` read
 - The rotation `UPDATE` now adds `AND tokenHash = <hash read at auth>`. When it changes no row, another request already rotated, and this response carries no `X-Sync-Token-Rotated` header. The client keeps the token it has, which is still current or within the 48-hour grace window.
 - Server-only fix: clients are unchanged, and overlapping syncs stay harmless.
 - Check: `sync/test/sync.test.ts` "#832" parks both rotation `UPDATE`s until both requests reach them, then asserts every token a client could end up holding still authenticates. It fails against the old `UPDATE`.
+### D357: Home "Discover" replaces "On This Date" (#834)
+
+Supersedes the Home-row parts of D162, D300, D307 and D334. The Home row/shelf now shows a random selection of the favorited artists' top-rated shows that the user hasn't started, on Android and macOS.
+
+- **Top rated, one request per artist:** phish.in uses its server-side top-by-likes list (`popularShows`, `sort=likes_count:desc`, the "Popular" period's source); Relisten uses `GET /v2/artists/{slug}/shows/top?limit=100`, sorted by `avg_rating`. `MusicSource.showsOnDate` is replaced by `MusicSource.topShows`. Relisten favorites stay capped at 10. The phish.in `year_range=` batching that On This Date needed is gone.
+- **Reshuffles once a day:** the candidate list is cached in memory per date + favorites (incomplete results aren't cached). The pick shuffles with a seed derived from the date digits (`20261118`), not `hashCode`/`hashValue`, so it's stable all day and differs tomorrow. Candidates are put in canonical order first so fan-out order doesn't change the pick.
+- **Unplayed means never started:** any non-deleted `progress` row for the show excludes it (Android `ProgressDao.startedKeys()`, macOS `ProgressStore.history()`), applied live like Next Stop's finished filter. The shuffle runs before the filter, so starting one show swaps in the next pick without reshuffling the rest.
+- **Identifiers:** Android `home.section.discover`, macOS `home.discover`; smoke journeys updated.

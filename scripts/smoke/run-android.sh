@@ -660,7 +660,7 @@ android_run_home_sections_after_relaunch() {
   # Top to bottom: the sections load asynchronously and sit in a LazyColumn, so a section
   # below the fold is absent from the dump until it is scrolled into view.
   local missing=() section
-  for section in home.section.in-progress home.section.next-tour-stops home.section.on-this-date; do
+  for section in home.section.in-progress home.section.next-tour-stops home.section.discover; do
     android::wait_for_tag "$section" 3 && continue
     android_scroll_to "$section" "" down && continue
     missing+=("$section")

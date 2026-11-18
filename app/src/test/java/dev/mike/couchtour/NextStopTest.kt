@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * The Home screen's "Next Couch Tour stop" row (#22). Pure functions and a fake [MusicSource],
- * the same split [OnThisDateTest] uses — no network call needed to check tour derivation, the
+ * the same split [DiscoverTest] uses — no network call needed to check tour derivation, the
  * unplayed filter, or the request-bounding logic.
  */
 class NextStopTest {

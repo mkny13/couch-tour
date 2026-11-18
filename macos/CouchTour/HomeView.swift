@@ -5,7 +5,7 @@ import SwiftUI
 /// Contains the Top bar with Date and In Progress header,
 /// In-Progress Shelf of 236px cards with 2px top progress bars,
 /// NEXT TOUR STOPS card table with top accent bar, and
-/// ON THIS DATE shelf of 236px cards.
+/// DISCOVER shelf of 236px cards.
 struct HomeView: View {
     @EnvironmentObject private var appModel: AppModel
     @EnvironmentObject private var player: Player
@@ -14,11 +14,12 @@ struct HomeView: View {
     @State private var relistenArtists: [ArtistRef] = []
     @State private var recent: [PlaybackProgress] = []
     @State private var historyCount: Int = 0
-    @State private var onThisDateShows: [ShowSummary] = []
+    @State private var discoverCandidates: [ShowSummary] = []
+    @State private var startedShowIds: Set<String> = []
     @State private var nextStopShows: [ShowSummary] = []
     @State private var tourPreferences: [ArtistTourPreference] = []
 
-    @State private var onThisDateError: Bool = false
+    @State private var discoverError: Bool = false
     @State private var nextStopError: Bool = false
 
     @State private var artistsError: String?
@@ -66,11 +67,11 @@ struct HomeView: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier(AXIdentifiers.homeNextTourStops)
 
-                // On This Date Shelf
-                onThisDateShelf
+                // Discover Shelf
+                discoverShelf
                     .padding(.bottom, 24)
                     .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier(AXIdentifiers.homeOnThisDate)
+                    .accessibilityIdentifier(AXIdentifiers.homeDiscover)
 
                 browsePlaylistsRow
                     .padding(.bottom, 24)
@@ -511,20 +512,27 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - On This Date Shelf
+    // MARK: - Discover Shelf
 
-    private var onThisDateShelf: some View {
-        VStack(alignment: .leading, spacing: 0) {
+    /// Applied live rather than cached with the candidates, so a show leaves the shelf as soon
+    /// as it's started instead of at midnight.
+    private var discoverShows: [ShowSummary] {
+        pickDiscoverShows(candidates: discoverCandidates, started: startedShowIds, today: today)
+    }
+
+    private var discoverShelf: some View {
+        let discoverShows = discoverShows
+        return VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
-                Text("ON THIS DATE")
+                Text("DISCOVER")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.4)
                     .foregroundStyle(colors.textMuted)
 
                 Spacer()
 
-                Text("\(onThisDateShows.count) shows")
+                Text("\(discoverShows.count) shows")
                     .font(.system(size: 12))
                     .foregroundStyle(colors.textMuted)
             }
@@ -535,7 +543,7 @@ struct HomeView: View {
             GradientHairline(height: 1, opacity: 0.85)
                 .padding(.horizontal, 24)
 
-            if onThisDateError {
+            if discoverError {
                 VStack(spacing: 12) {
                     ContentUnavailableView(
                         "Couldn't load shows",
@@ -548,20 +556,20 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 20)
-            } else if onThisDateShows.isEmpty {
+            } else if discoverShows.isEmpty {
                 ContentUnavailableView(
-                    "No shows on this date",
-                    systemImage: "calendar",
-                    description: Text("Favorites playing today will show up here.")
+                    "Nothing to discover",
+                    systemImage: "sparkles",
+                    description: Text("Top-rated shows from your favorites that you haven't started will show up here.")
                 )
                 .padding(.horizontal, 24)
                 .padding(.vertical, 20)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
-                        ForEach(onThisDateShows, id: \.date) { show in
+                        ForEach(discoverShows, id: \.self) { show in
                             NavigationLink(value: Route.show(show)) {
-                                onThisDateCard(show: show)
+                                discoverCard(show: show)
                             }
                             .buttonStyle(.plain)
                         }
@@ -574,7 +582,7 @@ struct HomeView: View {
         }
     }
 
-    private func onThisDateCard(show: ShowSummary) -> some View {
+    private func discoverCard(show: ShowSummary) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Text(ArtistAbbreviations.label(for: show.artist.name))
@@ -742,7 +750,9 @@ struct HomeView: View {
         }
         do {
             recent = try store.inProgress()
-            historyCount = try store.history().count
+            let history = try store.history()
+            historyCount = history.count
+            startedShowIds = playedShowIds(from: history.map(\.queueKey))
             tourPreferences = try store.getAllTourPreferences()
             progressError = nil
         } catch {
@@ -766,18 +776,18 @@ struct HomeView: View {
         let favs = favoritedArtists
         let dateStr = today
 
-        onThisDateError = false
+        discoverError = false
         nextStopError = false
 
         if !favs.isEmpty {
             do {
-                onThisDateShows = try await OnThisDate.load(favorites: favs, today: dateStr)
+                discoverCandidates = try await Discover.load(favorites: favs, today: dateStr)
             } catch {
-                onThisDateError = true
-                onThisDateShows = []
+                discoverError = true
+                discoverCandidates = []
             }
         } else {
-            onThisDateShows = []
+            discoverCandidates = []
         }
 
         if !favs.isEmpty {

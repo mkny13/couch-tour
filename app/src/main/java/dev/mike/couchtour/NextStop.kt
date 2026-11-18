@@ -11,7 +11,7 @@ import kotlinx.coroutines.coroutineScope
  * Neither backend exposes a "current tour" concept directly. [PeriodRef]s are years (or
  * year ranges on phish.in), not tours, so the only way to find one is to fetch an artist's
  * most recent shows and read [ShowSummary.tourName] off of them. That makes this the same
- * shape of problem [OnThisDate] solves for anniversaries: fetch a bounded slice of each
+ * shape of problem [Discover] solves for top-rated shows: fetch a bounded slice of each
  * favorited artist's catalog through the [MusicSource] seam, fan the artists out
  * concurrently, and cache the network half once a day (D162, D164).
  *
@@ -20,7 +20,7 @@ import kotlinx.coroutines.coroutineScope
  * otherwise expose only its tail, and since this picks the *oldest* show in the tour, a
  * missing older half doesn't degrade the answer, it makes it wrong.
  *
- * Unlike [OnThisDate], the "unplayed" half of the answer is not part of the daily cache —
+ * As in [Discover], the "unplayed" half of the answer is not part of the daily cache —
  * it depends on the `progress` table, which changes the moment a show finishes. [NextStop]
  * caches only [currentTours]' network result; callers apply [oldestUnplayed] live against a
  * fresh set of finished queue keys on every recomposition.
@@ -124,7 +124,7 @@ internal fun focusedCandidates(
  * Fetches every favorited artist's current-tour shows, within [MAX_TOUR_ARTISTS] per backend,
  * taking into account any configured [ArtistTourPreferenceEntity] for defunct or specific-tour tracking.
  * Artists are fanned out concurrently; each artist's own fetch is wrapped in [runCatching] so
- * one backend erroring costs only its own result, matching [OnThisDate]'s degrade-not-fail
+ * one backend erroring costs only its own result, matching [Discover]'s degrade-not-fail
  * shape. [source] is injectable so this runs without a network call in tests.
  */
 suspend fun currentTours(
@@ -230,7 +230,7 @@ internal suspend fun tourFor(
 
 /**
  * The Home screen's entry point: [currentTours] behind a one-entry in-memory cache, the same
- * shape as [OnThisDate] — keyed on the date plus the favorited artists and preferences, since that's exactly
+ * shape as [Discover] — keyed on the date plus the favorited artists and preferences, since that's exactly
  * what the network fetch depends on. The unplayed filter is deliberately *not* part of this
  * cache; apply [oldestUnplayed] to the result against a live finished-keys set instead.
  */

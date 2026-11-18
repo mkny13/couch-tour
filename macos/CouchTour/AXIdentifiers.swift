@@ -14,7 +14,7 @@ public enum AXIdentifiers {
     // Home
     public static let homeInProgress = "home.in_progress"
     public static let homeNextTourStops = "home.next_tour_stops"
-    public static let homeOnThisDate = "home.on_this_date"
+    public static let homeDiscover = "home.discover"
     public static let homeTrackTour = "home.track_tour"
     public static let tourPickerSheet = "tour_picker.sheet"
     public static let homeBrowsePlaylists = "home.browse_playlists"

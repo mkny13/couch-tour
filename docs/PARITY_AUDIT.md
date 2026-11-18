@@ -29,7 +29,7 @@ Each user-facing feature is marked as:
 | **Navigation** | Home Screen & Shelves | Present | Present | `launch-cold-start`, `home-sections-after-relaunch` | Core entry on both; discovery shelves data-driven. |
 | **Navigation** | In Progress / Continue Listening | Present | Present | `home-sections-after-relaunch`, `in-progress-syncs-android-to-mac` | Present on both; syncs via backend. |
 | **Navigation** | Next Tour Stops Card | Present | Present | `next-stop-chip-focus` | macOS uses inline Track tour button (#361); Android uses artist chips (#354, #387). |
-| **Navigation** | On This Date Shelf | Partial (#362) | Present | `home-sections-after-relaunch` | Android fixed in #352 (batch cap 300); macOS parity fix open in #362. |
+| **Navigation** | Discover Shelf | Present | Present | `home-sections-after-relaunch` | Replaced On This Date (#834, D357). |
 | **Navigation** | Surprise Me Action | Present | Present | None | macOS top bar pill; Android heuristic/curated discoverability. |
 | **Navigation** | Browse Public Playlists Entry | Missing | Present | None | Android has "Browse playlists" on Home; macOS lacks public playlists entry (Filed: #428). |
 | **Navigation** | Account Quick Links on Home | Missing | Present | None | Android has "Your phish.in account" section; macOS lacks Home account links (Related: #382). |

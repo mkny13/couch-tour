@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A horizontally scrolling row of cards, with its section header attached.
 ///
-/// Continue Listening and On This Date each built this inline, which is how they ended up with
+/// Continue Listening and On This Date (now Discover) each built this inline, which is how they ended up with
 /// different card padding and the same scroll behaviour written twice.
 struct Shelf<Content: View, Trailing: View>: View {
     let title: String

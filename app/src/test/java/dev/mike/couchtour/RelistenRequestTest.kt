@@ -91,20 +91,19 @@ class RelistenRequestTest {
     }
 
     @Test
-    fun `requests on-date shows by artist slug with month and day query params under v2`() = runBlocking {
-        enqueue("""[{"display_date":"1995-09-29"}]""")
+    fun `requests top-rated shows by artist slug with a limit under v2`() = runBlocking {
+        enqueue("""[{"display_date":"1977-05-08","avg_rating":9.8}]""")
 
-        val shows = RelistenApi.showsOnDate("moe", 9, 29)
+        val shows = RelistenApi.topShows("grateful-dead")
 
         val request = take()
         assertEquals(
-            listOf("api", "v2", "artists", "moe", "shows", "on-date"),
+            listOf("api", "v2", "artists", "grateful-dead", "shows", "top"),
             request.requestUrl!!.pathSegments
         )
-        assertEquals("9", request.requestUrl!!.queryParameter("month"))
-        assertEquals("29", request.requestUrl!!.queryParameter("day"))
+        assertEquals("100", request.requestUrl!!.queryParameter("limit"))
         assertEquals(1, shows.size)
-        assertEquals("1995-09-29", shows[0].displayDate)
+        assertEquals(9.8, shows[0].avgRating, 0.0)
     }
 
     @Test
