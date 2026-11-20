@@ -663,6 +663,18 @@ describe("security audit #475: request-size and field caps", () => {
   });
 });
 
+// Guard each test pins in src/index.ts. Each was mutation-checked (guard disabled -> only that
+// test fails), because these tests pass against the pre-#814 base only if the guard already
+// existed there, so a green run alone proves nothing about them:
+//  - 413 on >500 favoriteArtistChanges      -> the MAX_CHANGES_PER_SYNC check on favoriteArtistChanges
+//  - 400 non-array favoriteArtistChanges    -> the Array.isArray check in parseSyncBody
+//  - 400 artistKey >512 / empty             -> text() max length / the empty-key check in parseFavoriteArtistFields
+//  - 400 negative deletedAt / non-int updatedAt -> optionalNonNegativeInt / int() in parseFavoriteArtistFields
+//  - GET /devices 401                       -> authenticate() check in handleDevicesList
+//  - GET /devices group boundary            -> `WHERE groupId = ?` in handleDevicesList
+//  - DELETE /devices/:id 401 / 404 / 403    -> authenticate() check / missing-target / cross-group check in handleDeviceRevoke
+//  - revoke + immediate 401 + hidden in list -> `UPDATE devices SET revokedAt` and `revokedAt IS NULL` in the list
+//  - purgeOldTombstones favorites           -> favorite_artists DELETE and its meta.changes in rowsPurged
 describe("security audit #804: route authorization, isolation, and favorite artist caps", () => {
   test("/sync rejects favoriteArtistChanges exceeding 500 entries with 413", async () => {
     const { tokenA } = await pairTwoDevices();
