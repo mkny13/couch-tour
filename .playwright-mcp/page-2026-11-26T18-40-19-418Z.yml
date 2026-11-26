@@ -1,0 +1,825 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - link "Skip to content" [ref=e4] [cursor=pointer]:
+      - /url: "#start-of-content"
+    - banner [ref=e9]:
+      - heading "Navigation Menu" [level=2] [ref=e10]
+      - generic [ref=e11]:
+        - link "Homepage" [ref=e14] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e17]:
+          - navigation "Global" [ref=e18]:
+            - list [ref=e19]:
+              - listitem [ref=e20]:
+                - button "Products" [ref=e22] [cursor=pointer]
+              - listitem [ref=e25]:
+                - button "Developers" [ref=e27] [cursor=pointer]
+              - listitem [ref=e30]:
+                - button "Businesses" [ref=e32] [cursor=pointer]
+              - listitem [ref=e35]:
+                - button "Resources" [ref=e37] [cursor=pointer]
+              - listitem [ref=e40]:
+                - link "Pricing" [ref=e41] [cursor=pointer]:
+                  - /url: https://github.com/pricing
+          - generic [ref=e42]:
+            - button "Search or jump to, type / to search" [ref=e44] [cursor=pointer]
+            - generic [ref=e50]:
+              - link "Sign in" [ref=e52] [cursor=pointer]:
+                - /url: /login?return_to=https%3A%2F%2Fgithub.com%2Fmkny13%2Fcouch-tour%2Fpull%2F854
+              - link "Sign up" [ref=e55] [cursor=pointer]:
+                - /url: /signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E%2Fvoltron%2Fpull_requests_fragments%2Fpull_request_layout&source=header-repo&source_repo=mkny13%2Fcouch-tour
+              - button "Appearance settings" [ref=e58] [cursor=pointer]
+  - main [ref=e65]:
+    - generic "Global navigation menu" [ref=e68]:
+      - navigation "Breadcrumbs" [ref=e71]:
+        - list [ref=e72]:
+          - listitem [ref=e73]:
+            - link "mkny13" [ref=e74] [cursor=pointer]:
+              - /url: /mkny13
+          - listitem [ref=e76]:
+            - link "couch-tour" [ref=e77] [cursor=pointer]:
+              - /url: /mkny13/couch-tour
+      - heading "Repository navigation" [level=2] [ref=e80]
+      - navigation "Repository" [ref=e81]:
+        - list [ref=e82]:
+          - listitem [ref=e83]:
+            - link "Code" [ref=e84] [cursor=pointer]:
+              - /url: /mkny13/couch-tour
+          - listitem [ref=e89]:
+            - link "Issues (4)" [ref=e90] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/issues
+              - generic [ref=e95]: Issues
+              - generic [ref=e96]:
+                - generic [aria-hidden] [ref=e97]: "4"
+                - generic [ref=e98]: (4)
+          - listitem [ref=e99]:
+            - link "Pull requests (3)" [ref=e100] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/pulls
+              - generic [ref=e104]: Pull requests
+              - generic [ref=e105]:
+                - generic [aria-hidden] [ref=e106]: "3"
+                - generic [ref=e107]: (3)
+          - listitem [ref=e108]:
+            - link "Actions" [ref=e109] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/actions
+          - listitem [ref=e114]:
+            - link "Projects" [ref=e115] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/projects
+          - listitem [ref=e120]:
+            - link "Security and quality" [ref=e121] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/security
+          - listitem [ref=e126]:
+            - link "Insights" [ref=e127] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/pulse
+    - generic [ref=e138]:
+      - generic [ref=e142]:
+        - generic [ref=e144]:
+          - 'heading "Fix failing dependency update: build(deps-dev): bump the non-major group in /sync with 4 updates - #854" [level=1] [ref=e145]':
+            - text: "Fix failing dependency update: build(deps-dev): bump the non-major group in /sync with 4 updates"
+            - generic [ref=e146]: "- #854"
+          - generic [aria-hidden] [ref=e148]: "#854"
+        - generic [ref=e150]:
+          - generic [ref=e152]:
+            - img "Pull request" [ref=e153]
+            - text: Merged
+          - generic [ref=e156]:
+            - link "mahler-conductor[bot]" [ref=e157] [cursor=pointer]:
+              - /url: /mahler-conductor[bot]
+            - text: merged 1 commit into
+            - generic [ref=e158]:
+              - link "main" [ref=e159] [cursor=pointer]:
+                - /url: /mkny13/couch-tour/tree/main
+              - generic [ref=e160]: from
+              - generic [ref=e161]:
+                - link "mahler/852-fix-failing-dependency-update-build-deps" [ref=e162] [cursor=pointer]:
+                  - /url: /mkny13/couch-tour/tree/mahler/852-fix-failing-dependency-update-build-deps
+                - button "Copy head branch name to clipboard" [ref=e163] [cursor=pointer]
+            - generic [ref=e167]: Nov 26, 2026
+        - navigation "Pull request navigation" [ref=e172]:
+          - generic [ref=e173]:
+            - link "Conversation" [ref=e174] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/pull/854
+            - link "Commits (1)" [ref=e177] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/pull/854/commits
+              - text: Commits
+              - generic [aria-hidden] [ref=e180]: "1"
+              - generic [ref=e181]: (1)
+            - link "Checks" [ref=e182] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/pull/854/checks
+            - link "Files changed" [ref=e185] [cursor=pointer]:
+              - /url: /mkny13/couch-tour/pull/854/files
+      - generic [ref=e192]:
+        - generic [ref=e194]:
+          - heading "Conversation" [level=2] [ref=e195]
+          - generic [ref=e196]:
+            - generic [ref=e197]:
+              - generic [ref=e199]:
+                - link [ref=e200] [cursor=pointer]:
+                  - /url: /apps/mahler-conductor
+                  - img "@mahler-conductor" [ref=e201]
+                - generic [ref=e203]:
+                  - generic [ref=e204]:
+                    - heading "mahler-conductor Bot commented 15 hours ago" [level=3] [ref=e205]:
+                      - generic [ref=e206]:
+                        - strong [ref=e207]:
+                          - link "mahler-conductor" [ref=e208] [cursor=pointer]:
+                            - /url: /apps/mahler-conductor
+                          - generic [ref=e209]: Bot
+                        - text: commented
+                        - link "15 hours ago" [ref=e210] [cursor=pointer]:
+                          - /url: "#issue-6618478753"
+                    - generic [ref=e211]:
+                      - group [ref=e213]:
+                        - button [ref=e214] [cursor=pointer]:
+                          - img "Show options" [ref=e217]
+                      - generic "This user has previously committed to the couch-tour repository." [ref=e220]: Contributor
+                  - generic [ref=e225]:
+                    - paragraph [ref=e226]:
+                      - text: Fixes
+                      - link "#852" [ref=e227] [cursor=pointer]:
+                        - /url: https://github.com/mkny13/couch-tour/issues/852
+                    - paragraph [ref=e228]:
+                      - text: bump non-major devDependencies in /sync with 4 updates to fix failing PR
+                      - link "#849" [ref=e229] [cursor=pointer]:
+                        - /url: https://github.com/mkny13/couch-tour/pull/849
+                    - paragraph [ref=e230]:
+                      - subscript [ref=e231]:
+                        - link "Mahler commands" [ref=e232] [cursor=pointer]:
+                          - /url: https://github.com/mkny13/mahler/blob/main/docs/commands.md
+              - generic [ref=e233]:
+                - generic [ref=e244]:
+                  - link [ref=e247] [cursor=pointer]:
+                    - /url: /mkny13
+                    - img "@mkny13" [ref=e248]
+                  - generic [ref=e249]:
+                    - code [ref=e250]:
+                      - 'link "build(deps-dev): bump the non-major group in /sync with 4 updates" [ref=e251] [cursor=pointer]':
+                        - /url: /mkny13/couch-tour/pull/854/commits/7c0f01fdc52f5f3ecad06d11be13b0b14123726f
+                    - button "Commit message body" [ref=e253] [cursor=pointer]: …
+                  - group [ref=e257]:
+                    - img "10 / 10 checks OK" [ref=e259] [cursor=pointer]
+                  - code [ref=e262]:
+                    - link "7c0f01f" [ref=e263] [cursor=pointer]:
+                      - /url: /mkny13/couch-tour/pull/854/commits/7c0f01fdc52f5f3ecad06d11be13b0b14123726f
+                - generic [ref=e265]:
+                  - link [ref=e267] [cursor=pointer]:
+                    - /url: /apps/mahler-conductor
+                    - img "@mahler-conductor" [ref=e268]
+                  - generic [ref=e270]:
+                    - generic [ref=e271]:
+                      - heading "mahler-conductor Bot commented 15 hours ago" [level=3] [ref=e272]:
+                        - generic [ref=e273]:
+                          - strong [ref=e274]:
+                            - link "mahler-conductor" [ref=e275] [cursor=pointer]:
+                              - /url: /apps/mahler-conductor
+                            - generic [ref=e276]: Bot
+                          - text: commented
+                          - link "15 hours ago" [ref=e277] [cursor=pointer]:
+                            - /url: "#issuecomment-7181291147"
+                      - generic [ref=e278]:
+                        - group [ref=e280]:
+                          - button [ref=e281] [cursor=pointer]:
+                            - img "Show options" [ref=e284]
+                        - generic [ref=e286]:
+                          - generic "This user has previously committed to the couch-tour repository." [ref=e287]: Contributor
+                          - generic "This user is the author of this pull request." [ref=e289]: Author
+                    - table [ref=e293]:
+                      - rowgroup [ref=e294]:
+                        - row [ref=e295]:
+                          - cell [ref=e296]:
+                            - paragraph [ref=e297]:
+                              - strong [ref=e298]:
+                                - text: Conductor Dependency-Vetting Gate Evidence (head
+                                - code [ref=e299]: 7c0f01fdc52f5f3ecad06d11be13b0b14123726f
+                                - text: )
+                              - text: ":"
+                            - list [ref=e300]:
+                              - listitem [ref=e301]:
+                                - text: "npm @cloudflare/kv-asset-handler@0.5.1: first published 2019-09-19T23:45:00.441000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workers-sdk.git" [ref=e302] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workers-sdk.git
+                                - text: ; advisories none
+                              - listitem [ref=e303]:
+                                - text: "npm @cloudflare/vitest-plugin@1.9.0: first published 2026-08-20T14:33:16.826000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workers-sdk.git" [ref=e304] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workers-sdk.git
+                                - text: ; advisories none
+                              - listitem [ref=e305]:
+                                - text: "npm @cloudflare/workerd-darwin-64@1.20261119.1: first published 2022-09-27T12:49:16.209000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workerd.git" [ref=e306] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workerd.git
+                                - text: ; advisories none
+                              - listitem [ref=e307]:
+                                - text: "npm @cloudflare/workerd-darwin-arm64@1.20261119.1: first published 2022-09-27T12:48:22.270000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workerd.git" [ref=e308] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workerd.git
+                                - text: ; advisories none
+                              - listitem [ref=e309]:
+                                - text: "npm @cloudflare/workerd-linux-64@1.20261119.1: first published 2022-09-27T12:51:23.029000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workerd.git" [ref=e310] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workerd.git
+                                - text: ; advisories none
+                              - listitem [ref=e311]:
+                                - text: "npm @cloudflare/workerd-linux-arm64@1.20261119.1: first published 2022-09-27T12:52:28.166000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workerd.git" [ref=e312] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workerd.git
+                                - text: ; advisories none
+                              - listitem [ref=e313]:
+                                - text: "npm @cloudflare/workerd-windows-64@1.20261119.1: first published 2023-04-05T11:12:47.840000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workerd.git" [ref=e314] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workerd.git
+                                - text: ; advisories none
+                              - listitem [ref=e315]:
+                                - text: "npm @cloudflare/workers-types@5.20261123.1: first published 2019-06-13T18:03:22.687000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workerd.git" [ref=e316] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workerd.git
+                                - text: ; advisories none
+                              - listitem [ref=e317]:
+                                - text: "npm @cloudflare/workers-utils@0.56.0: first published 2025-10-30T09:47:51.589000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workers-sdk.git" [ref=e318] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workers-sdk.git
+                                - text: ; advisories none
+                              - listitem [ref=e319]:
+                                - text: "npm @emnapi/core@2.0.0-beta.2: first published 2023-02-14T07:41:45.725000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/toyobayashi/emnapi.git" [ref=e320] [cursor=pointer]:
+                                  - /url: https://github.com/toyobayashi/emnapi.git
+                                - text: ; advisories none
+                              - listitem [ref=e321]:
+                                - text: "npm @emnapi/runtime@2.0.0-beta.2: first published 2023-02-14T07:41:41.699000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/toyobayashi/emnapi.git" [ref=e322] [cursor=pointer]:
+                                  - /url: https://github.com/toyobayashi/emnapi.git
+                                - text: ; advisories none
+                              - listitem [ref=e323]:
+                                - text: "npm @emnapi/wasi-threads@2.2.0: first published 2024-05-19T06:29:20.038000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/toyobayashi/emnapi.git" [ref=e324] [cursor=pointer]:
+                                  - /url: https://github.com/toyobayashi/emnapi.git
+                                - text: ; advisories none
+                              - listitem [ref=e325]:
+                                - text: "npm @napi-rs/wasm-runtime@1.2.6: first published 2024-01-16T16:01:50.482000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/napi-rs/napi-rs.git" [ref=e326] [cursor=pointer]:
+                                  - /url: https://github.com/napi-rs/napi-rs.git
+                                - text: ; advisories none
+                              - listitem [ref=e327]:
+                                - text: "npm @rolldown/binding-android-arm-eabi@1.2.19: first published 2024-03-24T23:30:20.056000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e328] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e329]:
+                                - text: "npm @rolldown/binding-android-arm64@1.2.19: first published 2024-03-24T23:30:23.162000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e330] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e331]:
+                                - text: "npm @rolldown/binding-darwin-arm64@1.2.19: first published 2024-03-24T23:30:26.136000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e332] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e333]:
+                                - text: "npm @rolldown/binding-darwin-x64@1.2.19: first published 2024-03-24T23:30:29.168000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e334] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e335]:
+                                - text: "npm @rolldown/binding-freebsd-x64@1.2.19: first published 2024-03-24T23:30:32.695000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e336] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e337]:
+                                - text: "npm @rolldown/binding-linux-arm-gnueabihf@1.2.19: first published 2024-03-24T23:30:37.746000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e338] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e339]:
+                                - text: "npm @rolldown/binding-linux-arm64-gnu@1.2.19: first published 2024-03-24T23:30:41.617000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e340] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e341]:
+                                - text: "npm @rolldown/binding-linux-arm64-musl@1.2.19: first published 2024-03-24T23:30:45.906000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e342] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e343]:
+                                - text: "npm @rolldown/binding-linux-ppc64-gnu@1.2.19: first published 2026-02-28T04:14:27.850000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e344] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e345]:
+                                - text: "npm @rolldown/binding-linux-s390x-gnu@1.2.19: first published 2026-02-28T04:15:16.898000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e346] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e347]:
+                                - text: "npm @rolldown/binding-linux-x64-gnu@1.2.19: first published 2024-03-24T23:30:49.013000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e348] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e349]:
+                                - text: "npm @rolldown/binding-linux-x64-musl@1.2.19: first published 2024-03-24T23:30:51.854000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e350] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e351]:
+                                - text: "npm @rolldown/binding-openharmony-arm64@1.2.19: first published 2025-08-10T03:17:39.213000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e352] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e353]:
+                                - text: "npm @rolldown/binding-wasm32-wasi@1.2.19: first published 2024-04-16T15:58:30.639000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e354] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e355]:
+                                - text: "npm @rolldown/binding-win32-arm64-msvc@1.2.19: first published 2024-03-24T23:30:55.012000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e356] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e357]:
+                                - text: "npm @rolldown/binding-win32-x64-msvc@1.2.19: first published 2024-03-24T23:31:01.186000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e358] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e359]:
+                                - text: "npm @rolldown/pluginutils@1.1.1: first published 2025-05-09T14:34:07.682000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/plugins.git" [ref=e360] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/plugins.git
+                                - text: ; advisories none
+                              - listitem [ref=e361]:
+                                - text: "npm @tybys/wasm-util@0.10.5: first published 2022-10-28T14:07:53.902000+00:00; publisher toyobayashi; source git+"
+                                - link "https://github.com/toyobayashi/wasm-util.git" [ref=e362] [cursor=pointer]:
+                                  - /url: https://github.com/toyobayashi/wasm-util.git
+                                - text: ; advisories none
+                              - listitem [ref=e363]:
+                                - text: "npm @types/node@18.19.130: first published 2016-05-17T18:26:38.670000+00:00; publisher types; source"
+                                - link "https://github.com/DefinitelyTyped/DefinitelyTyped.git" [ref=e364] [cursor=pointer]:
+                                  - /url: https://github.com/DefinitelyTyped/DefinitelyTyped.git
+                                - text: ; advisories none
+                              - listitem [ref=e365]:
+                                - text: "npm @types/node@26.6.6: first published 2016-05-17T18:26:38.670000+00:00; publisher types; source"
+                                - link "https://github.com/DefinitelyTyped/DefinitelyTyped.git" [ref=e366] [cursor=pointer]:
+                                  - /url: https://github.com/DefinitelyTyped/DefinitelyTyped.git
+                                - text: ; advisories none
+                              - listitem [ref=e367]:
+                                - text: "npm @types/node-fetch@2.6.13: first published 2016-08-02T16:01:42.230000+00:00; publisher types; source"
+                                - link "https://github.com/DefinitelyTyped/DefinitelyTyped.git" [ref=e368] [cursor=pointer]:
+                                  - /url: https://github.com/DefinitelyTyped/DefinitelyTyped.git
+                                - text: ; advisories none
+                              - listitem [ref=e369]:
+                                - text: "npm @types/yargs@17.0.24: first published 2016-05-17T19:19:15.034000+00:00; publisher types; source"
+                                - link "https://github.com/DefinitelyTyped/DefinitelyTyped.git" [ref=e370] [cursor=pointer]:
+                                  - /url: https://github.com/DefinitelyTyped/DefinitelyTyped.git
+                                - text: ; advisories none
+                              - listitem [ref=e371]:
+                                - text: "npm @types/yargs-parser@21.0.3: first published 2018-10-11T22:56:04.152000+00:00; publisher types; source"
+                                - link "https://github.com/DefinitelyTyped/DefinitelyTyped.git" [ref=e372] [cursor=pointer]:
+                                  - /url: https://github.com/DefinitelyTyped/DefinitelyTyped.git
+                                - text: ; advisories none
+                              - listitem [ref=e373]:
+                                - text: "npm @vitest/mocker@5.1.1: first published 2024-09-09T15:13:17.490000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/vitest-dev/vitest.git" [ref=e374] [cursor=pointer]:
+                                  - /url: https://github.com/vitest-dev/vitest.git
+                                - text: ; advisories none
+                              - listitem [ref=e375]:
+                                - text: "npm @vitest/spy@5.1.1: first published 2023-01-09T12:33:15.277000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/vitest-dev/vitest.git" [ref=e376] [cursor=pointer]:
+                                  - /url: https://github.com/vitest-dev/vitest.git
+                                - text: ; advisories none
+                              - listitem [ref=e377]:
+                                - text: "npm abort-controller@3.0.0: first published 2017-09-29T04:07:35.761000+00:00; publisher mysticatea; source git+"
+                                - link "https://github.com/mysticatea/abort-controller.git" [ref=e378] [cursor=pointer]:
+                                  - /url: https://github.com/mysticatea/abort-controller.git
+                                - text: ; advisories none
+                              - listitem [ref=e379]: "npm agentkeepalive@4.6.0: first published 2012-08-24T13:22:15.355000+00:00; publisher fengmk2; source git://github.com/node-modules/agentkeepalive.git; advisories none"
+                              - listitem [ref=e380]:
+                                - text: "npm asynckit@0.4.0: first published 2016-05-18T23:25:43.646000+00:00; publisher alexindigo; source git+"
+                                - link "https://github.com/alexindigo/asynckit.git" [ref=e381] [cursor=pointer]:
+                                  - /url: https://github.com/alexindigo/asynckit.git
+                                - text: ; advisories none
+                              - listitem [ref=e382]:
+                                - text: "npm call-bind-apply-helpers@1.0.2: first published 2024-12-06T00:34:12.433000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/ljharb/call-bind-apply-helpers.git" [ref=e383] [cursor=pointer]:
+                                  - /url: https://github.com/ljharb/call-bind-apply-helpers.git
+                                - text: ; advisories none
+                              - listitem [ref=e384]:
+                                - text: "npm chalk@5.3.0: first published 2013-08-03T00:21:56.318000+00:00; publisher sindresorhus; source git+"
+                                - link "https://github.com/chalk/chalk.git" [ref=e385] [cursor=pointer]:
+                                  - /url: https://github.com/chalk/chalk.git
+                                - text: ; advisories none
+                              - listitem [ref=e386]:
+                                - text: "npm cloudflare@5.2.0: first published 2013-01-07T22:04:11.935000+00:00; publisher jacobbednarz; source"
+                                - link "https://github.com/cloudflare/cloudflare-typescript.git" [ref=e387] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/cloudflare-typescript.git
+                                - text: ; advisories none
+                              - listitem [ref=e388]: "npm combined-stream@1.0.8: first published 2011-05-24T06:36:14.531000+00:00; publisher alexindigo; source git://github.com/felixge/node-combined-stream.git; advisories none"
+                              - listitem [ref=e389]: "npm delayed-stream@1.0.0: first published 2011-05-22T13:50:32.615000+00:00; publisher apechimp; source git://github.com/felixge/node-delayed-stream.git; advisories none"
+                              - listitem [ref=e390]:
+                                - text: "npm devtools-protocol@0.0.1182435: first published 2017-07-12T21:47:43.447000+00:00; publisher google-wombot; source git+"
+                                - link "https://github.com/ChromeDevTools/devtools-protocol.git" [ref=e391] [cursor=pointer]:
+                                  - /url: https://github.com/ChromeDevTools/devtools-protocol.git
+                                - text: ; advisories none
+                              - listitem [ref=e392]: "npm dotenv@16.3.1: first published 2013-07-05T18:29:15.210000+00:00; publisher motdotla; source git://github.com/motdotla/dotenv.git; advisories none"
+                              - listitem [ref=e393]:
+                                - text: "npm dunder-proto@1.0.1: first published 2024-12-06T16:23:40.693000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/es-shims/dunder-proto.git" [ref=e394] [cursor=pointer]:
+                                  - /url: https://github.com/es-shims/dunder-proto.git
+                                - text: ; advisories none
+                              - listitem [ref=e395]:
+                                - text: "npm es-define-property@1.0.1: first published 2024-02-13T02:31:54.213000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/ljharb/es-define-property.git" [ref=e396] [cursor=pointer]:
+                                  - /url: https://github.com/ljharb/es-define-property.git
+                                - text: ; advisories none
+                              - listitem [ref=e397]:
+                                - text: "npm es-errors@1.3.0: first published 2024-02-03T17:47:05.536000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/ljharb/es-errors.git" [ref=e398] [cursor=pointer]:
+                                  - /url: https://github.com/ljharb/es-errors.git
+                                - text: ; advisories none
+                              - listitem [ref=e399]:
+                                - text: "npm es-object-atoms@1.1.2: first published 2024-03-17T06:19:03.175000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/ljharb/es-object-atoms.git" [ref=e400] [cursor=pointer]:
+                                  - /url: https://github.com/ljharb/es-object-atoms.git
+                                - text: ; advisories none
+                              - listitem [ref=e401]:
+                                - text: "npm es-set-tostringtag@2.1.0: first published 2022-12-21T17:47:03.806000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/es-shims/es-set-tostringtag.git" [ref=e402] [cursor=pointer]:
+                                  - /url: https://github.com/es-shims/es-set-tostringtag.git
+                                - text: ; advisories none
+                              - listitem [ref=e403]:
+                                - text: "npm event-target-shim@5.0.1: first published 2015-02-22T03:01:19.979000+00:00; publisher mysticatea; source git+"
+                                - link "https://github.com/mysticatea/event-target-shim.git" [ref=e404] [cursor=pointer]:
+                                  - /url: https://github.com/mysticatea/event-target-shim.git
+                                - text: ; advisories none
+                              - listitem [ref=e405]: "npm form-data@4.0.6: first published 2011-05-16T14:58:21.870000+00:00; publisher ljharb; source git://github.com/form-data/form-data.git; advisories none"
+                              - listitem [ref=e406]:
+                                - text: "npm form-data-encoder@1.7.2: first published 2021-05-12T20:06:06.400000+00:00; publisher octetstream; source git+"
+                                - link "https://github.com/octet-stream/form-data-encoder.git" [ref=e407] [cursor=pointer]:
+                                  - /url: https://github.com/octet-stream/form-data-encoder.git
+                                - text: ; advisories none
+                              - listitem [ref=e408]:
+                                - text: "npm formdata-node@4.4.1: first published 2017-10-17T22:24:50.379000+00:00; publisher octetstream; source git+"
+                                - link "https://github.com/octet-stream/form-data.git" [ref=e409] [cursor=pointer]:
+                                  - /url: https://github.com/octet-stream/form-data.git
+                                - text: ; advisories none
+                              - listitem [ref=e410]:
+                                - text: "npm function-bind@1.1.2: first published 2013-06-16T23:25:41.232000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/Raynos/function-bind.git" [ref=e411] [cursor=pointer]:
+                                  - /url: https://github.com/Raynos/function-bind.git
+                                - text: ; advisories none
+                              - listitem [ref=e412]:
+                                - text: "npm get-intrinsic@1.3.0: first published 2020-10-30T15:03:39.549000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/ljharb/get-intrinsic.git" [ref=e413] [cursor=pointer]:
+                                  - /url: https://github.com/ljharb/get-intrinsic.git
+                                - text: ; advisories none
+                              - listitem [ref=e414]:
+                                - text: "npm get-proto@1.0.1: first published 2025-01-02T06:35:32.797000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/ljharb/get-proto.git" [ref=e415] [cursor=pointer]:
+                                  - /url: https://github.com/ljharb/get-proto.git
+                                - text: ; advisories none
+                              - listitem [ref=e416]:
+                                - text: "npm gopd@1.2.0: first published 2022-11-02T05:36:15.165000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/ljharb/gopd.git" [ref=e417] [cursor=pointer]:
+                                  - /url: https://github.com/ljharb/gopd.git
+                                - text: ; advisories none
+                              - listitem [ref=e418]: "npm has-symbols@1.1.0: first published 2016-09-19T23:46:36.740000+00:00; publisher ljharb; source git://github.com/inspect-js/has-symbols.git; advisories none"
+                              - listitem [ref=e419]:
+                                - text: "npm has-tostringtag@1.0.2: first published 2021-08-05T14:59:41.280000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/inspect-js/has-tostringtag.git" [ref=e420] [cursor=pointer]:
+                                  - /url: https://github.com/inspect-js/has-tostringtag.git
+                                - text: ; advisories none
+                              - listitem [ref=e421]:
+                                - text: "npm hasown@2.0.4: first published 2014-09-03T06:38:13.950000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/inspect-js/hasOwn.git" [ref=e422] [cursor=pointer]:
+                                  - /url: https://github.com/inspect-js/hasOwn.git
+                                - text: ; advisories none
+                              - listitem [ref=e423]:
+                                - text: "npm humanize-ms@1.2.1: first published 2014-08-14T07:53:31.200000+00:00; publisher dead_horse; source git+"
+                                - link "https://github.com/node-modules/humanize-ms.git" [ref=e424] [cursor=pointer]:
+                                  - /url: https://github.com/node-modules/humanize-ms.git
+                                - text: ; advisories none
+                              - listitem [ref=e425]:
+                                - text: "npm math-intrinsics@1.1.0: first published 2024-12-11T21:17:21.383000+00:00; publisher ljharb; source git+"
+                                - link "https://github.com/es-shims/math-intrinsics.git" [ref=e426] [cursor=pointer]:
+                                  - /url: https://github.com/es-shims/math-intrinsics.git
+                                - text: ; advisories none
+                              - listitem [ref=e427]:
+                                - text: "npm mime-db@1.52.0: first published 2014-08-14T22:17:35.560000+00:00; publisher dougwilson; source git+"
+                                - link "https://github.com/jshttp/mime-db.git" [ref=e428] [cursor=pointer]:
+                                  - /url: https://github.com/jshttp/mime-db.git
+                                - text: ; advisories none
+                              - listitem [ref=e429]:
+                                - text: "npm mime-types@2.1.35: first published 2014-05-02T15:54:00.885000+00:00; publisher dougwilson; source git+"
+                                - link "https://github.com/jshttp/mime-types.git" [ref=e430] [cursor=pointer]:
+                                  - /url: https://github.com/jshttp/mime-types.git
+                                - text: ; advisories none
+                              - listitem [ref=e431]:
+                                - text: npm
+                                - link "miniflare@5.20261119.0-beta" [ref=e432] [cursor=pointer]:
+                                  - /url: mailto:miniflare@5.20261119.0-beta
+                                - text: ": first published 2021-05-20T10:48:38.655000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workers-sdk.git" [ref=e433] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workers-sdk.git
+                                - text: ; advisories none
+                              - listitem [ref=e434]:
+                                - text: "npm ms@2.1.3: first published 2011-12-21T19:38:08.664000+00:00; publisher styfle; source git+"
+                                - link "https://github.com/vercel/ms.git" [ref=e435] [cursor=pointer]:
+                                  - /url: https://github.com/vercel/ms.git
+                                - text: ; advisories none
+                              - listitem [ref=e436]:
+                                - text: "npm node-domexception@1.0.0: first published 2021-05-27T20:04:26.305000+00:00; publisher endless; source git+"
+                                - link "https://github.com/jimmywarting/node-domexception.git" [ref=e437] [cursor=pointer]:
+                                  - /url: https://github.com/jimmywarting/node-domexception.git
+                                - text: ; advisories none
+                              - listitem [ref=e438]:
+                                - text: "npm node-fetch@2.7.0: first published 2015-01-27T13:17:06.232000+00:00; publisher node-fetch-bot; source git+"
+                                - link "https://github.com/bitinn/node-fetch.git" [ref=e439] [cursor=pointer]:
+                                  - /url: https://github.com/bitinn/node-fetch.git
+                                - text: ; advisories none
+                              - listitem [ref=e440]:
+                                - text: "npm postcss@8.5.33: first published 2013-11-04T19:57:14.218000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/postcss/postcss.git" [ref=e441] [cursor=pointer]:
+                                  - /url: https://github.com/postcss/postcss.git
+                                - text: ; advisories none
+                              - listitem [ref=e442]:
+                                - text: "npm rolldown@1.2.19: first published 2017-01-01T22:00:15.147000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/rolldown/rolldown.git" [ref=e443] [cursor=pointer]:
+                                  - /url: https://github.com/rolldown/rolldown.git
+                                - text: ; advisories none
+                              - listitem [ref=e444]:
+                                - text: "npm source-map-js@1.2.4: first published 2021-02-07T21:53:50.190000+00:00; publisher 7rulnik; source git+"
+                                - link "https://github.com/7rulnik/source-map-js.git" [ref=e445] [cursor=pointer]:
+                                  - /url: https://github.com/7rulnik/source-map-js.git
+                                - text: ; advisories none
+                              - listitem [ref=e446]: "npm tinybench@6.2.4: first published 2022-04-29T11:34:05.073000+00:00; publisher GitHub Actions; source tinylibs/tinybench; advisories none"
+                              - listitem [ref=e447]:
+                                - text: "npm tr46@0.0.3: first published 2015-06-06T07:11:07.303000+00:00; publisher sebmaster; source git+"
+                                - link "https://github.com/Sebmaster/tr46.js.git" [ref=e448] [cursor=pointer]:
+                                  - /url: https://github.com/Sebmaster/tr46.js.git
+                                - text: ; advisories none
+                              - listitem [ref=e449]:
+                                - text: "npm undici-types@5.26.5: first published 2023-09-19T15:09:35.360000+00:00; publisher ethan_arrowood; source git+"
+                                - link "https://github.com/nodejs/undici.git" [ref=e450] [cursor=pointer]:
+                                  - /url: https://github.com/nodejs/undici.git
+                                - text: ; advisories none
+                              - listitem [ref=e451]:
+                                - text: "npm undici-types@8.9.0: first published 2023-09-19T15:09:35.360000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/nodejs/undici.git" [ref=e452] [cursor=pointer]:
+                                  - /url: https://github.com/nodejs/undici.git
+                                - text: ; advisories none
+                              - listitem [ref=e453]:
+                                - text: "npm vite@8.3.8: first published 2020-04-21T05:05:15.476000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/vitejs/vite.git" [ref=e454] [cursor=pointer]:
+                                  - /url: https://github.com/vitejs/vite.git
+                                - text: ; advisories none
+                              - listitem [ref=e455]:
+                                - text: "npm vitest@5.1.1: first published 2021-12-03T13:34:59.705000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/vitest-dev/vitest.git" [ref=e456] [cursor=pointer]:
+                                  - /url: https://github.com/vitest-dev/vitest.git
+                                - text: ; advisories none
+                              - listitem [ref=e457]:
+                                - text: "npm web-streams-polyfill@4.0.0-beta.3: first published 2016-03-02T18:29:50.194000+00:00; publisher mattiasbuelens; source git+"
+                                - link "https://github.com/MattiasBuelens/web-streams-polyfill.git" [ref=e458] [cursor=pointer]:
+                                  - /url: https://github.com/MattiasBuelens/web-streams-polyfill.git
+                                - text: ; advisories none
+                              - listitem [ref=e459]:
+                                - text: "npm webidl-conversions@3.0.1: first published 2014-08-15T20:52:19.528000+00:00; publisher sebmaster; source git+"
+                                - link "https://github.com/jsdom/webidl-conversions.git" [ref=e460] [cursor=pointer]:
+                                  - /url: https://github.com/jsdom/webidl-conversions.git
+                                - text: ; advisories none
+                              - listitem [ref=e461]:
+                                - text: "npm whatwg-url@5.0.0: first published 2015-06-04T13:09:58.924000+00:00; publisher domenic; source git+"
+                                - link "https://github.com/jsdom/whatwg-url.git" [ref=e462] [cursor=pointer]:
+                                  - /url: https://github.com/jsdom/whatwg-url.git
+                                - text: ; advisories none
+                              - listitem [ref=e463]:
+                                - text: "npm workerd@1.20261119.1: first published 2022-09-15T15:04:41.709000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workerd.git" [ref=e464] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workerd.git
+                                - text: ; advisories none
+                              - listitem [ref=e465]:
+                                - text: "npm wrangler@4.166.0: first published 2012-06-19T04:01:30.671000+00:00; publisher GitHub Actions; source git+"
+                                - link "https://github.com/cloudflare/workers-sdk.git" [ref=e466] [cursor=pointer]:
+                                  - /url: https://github.com/cloudflare/workers-sdk.git
+                                - text: ; advisories none
+                            - paragraph [ref=e467]:
+                              - subscript [ref=e468]:
+                                - link "Mahler commands" [ref=e469] [cursor=pointer]:
+                                  - /url: https://github.com/mkny13/mahler/blob/main/docs/commands.md
+                - generic [ref=e471]:
+                  - link [ref=e473] [cursor=pointer]:
+                    - /url: /apps/mahler-conductor
+                    - img "@mahler-conductor" [ref=e474]
+                  - generic [ref=e476]:
+                    - generic [ref=e477]:
+                      - heading "mahler-conductor Bot commented 15 hours ago" [level=3] [ref=e478]:
+                        - generic [ref=e479]:
+                          - strong [ref=e480]:
+                            - link "mahler-conductor" [ref=e481] [cursor=pointer]:
+                              - /url: /apps/mahler-conductor
+                            - generic [ref=e482]: Bot
+                          - text: commented
+                          - link "15 hours ago" [ref=e483] [cursor=pointer]:
+                            - /url: "#issuecomment-7181429174"
+                      - generic [ref=e484]:
+                        - group [ref=e486]:
+                          - button [ref=e487] [cursor=pointer]:
+                            - img "Show options" [ref=e490]
+                        - generic [ref=e492]:
+                          - generic "This user has previously committed to the couch-tour repository." [ref=e493]: Contributor
+                          - generic "This user is the author of this pull request." [ref=e495]: Author
+                    - table [ref=e499]:
+                      - rowgroup [ref=e500]:
+                        - row [ref=e501]:
+                          - cell [ref=e502]:
+                            - paragraph [ref=e503]:
+                              - strong [ref=e504]: Review
+                              - text: "— copilot found no blocking issues. Notes (not required for merge):"
+                            - list [ref=e505]:
+                              - listitem [ref=e506]:
+                                - text: "sync/package.json:19: [follow-up/spec] PR"
+                                - 'link "Fix failing dependency update: build(deps-dev): bump the non-major group in /sync with 4 updates #854" [ref=e510] [cursor=pointer]':
+                                  - /url: https://github.com/mkny13/couch-tour/pull/854
+                                - text: references
+                                - 'link "build(deps-dev): bump the non-major group in /sync with 4 updates #849" [ref=e514] [cursor=pointer]':
+                                  - /url: https://github.com/mkny13/couch-tour/pull/849
+                                - text: but does not state that it supersedes it. — The explicit PR-description acceptance criterion remains unmet, although the commit states Supersedes
+                                - 'link "build(deps-dev): bump the non-major group in /sync with 4 updates #849" [ref=e518] [cursor=pointer]':
+                                  - /url: https://github.com/mkny13/couch-tour/pull/849
+                                - text: .
+                            - paragraph [ref=e519]:
+                              - subscript [ref=e520]:
+                                - link "Mahler commands" [ref=e521] [cursor=pointer]:
+                                  - /url: https://github.com/mkny13/mahler/blob/main/docs/commands.md
+                - generic [ref=e523]:
+                  - link [ref=e525] [cursor=pointer]:
+                    - /url: /apps/mahler-conductor
+                    - img "@mahler-conductor" [ref=e526]
+                  - generic [ref=e528]:
+                    - generic [ref=e529]:
+                      - heading "mahler-conductor Bot commented 15 hours ago" [level=3] [ref=e530]:
+                        - generic [ref=e531]:
+                          - strong [ref=e532]:
+                            - link "mahler-conductor" [ref=e533] [cursor=pointer]:
+                              - /url: /apps/mahler-conductor
+                            - generic [ref=e534]: Bot
+                          - text: commented
+                          - link "15 hours ago" [ref=e535] [cursor=pointer]:
+                            - /url: "#issuecomment-7181463206"
+                      - generic [ref=e536]:
+                        - group [ref=e538]:
+                          - button [ref=e539] [cursor=pointer]:
+                            - img "Show options" [ref=e542]
+                        - generic [ref=e544]:
+                          - generic "This user has previously committed to the couch-tour repository." [ref=e545]: Contributor
+                          - generic "This user is the author of this pull request." [ref=e547]: Author
+                    - table [ref=e551]:
+                      - rowgroup [ref=e552]:
+                        - row [ref=e553]:
+                          - cell [ref=e554]:
+                            - paragraph [ref=e555]:
+                              - text: "Review follow-up:"
+                              - link "#855" [ref=e556] [cursor=pointer]:
+                                - /url: https://github.com/mkny13/couch-tour/issues/855
+                            - paragraph [ref=e557]:
+                              - text: "sync/package.json:19: [follow-up/spec] PR"
+                              - link "#854" [ref=e558] [cursor=pointer]:
+                                - /url: https://github.com/mkny13/couch-tour/pull/854
+                              - text: references
+                              - link "#849" [ref=e559] [cursor=pointer]:
+                                - /url: https://github.com/mkny13/couch-tour/pull/849
+                              - text: but does not state that it supersedes it. — The explicit PR-description acceptance criterion remains unmet, although the commit states Supersedes
+                              - link "#849" [ref=e560] [cursor=pointer]:
+                                - /url: https://github.com/mkny13/couch-tour/pull/849
+                              - text: .
+                            - paragraph [ref=e561]: "Classified as nonblocking: no substantiated merge blocker in this finding; tracked independently to keep review scope bounded."
+                            - paragraph [ref=e562]:
+                              - subscript [ref=e563]:
+                                - link "Mahler commands" [ref=e564] [cursor=pointer]:
+                                  - /url: https://github.com/mkny13/mahler/blob/main/docs/commands.md
+                - generic [ref=e565]:
+                  - generic [ref=e570]:
+                    - generic [ref=e571]:
+                      - link [ref=e572] [cursor=pointer]:
+                        - /url: /apps/mahler-conductor
+                        - img "@mahler-conductor" [ref=e573]
+                      - link "mahler-conductor" [ref=e574] [cursor=pointer]:
+                        - /url: /apps/mahler-conductor
+                      - generic [ref=e575]: Bot
+                      - text: mentioned this pull request
+                      - link "15 hours ago" [ref=e576] [cursor=pointer]:
+                        - /url: "#ref-issue-6618656472"
+                    - generic [ref=e577]:
+                      - 'link "Review follow-up: sync/package.json:19 — PR #854 references #849 but does not state that it supersedes it. #855" [ref=e579] [cursor=pointer]':
+                        - /url: /mkny13/couch-tour/issues/855
+                      - 'generic "Status: Open" [ref=e581]': Open
+                    - generic [ref=e585]: 1 task
+                  - generic [ref=e595]:
+                    - button "View details" [ref=e596] [cursor=pointer]
+                    - generic [ref=e597]:
+                      - link [ref=e599] [cursor=pointer]:
+                        - /url: /apps/mahler-conductor
+                        - img "@mahler-conductor" [ref=e600]
+                      - generic [ref=e601]:
+                        - link "mahler-conductor" [ref=e602] [cursor=pointer]:
+                          - /url: /apps/mahler-conductor
+                        - generic [ref=e603]: Bot
+                        - text: merged commit
+                        - link [ref=e604] [cursor=pointer]:
+                          - /url: /mkny13/couch-tour/commit/2abfee849bd53740e584de44799067da228f8665
+                          - code [ref=e605]: 2abfee8
+                        - text: into
+                        - generic [ref=e606]: main
+                        - link "15 hours ago" [ref=e608] [cursor=pointer]:
+                          - /url: https://github.com/mkny13/couch-tour/pull/854#event-37324422887
+                        - generic [ref=e609]: 10 checks passed
+                  - generic [ref=e616]:
+                    - link [ref=e618] [cursor=pointer]:
+                      - /url: /apps/mahler-conductor
+                      - img "@mahler-conductor" [ref=e619]
+                    - generic [ref=e621]:
+                      - link "mahler-conductor" [ref=e622] [cursor=pointer]:
+                        - /url: /apps/mahler-conductor
+                      - generic [ref=e623]: Bot
+                      - text: deleted the
+                      - generic [ref=e624]: mahler/852-fix-failing-dependency-update-build-deps
+                      - text: branch
+                      - link "15 hours ago" [ref=e626] [cursor=pointer]:
+                        - /url: "#event-37324425114"
+                  - generic [ref=e631]:
+                    - generic [ref=e632]: This was referenced 15 hours ago
+                    - generic [ref=e633]:
+                      - 'link "Fix failing dependency update: build(deps-dev): bump the non-major group in /sync with 4 updates #852" [ref=e635] [cursor=pointer]':
+                        - /url: /mkny13/couch-tour/issues/852
+                      - 'generic "Status: Closed" [ref=e637]': Closed
+                    - generic [ref=e641]:
+                      - 'link "build(deps-dev): bump the non-major group in /sync with 4 updates #849" [ref=e643] [cursor=pointer]':
+                        - /url: /mkny13/couch-tour/pull/849
+                      - 'generic "Status: Closed" [ref=e645]': Closed
+            - generic [ref=e651]:
+              - link "Sign up for free" [ref=e652] [cursor=pointer]:
+                - /url: /join?source=comment-repo
+              - strong [ref=e653]: to join this conversation on GitHub
+              - text: . Already have an account?
+              - link "Sign in to comment" [ref=e654] [cursor=pointer]:
+                - /url: /login?return_to=https%3A%2F%2Fgithub.com%2Fmkny13%2Fcouch-tour%2Fpull%2F854
+        - generic [ref=e658]:
+          - form "Select reviewers" [ref=e660]:
+            - heading "Reviewers" [level=3] [ref=e661]
+            - text: No reviews
+          - form "Select assignees" [ref=e663]:
+            - heading "Assignees" [level=3] [ref=e664]
+            - text: No one assigned
+          - generic [ref=e665]:
+            - heading "Labels" [level=3] [ref=e666]
+            - generic [ref=e667]: None yet
+          - form "Select projects" [ref=e669]:
+            - heading "Projects" [level=3] [ref=e670]
+            - text: None yet
+          - form "Select milestones" [ref=e672]:
+            - heading "Milestone" [level=3] [ref=e673]
+            - text: No milestone
+          - form "Link issues" [ref=e679]:
+            - heading "Development" [level=3] [ref=e680]
+            - paragraph [ref=e681]: Successfully merging this pull request may close these issues.
+            - link [ref=e683] [cursor=pointer]:
+              - /url: https://github.com/mkny13/couch-tour/issues/852
+              - img "Closed issue" [ref=e684]
+              - text: "Fix failing dependency update: build(deps-dev): bump the non-major group in /sync with 4 updates"
+          - generic [ref=e688]:
+            - heading "1 participant" [level=3] [ref=e689]
+            - link [ref=e691] [cursor=pointer]:
+              - /url: /mkny13
+              - img "@mkny13" [ref=e692]
+  - contentinfo [ref=e693]:
+    - heading "Footer" [level=2] [ref=e694]
+    - generic [ref=e695]:
+      - generic [ref=e696]:
+        - link "GitHub Homepage" [ref=e697] [cursor=pointer]:
+          - /url: https://github.com
+        - generic [ref=e700]: © 2026 GitHub, Inc.
+      - navigation "Footer" [ref=e701]:
+        - heading "Footer navigation" [level=3] [ref=e702]
+        - list "Footer navigation" [ref=e703]:
+          - listitem [ref=e704]:
+            - link "Terms" [ref=e705] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+          - listitem [ref=e706]:
+            - link "Privacy" [ref=e707] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+          - listitem [ref=e708]:
+            - link "Security" [ref=e709] [cursor=pointer]:
+              - /url: https://github.com/security
+          - listitem [ref=e710]:
+            - link "Status" [ref=e711] [cursor=pointer]:
+              - /url: https://www.githubstatus.com/
+          - listitem [ref=e712]:
+            - link "Community" [ref=e713] [cursor=pointer]:
+              - /url: https://github.community/
+          - listitem [ref=e714]:
+            - link "Docs" [ref=e715] [cursor=pointer]:
+              - /url: https://docs.github.com/
+          - listitem [ref=e716]:
+            - link "Contact" [ref=e717] [cursor=pointer]:
+              - /url: https://support.github.com?tags=dotcom-footer
+          - listitem [ref=e718]:
+            - button "Manage cookies" [ref=e720] [cursor=pointer]
+          - listitem [ref=e721]:
+            - button "Do not share my personal information" [ref=e723] [cursor=pointer]
